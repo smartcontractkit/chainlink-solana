@@ -124,6 +124,10 @@ func (q *queryArgs) withIsBackfilled(isBackfilled bool) *queryArgs {
 	return q.withField("is_backfilled", isBackfilled)
 }
 
+func (q *queryArgs) withIncludeReverted(includeReverted bool) *queryArgs {
+	return q.withField("include_reverted", includeReverted)
+}
+
 func logsQuery(clause string) string {
 	// TODO: using DISTINCT in a query is less efficient but required because of duplicate logs coming from multipler filters
 	return fmt.Sprintf(`SELECT DISTINCT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)

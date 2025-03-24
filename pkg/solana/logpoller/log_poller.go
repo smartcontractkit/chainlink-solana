@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -148,27 +148,43 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 
 	var logs []Log
 	for filter := range matchingFilters {
+		var revertErr *string
+		if blockData.Error != nil {
+			if !filter.IncludeReverted {
+				continue
+			}
+			revertErr = new(string)
+			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+				*revertErr = fmt.Sprintf("%v", blockData.Error)
+				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+			} else {
+				*revertErr = string(j)
+			}
+		}
+
 		var logIndex int64
 		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
 		if err != nil {
 			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
 			return err
 		}
-		if blockData.SlotNumber == math.MaxInt64 {
+		if blockData.SlotNumber > math.MaxInt64 {
 			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
 			lp.lggr.Critical(err.Error())
 			return err
 		}
+
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       logIndex,
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
+			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
+			Error:          revertErr,
 		}
 
 		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)

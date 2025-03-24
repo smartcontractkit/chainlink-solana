@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -115,4 +116,10 @@ func InjectAddressModifier(inputModifications, outputModifications commoncodec.M
 			outputModifications[i] = addrModifierConfig
 		}
 	}
+}
+
+func GetRandomPubKey(t *testing.T) solana.PublicKey {
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	return privKey.PublicKey()
 }

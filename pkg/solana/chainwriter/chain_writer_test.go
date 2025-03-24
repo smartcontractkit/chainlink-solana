@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -21,9 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -33,6 +35,7 @@ import (
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type Arguments struct {
@@ -42,7 +45,7 @@ type Arguments struct {
 }
 
 var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipRouterIDL = idl.FetchCCIPRouterIDL()
+var ccipCommonIDL = idl.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {
@@ -85,7 +88,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	}
 
 	// setup pda account with inner field lookup
-	programID := chainwriter.GetRandomPubKey(t)
+	programID := utils.GetRandomPubKey(t)
 	seed2 := []byte("seed2")
 	pda2 := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
 	// mock data account response from program
@@ -124,8 +127,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	}
 
 	t.Run("resolve addresses from different types of lookups", func(t *testing.T) {
-		constantAccountMeta.PublicKey = chainwriter.GetRandomPubKey(t)
-		accountLookupMeta.PublicKey = chainwriter.GetRandomPubKey(t)
+		constantAccountMeta.PublicKey = utils.GetRandomPubKey(t)
+		accountLookupMeta.PublicKey = utils.GetRandomPubKey(t)
 		// correlates to DerivedTable index in account lookup config
 		derivedTablePdaLookupMeta.PublicKey = storedPubKeys[0]
 
@@ -410,17 +413,17 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)
 
-	programID := chainwriter.GetRandomPubKey(t)
+	programID := utils.GetRandomPubKey(t)
 	seed1 := []byte("seed1")
 	pda1 := mustFindPdaProgramAddress(t, [][]byte{seed1}, programID)
 	// mock data account response from program
 	lookupTablePubkey := mockDataAccountLookupTable(t, rw, pda1)
 	// mock fetch lookup table addresses call
-	storedPubKey := chainwriter.GetRandomPubKey(t)
+	storedPubKey := utils.GetRandomPubKey(t)
 	unusedKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, append([]solana.PublicKey{storedPubKey}, unusedKeys...))
 
-	unusedProgramID := chainwriter.GetRandomPubKey(t)
+	unusedProgramID := utils.GetRandomPubKey(t)
 	seed2 := []byte("seed2")
 	unusedPda := mustFindPdaProgramAddress(t, [][]byte{seed2}, unusedProgramID)
 	// mock data account response from program
@@ -430,9 +433,9 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	mockFetchLookupTableAddresses(t, rw, unusedLookupTable, unusedKeys)
 
 	// mock static lookup table calls
-	staticLookupTablePubkey1 := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey1 := utils.GetRandomPubKey(t)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey1, chainwriter.CreateTestPubKeys(t, 2))
-	staticLookupTablePubkey2 := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey2 := utils.GetRandomPubKey(t)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey2, chainwriter.CreateTestPubKeys(t, 2))
 
 	lookupTableConfig := chainwriter.LookupTables{
@@ -529,7 +532,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{
 			{AccountConstant: &chainwriter.AccountConstant{
 				Name:       "Constant",
-				Address:    chainwriter.GetRandomPubKey(t).String(),
+				Address:    utils.GetRandomPubKey(t).String(),
 				IsSigner:   false,
 				IsWritable: false,
 			}},
@@ -568,8 +571,8 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
-	account1 := chainwriter.GetRandomPubKey(t)
-	account2 := chainwriter.GetRandomPubKey(t)
+	account1 := utils.GetRandomPubKey(t)
+	account2 := utils.GetRandomPubKey(t)
 
 	seed1 := []byte("seed1")
 	account3 := mustFindPdaProgramAddress(t, [][]byte{seed1}, solana.SystemProgramID)
@@ -585,7 +588,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	mockFetchLookupTableAddresses(t, rw, derivedLookupTablePubkey, derivedLookupKeys)
 
 	// mock static lookup table call
-	staticLookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	staticLookupTablePubkey := utils.GetRandomPubKey(t)
 	staticLookupKeys := chainwriter.CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
@@ -755,12 +758,14 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	require.NoError(t, err)
 	admin := adminPk.PublicKey()
 
-	offrampAddr := chainwriter.GetRandomPubKey(t)
-	routerAddr := chainwriter.GetRandomPubKey(t)
-	destTokenAddr := chainwriter.GetRandomPubKey(t)
+	offrampAddr := utils.GetRandomPubKey(t)
+	routerAddr := utils.GetRandomPubKey(t)
+	destTokenAddr := utils.GetRandomPubKey(t)
+	feeQuoterAddr := utils.GetRandomPubKey(t)
 
 	poolKeys := []solana.PublicKey{destTokenAddr}
-	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 3)...)
+	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 6)...)
+	tokenAdminRegistryAddr := poolKeys[1]
 
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
@@ -812,8 +817,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 											InternalField: chainwriter.InternalField{
 												TypeName: "TokenAdminRegistry",
 												Location: "LookupTable",
-												// TokenAdminRegistry is in the router program so need to provide the router's IDL
-												IDL: ccipRouterIDL,
+												// TokenAdminRegistry is defined in the ccip common module so need to provide common's IDL
+												IDL: ccipCommonIDL,
 											},
 										},
 									},
@@ -821,36 +826,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 								},
 							},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc1",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc2",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "testAcc3",
-								Address: chainwriter.GetRandomPubKey(t).String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr1",
-								Address: poolKeys[0].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr2",
-								Address: poolKeys[1].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr3",
-								Address: poolKeys[2].String(),
-							}},
-							{AccountConstant: &chainwriter.AccountConstant{
-								Name:    "poolAddr4",
-								Address: poolKeys[3].String(),
-							}},
-						},
+						Accounts: generateExecuteMandatoryAccounts(t),
 					},
 					ccipconsts.MethodCommit: {
 						FromAddress: admin.String(),
@@ -868,15 +844,15 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc1",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc2",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:    "testAcc3",
-								Address: chainwriter.GetRandomPubKey(t).String(),
+								Address: utils.GetRandomPubKey(t).String(),
 							}},
 						},
 					},
@@ -911,7 +887,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
 		mockFetchRouterAddress(t, rw, routerAddr, offrampAddr)
+		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddr)
 		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
+		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
 
 		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
@@ -925,14 +903,31 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			tokenIndexes := *decoded.TokenIndexes
 
 			require.Len(t, tokenIndexes, 1)
-			require.Equal(t, uint8(3), tokenIndexes[0])
+			require.Equal(t, uint8(0), tokenIndexes[0]) // no user accounts at the start of remaining accounts
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
+		// TODO: re-enable once Sanitize failure is fixed
+		// }), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig"), mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+		// 	opt1, ok := args[5].(txmutils.SetTxConfig)
+		// 	require.True(t, ok)
+		//
+		// 	opt2, ok := args[6].(txmutils.SetTxConfig)
+		// 	require.True(t, ok)
+		//
+		// 	txConfig := &txmutils.TxConfig{}
+		// 	opt1(txConfig)
+		// 	opt2(txConfig)
+		//
+		// 	require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
+		// 	require.Equal(t, chainwriter.StaticCuOverhead+700, txConfig.ComputeUnitLimit)
+		// }).Once()
 
 		// stripped back report just for purposes of example
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
 			Messages: []ccipocr3.Message{
 				{
+					Receiver: utils.GetRandomPubKey(t).Bytes(),
+					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: ccipocr3.ChainSelector(1)},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
@@ -946,12 +941,20 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		encodedReport, err := json.Marshal(abstractReport)
 		require.NoError(t, err)
 
-		args := ReportPreTransform{
+		args := ccipsolana.SVMExecCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        encodedReport,
 			Info: ccipocr3.ExecuteReportInfo{
 				MerkleRoots:     []ccipocr3.MerkleRootChain{},
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},
+			},
+			ExtraData: ccipsolana.ExtraDataDecoded{
+				ExtraArgsDecoded: map[string]any{
+					"computeUnits": uint32(500),
+				},
+				DestExecDataDecoded: []map[string]any{
+					{"destGasAmount": uint32(200)},
+				},
 			},
 		}
 
@@ -1004,6 +1007,15 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			require.Len(t, tx.Message.Instructions[0].Accounts, 2)
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
+		// TODO: re-enable once Sanitize failure is fixed
+		// }), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+		// 	opt, ok := args[5].(txmutils.SetTxConfig)
+		// 	require.True(t, ok)
+		// 	txConfig := &txmutils.TxConfig{}
+		// 	opt(txConfig)
+
+		// 	require.Equal(t, true, txConfig.EstimateComputeUnitLimit)
+		// }).Once()
 
 		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodCommit, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
@@ -1123,11 +1135,11 @@ func mustFindPdaProgramAddress(t *testing.T, seeds [][]byte, programID solana.Pu
 }
 
 func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
+	lookupTablePubkey := utils.GetRandomPubKey(t)
 	dataAccount := chainwriter.DataAccount{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 	}
 	dataAccountBytes := mustBorshEncodeStruct(t, dataAccount)
@@ -1141,11 +1153,11 @@ func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda 
 }
 
 func mockTokenAdminRegistryLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
-	lookupTablePubkey := chainwriter.GetRandomPubKey(t)
-	tokenAdminRegistry := ccip_router.TokenAdminRegistry{
+	lookupTablePubkey := utils.GetRandomPubKey(t)
+	tokenAdminRegistry := ccip_common.TokenAdminRegistry{
 		Version:              1,
-		Administrator:        chainwriter.GetRandomPubKey(t),
-		PendingAdministrator: chainwriter.GetRandomPubKey(t),
+		Administrator:        utils.GetRandomPubKey(t),
+		PendingAdministrator: utils.GetRandomPubKey(t),
 		LookupTable:          lookupTablePubkey,
 		WritableIndexes:      [2]ag_binary.Uint128{},
 	}
@@ -1184,4 +1196,18 @@ func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAd
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(referenceAddressesBytes)},
 	}, nil)
+}
+
+func generateExecuteMandatoryAccounts(t *testing.T) []chainwriter.Lookup {
+	mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+	accountLookups := make([]chainwriter.Lookup, 0, len(mandatoryAccounts))
+	for i, acc := range mandatoryAccounts {
+		accountLookups = append(accountLookups,
+			chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+				Name:    fmt.Sprintf("testAcc%d", i),
+				Address: acc.String(),
+			}},
+		)
+	}
+	return accountLookups
 }

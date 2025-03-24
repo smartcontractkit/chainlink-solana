@@ -732,10 +732,10 @@ type chainReaderInterfaceTester struct {
 }
 
 func (r *chainReaderInterfaceTester) GetAccountBytes(i int) []byte {
-	account := [20]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	account := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2}
 
-	account[i%20] += byte(i)
-	account[(i+3)%20] += byte(i + 3)
+	account[i%32] += byte(i)
+	account[(i+3)%32] += byte(i + 3)
 
 	pk := solana.PublicKeyFromBytes(account[:])
 

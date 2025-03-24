@@ -358,7 +358,7 @@ func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.Bound
 				}
 			}
 
-			return nil
+			continue
 		}
 
 		if err := s.addAddressResponseHardCoderModifier(bindings[idx].Name, bindings[idx].Address); err != nil {

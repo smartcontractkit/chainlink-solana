@@ -144,6 +144,12 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			returnVal: batchCall.ReturnVal,
 		}
 
+		// HACK: workaround for RouterGetWrappedNative
+		if batchCall.ReadName == ccipconsts.MethodNameRouterGetWrappedNative {
+			*(results[idx].returnVal.(*[]byte)) = solana.WrappedSol.Bytes()
+			continue
+		}
+
 		if data[idx] == nil || data[idx].Data == nil || data[idx].Data.GetBinary() == nil || len(data[idx].Data.GetBinary()) == 0 {
 			if batchCall.ErrOnMissingAccountData {
 				results[idx].err = ErrMissingAccountData
