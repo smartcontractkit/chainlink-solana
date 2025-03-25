@@ -68,7 +68,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		},
 	)
 	if err != nil {
-		oldestAvailableSlot, err2 := j.client.GetFirstAvailableSlot(ctx)
+		oldestAvailableSlot, err2 := j.client.GetFirstAvailableBlock(ctx)
 		if err2 != nil {
 			return fmt.Errorf("failed to get first available slot: %w", err2)
 		}

@@ -85,12 +85,12 @@ func (_c *RPCClient_GetBlockWithOpts_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// GetFirstAvailableSlot provides a mock function with given fields: ctx
-func (_m *RPCClient) GetFirstAvailableSlot(ctx context.Context) (uint64, error) {
+// GetFirstAvailableBlock provides a mock function with given fields: ctx
+func (_m *RPCClient) GetFirstAvailableBlock(ctx context.Context) (uint64, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetFirstAvailableSlot")
+		panic("no return value specified for GetFirstAvailableBlock")
 	}
 
 	var r0 uint64
@@ -113,30 +113,30 @@ func (_m *RPCClient) GetFirstAvailableSlot(ctx context.Context) (uint64, error) 
 	return r0, r1
 }
 
-// RPCClient_GetFirstAvailableSlot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFirstAvailableSlot'
-type RPCClient_GetFirstAvailableSlot_Call struct {
+// RPCClient_GetFirstAvailableBlock_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFirstAvailableBlock'
+type RPCClient_GetFirstAvailableBlock_Call struct {
 	*mock.Call
 }
 
-// GetFirstAvailableSlot is a helper method to define mock.On call
+// GetFirstAvailableBlock is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *RPCClient_Expecter) GetFirstAvailableSlot(ctx interface{}) *RPCClient_GetFirstAvailableSlot_Call {
-	return &RPCClient_GetFirstAvailableSlot_Call{Call: _e.mock.On("GetFirstAvailableSlot", ctx)}
+func (_e *RPCClient_Expecter) GetFirstAvailableBlock(ctx interface{}) *RPCClient_GetFirstAvailableBlock_Call {
+	return &RPCClient_GetFirstAvailableBlock_Call{Call: _e.mock.On("GetFirstAvailableBlock", ctx)}
 }
 
-func (_c *RPCClient_GetFirstAvailableSlot_Call) Run(run func(ctx context.Context)) *RPCClient_GetFirstAvailableSlot_Call {
+func (_c *RPCClient_GetFirstAvailableBlock_Call) Run(run func(ctx context.Context)) *RPCClient_GetFirstAvailableBlock_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context))
 	})
 	return _c
 }
 
-func (_c *RPCClient_GetFirstAvailableSlot_Call) Return(_a0 uint64, _a1 error) *RPCClient_GetFirstAvailableSlot_Call {
+func (_c *RPCClient_GetFirstAvailableBlock_Call) Return(_a0 uint64, _a1 error) *RPCClient_GetFirstAvailableBlock_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *RPCClient_GetFirstAvailableSlot_Call) RunAndReturn(run func(context.Context) (uint64, error)) *RPCClient_GetFirstAvailableSlot_Call {
+func (_c *RPCClient_GetFirstAvailableBlock_Call) RunAndReturn(run func(context.Context) (uint64, error)) *RPCClient_GetFirstAvailableBlock_Call {
 	_c.Call.Return(run)
 	return _c
 }
