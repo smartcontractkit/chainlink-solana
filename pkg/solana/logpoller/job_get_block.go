@@ -85,6 +85,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 			case j.blocks <- result:
 				close(j.done)
 			}
+			return nil
 		}
 		return err
 	}

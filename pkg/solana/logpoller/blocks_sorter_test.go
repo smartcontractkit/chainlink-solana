@@ -4,7 +4,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -38,10 +37,7 @@ func TestBlocksSorter(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for _, b := range []uint64{2, 10, 1, 3} {
-				inCh <- Block{
-					SlotNumber: b,
-					BlockHash:  &solana.Hash{},
-				}
+				inCh <- Block{SlotNumber: b}
 			}
 			close(inCh)
 		}()

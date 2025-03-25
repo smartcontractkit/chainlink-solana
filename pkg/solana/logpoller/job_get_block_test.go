@@ -30,10 +30,31 @@ func TestGetBlockJob(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
 		expectedError := errors.New("rpc failed")
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
-		client.EXPECT().GetFirstAvailableSlot(mock.Anything).Return(0, expectedError).Once()
+		client.EXPECT().GetFirstAvailableSlot(mock.Anything).Return(0, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
 		err := job.Run(tests.Context(t))
 		require.ErrorIs(t, err, expectedError)
+	})
+	t.Run("Success if fails to get block because of pruning", func(t *testing.T) {
+		client := mocks.NewRPCClient(t)
+		lggr := logger.Sugared(logger.Test(t))
+		expectedError := errors.New("rpc failed")
+		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
+		client.EXPECT().GetFirstAvailableSlot(mock.Anything).Return(slotNumber+1, nil).Once()
+		job := newGetBlockJob(nil, client, make(chan Block, 1), lggr, slotNumber)
+		err := job.Run(tests.Context(t))
+		require.NoError(t, err)
+		result := <-job.blocks
+		require.Equal(t, Block{
+			SlotNumber: slotNumber,
+			BlockHash:  nil,
+			Events:     []ProgramEvent{},
+		}, result)
+		select {
+		case <-job.Done():
+		default:
+			t.Fatal("expected job to be done")
+		}
 	})
 	t.Run("Error if block height is not present", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)

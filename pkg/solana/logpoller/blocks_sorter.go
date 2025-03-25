@@ -67,10 +67,10 @@ func (p *blocksSorter) readBlocks(ctx context.Context) {
 				close(p.receivedNewBlock) // trigger last flush of ready blocks
 				return
 			}
-			if block.BlockHash == nil {
-				// block is not available
-				continue
-			}
+			//if block.BlockHash == nil {
+			// block is not available
+			//	continue
+			//}
 
 			p.mu.Lock()
 			p.readyBlocks[block.SlotNumber] = block
@@ -107,21 +107,18 @@ func (p *blocksSorter) writeOrderedBlocks(ctx context.Context) {
 func (p *blocksSorter) readNextReadyBlock() *Block {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for {
-		element := p.queue.Front()
-		if element == nil {
-			return nil
-		}
-
-		slotNumber := element.Value.(uint64)
-		block, ok := p.readyBlocks[slotNumber]
-		p.queue.Remove(element)
-		if !ok {
-			// block couldn't be fetched from the RPC. Skip it
-			continue
-		}
-		return &block
+	element := p.queue.Front()
+	if element == nil {
+		return nil
 	}
+
+	slotNumber := element.Value.(uint64)
+	block, ok := p.readyBlocks[slotNumber]
+	if !ok {
+		return nil
+	}
+	p.queue.Remove(element)
+	return &block
 }
 
 // flushReadyBlocks - sends all blocks in order defined by queue to the consumer.
