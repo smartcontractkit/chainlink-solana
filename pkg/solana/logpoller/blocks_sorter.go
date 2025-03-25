@@ -113,7 +113,7 @@ func (p *blocksSorter) readNextReadyBlock() *Block {
 	if !ok {
 		return nil
 	}
-	
+
 	p.queue.Remove(element)
 	return &block
 }
