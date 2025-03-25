@@ -39,7 +39,7 @@ var (
 		"event_sig", "tx_hash", "data", "error"}
 
 	filterFields = [...]string{"id", "name", "address", "event_name", "event_sig", "starting_block",
-		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled"}
+		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled", "include_reverted"}
 )
 
 type IndexedValueComparator struct {
