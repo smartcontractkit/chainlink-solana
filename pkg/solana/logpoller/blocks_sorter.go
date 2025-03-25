@@ -67,10 +67,6 @@ func (p *blocksSorter) readBlocks(ctx context.Context) {
 				close(p.receivedNewBlock) // trigger last flush of ready blocks
 				return
 			}
-			//if block.BlockHash == nil {
-			// block is not available
-			//	continue
-			//}
 
 			p.mu.Lock()
 			p.readyBlocks[block.SlotNumber] = block
@@ -117,6 +113,7 @@ func (p *blocksSorter) readNextReadyBlock() *Block {
 	if !ok {
 		return nil
 	}
+	
 	p.queue.Remove(element)
 	return &block
 }
