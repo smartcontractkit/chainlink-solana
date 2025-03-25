@@ -39,6 +39,7 @@ type Reader interface {
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
 	GetLatestBlockHeight(ctx context.Context) (uint64, error)
