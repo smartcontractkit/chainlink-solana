@@ -15,12 +15,14 @@ const (
 	DefaultLogPollerRetention = 30 * 24 * time.Hour
 	DefaultMaxLogsKept        = 0
 	DefaultStartingBlock      = 0
+	DefaultIncludeReverted    = false
 )
 
 type PollingFilter struct {
-	Retention     *time.Duration `json:"retention,omitempty"`     // maximum amount of time to retain logs
-	MaxLogsKept   *int64         `json:"maxLogsKept,omitempty"`   // maximum number of logs to retain ( 0 = unlimited )
-	StartingBlock *int64         `json:"startingBlock,omitempty"` // which block to start looking for logs
+	Retention       *time.Duration `json:"retention,omitempty"`     // maximum amount of time to retain logs
+	MaxLogsKept     *int64         `json:"maxLogsKept,omitempty"`   // maximum number of logs to retain ( 0 = unlimited )
+	StartingBlock   *int64         `json:"startingBlock,omitempty"` // which block to start looking for logs
+	IncludeReverted *bool          `json:"includeReverted"`         // whether to include logs emitted by transactions which failed while executing on chain
 }
 
 func (f PollingFilter) GetRetention() time.Duration {
@@ -45,6 +47,13 @@ func (f PollingFilter) GetStartingBlock() int64 {
 	}
 
 	return *f.StartingBlock
+}
+
+func (f PollingFilter) GetIncludeReverted() bool {
+	if f.IncludeReverted == nil {
+		return DefaultIncludeReverted
+	}
+	return *f.IncludeReverted
 }
 
 type ContractReader struct {

@@ -118,8 +118,24 @@ pub mod contract_reader_interface {
         data.idx = test_idx;
         data.account = account.key();
         data.bump = ctx.bumps.data;
+
         Ok(())
     }
+
+    pub fn create_event_and_fail(_ctx: Context<Events>) -> Result<()> {
+        emit!(StateChangedEvent {
+            new_state: "Pending".to_string()
+        });
+
+        // Intentionally fail the transaction after emitting the event
+        Err(ErrorCode::IntentionalFailure.into())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Events<'info> {
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -474,4 +490,15 @@ pub struct TimestampedPackedU224 {
 pub enum TokenAccountError {
     #[msg("Uninitialized token account")]
     UninitializedTokenAccount,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("This error is intentionally triggered for testing purposes.")]
+    IntentionalFailure,
+}
+
+#[event]
+pub struct StateChangedEvent {
+    pub new_state: String,
 }

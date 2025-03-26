@@ -64,7 +64,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		var signatures []*rpc.TransactionSignature
 		for _, slot := range []uint64{21, 20, 11, 10, 9} {
 			if slot == 20 {
-				// must be skipped due to error
+				// must be included even though tx has failed
 				signatures = append(signatures, &rpc.TransactionSignature{Slot: 19, Err: errors.New("transaction failed")})
 			}
 			if slot == 10 {
@@ -81,7 +81,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		err := job.Run(tests.Context(t))
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
-		require.Equal(t, []uint64{20, 11, 10}, actualSlots)
+		require.Equal(t, []uint64{19, 20, 11, 10, 10}, actualSlots)
 	})
 	t.Run("If slot range may have more signatures, schedules a new job", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)

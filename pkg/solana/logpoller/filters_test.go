@@ -225,6 +225,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		filter.StartingBlock++
 		filter.Retention++
 		filter.MaxLogsKept++
+		filter.IncludeReverted = true
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 		err = fs.RegisterFilter(tests.Context(t), filter)
 		require.NoError(t, err)
