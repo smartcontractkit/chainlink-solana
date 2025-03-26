@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -82,19 +83,18 @@ type Service struct {
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
-	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &Service{
-		orm:     orm,
-		client:  cl,
-		filters: newFilters(lggr, orm),
+		orm:    orm,
+		client: cl,
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
-		Name:  "LogPollerService",
+		Name:  "LogPoller",
 		Start: lp.start,
-		NewSubServices: func(l logger.Logger) []services.Service {
+		NewSubServices: func(lggr logger.Logger) []services.Service {
+			lp.filters = newFilters(lggr, orm)
 			loader := NewEncodedLogCollector(cl, lggr)
 			lp.loader = loader
 			return []services.Service{loader}

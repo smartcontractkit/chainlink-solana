@@ -36,7 +36,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	client := mocks.NewRPCClient(t)
 	ctx := tests.Context(t)
 
-	collector := logpoller.NewEncodedLogCollector(client, logger.TestSugared(t))
+	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t))
 
 	require.NoError(t, collector.Start(ctx))
 	t.Cleanup(func() {

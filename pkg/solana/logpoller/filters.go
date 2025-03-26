@@ -37,10 +37,10 @@ type filters struct {
 	discriminatorExtractor codec.DiscriminatorExtractor
 }
 
-func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
+func newFilters(lggr logger.Logger, orm ORM) *filters {
 	return &filters{
 		orm:                    orm,
-		lggr:                   lggr,
+		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]Decoder),
 		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
 	}
