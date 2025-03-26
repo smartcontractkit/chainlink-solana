@@ -34,6 +34,7 @@ import (
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
@@ -904,22 +905,20 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			require.Len(t, tokenIndexes, 1)
 			require.Equal(t, uint8(0), tokenIndexes[0]) // no user accounts at the start of remaining accounts
 			return true
-		}), &txID, mock.Anything).Return(nil).Once()
-		// TODO: re-enable once Sanitize failure is fixed
-		// }), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig"), mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
-		// 	opt1, ok := args[5].(txmutils.SetTxConfig)
-		// 	require.True(t, ok)
-		//
-		// 	opt2, ok := args[6].(txmutils.SetTxConfig)
-		// 	require.True(t, ok)
-		//
-		// 	txConfig := &txmutils.TxConfig{}
-		// 	opt1(txConfig)
-		// 	opt2(txConfig)
-		//
-		// 	require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
-		// 	require.Equal(t, chainwriter.StaticCuOverhead+700, txConfig.ComputeUnitLimit)
-		// }).Once()
+		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig"), mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+			opt1, ok := args[5].(txmutils.SetTxConfig)
+			require.True(t, ok)
+
+			opt2, ok := args[6].(txmutils.SetTxConfig)
+			require.True(t, ok)
+
+			txConfig := &txmutils.TxConfig{}
+			opt1(txConfig)
+			opt2(txConfig)
+
+			require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
+			require.Equal(t, chainwriter.StaticCuOverhead+700, txConfig.ComputeUnitLimit)
+		}).Once()
 
 		// stripped back report just for purposes of example
 		abstractReport := ccipocr3.ExecutePluginReportSingleChain{
@@ -971,19 +970,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		recentBlockHash := solana.Hash{}
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 
-		type CommitArgs struct {
-			ReportContext [2][32]byte
-			Report        []byte
-			Rs            [][32]byte
-			Ss            [][32]byte
-			RawVs         [32]byte
-			Info          ccipocr3.CommitReportInfo
-		}
-
 		txID := uuid.NewString()
 
-		// TODO: Replace with actual type from ccipocr3
-		args := CommitArgs{
+		args := ccipsolana.SVMCommitCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        []byte{0x01, 0x02},
 			Rs:            [][32]byte{{0x01, 0x02}},
@@ -1005,16 +994,14 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			// The CCIPCommit ArgsTransform should remove the last account since no price updates were provided in the report
 			require.Len(t, tx.Message.Instructions[0].Accounts, 2)
 			return true
-		}), &txID, mock.Anything).Return(nil).Once()
-		// TODO: re-enable once Sanitize failure is fixed
-		// }), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
-		// 	opt, ok := args[5].(txmutils.SetTxConfig)
-		// 	require.True(t, ok)
-		// 	txConfig := &txmutils.TxConfig{}
-		// 	opt(txConfig)
+		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
+			opt, ok := args[5].(txmutils.SetTxConfig)
+			require.True(t, ok)
+			txConfig := &txmutils.TxConfig{}
+			opt(txConfig)
 
-		// 	require.Equal(t, true, txConfig.EstimateComputeUnitLimit)
-		// }).Once()
+			require.Equal(t, true, txConfig.EstimateComputeUnitLimit)
+		}).Once()
 
 		submitErr := cw.SubmitTransaction(ctx, ccipconsts.ContractNameOffRamp, ccipconsts.MethodCommit, args, txID, offrampAddr.String(), nil, nil)
 		require.NoError(t, submitErr)
