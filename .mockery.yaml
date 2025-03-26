@@ -25,7 +25,6 @@ packages:
       Config:
         config:
           filename: config.go
-          case: underscore
   github.com/smartcontractkit/chainlink-solana/pkg/solana/fees:
     interfaces:
       Estimator:
@@ -36,7 +35,6 @@ packages:
       SimpleKeystore:
         config:
           filename: simple_keystore.go
-          case: underscore
       TxManager:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
     interfaces:
