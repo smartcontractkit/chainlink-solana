@@ -95,7 +95,7 @@ func (r *Relayer) HealthReport() map[string]error {
 	return hp
 }
 
-func (r *Relayer) ReplayStatus() relaytypes.ReplayStatus {
+func (r *Relayer) ReplayStatus() *relaytypes.ReplayStatus {
 	return r.chain.LogPoller().ReplayStatus()
 }
 

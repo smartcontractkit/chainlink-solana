@@ -445,7 +445,7 @@ func Test_LogPoller_Replay(t *testing.T) {
 		lp.LogPoller.replay.status = types.ReplayStatusComplete
 		assert.False(t, lp.LogPoller.checkForReplayRequest())
 		assertReplayInfo(400, types.ReplayStatusComplete)
-		assert.Equal(t, types.ReplayStatusComplete, lp.LogPoller.ReplayStatus())
+		assert.Equal(t, types.ReplayStatusComplete, lp.LogPoller.replay.status)
 	})
 
 	t.Run("checkForReplayRequest should enter pending state if there is a new request", func(t *testing.T) {
@@ -453,7 +453,7 @@ func Test_LogPoller_Replay(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = 18
 		assert.True(t, lp.LogPoller.checkForReplayRequest())
 		assertReplayInfo(18, types.ReplayStatusPending)
-		assert.Equal(t, types.ReplayStatusPending, lp.LogPoller.ReplayStatus())
+		assert.Equal(t, types.ReplayStatusPending, lp.LogPoller.replay.status)
 	})
 
 	t.Run("replayComplete enters ReplayComplete state", func(t *testing.T) {

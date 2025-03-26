@@ -45,7 +45,7 @@ type LogPoller interface {
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
 	Replay(fromBlock int64)
-	ReplayStatus() types.ReplayStatus
+	ReplayStatus() *types.ReplayStatus
 }
 
 type Chain interface {
@@ -378,9 +378,10 @@ func (c *chain) GetChainStatus(ctx context.Context) (types.ChainStatus, error) {
 		return types.ChainStatus{}, err
 	}
 	return types.ChainStatus{
-		ID:      c.id,
-		Enabled: c.cfg.IsEnabled(),
-		Config:  toml,
+		ID:           c.id,
+		Enabled:      c.cfg.IsEnabled(),
+		Config:       toml,
+		ReplayStatus: c.lp.ReplayStatus(),
 	}, nil
 }
 
