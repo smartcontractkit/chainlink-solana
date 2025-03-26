@@ -7,9 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
-	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -133,6 +131,12 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
+const (
+	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+)
+
 func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
 	v.chainIDVerifiedLock.RLock()
 	if v.chainIDVerified {
@@ -153,13 +157,26 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// check chainID matches expected chainID
-	expectedChainID := strings.ToLower(v.expectedChainID)
 	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.chainID == "localnet" && !slices.Contains([]string{"mainnet", "testnet", "devnet"}, expectedChainID)
-	if !ignore && v.chainID != expectedChainID {
-		v.chainIDVerified = false
-		return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", expectedChainID, v.chainID, v.nodeURL)
+	ignore := v.chainID == "localnet"
+
+	if !ignore {
+		var matches bool
+		switch v.chainID {
+		case "devnet":
+			matches = DevnetGenesisHash == v.expectedChainID
+		case "testnet":
+			matches = TestnetGenesisHash == v.expectedChainID
+		case "mainnet":
+			matches = MainnetGenesisHash == v.expectedChainID
+		default:
+			matches = v.chainID == v.expectedChainID
+		}
+
+		if !matches {
+			v.chainIDVerified = false
+			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+		}
 	}
 
 	v.chainIDVerified = true

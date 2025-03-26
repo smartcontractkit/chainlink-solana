@@ -21,12 +21,6 @@ import (
 // If the requested block contains a transaction with a higher version, an error will be returned.
 const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
 
-const (
-	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
-	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
-	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
-)
-
 type ReaderWriter interface {
 	Writer
 	Reader
@@ -239,20 +233,7 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 		return "", err
 	}
 	hash := v.(solana.Hash)
-
-	var network string
-	switch hash.String() {
-	case DevnetGenesisHash:
-		network = "devnet"
-	case TestnetGenesisHash:
-		network = "testnet"
-	case MainnetGenesisHash:
-		network = "mainnet"
-	default:
-		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
-		network = "localnet"
-	}
-	return mn.StringID(network), nil
+	return mn.StringID(hash.String()), nil
 }
 
 func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
