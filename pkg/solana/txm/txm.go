@@ -227,7 +227,6 @@ func (txm *Txm) buildTx(ctx context.Context, msg pendingTx, retryCount int) (sol
 
 	// Set compute unit limit if specified
 	if msg.cfg.ComputeUnitLimit != 0 {
-		txm.lggr.Infow("Setting compute unit limit", "limit", msg.cfg.ComputeUnitLimit)
 		if err := fees.SetComputeUnitLimit(&newTx, fees.ComputeUnitLimit(msg.cfg.ComputeUnitLimit)); err != nil {
 			return solanaGo.Transaction{}, fmt.Errorf("failed to add compute unit limit instruction: %w", err)
 		}
