@@ -26,13 +26,7 @@ func CalculateFee(base, maxFee, minFee uint64, count uint) uint64 {
 	}
 
 	// respect bounds
-	if amount < minFee {
-		return minFee
-	}
-	if amount > maxFee {
-		return maxFee
-	}
-	return amount
+	return min(max(amount, minFee), maxFee)
 }
 
 type BlockData struct {
