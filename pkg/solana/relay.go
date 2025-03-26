@@ -95,10 +95,6 @@ func (r *Relayer) HealthReport() map[string]error {
 	return hp
 }
 
-func (r *Relayer) ReplayStatus() relayReplayStatus {
-	return r.chain.LogPoller().ReplayStatus()
-}
-
 func (r *Relayer) LatestHead(ctx context.Context) (relaytypes.Head, error) {
 	return r.chain.LatestHead(ctx)
 }
