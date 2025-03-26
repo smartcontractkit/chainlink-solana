@@ -45,7 +45,6 @@ type LogPoller interface {
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
 	Replay(fromBlock int64)
-	ReplayStatus() types.ReplayStatus
 }
 
 type Chain interface {

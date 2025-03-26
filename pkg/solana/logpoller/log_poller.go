@@ -15,7 +15,6 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
@@ -59,13 +58,13 @@ type filtersI interface {
 type ReplayInfo struct {
 	mut          sync.RWMutex
 	requestBlock int64
-	status       types.ReplayStatus
+	status       ReplayStatus
 }
 
 // hasRequest returns true if a new request has been received (since the last request completed),
 // whether or not it is pending yet
 func (r *ReplayInfo) hasRequest() bool {
-	return r.status == types.ReplayStatusRequested || r.status == types.ReplayStatusPending
+	return r.status == ReplayStatusRequested || r.status == ReplayStatusPending
 }
 
 type Service struct {
@@ -102,7 +101,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
-	lp.replay.status = types.ReplayStatusNoRequest
+	lp.replay.status = ReplayStatusNoRequest
 
 	return lp
 }
@@ -266,8 +265,8 @@ func (lp *Service) Replay(fromBlock int64) {
 	}
 	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
-	if lp.replay.status != types.ReplayStatusPending {
-		lp.replay.status = types.ReplayStatusRequested
+	if lp.replay.status != ReplayStatusPending {
+		lp.replay.status = ReplayStatusRequested
 	}
 }
 
@@ -277,7 +276,7 @@ func (lp *Service) Replay(fromBlock int64) {
 // Requested - a replay has been requested, but has not started yet
 // Pending - a replay is currently in progress
 // Complete - there was at least one replay executed since startup, but all have since completed
-func (lp *Service) ReplayStatus() types.ReplayStatus {
+func (lp *Service) ReplayStatus() ReplayStatus {
 	lp.replay.mut.RLock()
 	defer lp.replay.mut.RUnlock()
 	return lp.replay.status
@@ -321,7 +320,7 @@ func (lp *Service) checkForReplayRequest() bool {
 	}
 
 	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
-	lp.replay.status = types.ReplayStatusPending
+	lp.replay.status = ReplayStatusPending
 	return true
 }
 
@@ -476,10 +475,10 @@ func (lp *Service) replayComplete(from, to int64) bool {
 
 	if lp.replay.requestBlock < from {
 		// received a new request with lower block number while replaying, we'll process that next time
-		lp.replay.status = types.ReplayStatusRequested
+		lp.replay.status = ReplayStatusRequested
 		return false
 	}
-	lp.replay.status = types.ReplayStatusComplete
+	lp.replay.status = ReplayStatusComplete
 	return true
 }
 
