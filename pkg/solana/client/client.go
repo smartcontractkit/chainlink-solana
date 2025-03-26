@@ -17,6 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
+const (
+	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
+	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+)
+
 // MaxSupportTransactionVersion defines max transaction version to return in responses.
 // If the requested block contains a transaction with a higher version, an error will be returned.
 const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)

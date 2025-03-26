@@ -131,12 +131,6 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
-const (
-	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
-	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
-	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
-)
-
 func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
 	v.chainIDVerifiedLock.RLock()
 	if v.chainIDVerified {
@@ -158,17 +152,17 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 	}
 
 	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.chainID == "localnet"
+	ignore := v.expectedChainID == "localnet"
 
 	if !ignore {
 		var matches bool
 		switch v.chainID {
 		case "devnet":
-			matches = DevnetGenesisHash == v.expectedChainID
+			matches = client.DevnetGenesisHash == v.expectedChainID
 		case "testnet":
-			matches = TestnetGenesisHash == v.expectedChainID
+			matches = client.TestnetGenesisHash == v.expectedChainID
 		case "mainnet":
-			matches = MainnetGenesisHash == v.expectedChainID
+			matches = client.MainnetGenesisHash == v.expectedChainID
 		default:
 			matches = v.chainID == v.expectedChainID
 		}

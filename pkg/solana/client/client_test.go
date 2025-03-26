@@ -141,7 +141,6 @@ func TestClient_Reader_ChainID(t *testing.T) {
 		MainnetGenesisHash, // mainnet
 		"GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE3MEE6JC", // localnet (random)
 	}
-	networks := []string{"devnet", "testnet", "mainnet", "localnet"}
 	hashCounter := 0
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,10 +158,10 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	require.NoError(t, err)
 
 	// get chain ID based on gensis hash
-	for _, n := range networks {
+	for _, hash := range genesisHashes {
 		network, err := c.ChainID(ctx)
 		assert.NoError(t, err)
-		assert.Equal(t, mn.StringID(n), network)
+		assert.Equal(t, mn.StringID(hash), network)
 	}
 }
 

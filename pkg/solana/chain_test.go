@@ -178,7 +178,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	}
 
 	// happy path
-	testChain.id = "devnet"
+	testChain.id = client.DevnetGenesisHash
 	_, err := testChain.verifiedClient(node)
 	require.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	_, err = c.ChainID(tests.Context(t))
 	// expect error from id mismatch (even if using a cached client) when performing RPC calls
 	assert.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.URL), err.Error())
+	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", client.DevnetGenesisHash, node.URL), err.Error())
 }
 
 func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
