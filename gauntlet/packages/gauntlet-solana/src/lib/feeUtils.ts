@@ -16,11 +16,11 @@ enum ComputeBudgetInstruction {
   SetComputeUnitPrice = 0x03,
 }
 
-export const parseBlock = (block: BlockResponse): BlockData => {
+export const parseBlockFees = (block: BlockResponse): BlockData => {
   const blockData: BlockData = { fees: [], prices: [] }
   for (const tx of block.transactions) {
     const meta = tx.meta
-    let computeUnitPrice: number
+    let computeUnitPrice: number = 0
     // filter out consensus vote transactions
     // consensus messages are included as txs within blocks
     // validate AccountKeys has enough elements to index into ProgramIDIndex
@@ -45,10 +45,8 @@ export const parseBlock = (block: BlockResponse): BlockData => {
       }
     }
 
-    if (meta && computeUnitPrice) {
-      blockData.fees = [...blockData.fees, meta.fee]
-      blockData.prices = [...blockData.prices, computeUnitPrice]
-    }
+    blockData.fees = [...blockData.fees, meta.fee]
+    blockData.prices = [...blockData.prices, computeUnitPrice]
   }
 
   return blockData
@@ -80,7 +78,7 @@ export const parseComputeBudgetInstruction = (
 
 export const parseComputeUnitPrice = (data: Buffer): number | null => {
   if (data[0] !== ComputeBudgetInstruction.SetComputeUnitPrice) {
-    return
+    return null
   }
   return parseComputeBudgetInstruction(ComputeBudgetInstruction.SetComputeUnitPrice, data)
 }

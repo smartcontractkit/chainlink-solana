@@ -17,13 +17,21 @@ export const makeTx = (
   return rawTx.reduce((tx, instruction) => tx.add(instruction), initialTx)
 }
 
-export const median = (values: number[]): number | null => {
+export const percentile = (values: number[], p: number): number | null => {
   if (values.length === 0) return null // Handle empty arrays
+  if (p < 0 || p > 1) throw new Error('Percentile must be between 0 and 1')
 
   // Sort the array in ascending order
   const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
 
-  // If even, return the average of the two middle numbers
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+  // Compute the index based on the percentile
+  const index = (sorted.length - 1) * p
+  const lower = Math.floor(index)
+  const upper = Math.ceil(index)
+
+  // If index is an integer, return the value directly
+  if (lower === upper) return sorted[lower]
+
+  // Interpolate between the two closest values
+  return sorted[lower] + (index - lower) * (sorted[upper] - sorted[lower])
 }

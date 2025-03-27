@@ -18,8 +18,8 @@ import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@coral-xyz/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx, median, Overrides } from '../../lib/utils'
-import { parseBlock } from '../../lib/feeUtils'
+import { makeTx, percentile, Overrides } from '../../lib/utils'
+import { BlockData, parseBlockFees } from '../../lib/feeUtils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
@@ -42,15 +42,20 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
 
   static lamportsToSol = (lamports: number) => lamports / LAMPORTS_PER_SOL
 
-  calculatePriceFromLatestBlock = async (): Promise<number> => {
-    const slot = await this.provider.connection.getSlot()
-    const block = await this.provider.connection.getBlock(slot, {
-      maxSupportedTransactionVersion: 0,
-    })
-
-    const blockData = parseBlock(block)
+  calculatePriceFromHistoricalBlocks = async (numberOfBlocks: number = 1, p: number = 0.5): Promise<number> => {
+    const latestSlot = await this.provider.connection.getSlot()
+    let prices = []
+    let blockData: BlockData
+    for (let i = 0; i < numberOfBlocks; i++) {
+      const slot = latestSlot - i
+      const block = await this.provider.connection.getBlock(slot, {
+        maxSupportedTransactionVersion: 0,
+      })
+      blockData = parseBlockFees(block)
+      prices = [...prices, blockData.prices]
+    }
     // return median of priority fess used
-    return median(blockData.prices)
+    return percentile(blockData.prices, p)
   }
 
   sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -101,11 +106,17 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     overrides: Overrides = {},
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+    if (this.flags.priorityFeesConstant && this.flags.priorityFeesHistorical) {
+      throw new Error('Cannot have both constant priority fees set and historical priority fees')
+    }
 
     // Default send with priority fees found using block estimator utils if not set
-    if (!overrides.price) {
-      overrides.price = await this.calculatePriceFromLatestBlock()
+    if (!overrides.price && this.flags.priorityFeesHistorical) {
+      const [nBlocks, percentile] = this.flags.priorityFeesHistorical.split(',')
+      overrides.price = await this.calculatePriceFromHistoricalBlocks(nBlocks, percentile)
       logger.info(`Found past median priority fees as: ${overrides.price}. Setting as Priority Fee`)
+    } else if (overrides.price && this.flags.priorityFeesConstant) {
+      overrides.price = this.flags.priorityFeesConstant
     }
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
@@ -129,7 +140,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
     } catch (error) {
       // Retry mechanism with greater priority fees
-      console.log('Error type:', error)
       if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
         overrides.price += 1000
         logger.info(
