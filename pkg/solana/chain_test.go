@@ -200,8 +200,6 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 }
 
 func TestSolanaChain_VerifiedClients(t *testing.T) {
-	ctx := tests.Context(t)
-
 	testCases := []struct {
 		name        string
 		chainID     string
@@ -265,7 +263,7 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			// retrieve cached client and retrieve slot height
 			c, err := testChain.verifiedClient(node)
 			require.NoError(t, err)
-			slot, err := c.SlotHeight(ctx)
+			slot, err := c.SlotHeight(t.Context())
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(1234), slot)
 
