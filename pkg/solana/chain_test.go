@@ -341,7 +341,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	mnCfg.MultiNode.Enabled = ptr(true)
 
 	cfg := &solcfg.TOMLConfig{
-		ChainID:   ptr("devnet"),
+		ChainID:   ptr(client.DevnetGenesisHash),
 		Chain:     ch,
 		MultiNode: mnCfg,
 	}
@@ -356,7 +356,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 		},
 	}
 
-	testChain, err := newChain("devnet", cfg, nil, logger.Test(t), sqltest.NewNoOpDataSource())
+	testChain, err := newChain(client.DevnetGenesisHash, cfg, nil, logger.Test(t), sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 
 	servicetest.Run(t, testChain)
@@ -371,7 +371,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	id, err := selectedClient.ChainID(tests.Context(t))
 	require.NoError(t, err)
-	assert.Equal(t, "devnet", id.String())
+	assert.Equal(t, client.DevnetGenesisHash, id.String())
 }
 
 func TestChain_MultiNode_TransactionSender(t *testing.T) {
