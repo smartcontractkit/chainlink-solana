@@ -9,7 +9,6 @@ import (
 
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 type testErrEncodeEntry struct {

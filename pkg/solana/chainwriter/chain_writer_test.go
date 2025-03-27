@@ -20,7 +20,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"

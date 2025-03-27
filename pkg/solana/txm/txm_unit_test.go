@@ -23,7 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
