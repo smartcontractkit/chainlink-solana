@@ -199,7 +199,7 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 }
 
 func BenchmarkWorkerGroup(b *testing.B) {
-	ctx := tests.Context(b)
+	ctx := b.Context()
 
 	group := worker.NewGroup(100, logger.Sugared(logger.Nop()))
 	job := testJob{job: func(ctx context.Context) error { return nil }}

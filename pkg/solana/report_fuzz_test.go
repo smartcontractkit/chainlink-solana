@@ -11,15 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 // Ensure your env is using go 1.18 then in pkg/solana:
 // go test -tags=go1.18 -fuzz ./...
 func FuzzReportCodecMedianFromReport(f *testing.F) {
 	cdc := ReportCodec{}
-	report, err := cdc.BuildReport(tests.Context(f), []median.ParsedAttributedObservation{
+	report, err := cdc.BuildReport(f.Context(), []median.ParsedAttributedObservation{
 		{Timestamp: uint32(time.Now().Unix()), Value: big.NewInt(10), JuelsPerFeeCoin: big.NewInt(100000)},
 		{Timestamp: uint32(time.Now().Unix()), Value: big.NewInt(10), JuelsPerFeeCoin: big.NewInt(200000)},
 		{Timestamp: uint32(time.Now().Unix()), Value: big.NewInt(11), JuelsPerFeeCoin: big.NewInt(300000)}})
