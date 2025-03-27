@@ -28,7 +28,7 @@ import (
 
 func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// setup mock keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -155,7 +155,7 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 
 func TestTxm_ProcessError(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// setup mock keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -249,7 +249,7 @@ func TestTxm_ProcessError(t *testing.T) {
 
 func createTx(t *testing.T, client solanaClient.ReaderWriter, signer solana.PublicKey, sender solana.PublicKey, receiver solana.PublicKey, amt uint64) *solana.Transaction {
 	// create transfer tx
-	hash, err := client.LatestBlockhash(tests.Context(t))
+	hash, err := client.LatestBlockhash(t.Context())
 	require.NoError(t, err)
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{

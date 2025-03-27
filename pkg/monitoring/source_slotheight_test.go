@@ -17,7 +17,7 @@ import (
 func TestSlotHeightSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	factory := NewSlotHeightSourceFactory(cr, lgr)
 	assert.Equal(t, types.SlotHeightType, factory.GetType())

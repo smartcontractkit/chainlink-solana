@@ -151,7 +151,7 @@ func TestGetLatestTransmission(t *testing.T) {
 }
 
 func TestCache(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// create response
 		body, err := io.ReadAll(r.Body)

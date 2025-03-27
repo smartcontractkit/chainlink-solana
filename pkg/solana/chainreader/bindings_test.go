@@ -200,7 +200,7 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				readers: tt.fields.readers,
 				bound:   tt.fields.bound,
 			}
-			err := b.BindReaders(tests.Context(t), tt.address)
+			err := b.BindReaders(t.Context(), tt.address)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

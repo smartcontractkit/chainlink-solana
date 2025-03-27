@@ -19,7 +19,7 @@ import (
 )
 
 func TestFees(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	m := mocks.NewFees(t)
 	m.On("Set", mock.Anything, mock.Anything, mock.Anything).Once()

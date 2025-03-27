@@ -49,7 +49,7 @@ var ccipCommonIDL = idl.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
@@ -397,7 +397,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 }
 
 func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
@@ -555,7 +555,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
@@ -862,7 +862,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
@@ -1025,7 +1025,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 func TestChainWriter_GetTransactionStatus(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
 		return rw, nil
@@ -1092,7 +1092,7 @@ func TestChainWriter_GetTransactionStatus(t *testing.T) {
 func TestChainWriter_GetFeeComponents(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
 		return rw, nil

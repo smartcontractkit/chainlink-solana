@@ -28,7 +28,7 @@ func FuzzReportCodecMedianFromReport(f *testing.F) {
 	// Seed with valid report
 	f.Add([]byte(report))
 	f.Fuzz(func(t *testing.T, report []byte) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		med, err := cdc.MedianFromReport(ctx, report)
 		if err == nil {
 			// Should always be able to build a report from the medians extracted

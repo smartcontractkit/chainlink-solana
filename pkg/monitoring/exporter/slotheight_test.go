@@ -16,7 +16,7 @@ import (
 )
 
 func TestSlotHeight(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	m := mocks.NewSlotHeight(t)
 	m.On("Set", mock.Anything, mock.Anything, mock.Anything).Once()
 	m.On("Cleanup").Once()

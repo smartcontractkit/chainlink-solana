@@ -31,7 +31,7 @@ type ReportPreTransform struct {
 }
 
 func Test_CCIPExecuteArgsTransform(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
@@ -226,7 +226,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 }
 
 func Test_CCIPCommitAccountTransform(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)

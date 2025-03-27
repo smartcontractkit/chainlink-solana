@@ -18,7 +18,7 @@ import (
 )
 
 func TestNetworkFees(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	m := mocks.NewNetworkFees(t)
 	m.On("Set", mock.Anything, mock.Anything).Once()
 	m.On("Cleanup").Once()

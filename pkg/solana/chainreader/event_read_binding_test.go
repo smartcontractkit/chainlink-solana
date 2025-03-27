@@ -52,7 +52,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)
@@ -70,7 +70,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)
@@ -88,7 +88,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)

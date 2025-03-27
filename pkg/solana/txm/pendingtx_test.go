@@ -19,7 +19,7 @@ import (
 
 func TestPendingTxContext_add_remove_multiple(t *testing.T) {
 	var wg sync.WaitGroup
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	newProcess := func() (solana.Signature, context.CancelFunc) {
 		// make random signature
@@ -71,7 +71,7 @@ func TestPendingTxContext_New(t *testing.T) {
 	t.Parallel()
 
 	txs := newPendingTxContext()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, cancel := context.WithCancel(ctx)
 
 	t.Run("successfully adds new transaction in pending state", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestPendingTxContext_New(t *testing.T) {
 
 func TestPendingTxContext_OnBroadcasted(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	sig := randomSignature(t)
 	txs := newPendingTxContext()
 
@@ -177,7 +177,7 @@ func TestPendingTxContext_OnBroadcasted(t *testing.T) {
 
 func TestPendingTxContext_add_signature(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 
 	t.Run("successfully add signature to transaction", func(t *testing.T) {
@@ -263,7 +263,7 @@ func TestPendingTxContext_add_signature(t *testing.T) {
 
 func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 
@@ -388,7 +388,7 @@ func TestPendingTxContext_on_broadcasted_processed(t *testing.T) {
 
 func TestPendingTxContext_on_confirmed(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 
@@ -501,7 +501,7 @@ func TestPendingTxContext_on_confirmed(t *testing.T) {
 
 func TestPendingTxContext_on_finalized(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 
@@ -652,7 +652,7 @@ func TestPendingTxContext_on_finalized(t *testing.T) {
 
 func TestPendingTxContext_on_error(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 
@@ -845,7 +845,7 @@ func TestPendingTxContext_on_error(t *testing.T) {
 
 func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 
@@ -907,7 +907,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 
 func TestPendingTxContext_RevertToAwaitingBroadcast(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
@@ -1058,7 +1058,7 @@ func TestPendingTxContext_trim_finalized_errored_txs(t *testing.T) {
 
 func TestPendingTxContext_expired(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	sig := solana.Signature{}
 	txs := newPendingTxContext()
 	txID := uuid.NewString()
@@ -1151,7 +1151,7 @@ func TestPendingTxContext_race(t *testing.T) {
 
 func TestGetTxState(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(tests.Context(t))
+	_, cancel := context.WithCancel(t.Context())
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
 

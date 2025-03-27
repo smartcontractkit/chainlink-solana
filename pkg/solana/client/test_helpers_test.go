@@ -29,7 +29,7 @@ func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 
 	// check & fund address
 	checkFunded := func(t *testing.T, url string) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		// create client
 		c, err := NewClient(url, cfg, requestTimeout, lggr)
 		require.NoError(t, err)

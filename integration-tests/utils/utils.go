@@ -88,7 +88,7 @@ func NewExtendLookupTableInstruction(
 }
 
 func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rpc.Client) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	sigs := []solana.Signature{}
 	for _, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
@@ -167,8 +167,7 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 	return table
 }
 
-func CreateRandomToken(t tests.TestingT, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
-	ctx := tests.Context(t)
+func CreateRandomToken(ctx context.Context, t tests.TestingT, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
 	mint, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 

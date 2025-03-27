@@ -18,7 +18,7 @@ import (
 )
 
 func TestReportObservations(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	m := mocks.NewReportObservations(t)
 	m.On("SetCount", mock.Anything, mock.Anything).Once()

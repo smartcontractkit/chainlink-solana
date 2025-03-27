@@ -32,7 +32,7 @@ func TestCodec(t *testing.T) {
 	RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
 
 	t.Run("Events are encode-able and decode-able for a single item", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		item := CreateTestStruct[*testing.T](0, tester)
 		req := &EncodeRequest{TestStructs: []TestStruct{item}, TestOn: testutils.TestEventItem}
 		resp := tester.EncodeFields(t, req)

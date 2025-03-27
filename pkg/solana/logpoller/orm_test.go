@@ -74,7 +74,7 @@ func TestLogPollerFilters(t *testing.T) {
 
 		for _, filter := range filters {
 			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 				orm := NewORM(chainID, dbx, lggr)
 				id, err := orm.InsertFilter(ctx, filter)
@@ -103,7 +103,7 @@ func TestLogPollerFilters(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		id, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		filter.EventName = uuid.NewString()
@@ -122,7 +122,7 @@ func TestLogPollerFilters(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		// mark deleted
@@ -141,7 +141,7 @@ func TestLogPollerFilters(t *testing.T) {
 		orm1 := NewORM(uuid.NewString(), dbx, lggr)
 		orm2 := NewORM(uuid.NewString(), dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID1, err := orm1.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		filterID2, err := orm2.InsertFilter(ctx, filter)
@@ -152,7 +152,7 @@ func TestLogPollerFilters(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		log := newRandomLog(t, filterID, chainID, "My Event")
@@ -190,7 +190,7 @@ func TestLogPollerFilters(t *testing.T) {
 		orm := NewORM(chainID, dbx, lggr)
 
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filter.IsBackfilled = true
 		filterID, err := orm.InsertFilter(ctx, filter)
 		filterIDs := []int64{filterID}
@@ -219,7 +219,7 @@ func TestLogPollerLogs(t *testing.T) {
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// create filter as it's required for a log
 	filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestLogPollerLogs(t *testing.T) {
 	require.Equal(t, log2, dbLogs[0])
 
 	t.Run("SelectSequenceNums", func(t *testing.T) {
-		seqNums, err := orm.SelectSeqNums(tests.Context(t))
+		seqNums, err := orm.SelectSeqNums(t.Context())
 		require.NoError(t, err)
 		require.Len(t, seqNums, 2)
 	})
@@ -268,9 +268,9 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	orm1 := NewORM(uuid.NewString(), dbx, lggr)
-	createLogsForBlocks(tests.Context(t), orm1, 10, 11, 12)
+	createLogsForBlocks(t.Context(), orm1, 10, 11, 12)
 	orm2 := NewORM(uuid.NewString(), dbx, lggr)
 	createLogsForBlocks(context.Background(), orm2, 100, 110, 120)
 	latestBlockChain1, err := orm1.GetLatestBlock(ctx)
@@ -300,7 +300,7 @@ func TestFilteredLogs(t *testing.T) {
 	lggr := logger.Test(t)
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string

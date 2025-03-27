@@ -21,7 +21,7 @@ import (
 func TestTxResultsSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	factory := NewTxResultsSourceFactory(cr, lgr)
 	assert.Equal(t, txresultsType, factory.GetType())

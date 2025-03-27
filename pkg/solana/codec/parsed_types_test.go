@@ -22,7 +22,7 @@ func TestEncodeDecodeBigInt(t *testing.T) {
 		B *big.Int
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	types := newTestCodec(t)
 	typedCodec, err := types.ToCodec()
 

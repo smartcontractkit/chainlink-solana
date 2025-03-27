@@ -27,7 +27,7 @@ import (
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	genesisHashes := []string{
 		DevnetGenesisHash,  // devnet
 		TestnetGenesisHash, // testnet
@@ -177,7 +177,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -278,7 +278,7 @@ func TestClient_GetBlocks(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -297,7 +297,7 @@ func TestClient_GetBlocks(t *testing.T) {
 func TestClient_GetLatestBlockHeight(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := SetupLocalSolNode(t)
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -321,7 +321,7 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 }
 
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// set up environment
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()

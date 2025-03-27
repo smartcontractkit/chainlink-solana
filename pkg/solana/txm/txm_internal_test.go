@@ -123,7 +123,7 @@ func TestTxm(t *testing.T) {
 			id := "mocknet-" + estimator + "-" + uuid.NewString()
 			t.Logf("Starting new iteration: %s", id)
 
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			lggr := logger.Test(t)
 			cfg := config.NewDefault()
 			cfg.Chain.FeeEstimatorMode = &estimator
@@ -781,7 +781,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -986,7 +986,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -1142,7 +1142,7 @@ func TestTxm_Enqueue(t *testing.T) {
 			return out
 		}, nil,
 	).Maybe()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -1240,7 +1240,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(5 * time.Second)
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second) // Enable retention to keep transactions after finality and be able to check their statuses.
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper function to set up common test environment
 	setupTxmTest := func(
@@ -1632,7 +1632,7 @@ func TestTxm_OnReorg(t *testing.T) {
 	// Enable retention to keep transactions after finality and be able to check their statuses.
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second)
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper that sets up a Txm and mocks.
 	setupTxmTest := func(
@@ -1802,7 +1802,7 @@ func TestTxm_OnReorg(t *testing.T) {
 func TestTxm_GetTransactionStatus(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, cancel := context.WithCancel(ctx)
 
 	// set up configs needed in txm
@@ -1887,7 +1887,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 }
 
 func TestTxm_DependencyTx(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	estimator := "fixed"
 	id := "mocknet-dep-" + uuid.NewString()
