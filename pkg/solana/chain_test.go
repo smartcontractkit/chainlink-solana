@@ -132,73 +132,6 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSolanaChain_VerifiedClient(t *testing.T) {
-	ctx := tests.Context(t)
-	called := false
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
-
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-
-		// handle getGenesisHash request
-		if strings.Contains(string(body), "getGenesisHash") {
-			// should only be called once, chainID will be cached in chain
-			// allowing `mismatch` to be ignored, since invalid nodes will try to verify the chain ID
-			// if it is not verified
-			if !strings.Contains(r.URL.Path, "/mismatch") && called {
-				assert.NoError(t, errors.New("rpc has been called once already"))
-			}
-			// devnet genesis hash
-			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
-		}
-		_, err = w.Write([]byte(out))
-		require.NoError(t, err)
-		called = true
-	}))
-	defer mockServer.Close()
-
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
-	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Chain:   ch,
-	}
-	cfg.SetDefaults()
-
-	testChain := chain{
-		cfg:         cfg,
-		lggr:        logger.Test(t),
-		clientCache: map[string]*verifiedCachedClient{},
-	}
-	nName := t.Name() + "-" + uuid.NewString()
-	node := &solcfg.Node{
-		Name: &nName,
-		URL:  config.MustParseURL(mockServer.URL),
-	}
-
-	// happy path
-	testChain.id = client.DevnetGenesisHash
-	_, err := testChain.verifiedClient(node)
-	require.NoError(t, err)
-
-	// retrieve cached client and retrieve slot height
-	c, err := testChain.verifiedClient(node)
-	require.NoError(t, err)
-	slot, err := c.SlotHeight(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1234), slot)
-
-	node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
-	testChain.id = "incorrect"
-	c, err = testChain.verifiedClient(node)
-	assert.NoError(t, err)
-	_, err = c.ChainID(tests.Context(t))
-	// expect error from id mismatch (even if using a cached client) when performing RPC calls
-	assert.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", client.DevnetGenesisHash, node.URL), err.Error())
-}
-
 func TestSolanaChain_VerifiedClients(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -339,7 +272,7 @@ func ptr[T any](t T) *T {
 }
 
 func TestChain_Transact(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := client.SetupLocalSolNode(t)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 

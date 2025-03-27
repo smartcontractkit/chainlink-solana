@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
