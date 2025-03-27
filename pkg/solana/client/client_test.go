@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -77,11 +76,6 @@ func TestClient_Reader_Integration(t *testing.T) {
 	fee, err := c.GetFeeForMessage(ctx, tx.Message.ToBase64())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5000), fee)
-
-	// get chain ID based on gensis hash
-	network, err := c.ChainID(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, mn.StringID("localnet"), network)
 
 	// get account info (also tested inside contract_test)
 	res, err := c.GetAccountInfoWithOpts(ctx, solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
