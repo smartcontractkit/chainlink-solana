@@ -40,7 +40,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(slotNumber+1, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block, 1), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
 		require.Equal(t, Block{
