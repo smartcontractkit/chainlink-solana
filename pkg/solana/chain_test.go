@@ -199,6 +199,88 @@ func TestSolanaChain_VerifiedClient(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", client.DevnetGenesisHash, node.URL), err.Error())
 }
 
+func TestSolanaChain_VerifiedClients(t *testing.T) {
+	ctx := tests.Context(t)
+
+	testCases := []struct {
+		name        string
+		chainID     string
+		genesisHash string
+	}{
+		{"Mainnet", "mainnet", client.MainnetGenesisHash},
+		{"Testnet", "testnet", client.TestnetGenesisHash},
+		{"Devnet", "devnet", client.DevnetGenesisHash},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
+
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				// handle getGenesisHash request
+				if strings.Contains(string(body), "getGenesisHash") {
+					// should only be called once, chainID will be cached in chain
+					// allowing `mismatch` to be ignored, since invalid nodes will try to verify the chain ID
+					// if it is not verified
+					if !strings.Contains(r.URL.Path, "/mismatch") && called {
+						assert.NoError(t, errors.New("rpc has been called once already"))
+					}
+					// return the appropriate genesis hash based on the test case
+					out = fmt.Sprintf(TestSolanaGenesisHashTemplate, tc.genesisHash)
+				}
+				_, err = w.Write([]byte(out))
+				require.NoError(t, err)
+				called = true
+			}))
+			defer mockServer.Close()
+
+			ch := solcfg.Chain{}
+			ch.SetDefaults()
+			cfg := &solcfg.TOMLConfig{
+				ChainID: ptr(tc.chainID),
+				Chain:   ch,
+			}
+			cfg.SetDefaults()
+
+			testChain := chain{
+				cfg:         cfg,
+				lggr:        logger.Test(t),
+				clientCache: map[string]*verifiedCachedClient{},
+			}
+			nName := t.Name() + "-" + uuid.NewString()
+			node := &solcfg.Node{
+				Name: &nName,
+				URL:  config.MustParseURL(mockServer.URL),
+			}
+
+			// happy path
+			testChain.id = tc.genesisHash
+			_, err := testChain.verifiedClient(node)
+			require.NoError(t, err)
+
+			// retrieve cached client and retrieve slot height
+			c, err := testChain.verifiedClient(node)
+			require.NoError(t, err)
+			slot, err := c.SlotHeight(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(1234), slot)
+
+			node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
+			testChain.id = "incorrect"
+			c, err = testChain.verifiedClient(node)
+			assert.NoError(t, err)
+			_, err = c.ChainID(tests.Context(t))
+			// expect error from id mismatch (even if using a cached client) when performing RPC calls
+			assert.Error(t, err)
+			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", tc.genesisHash, node.URL), err.Error())
+		})
+	}
+}
+
 func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
