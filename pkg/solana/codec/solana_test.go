@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
@@ -23,7 +22,7 @@ func TestNewIDLAccountCodec(t *testing.T) {
 	/// TODO BCI-3155 this should run the codec interface tests
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, _, entry := newTestIDLAndCodec(t, accountIDLType)
 
 	expected := testutils.DefaultTestStruct
@@ -45,7 +44,7 @@ func TestCodecProperties(t *testing.T) {
 	t.Skip()
 
 	tester := &codecInterfaceTester{}
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, _, entry := newTestIDLAndCodec(t, eventIDLType)
 	t.Log(entry)
 
@@ -66,7 +65,7 @@ func TestNewIDLDefinedTypesCodecCodec(t *testing.T) {
 	/// TODO BCI-3155 this should run the codec interface tests
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, _, entry := newTestIDLAndCodec(t, definedTypesIDLType)
 
 	expected := testutils.DefaultTestStruct
@@ -86,7 +85,7 @@ func TestNewIDLDefinedTypesCodecCodec(t *testing.T) {
 func TestNewIDLCodec_WithModifiers(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, _, idlCodec := newTestIDLAndCodec(t, accountIDLType)
 	modConfig := codeccommon.ModifiersConfig{
 		&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},

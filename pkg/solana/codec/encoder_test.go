@@ -9,7 +9,6 @@ import (
 
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 type testErrEncodeEntry struct {
@@ -39,7 +38,7 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 
 	t.Run("error when item type not found", func(t *testing.T) {
 		_, err := newEncoder(map[string]Entry{}).
-			Encode(tests.Context(t), nil, "output.NonExistent.Type")
+			Encode(t.Context(), nil, "output.NonExistent.Type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
 		t.Log(err.Error())
@@ -47,13 +46,13 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 	})
 
 	t.Run("error when convert fails because of unexpected type", func(t *testing.T) {
-		_, err := newEncoder(map[string]Entry{someType: &testErrEncodeEntry{}}).Encode(tests.Context(t), nil, someType)
+		_, err := newEncoder(map[string]Entry{someType: &testErrEncodeEntry{}}).Encode(t.Context(), nil, someType)
 		require.Error(t, err)
 	})
 
 	t.Run("error when entry encode fails", func(t *testing.T) {
 		_, err := newEncoder(map[string]Entry{someType: &testErrEncodeEntry{codecType: commonencodings.Empty{}}}).
-			Encode(tests.Context(t), make(map[string]interface{}), someType)
+			Encode(t.Context(), make(map[string]interface{}), someType)
 		require.ErrorContains(t, err, "encode error")
 	})
 }
@@ -73,7 +72,7 @@ func (t testErrGetSize) Size(_ int) (int, error) {
 
 func TestEncoder_GetMaxEncodingSize_Errors(t *testing.T) {
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
-		_, err := newEncoder(map[string]Entry{}).GetMaxEncodingSize(tests.Context(t), 10, "no-entry-type")
+		_, err := newEncoder(map[string]Entry{}).GetMaxEncodingSize(t.Context(), 10, "no-entry-type")
 		require.Error(t, err)
 		require.ErrorIs(t, err, commontypes.ErrInvalidType)
 		require.Contains(t, err.Error(), "nil entry")
@@ -82,7 +81,7 @@ func TestEncoder_GetMaxEncodingSize_Errors(t *testing.T) {
 	t.Run("error when size calculation fails", func(t *testing.T) {
 		someType := "some-type"
 		_, err := newEncoder(map[string]Entry{someType: &testErrEncodeTypeEntry{tCodec: testErrGetSize{}}}).
-			GetMaxEncodingSize(tests.Context(t), 0, someType)
+			GetMaxEncodingSize(t.Context(), 0, someType)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "size error")
 	})

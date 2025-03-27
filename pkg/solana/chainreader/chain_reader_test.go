@@ -33,7 +33,6 @@ import (
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
@@ -72,7 +71,7 @@ func TestSolanaChainReaderService_ReaderInterface(t *testing.T) {
 func TestSolanaContractReaderService_ServiceCtx(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	svc, err := chainreader.NewContractReaderService(logger.Test(t), new(mockedMultipleAccountGetter), config.ContractReader{}, nil)
 
 	require.NoError(t, err)
@@ -97,7 +96,7 @@ func TestSolanaContractReaderService_ServiceCtx(t *testing.T) {
 func TestSolanaChainReaderService_Start(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	rpcClient := lpmocks.NewRPCClient(t)
 	pk := solana.NewWallet().PublicKey()
@@ -212,7 +211,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 }
 
 func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// encode values from unmodified test struct to be read and decoded
 	expected := testutils.DefaultTestStruct

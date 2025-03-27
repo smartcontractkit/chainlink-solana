@@ -39,6 +39,7 @@ type Reader interface {
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
 	GetLatestBlockHeight(ctx context.Context) (uint64, error)
@@ -192,6 +193,15 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
+func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {
+	done := c.latency("first_available_block")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	return c.rpc.GetFirstAvailableBlock(ctx)
 }
 
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {

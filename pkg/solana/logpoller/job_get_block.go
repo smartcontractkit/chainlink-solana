@@ -68,6 +68,25 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		},
 	)
 	if err != nil {
+		oldestAvailableSlot, err2 := j.client.GetFirstAvailableBlock(ctx)
+		if err2 != nil {
+			return fmt.Errorf("failed to get first available slot: %w", err2)
+		}
+		if oldestAvailableSlot > j.slotNumber {
+			j.lggr.Warnf("slot %d is pruned away, as oldest available slot is %d. skipping this slot", j.slotNumber, oldestAvailableSlot)
+			result := Block{
+				SlotNumber: j.slotNumber,
+				BlockHash:  nil,
+				Events:     []ProgramEvent{},
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case j.blocks <- result:
+				close(j.done)
+			}
+			return nil
+		}
 		return err
 	}
 
@@ -111,7 +130,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 
 	result := Block{
 		SlotNumber: j.slotNumber,
-		BlockHash:  block.Blockhash,
+		BlockHash:  &block.Blockhash,
 		Events:     events,
 	}
 	select {
