@@ -85,6 +85,62 @@ func (_c *RPCClient_GetBlockWithOpts_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// GetFirstAvailableBlock provides a mock function with given fields: ctx
+func (_m *RPCClient) GetFirstAvailableBlock(ctx context.Context) (uint64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFirstAvailableBlock")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RPCClient_GetFirstAvailableBlock_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFirstAvailableBlock'
+type RPCClient_GetFirstAvailableBlock_Call struct {
+	*mock.Call
+}
+
+// GetFirstAvailableBlock is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *RPCClient_Expecter) GetFirstAvailableBlock(ctx interface{}) *RPCClient_GetFirstAvailableBlock_Call {
+	return &RPCClient_GetFirstAvailableBlock_Call{Call: _e.mock.On("GetFirstAvailableBlock", ctx)}
+}
+
+func (_c *RPCClient_GetFirstAvailableBlock_Call) Run(run func(ctx context.Context)) *RPCClient_GetFirstAvailableBlock_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *RPCClient_GetFirstAvailableBlock_Call) Return(_a0 uint64, _a1 error) *RPCClient_GetFirstAvailableBlock_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *RPCClient_GetFirstAvailableBlock_Call) RunAndReturn(run func(context.Context) (uint64, error)) *RPCClient_GetFirstAvailableBlock_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSignaturesForAddressWithOpts provides a mock function with given fields: _a0, _a1, _a2
 func (_m *RPCClient) GetSignaturesForAddressWithOpts(_a0 context.Context, _a1 solana.PublicKey, _a2 *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
 	ret := _m.Called(_a0, _a1, _a2)

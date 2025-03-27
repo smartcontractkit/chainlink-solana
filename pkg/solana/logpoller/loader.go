@@ -17,11 +17,12 @@ import (
 
 type Block struct {
 	SlotNumber uint64
-	BlockHash  solana.Hash
+	BlockHash  *solana.Hash
 	Events     []ProgramEvent
 }
 
 type RPCClient interface {
+	GetFirstAvailableBlock(ctx context.Context) (uint64, error)
 	GetBlockWithOpts(context.Context, uint64, *rpc.GetBlockOpts) (*rpc.GetBlockResult, error)
 	GetSignaturesForAddressWithOpts(context.Context, solana.PublicKey, *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error)
 	SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error)
