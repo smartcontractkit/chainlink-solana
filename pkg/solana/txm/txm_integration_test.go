@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
