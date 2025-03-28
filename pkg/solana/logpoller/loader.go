@@ -45,11 +45,10 @@ type EncodedLogCollector struct {
 
 func NewEncodedLogCollector(
 	client RPCClient,
-	lggr logger.SugaredLogger,
+	lggr logger.Logger,
 ) *EncodedLogCollector {
 	c := &EncodedLogCollector{
 		client: client,
-		lggr:   lggr,
 	}
 
 	c.Service, c.engine = services.Config{
@@ -60,6 +59,7 @@ func NewEncodedLogCollector(
 			return []services.Service{c.workers}
 		},
 	}.NewServiceEngine(lggr)
+	c.lggr = c.engine
 
 	return c
 }

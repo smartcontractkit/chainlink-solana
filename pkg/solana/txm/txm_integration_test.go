@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -124,7 +123,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 }
 
 func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Context, *solanaClient.Client, *Txm, solana.PublicKey, solana.PublicKey, *observer.ObservedLogs) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Generate sender and receiver keys and fund sender account
 	senderKey, err := solana.NewRandomPrivateKey()

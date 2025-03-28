@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
@@ -128,7 +127,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 		{
 			Name: "Test address groups where first namespace shares address with second namespace",
 			Test: func(t T) {
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				cfg := it.buildContractReaderConfig(t)
 				cfg.AddressShareGroups = [][]string{{AnyContractNameWithSharedAddress1, AnyContractNameWithSharedAddress2, AnyContractNameWithSharedAddress3}}
 				cr := it.GetContractReaderWithCustomCfg(t, cfg)
@@ -201,7 +200,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
@@ -254,7 +253,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				contracts := it.GetBindings(t)
 
 				idx := it.getTestIdx(t.Name())
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(contracts, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, contracts))
 
@@ -305,13 +304,13 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				contracts := it.GetBindings(t)
 
 				idx := it.getTestIdx(t.Name())
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(contracts, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, contracts))
 
 				tokenProgram := solana.Token2022ProgramID
 				feePayerPk := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
-				mint := utils.CreateRandomToken(t, feePayerPk, tokenProgram, it.Helper.RPC())
+				mint := utils.CreateRandomToken(t.Context(), t, feePayerPk, tokenProgram, it.Helper.RPC())
 
 				wallet, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
@@ -358,7 +357,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, bindings))
@@ -399,7 +398,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, bindings))
@@ -426,7 +425,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
@@ -451,7 +450,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
@@ -476,7 +475,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
@@ -509,7 +508,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
 				require.NoError(t, cr.Bind(ctx, bindings))
@@ -563,7 +562,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 				cr := it.GetContractReader(t)
 				cw := it.GetContractWriter(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
 				require.NoError(t, cr.Bind(ctx, bindings))
@@ -596,7 +595,7 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 func SubmitTransactionAndExpectFailure[T TestingT[T]](t T, tester ChainComponentsInterfaceTester[T], cw types.ContractWriter, method string, args any, contract types.BoundContract) string {
 	tester.DirtyContracts()
 	txID := uuid.New().String()
-	err := cw.SubmitTransaction(tests.Context(t), contract.Name, method, args, txID, contract.Address, nil, big.NewInt(0))
+	err := cw.SubmitTransaction(t.Context(), contract.Name, method, args, txID, contract.Address, nil, big.NewInt(0))
 	require.NoError(t, err)
 
 	err = WaitForTransactionStatus(t, tester, cw, txID, types.Failed, false)
@@ -766,7 +765,7 @@ func (h *helper) Init(t *testing.T) {
 	h.sender = privateKey
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
-	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
+	h.wsClient, err = ws.Connect(t.Context(), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
 	lggr := logger.Test(t)
 
@@ -789,7 +788,7 @@ func (h *helper) Init(t *testing.T) {
 	}, nil)
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
-	err = txm.Start(tests.Context(t))
+	err = txm.Start(t.Context())
 	require.NoError(t, err)
 
 	h.txm = txm
@@ -833,7 +832,7 @@ func (h *helper) SolanaClient() *client.Client {
 }
 
 func (h *helper) Context(t *testing.T) context.Context {
-	return tests.Context(t)
+	return t.Context()
 }
 
 func (h *helper) Logger(t *testing.T) logger.Logger {

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 type testLoader struct {
@@ -27,7 +25,7 @@ func newTestLoader() *testLoader {
 
 func TestLoader(t *testing.T) {
 	t.Run("direct loading", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		loader := newTestLoader()
 		_, _ = loader.Get(ctx)
 		_, _ = loader.Get(ctx)

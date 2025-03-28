@@ -13,8 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 )
 
@@ -32,7 +30,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(0, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
 	t.Run("Success if fails to get block because of pruning", func(t *testing.T) {
@@ -42,7 +40,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(slotNumber+1, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block, 1), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
 		require.Equal(t, Block{
@@ -62,7 +60,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block number")
 	})
 	t.Run("Error if block time is not present", func(t *testing.T) {
@@ -72,7 +70,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10))}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block time")
 	})
 	t.Run("Error if transaction field is not present", func(t *testing.T) {
@@ -81,7 +79,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: nil}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42: missing transaction field")
 	})
 	t.Run("Error if fails to get transaction", func(t *testing.T) {
@@ -90,7 +88,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes([]byte("{"))}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42")
 	})
 	t.Run("Error if Tx has no signatures", func(t *testing.T) {
@@ -102,7 +100,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes(txB)}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err = job.Run(tests.Context(t))
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected all transactions to have at least one signature 0 in slot 42")
 	})
 	t.Run("Error if Tx has no Meta", func(t *testing.T) {
@@ -114,7 +112,7 @@ func TestGetBlockJob(t *testing.T) {
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes(txB)}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		job := newGetBlockJob(nil, client, make(chan Block), lggr, slotNumber)
-		err = job.Run(tests.Context(t))
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected transaction to have meta. signature: 2AnZxg8HN2sGa7GC7iWGDgpXbEasqXQNEumCjvHUFDcBnfRKAdaN3SvKLhbQwheN15xDkL5D5mdX21A5gH1MdYB; slot: 42; idx: 0")
 	})
 	t.Run("Can abort even if no one waits for result", func(t *testing.T) {
@@ -123,7 +121,7 @@ func TestGetBlockJob(t *testing.T) {
 		tx := solana.Transaction{Signatures: make([]solana.Signature, 1)}
 		txB, err := tx.MarshalBinary()
 		require.NoError(t, err)
-		ctx, cancel := context.WithCancel(tests.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes(txB), Meta: &rpc.TransactionMeta{}}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).RunAndReturn(func(ctx context.Context, u uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
 			cancel()
@@ -167,7 +165,7 @@ func TestGetBlockJob(t *testing.T) {
 			}
 			return []ProgramOutput{result}
 		}
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
 		require.Equal(t, Block{
