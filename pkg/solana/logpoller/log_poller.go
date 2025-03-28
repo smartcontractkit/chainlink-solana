@@ -23,6 +23,8 @@ var (
 	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
 
+const DefaultLookbackWindow = 30 * 24 * time.Hour
+
 type ORM interface {
 	ChainID() string
 	HasFilter(ctx context.Context, name string) (bool, error)
@@ -54,6 +56,7 @@ type filtersI interface {
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
+	MaxRetention() time.Duration
 }
 
 type ReplayInfo struct {
@@ -80,6 +83,7 @@ type Service struct {
 	loader            logsLoader
 	filters           filtersI
 	processBlocks     func(ctx context.Context, blocks []Block) error
+	blockTime         time.Duration
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
@@ -102,6 +106,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
 	lp.replay.status = ReplayStatusNoRequest
+	lp.blockTime = 600 * time.Millisecond // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
 
 	return lp
 }
@@ -113,7 +118,7 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 }
 
 func (lp *Service) start(_ context.Context) error {
-	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
+	lp.eng.GoTick(services.NewTicker(lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
@@ -282,31 +287,29 @@ func (lp *Service) ReplayStatus() ReplayStatus {
 	return lp.replay.status
 }
 
-func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
-	if lp.lastProcessedSlot != 0 {
-		return lp.lastProcessedSlot, nil
+func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int64, err error) {
+	lastProcessed = lp.lastProcessedSlot
+	if lastProcessed == 0 {
+		lastProcessed, err = lp.orm.GetLatestBlock(ctx)
 	}
 
-	latestDBBlock, err := lp.orm.GetLatestBlock(ctx)
-	if err == nil {
-		return latestDBBlock, nil
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("error getting latest block from db: %w", err)
-	}
-
-	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("error getting latest block from db: %w", err)
+		}
+		lastProcessed = 0
 	}
 
-	if latestFinalizedSlot == 0 {
-		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	var lookbackBlock int64
+	lookbackBlock, err = lp.computeLookbackWindow(ctx)
+	if err != nil {
+		return 0, err
 	}
-	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(latestFinalizedSlot) - 1, nil //
+	if lookbackBlock > lastProcessed {
+		return lookbackBlock, nil
+	}
+
+	return lastProcessed, nil
 }
 
 // checkForReplayRequest checks whether there have been any new replay requests since it was last called,
@@ -509,4 +512,34 @@ func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 
 func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
+}
+
+func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
+
+	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+	}
+
+	if latestFinalizedSlot == 0 {
+		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	}
+
+	lookback := lp.filters.MaxRetention()
+	if lookback == 0 { // Use default lookback if all filters have permanent retention or less than
+		lookback = DefaultLookbackWindow
+	}
+
+	firstAvailableSlot, err := lp.client.GetFirstAvailableBlock(ctx) // Despite the name, this returns slot # not block number
+
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	latestSlot, firstSlot := int64(latestFinalizedSlot), int64(firstAvailableSlot)
+	lookbackSlot := latestSlot - int64(lookback/lp.blockTime) - 1
+
+	// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
+	if err == nil && firstSlot > lookbackSlot {
+		lookbackSlot = firstSlot
+	}
+	return lookbackSlot, nil
 }

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -35,6 +36,7 @@ type filters struct {
 	seqNums                map[int64]int64
 	decoders               map[int64]Decoder
 	discriminatorExtractor codec.DiscriminatorExtractor
+	maxRetention           time.Duration
 }
 
 func newFilters(lggr logger.Logger, orm ORM) *filters {
@@ -201,6 +203,10 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) {
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
 	fl.knownDiscriminators[filter.EventSig]++
+
+	if filter.Retention > fl.maxRetention {
+		fl.maxRetention = filter.Retention
+	}
 }
 
 // UnregisterFilter will mark the filter with the given name for pruning and async prune all corresponding logs.
@@ -237,6 +243,8 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 	return nil
 }
 
+// removeFilterFromIndexes removes the filter from all indexes
+// WARNING: not thread safe, should only be called while fl.filtersMutex is locked
 func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
@@ -281,6 +289,18 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 			fl.knownDiscriminators[filter.EventSig] = refcount
 		} else {
 			delete(fl.knownDiscriminators, filter.EventSig)
+		}
+	}
+
+	if filter.Retention < fl.maxRetention {
+		return
+	}
+
+	// If this was one of the maximum retention filters, recompute maxRetention
+	fl.maxRetention = 0
+	for _, f := range fl.filtersByID {
+		if f.Retention != 0 && f.Retention > fl.maxRetention {
+			fl.maxRetention = filter.Retention
 		}
 	}
 }
@@ -511,6 +531,10 @@ func (fl *filters) DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, 
 		return nil, err
 	}
 	return ExtractField(decodedEvent, subKeyPath)
+}
+
+func (fl *filters) MaxRetention() time.Duration {
+	return fl.maxRetention
 }
 
 // ExtractField extracts the value of a field or nested subfield from a composite datatype composed
