@@ -47,6 +47,12 @@ func newMockedLP(t *testing.T) mockedLP {
 }
 
 func TestLogPoller_run(t *testing.T) {
+	expectLookback := func(lp mockedLP, latestFinalized uint64) {
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+		lp.Filters.EXPECT().MaxRetention().Return(600 * time.Second).Once()
+	}
+
 	t.Run("Abort run if failed to load filters", func(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to load filters")
@@ -59,6 +65,8 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{{StartingBlock: 16}}).Once()
+		expectLookback(lp, 128)
+
 		expectedErr := errors.New("loaderFailed")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
@@ -73,6 +81,7 @@ func TestLogPoller_run(t *testing.T) {
 			{ID: 2, StartingBlock: 12, Address: PublicKey{1, 2, 3}},
 			{ID: 3, StartingBlock: 14, Address: PublicKey{3, 2, 1}},
 		}).Once()
+		expectLookback(lp, 128)
 		done := func() {}
 		blocks := make(chan Block)
 		close(blocks)
@@ -98,6 +107,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, expectedErr).Once()
+		expectLookback(lp, 128)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed getting addresses: failed to load filters")
 	})
@@ -107,6 +117,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, nil).Once()
+		expectLookback(lp, 128)
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 	})
@@ -117,6 +128,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
+		expectLookback(lp, 128)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
@@ -128,6 +140,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
+		expectLookback(lp, 16)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "last processed slot 128 is higher than highest RPC slot 16")
 	})
@@ -140,6 +153,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
+		expectLookback(lp, 130)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed processing block range [129, 130]: error backfilling filters: failed to start backfill")
 	})
@@ -150,6 +164,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
+		expectLookback(lp, 130)
 		blocks := make(chan Block)
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
@@ -159,53 +174,121 @@ func TestLogPoller_run(t *testing.T) {
 	})
 }
 
-func TestLogPoller_getLastProcessedSlot(t *testing.T) {
-	t.Run("Returns cached value if available", func(t *testing.T) {
-		lp := newMockedLP(t)
-		lp.LogPoller.lastProcessedSlot = 10
-		result, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.NoError(t, err)
-		require.Equal(t, int64(10), result)
-	})
-	t.Run("Returns error if failed to read from db", func(t *testing.T) {
-		lp := newMockedLP(t)
-		expectedErr := errors.New("failed to read from db")
-		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, expectedErr).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.ErrorIs(t, err, expectedErr)
-	})
-	t.Run("Reads latest processed from db", func(t *testing.T) {
-		lp := newMockedLP(t)
-		expectedValue := int64(10)
-		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(expectedValue, nil).Once()
-		result, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.NoError(t, err)
-		require.Equal(t, expectedValue, result)
-	})
-	t.Run("Returns error if failed to read from DB (no data) and RPC", func(t *testing.T) {
-		lp := newMockedLP(t)
-		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
-		expectedError := errors.New("RPC failed")
-		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedError).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.ErrorIs(t, err, expectedError)
-	})
-	t.Run("Returns error if genesis block is the latest finalized", func(t *testing.T) {
-		lp := newMockedLP(t)
-		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
-		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, nil).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.ErrorContains(t, err, "latest finalized slot is 0 - waiting for next slot to start processing")
-	})
-	t.Run("Returns block before latest finalized as last processed if using RPC", func(t *testing.T) {
-		lp := newMockedLP(t)
-		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
-		const latestFinalized = uint64(10)
-		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
-		actual, err := lp.LogPoller.getLastProcessedSlot(t.Context())
-		require.NoError(t, err)
-		require.Equal(t, int64(latestFinalized-1), actual)
-	})
+func Test_GetLastProcessedSlot(t *testing.T) {
+	ctx := t.Context()
+
+	type testCase struct {
+		name              string
+		lastProcessedSlot int64
+		dbSlot            int64
+		dbErr             error
+		finalizedSlot     uint64
+		firstAvailable    uint64
+		lookbackErr       error
+		maxRetention      time.Duration
+		expectedSlot      int64
+		expectError       bool
+	}
+
+	testCases := []testCase{
+		{
+			name:              "uses lastProcessedSlot when greater than lookback",
+			lastProcessedSlot: 12000,
+			finalizedSlot:     11400, // so computed lookback = 11400 - 1000 = 10400 < 12000
+			firstAvailable:    0,
+			maxRetention:      600 * time.Second,
+			expectedSlot:      12000,
+		},
+		{
+			name:           "uses dbSlot when greater than lookback",
+			dbSlot:         11500,
+			dbErr:          nil,
+			finalizedSlot:  11100, // computed lookback = 10500
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   11500,
+		},
+		{
+			name:           "uses lookbackSlot when greater than dbSlot",
+			dbSlot:         11000,
+			dbErr:          nil,
+			finalizedSlot:  13100, // computed lookback = 12500
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   12100,
+		},
+		{
+			name:           "uses lookbackSlot when db returns sql.ErrNoRows",
+			dbErr:          sql.ErrNoRows,
+			finalizedSlot:  10100, // lookback = 9100
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   9100,
+		},
+		{
+			name:        "returns error when DB returns unexpected error",
+			dbErr:       errors.New("db failure"),
+			expectError: true,
+		},
+		{
+			name:        "returns error when computeLookbackWindow fails",
+			dbSlot:      10000,
+			dbErr:       nil,
+			lookbackErr: errors.New("rpc error"),
+			expectError: true,
+		},
+		{
+			name:           "firstAvailableSlot overrides computed lookbackSlot",
+			dbErr:          sql.ErrNoRows,
+			finalizedSlot:  10600,
+			firstAvailable: 10100, // should take precedence over computed lookback
+			maxRetention:   600 * time.Second,
+			expectedSlot:   10100,
+		},
+	}
+
+	lp := newMockedLP(t)
+
+	lp.LogPoller.blockTime = 600 * time.Millisecond
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lp.LogPoller.lastProcessedSlot = tc.lastProcessedSlot
+			if tc.lastProcessedSlot == 0 {
+				lp.ORM.On("GetLatestBlock", mock.Anything).Return(tc.dbSlot, tc.dbErr).Once()
+			}
+
+			// Set up lookback window mocks *only if GetLatestBlock is expected to succeed or be sql.ErrNoRows*
+			shouldRunLookback := tc.lastProcessedSlot != 0 || tc.dbErr == nil || errors.Is(tc.dbErr, sql.ErrNoRows)
+			if shouldRunLookback {
+				if tc.lookbackErr == nil {
+					if tc.finalizedSlot != 0 {
+						lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
+							Return(tc.finalizedSlot, nil).Once()
+					}
+					lp.Client.On("GetFirstAvailableBlock", mock.Anything).
+						Return(tc.firstAvailable, nil).Once()
+					lp.Filters.On("MaxRetention").Return(tc.maxRetention).Once()
+				} else {
+					lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
+						Return(uint64(0), tc.lookbackErr).Once()
+				}
+			}
+
+			slot, err := lp.LogPoller.getLastProcessedSlot(ctx)
+			if tc.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedSlot, slot)
+				assert.NotZero(t, slot)
+			}
+
+			lp.ORM.AssertExpectations(t)
+			lp.Client.AssertExpectations(t)
+			lp.Filters.AssertExpectations(t)
+		})
+	}
 }
 
 func TestLogPoller_processBlocksRange(t *testing.T) {
