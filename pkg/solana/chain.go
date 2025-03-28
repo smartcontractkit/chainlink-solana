@@ -157,7 +157,7 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 
 	if !ignore {
 		var matches bool
-		// v.expectedChainID comes from the configuration, though it should be genesis block hash, but "devnet", "testnet", "mainnet" are the legacy chainIDs
+		// v.expectedChainID comes from the configuration, though it should be genesis block hash, "devnet", "testnet", "mainnet" are the legacy chainIDs
 		switch v.expectedChainID {
 		case "devnet":
 			matches = v.chainID == client.DevnetGenesisHash
