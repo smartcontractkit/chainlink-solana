@@ -8,15 +8,13 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -48,7 +46,7 @@ func TestLookup(t *testing.T) {
 				Location: "test",
 			},
 		}
-		_, err := lookupConfig.Resolve(tests.Context(t), nil, nil, client.MultiClient{})
+		_, err := lookupConfig.Resolve(t.Context(), nil, nil, client.MultiClient{})
 		require.Contains(t, err.Error(), "exactly one of AccountConstant, AccountLookup, PDALookups, or AccountsFromLookupTable must be specified, got 2")
 	})
 }
@@ -359,7 +357,7 @@ func TestAccountLookups(t *testing.T) {
 
 func TestPDALookups(t *testing.T) {
 	programID := solanautils.GetRandomPubKey(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
 		seed := solanautils.GetRandomPubKey(t)
@@ -574,7 +572,7 @@ func TestPDALookups(t *testing.T) {
 }
 
 func TestLookupTables(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sender, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -842,7 +840,7 @@ func TestLookupTables(t *testing.T) {
 }
 
 func TestCreateATAs(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	sender, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -976,7 +974,7 @@ func TestCreateATAs(t *testing.T) {
 
 	t.Run("successfully creates ATAs only when necessary", func(t *testing.T) {
 		tokenProgram := solana.Token2022ProgramID
-		mint := utils.CreateRandomToken(t, sender, solana.Token2022ProgramID, rpcClient)
+		mint := utils.CreateRandomToken(t.Context(), t, sender, solana.Token2022ProgramID, rpcClient)
 
 		ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, feePayer)
 		require.NoError(t, err)
@@ -1020,7 +1018,7 @@ func TestCreateATAs(t *testing.T) {
 		const numMints = 3
 		var mints []solana.PublicKey
 		for i := 0; i < numMints; i++ {
-			mintPubKey := utils.CreateRandomToken(t, sender, tokenProgram, rpcClient)
+			mintPubKey := utils.CreateRandomToken(t.Context(), t, sender, tokenProgram, rpcClient)
 			mints = append(mints, mintPubKey)
 		}
 
@@ -1099,6 +1097,6 @@ func TestCreateATAs(t *testing.T) {
 }
 
 func checkIfATAExists(t *testing.T, rpcClient *rpc.Client, ataAddress solana.PublicKey) bool {
-	_, err := rpcClient.GetAccountInfo(tests.Context(t), ataAddress)
+	_, err := rpcClient.GetAccountInfo(t.Context(), ataAddress)
 	return err == nil
 }

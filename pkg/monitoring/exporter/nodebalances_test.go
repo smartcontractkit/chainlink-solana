@@ -18,7 +18,7 @@ import (
 )
 
 func TestNodeBalances(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	factory := NewNodeBalancesFactory(lgr, metrics.NewNodeBalances)
 

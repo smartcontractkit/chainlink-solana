@@ -495,6 +495,62 @@ func (_c *ReaderWriter_GetFeeForMessage_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetFirstAvailableBlock provides a mock function with given fields: ctx
+func (_m *ReaderWriter) GetFirstAvailableBlock(ctx context.Context) (uint64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFirstAvailableBlock")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetFirstAvailableBlock_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFirstAvailableBlock'
+type ReaderWriter_GetFirstAvailableBlock_Call struct {
+	*mock.Call
+}
+
+// GetFirstAvailableBlock is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *ReaderWriter_Expecter) GetFirstAvailableBlock(ctx interface{}) *ReaderWriter_GetFirstAvailableBlock_Call {
+	return &ReaderWriter_GetFirstAvailableBlock_Call{Call: _e.mock.On("GetFirstAvailableBlock", ctx)}
+}
+
+func (_c *ReaderWriter_GetFirstAvailableBlock_Call) Run(run func(ctx context.Context)) *ReaderWriter_GetFirstAvailableBlock_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetFirstAvailableBlock_Call) Return(out uint64, err error) *ReaderWriter_GetFirstAvailableBlock_Call {
+	_c.Call.Return(out, err)
+	return _c
+}
+
+func (_c *ReaderWriter_GetFirstAvailableBlock_Call) RunAndReturn(run func(context.Context) (uint64, error)) *ReaderWriter_GetFirstAvailableBlock_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestBlock provides a mock function with given fields: ctx
 func (_m *ReaderWriter) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
 	ret := _m.Called(ctx)

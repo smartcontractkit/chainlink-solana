@@ -95,6 +95,15 @@ func (m *MultiClient) SlotHeight(ctx context.Context) (uint64, error) {
 	return r.SlotHeight(ctx)
 }
 
+func (m *MultiClient) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {
+	r, err := m.getClient(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return r.GetFirstAvailableBlock(ctx)
+}
+
 func (m *MultiClient) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
