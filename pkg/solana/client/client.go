@@ -251,12 +251,11 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 	}
 
 	hash := v.(solana.Hash).String()
-
-	// If the genesis hash does not match any known network, we return it as a 'localnet' instead of a genesis hash
 	if hash == MainnetGenesisHash || hash == TestnetGenesisHash || hash == DevnetGenesisHash {
 		return mn.StringID(hash), nil
 	}
 
+	// use 'localnet' instead of a genesis hash for chainID for localnet, as it's non-deterministic for each run
 	return "localnet", nil
 }
 
