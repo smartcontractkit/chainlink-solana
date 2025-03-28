@@ -162,19 +162,6 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
           return this.signAndSendRawTx(rawTxs, extraSigners, overrides, (retryCount += 1))
         }
         throw error
-      } else if (error instanceof TransactionExpiredTimeoutError) {
-        // Sometimes it takes longer to confirm or we need to retry check the transaction
-        // Do 3 retries
-        const signature = error.signature
-        for (let i = 0; i < 3; i++) {
-          const status = await this.provider.connection.getSignatureStatus(signature)
-          if (status.value && status.value.confirmationStatus == 'confirmed') {
-            return signature
-          }
-          // exponential
-          this.sleep(3000 ** i)
-        }
-        throw error
       } else {
         throw error
       }
