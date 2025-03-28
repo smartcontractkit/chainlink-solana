@@ -242,14 +242,22 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
+
 	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
 		return c.rpc.GetGenesisHash(ctx)
 	})
 	if err != nil {
 		return "", err
 	}
-	hash := v.(solana.Hash)
-	return mn.StringID(hash.String()), nil
+
+	hash := v.(solana.Hash).String()
+
+	// If the genesis hash does not match any known network, we return it as a 'localnet' instead of a genesis hash
+	if hash == MainnetGenesisHash || hash == TestnetGenesisHash || hash == DevnetGenesisHash {
+		return mn.StringID(hash), nil
+	}
+
+	return "localnet", nil
 }
 
 func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
