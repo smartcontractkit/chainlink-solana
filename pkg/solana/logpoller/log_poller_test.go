@@ -490,3 +490,48 @@ func Test_LogPoller_Replay(t *testing.T) {
 		assertReplayInfo(3, ReplayStatusRequested)
 	})
 }
+
+func TestShuffledFilters(t *testing.T) {
+	fl := &filters{
+		filtersByID: map[int64]*Filter{
+			0: {Name: "Filter A"},
+			1: {Name: "Filter B"},
+			2: {Name: "Filter C"},
+		},
+	}
+
+	seen := map[string]bool{}
+	for filter := range fl.shuffledFilters() {
+		seen[filter.Name] = true
+	}
+
+	require.Len(t, seen, 3)
+
+	for _, filter := range fl.filtersByID {
+		assert.Contains(t, seen, filter.Name)
+	}
+}
+
+func TestBackgroundWorkerRun(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	lggr := logger.TestSugared(t)
+	orm := NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lp := New(lggr, orm, cl)
+
+	filter1 := Filter{ID: 1, Name: "Filter A"}
+	filter2 := Filter{ID: 2, Name: "Filter B"}
+	filter3 := Filter{ID: 3, Name: "Filter C"}
+
+	filters := []Filter{
+		filter1, filter2, filter3,
+	}
+
+	orm.EXPECT().SelectFilters(mock.Anything).Return(filters, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil)
+	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(1), nil)
+
+	lp.backgroundWorkerRun(ctx)
+	orm.AssertNumberOfCalls(t, "PruneLogsForFilter", 3)
+}

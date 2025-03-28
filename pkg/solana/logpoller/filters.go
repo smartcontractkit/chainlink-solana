@@ -85,9 +85,9 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 // Returns a randomly shuffled snapshot of all currently registered filters
 func (fl *filters) shuffledFilters() iter.Seq[Filter] {
 	fl.filtersMutex.Lock()
-	filterSlice := make([]*Filter, len(fl.filtersByID))
-	for i, filter := range fl.filtersByID {
-		filterSlice[i] = filter
+	filterSlice := make([]*Filter, 0, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		filterSlice = append(filterSlice, filter)
 	}
 	fl.filtersMutex.Unlock()
 
