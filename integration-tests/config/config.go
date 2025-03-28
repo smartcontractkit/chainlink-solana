@@ -18,7 +18,7 @@ type ProgramAddresses struct {
 func DevnetConfig() *Config {
 	return &Config{
 		ChainName: "solana",
-		ChainID:   "devnet",
+		ChainID:   "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
 		// Will be overridden if set in toml
 		RPCUrls: []string{"https://api.devnet.solana.com"},
 		WSUrls:  []string{"wss://api.devnet.solana.com/"},
