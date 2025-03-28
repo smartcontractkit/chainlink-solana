@@ -89,6 +89,10 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		return nil, nil, nil, fmt.Errorf("failed to fetch fee quoter address: %w", err)
 	}
 
+	if len(accounts) < MandatoryExecuteAccounts {
+		return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
+	}
+
 	var tokenIndexes []uint8
 	// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
 	poolProgram := poolLookupAccounts[2]
@@ -96,6 +100,25 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
 		receiver := message.Receiver
+
+		if !receiver.IsZeroOrEmpty() {
+			userAccountsLookup := AccountLookup{
+				Name:       "UserAccounts",
+				Location:   "ExtraData.ExtraArgsDecoded.accounts",
+				IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap", StartIndex: 0},
+				IsSigner:   MetaBool{Value: false},
+			}
+			userAccounts, err := userAccountsLookup.Resolve(args)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to resolve user accounts: %w", err)
+			}
+			accounts = append(accounts, &solana.AccountMeta{
+				PublicKey:  solana.PublicKeyFromBytes(receiver),
+				IsWritable: false,
+				IsSigner:   false,
+			})
+			accounts = append(accounts, userAccounts...)
+		}
 		sourceChainSelector := make([]byte, 8)
 		binary.LittleEndian.PutUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
 		for _, tokenAmount := range message.TokenAmounts {
@@ -111,9 +134,6 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 			poolChainConfig, err := getPoolChainConfig(sourceChainSelector, destTokenAddress, poolProgram.PublicKey)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
-			}
-			if len(accounts) < MandatoryExecuteAccounts {
-				return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
 			}
 			// Token indexes are relative to the remaining accounts which exclude mandatory accounts
 			tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec

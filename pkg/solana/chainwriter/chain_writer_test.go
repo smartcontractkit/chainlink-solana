@@ -950,7 +950,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			},
 			ExtraData: ccipsolana.ExtraDataDecoded{
 				ExtraArgsDecoded: map[string]any{
-					"computeUnits": uint32(500),
+					"computeUnits":            uint32(500),
+					"accounts":                utils.GetRandomPubKey(t),
+					"accountIsWritableBitmap": uint64(1),
 				},
 				DestExecDataDecoded: []map[string]any{
 					{"destGasAmount": uint32(200)},
