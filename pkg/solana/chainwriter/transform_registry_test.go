@@ -68,6 +68,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolChainConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram)
 	require.NoError(t, err)
 
+	extraArgsUserAccount := utils.GetRandomPubKey(t)
+
 	args := ccipsolana.SVMExecCallArgs{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
@@ -87,7 +89,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		},
 		ExtraData: ccipsolana.ExtraDataDecoded{
 			ExtraArgsDecoded: map[string]any{
-				"computeUnits": uint32(500),
+				"computeUnits":            uint32(500),
+				"accounts":                extraArgsUserAccount,
+				"accountIsWritableBitmap": uint64(1),
 			},
 			DestExecDataDecoded: []map[string]any{
 				{"destGasAmount": uint32(500)},
@@ -128,11 +132,13 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
-		// mandatory accounts + user accounts + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
-		require.Len(t, newAccounts, len(mandatoryAccounts)+len(userAccounts)+3+len(poolKeys)+3+len(poolKeys))
+		// mandatory accounts + 1 for msg.Receiver + 1 for the extra args user account + user accounts  + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
+		require.Len(t, newAccounts, len(mandatoryAccounts)+2+len(userAccounts)+3+len(poolKeys)+3+len(poolKeys))
 		// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
 		remainingAccounts := newAccounts[chainwriter.MandatoryExecuteAccounts:]
-		require.Len(t, remainingAccounts, len(userAccounts)+3+len(poolKeys)+3+len(poolKeys))
+		require.Len(t, remainingAccounts, len(userAccounts)+2+3+len(poolKeys)+3+len(poolKeys))
+		require.Equal(t, receiver, remainingAccounts[4].PublicKey)
+		require.Equal(t, extraArgsUserAccount, remainingAccounts[5].PublicKey)
 		for i, tokenIdx := range typedArgs.TokenIndexes {
 			startIdx := tokenIdx
 			var endIdx uint8
@@ -157,10 +163,10 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				require.True(t, tokenAccounts[j].IsWritable)
 			}
 		}
-		// Token addresses shifted by userAccounts since token index is relative to remaining accounts which include user accounts at the beginning
-		require.Equal(t, uint8(len(userAccounts)), typedArgs.TokenIndexes[0])
-		// Token addresses shifted by user accounts + the previous token accounts
-		require.Equal(t, uint8(len(userAccounts)+10), typedArgs.TokenIndexes[1])
+		// Token addresses shifted by userAccounts, msg.Receiver and extra args user account, and since token index is relative to remaining accounts which include user accounts at the beginning
+		require.Equal(t, uint8(len(userAccounts)+2), typedArgs.TokenIndexes[0])
+		// Token addresses shifted by user accounts + msg.Receiver and extra args user account + the previous token accounts
+		require.Equal(t, uint8(len(userAccounts)+10+2), typedArgs.TokenIndexes[1])
 	})
 
 	t.Run("CCIPExecute ArgsTransform includes empty token indexes if lookup table not found", func(t *testing.T) {

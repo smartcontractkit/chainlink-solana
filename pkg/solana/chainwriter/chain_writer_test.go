@@ -903,7 +903,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			tokenIndexes := *decoded.TokenIndexes
 
 			require.Len(t, tokenIndexes, 1)
-			require.Equal(t, uint8(0), tokenIndexes[0]) // no user accounts at the start of remaining accounts
+			require.Equal(t, uint8(2), tokenIndexes[0]) // 2 user accounts, msg.Receiver and the extra args user acccount
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 		// TODO: re-enable once Sanitize failure is fixed
