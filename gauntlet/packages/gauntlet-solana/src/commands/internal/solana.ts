@@ -117,11 +117,14 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
 
     // Default send with priority fees found using block estimator utils if not set
-    if (!overrides.price && validateHistoricalPriorityFeeInput(this.flags.priorityFeesHistorical)) {
+    if (!overrides.price && this.flags.priorityFeesHistorical) {
+      validateHistoricalPriorityFeeInput(this.flags.priorityFeesHistorical)
       const [percentile, nBlocks] = this.flags.priorityFeesHistorical.split(',')
       overrides.price = await this.calculatePriceFromHistoricalBlocks(nBlocks, percentile)
       logger.info(
-        `Found ${percentile} percentile priority fees in past ${nBlocks} as: ${overrides.price}. Setting as Priority Fee`,
+        `Found ${parseFloat(percentile) * 100}th percentile priority fees in past ${nBlocks} blocks as: ${
+          overrides.price
+        }. Setting as Priority Fee`,
       )
     } else if (!overrides.price && this.flags.priorityFeesConstant) {
       overrides.price = this.flags.priorityFeesConstant
@@ -147,15 +150,13 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
     } catch (error) {
       // Retry mechanism with greater priority fees
-      if (
-        error instanceof SendTransactionError &&
-        error.message.includes('congestion') &&
+      if (error instanceof SendTransactionError && error.message.includes('congestion')) {
         validateRetryPriorityInput(this.flags.priorityRetry)
-      ) {
         const [percentBump, numberOfRetries] = this.flags.priorityRetry.split(',')
         overrides.price *= 1 + percentBump
         logger.info(
-          `Attempt: ${retryCount} - Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
+          `Attempt: ${retryCount} - Transaction Failed due to network congestion, increasing by 
+          ${parseFloat(1 + percentBump) * 100}% with ${overrides.price} micro Lamports priority fee`,
         )
         if (retryCount < numberOfRetries) {
           return this.signAndSendRawTx(rawTxs, extraSigners, overrides, (retryCount += 1))

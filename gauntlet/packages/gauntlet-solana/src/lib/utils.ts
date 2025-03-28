@@ -37,7 +37,7 @@ export const percentile = (values: number[], p: number): number | null => {
 }
 
 export const validateHistoricalPriorityFeeInput = (val: string): boolean => {
-  if (!val) return false
+  if (!val) throw new Error('No Input for Historical Priority Fees')
 
   const [p, nBlocks] = val.split(',')
 
@@ -46,11 +46,15 @@ export const validateHistoricalPriorityFeeInput = (val: string): boolean => {
   const nBlocksNum = parseInt(nBlocks, 10)
 
   // Return true if all conditions are met
-  return !isNaN(pNum) && !isNaN(nBlocksNum) && pNum < 1 && nBlocksNum > 0
+  if (!isNaN(pNum) && !isNaN(nBlocksNum) && pNum < 1 && nBlocksNum > 0) {
+    return
+  } else {
+    throw new Error('Invalid input for Historical Priority fees')
+  }
 }
 
 export const validateRetryPriorityInput = (val: string): boolean => {
-  if (!val) return false
+  if (!val) throw new Error('No Input for Historical Priority Fees')
 
   const [bumpPercentage, numberOfRetries] = val.split(',')
 
@@ -58,9 +62,9 @@ export const validateRetryPriorityInput = (val: string): boolean => {
   const bumpPercentageNum = parseFloat(bumpPercentage)
   const numberOfRetriesNum = parseInt(numberOfRetries, 10)
 
-  console.log(bumpPercentage, numberOfRetries)
-  console.log(typeof bumpPercentageNum === 'number') // Check if it's a number
-  console.log(typeof numberOfRetriesNum === 'number') // Check if it's a number
-
-  return !isNaN(bumpPercentageNum) && !isNaN(numberOfRetriesNum) && bumpPercentageNum < 1 && numberOfRetriesNum > 0
+  if (!isNaN(bumpPercentageNum) && !isNaN(numberOfRetriesNum) && bumpPercentageNum < 1 && numberOfRetriesNum > 0) {
+    return
+  } else {
+    throw new Error('Invalid input for Retry Priority Fees input')
+  }
 }
