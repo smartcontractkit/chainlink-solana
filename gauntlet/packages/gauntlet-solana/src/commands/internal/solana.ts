@@ -18,7 +18,13 @@ import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@coral-xyz/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx, percentile, Overrides } from '../../lib/utils'
+import {
+  makeTx,
+  percentile,
+  validateHistoricalPriorityFeeInput,
+  validateRetryPriorityInput,
+  Overrides,
+} from '../../lib/utils'
 import { BlockData, parseBlockFees } from '../../lib/feeUtils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
@@ -52,10 +58,10 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
         maxSupportedTransactionVersion: 0,
       })
       blockData = parseBlockFees(block)
-      prices = [...prices, blockData.prices]
+      prices = [...prices, ...blockData.prices]
     }
-    // return median of priority fess used
-    return percentile(blockData.prices, p)
+    // return percentile of priority fess used
+    return Math.floor(percentile(prices, p))
   }
 
   sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -102,8 +108,8 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
-    withPriorityFee: Boolean = true,
     overrides: Overrides = {},
+    retryCount: number = 0,
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
     if (this.flags.priorityFeesConstant && this.flags.priorityFeesHistorical) {
@@ -111,11 +117,13 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
 
     // Default send with priority fees found using block estimator utils if not set
-    if (!overrides.price && this.flags.priorityFeesHistorical) {
-      const [nBlocks, percentile] = this.flags.priorityFeesHistorical.split(',')
+    if (!overrides.price && validateHistoricalPriorityFeeInput(this.flags.priorityFeesHistorical)) {
+      const [percentile, nBlocks] = this.flags.priorityFeesHistorical.split(',')
       overrides.price = await this.calculatePriceFromHistoricalBlocks(nBlocks, percentile)
-      logger.info(`Found past median priority fees as: ${overrides.price}. Setting as Priority Fee`)
-    } else if (overrides.price && this.flags.priorityFeesConstant) {
+      logger.info(
+        `Found ${percentile} percentile priority fees in past ${nBlocks} as: ${overrides.price}. Setting as Priority Fee`,
+      )
+    } else if (!overrides.price && this.flags.priorityFeesConstant) {
       overrides.price = this.flags.priorityFeesConstant
     }
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
@@ -135,17 +143,24 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
-
     try {
       return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
     } catch (error) {
       // Retry mechanism with greater priority fees
-      if (error instanceof SendTransactionError && error.message.includes('congestion') && withPriorityFee) {
-        overrides.price += 1000
+      if (
+        error instanceof SendTransactionError &&
+        error.message.includes('congestion') &&
+        validateRetryPriorityInput(this.flags.priorityRetry)
+      ) {
+        const [percentBump, numberOfRetries] = this.flags.priorityRetry.split(',')
+        overrides.price *= 1 + percentBump
         logger.info(
-          `Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
+          `Attempt: ${retryCount} - Transaction Failed due to network congestion, increasing and retrying with ${overrides.price} micro Lamports priority fee`,
         )
-        return this.signAndSendRawTx(rawTxs, extraSigners, true, overrides)
+        if (retryCount < numberOfRetries) {
+          return this.signAndSendRawTx(rawTxs, extraSigners, overrides, (retryCount += 1))
+        }
+        throw error
       } else if (error instanceof TransactionExpiredTimeoutError) {
         // Sometimes it takes longer to confirm or we need to retry check the transaction
         // Do 3 retries
