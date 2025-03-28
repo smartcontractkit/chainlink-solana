@@ -18,7 +18,6 @@ import (
 	looptestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
@@ -32,7 +31,7 @@ func TestCodec(t *testing.T) {
 	RunCodecInterfaceTests(t, looptestutils.WrapCodecTesterForLoop(tester))
 
 	t.Run("Events are encode-able and decode-able for a single item", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		item := CreateTestStruct[*testing.T](0, tester)
 		req := &EncodeRequest{TestStructs: []TestStruct{item}, TestOn: testutils.TestEventItem}
 		resp := tester.EncodeFields(t, req)

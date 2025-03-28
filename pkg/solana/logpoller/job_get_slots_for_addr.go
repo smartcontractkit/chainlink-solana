@@ -93,10 +93,7 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 			return true, nil
 		}
 
-		// no need to fetch slot, if transaction failed
-		if sig.Err == nil {
-			f.storeSlot(sig.Slot)
-		}
+		f.storeSlot(sig.Slot)
 	}
 
 	oldestSig := sigs[len(sigs)-1]

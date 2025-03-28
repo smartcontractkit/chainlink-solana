@@ -19,9 +19,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -110,6 +109,10 @@ func (r *Relayer) ListNodeStatuses(ctx context.Context, pageSize int32, pageToke
 
 func (r *Relayer) Transact(ctx context.Context, from, to string, amount *big.Int, balanceCheck bool) error {
 	return r.chain.Transact(ctx, from, to, amount, balanceCheck)
+}
+
+func (r *Relayer) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
+	return r.chain.Replay(ctx, fromBlock, args)
 }
 
 func (r *Relayer) NewMercuryProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.MercuryProvider, error) {

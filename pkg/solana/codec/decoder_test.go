@@ -8,7 +8,6 @@ import (
 
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 type testErrDecodeEntry struct {
@@ -33,18 +32,18 @@ func TestDecoder_Decode_Errors(t *testing.T) {
 	t.Run("error when item type not found", func(t *testing.T) {
 		nonExistentType := "output.Non.Existent"
 		err := newDecoder(map[string]Entry{someType: &entry{}}).
-			Decode(tests.Context(t), []byte{}, &into, nonExistentType)
+			Decode(t.Context(), []byte{}, &into, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
 		require.Error(t, newDecoder(map[string]Entry{someType: &testErrDecodeEntry{}}).
-			Decode(tests.Context(t), []byte{}, &into, someType))
+			Decode(t.Context(), []byte{}, &into, someType))
 	})
 
 	t.Run("remaining bytes exist after decode is ok", func(t *testing.T) {
 		require.NoError(t, newDecoder(map[string]Entry{someType: &testErrDecodeRemainingBytes{}}).
-			Decode(tests.Context(t), []byte{}, &into, someType))
+			Decode(t.Context(), []byte{}, &into, someType))
 	})
 }
 
@@ -70,13 +69,13 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 	t.Run("error when entry for item type is missing", func(t *testing.T) {
 		nonExistentType := "non-existent"
 		_, err := newDecoder(map[string]Entry{someType: &entry{}}).
-			GetMaxDecodingSize(tests.Context(t), 0, nonExistentType)
+			GetMaxDecodingSize(t.Context(), 0, nonExistentType)
 		require.ErrorIs(t, err, fmt.Errorf("%w: cannot find type %s", commontypes.ErrInvalidType, nonExistentType))
 	})
 
 	t.Run("error when underlying entry decode fails", func(t *testing.T) {
 		_, err := newDecoder(map[string]Entry{someType: &testErrGetMaxDecodingSize{}}).
-			GetMaxDecodingSize(tests.Context(t), 0, someType)
+			GetMaxDecodingSize(t.Context(), 0, someType)
 		require.Error(t, err)
 	})
 }

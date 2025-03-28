@@ -424,3 +424,18 @@ func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	return nil
 }
+
+type ErrorCode ag_binary.BorshEnum
+
+const (
+	IntentionalFailure_ErrorCode ErrorCode = iota
+)
+
+func (value ErrorCode) String() string {
+	switch value {
+	case IntentionalFailure_ErrorCode:
+		return "IntentionalFailure"
+	default:
+		return ""
+	}
+}
