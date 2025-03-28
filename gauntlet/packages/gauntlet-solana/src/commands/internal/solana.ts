@@ -9,19 +9,28 @@ import {
   TransactionSignature,
   TransactionInstruction,
   sendAndConfirmRawTransaction,
+  SendTransactionError,
+  TransactionExpiredTimeoutError,
 } from '@solana/web3.js'
+
 import { withProvider, withWallet, withNetwork } from '../middlewares'
 import { TransactionResponse } from '../types'
 import { ProgramError, parseIdlErrors, Idl, Program, AnchorProvider } from '@coral-xyz/anchor'
 import { SolanaWallet } from '../wallet'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
-import { makeTx } from '../../lib/utils'
+import {
+  makeTx,
+  percentile,
+  validateHistoricalPriorityFeeInput,
+  validateRetryPriorityInput,
+  Overrides,
+} from '../../lib/utils'
+import { BlockData, parseBlockFees } from '../../lib/feeUtils'
 
 export default abstract class SolanaCommand extends WriteCommand<TransactionResponse> {
   wallet: SolanaWallet
   provider: AnchorProvider
   program: Program
-
   abstract execute: () => Promise<Result<TransactionResponse>>
   makeRawTransaction: (signer: PublicKey) => Promise<TransactionInstruction[]>
 
@@ -38,6 +47,24 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   }
 
   static lamportsToSol = (lamports: number) => lamports / LAMPORTS_PER_SOL
+
+  calculatePriceFromHistoricalBlocks = async (numberOfBlocks: number = 1, p: number = 0.5): Promise<number> => {
+    const latestSlot = await this.provider.connection.getSlot()
+    let prices = []
+    let blockData: BlockData
+    for (let i = 0; i < numberOfBlocks; i++) {
+      const slot = latestSlot - i
+      const block = await this.provider.connection.getBlock(slot, {
+        maxSupportedTransactionVersion: 0,
+      })
+      blockData = parseBlockFees(block)
+      prices = [...prices, ...blockData.prices]
+    }
+    // return percentile of priority fess used
+    return Math.floor(percentile(prices, p))
+  }
+
+  sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
   loadProgram = (idl: Idl, address: string): Program<Idl> => {
     const program = new Program(idl, address, this.provider)
@@ -81,18 +108,30 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
   signAndSendRawTx = async (
     rawTxs: TransactionInstruction[],
     extraSigners?: Keypair[],
-    overrides: {
-      units?: number
-      price?: number
-    } = {},
+    overrides: Overrides = {},
+    retryCount: number = 0,
   ): Promise<TransactionSignature> => {
     const { blockhash, lastValidBlockHeight } = await this.provider.connection.getLatestBlockhash()
+    if (this.flags.priorityFeesConstant && this.flags.priorityFeesHistorical) {
+      throw new Error('Cannot have both constant priority fees set and historical priority fees')
+    }
 
-    if (!overrides.units && !!this.flags.computeUnits) overrides.units = this.flags.computeUnits
-    if (!overrides.price && !!this.flags.computePrice) overrides.price = this.flags.computePrice
-
+    // Default send with priority fees found using block estimator utils if not set
+    if (!overrides.price && this.flags.priorityFeesHistorical) {
+      validateHistoricalPriorityFeeInput(this.flags.priorityFeesHistorical)
+      const [percentile, nBlocks] = this.flags.priorityFeesHistorical.split(',')
+      overrides.price = await this.calculatePriceFromHistoricalBlocks(nBlocks, percentile)
+      logger.info(
+        `Found ${parseFloat(percentile) * 100}th percentile priority fees in past ${nBlocks} blocks as: ${
+          overrides.price
+        }. Setting as Priority Fee`,
+      )
+    } else if (!overrides.price && this.flags.priorityFeesConstant) {
+      overrides.price = this.flags.priorityFeesConstant
+    }
     if (overrides.units) logger.info(`Sending transaction with custom unit limit: ${overrides.units}`)
     if (overrides.price) logger.info(`Sending transaction with custom unit price: ${overrides.price}`)
+
     const tx = makeTx(
       rawTxs,
       {
@@ -107,7 +146,26 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     }
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
-    return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+    try {
+      return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+    } catch (error) {
+      // Retry mechanism with greater priority fees
+      if (error instanceof SendTransactionError && error.message.includes('congestion')) {
+        validateRetryPriorityInput(this.flags.priorityRetry)
+        const [percentBump, numberOfRetries] = this.flags.priorityRetry.split(',')
+        overrides.price *= 1 + percentBump
+        logger.info(
+          `Attempt: ${retryCount} - Transaction Failed due to network congestion, increasing by 
+          ${parseFloat(1 + percentBump) * 100}% with ${overrides.price} micro Lamports priority fee`,
+        )
+        if (retryCount < numberOfRetries) {
+          return this.signAndSendRawTx(rawTxs, extraSigners, overrides, (retryCount += 1))
+        }
+        throw error
+      } else {
+        throw error
+      }
+    }
   }
 
   sendTxWithIDL = (sendAction: (...args: any) => Promise<TransactionSignature>, idl: Idl) => async (
