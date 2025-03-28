@@ -399,11 +399,6 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	require.NoError(t, err)
 	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
 
-	// get genesis hash and use it as chainID
-	solClient := rpc.New(url)
-	genesisHash, err := solClient.GetGenesisHash(ctx)
-	require.NoError(t, err)
-
 	// configuration
 	cfg := solcfg.NewDefault()
 	cfg.MultiNode.MultiNode.Enabled = ptr(true)
@@ -416,7 +411,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 
 	// mocked keystore
 	mkey := mocks.NewSimpleKeystore(t)
-	c, err := newChain(genesisHash.String(), cfg, mkey, lgr, sqltest.NewNoOpDataSource())
+	c, err := newChain("localnet", cfg, mkey, lgr, sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 	servicetest.Run(t, c)
 

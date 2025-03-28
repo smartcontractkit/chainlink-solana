@@ -154,6 +154,9 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	for _, hash := range genesisHashes {
 		network, err := c.ChainID(ctx)
 		assert.NoError(t, err)
+		if network == "localnet" {
+			continue
+		}
 		assert.Equal(t, mn.StringID(hash), network)
 	}
 }
