@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -205,6 +206,123 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int64(latestFinalized-1), actual)
 	})
+}
+
+func Test_GetLastProcessedSlot(t *testing.T) {
+	ctx := t.Context()
+
+	type testCase struct {
+		name              string
+		lastProcessedSlot int64
+		dbSlot            int64
+		dbErr             error
+		finalizedSlot     uint64
+		firstAvailable    uint64
+		lookbackErr       error
+		maxRetention      time.Duration
+		expectedSlot      int64
+		expectError       bool
+	}
+
+	testCases := []testCase{
+		{
+			name:              "uses lastProcessedSlot when greater than lookback",
+			lastProcessedSlot: 12000,
+			finalizedSlot:     11400, // so computed lookback = 11400 - 1000 = 10400 < 12000
+			firstAvailable:    0,
+			maxRetention:      600 * time.Second,
+			expectedSlot:      12000,
+		},
+		{
+			name:           "uses dbSlot when greater than lookback",
+			dbSlot:         11500,
+			dbErr:          nil,
+			finalizedSlot:  11100, // computed lookback = 10500
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   11500,
+		},
+		{
+			name:           "uses lookbackSlot when greater than dbSlot",
+			dbSlot:         11000,
+			dbErr:          nil,
+			finalizedSlot:  13100, // computed lookback = 12500
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   12100,
+		},
+		{
+			name:           "uses lookbackSlot when db returns sql.ErrNoRows",
+			dbErr:          sql.ErrNoRows,
+			finalizedSlot:  10100, // lookback = 9100
+			firstAvailable: 0,
+			maxRetention:   600 * time.Second,
+			expectedSlot:   9100,
+		},
+		{
+			name:        "returns error when DB returns unexpected error",
+			dbErr:       errors.New("db failure"),
+			expectError: true,
+		},
+		{
+			name:        "returns error when computeLookbackWindow fails",
+			dbSlot:      10000,
+			dbErr:       nil,
+			lookbackErr: errors.New("rpc error"),
+			expectError: true,
+		},
+		{
+			name:           "firstAvailableSlot overrides computed lookbackSlot",
+			dbErr:          sql.ErrNoRows,
+			finalizedSlot:  10600,
+			firstAvailable: 10100, // should take precedence over computed lookback
+			maxRetention:   600 * time.Second,
+			expectedSlot:   10100,
+		},
+	}
+
+	lp := newMockedLP(t)
+
+	lp.LogPoller.blockTime = 600 * time.Millisecond
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lp.LogPoller.lastProcessedSlot = tc.lastProcessedSlot
+			if tc.lastProcessedSlot == 0 {
+				lp.ORM.On("GetLatestBlock", mock.Anything).Return(tc.dbSlot, tc.dbErr).Once()
+			}
+
+			// Set up lookback window mocks *only if GetLatestBlock is expected to succeed or be sql.ErrNoRows*
+			shouldRunLookback := tc.lastProcessedSlot != 0 || tc.dbErr == nil || errors.Is(tc.dbErr, sql.ErrNoRows)
+			if shouldRunLookback {
+				if tc.lookbackErr == nil {
+					if tc.finalizedSlot != 0 {
+						lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
+							Return(tc.finalizedSlot, nil).Once()
+					}
+					lp.Client.On("GetFirstAvailableBlock", mock.Anything).
+						Return(tc.firstAvailable, nil).Once()
+					lp.Filters.On("MaxRetention").Return(tc.maxRetention).Once()
+				} else {
+					lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
+						Return(uint64(0), tc.lookbackErr).Once()
+				}
+			}
+
+			slot, err := lp.LogPoller.getLastProcessedSlot(ctx)
+			if tc.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedSlot, slot)
+				assert.NotZero(t, slot)
+			}
+
+			lp.ORM.AssertExpectations(t)
+			lp.Client.AssertExpectations(t)
+			lp.Filters.AssertExpectations(t)
+		})
+	}
 }
 
 func TestLogPoller_processBlocksRange(t *testing.T) {

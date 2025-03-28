@@ -535,7 +535,7 @@ func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
 	latestSlot, firstSlot := int64(latestFinalizedSlot), int64(firstAvailableSlot)
-	lookbackSlot := latestSlot - int64(lookback/lp.blockTime) - 1
+	lookbackSlot := latestSlot - int64((lookback-1)/lp.blockTime) - 1 // = latestSlot - ceil(lookback/blockTime)
 
 	// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
 	if err == nil && firstSlot > lookbackSlot {
