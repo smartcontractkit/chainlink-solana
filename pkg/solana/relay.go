@@ -52,6 +52,11 @@ type Relayer struct {
 	stopCh services.StopChan
 }
 
+func (r *Relayer) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 // Note: constructed in core
 func NewRelayer(lggr logger.Logger, chain Chain, _ core.CapabilitiesRegistry) *Relayer {
 	return &Relayer{

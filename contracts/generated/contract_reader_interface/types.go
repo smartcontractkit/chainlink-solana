@@ -424,3 +424,25 @@ func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	return nil
 }
+
+type CurseSubject struct {
+	Value [16]uint8
+}
+
+func (obj CurseSubject) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Value` param:
+	err = encoder.Encode(obj.Value)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CurseSubject) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Value`:
+	err = decoder.Decode(&obj.Value)
+	if err != nil {
+		return err
+	}
+	return nil
+}

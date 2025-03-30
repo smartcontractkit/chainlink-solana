@@ -30,6 +30,7 @@ func (d *decoder) Decode(ctx context.Context, raw []byte, into any, itemType str
 		}
 	}()
 
+	fmt.Println("decoder 1")
 	_, itemType = commoncodec.ItemTyper(itemType).Next()
 	head, tail := commoncodec.ItemTyper(itemType).Next()
 

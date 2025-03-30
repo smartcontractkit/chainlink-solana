@@ -6,14 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/mitchellh/mapstructure"
 
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -139,37 +136,37 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poolTables map[string][]*solana.AccountMeta) ([]*solana.AccountMeta, error) {
 	var poolAccounts []*solana.AccountMeta
 	// poolTables only contains a single lookup table for token admin registry
-	for _, table := range poolTables {
-		tokenAdminRegistryPDA := table[1].PublicKey
-
-		// load token admin registry
-		resp, err := client.GetAccountInfoWithOpts(ctx, tokenAdminRegistryPDA, &rpc.GetAccountInfoOpts{
-			Encoding:   "base64",
-			Commitment: rpc.CommitmentFinalized,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch token admin registry account: %w", err)
-		}
-		tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
-		err = bin.NewBorshDecoder(resp.GetBinary()).Decode(&tokenAdminRegistry)
-		if err != nil {
-			return nil, fmt.Errorf("failed to borsh decode token admin registry account: %w", err)
-		}
-
-		// lookup tables can store 256 addresses
-		// token admin registry's WritableIndexes field is the binary representation of indexes that are writable stored in 2 separate uint128 on-chain
-		writableBytes := append(tokenAdminRegistry.WritableIndexes[0].Bytes(), tokenAdminRegistry.WritableIndexes[1].Bytes()...)
-		writableBits := ""
-		for _, b := range writableBytes {
-			writableBits += fmt.Sprintf("%08b", b)
-		}
-		// set IsWritable according to token admin registry's WritableIndexes
-		for i, meta := range table {
-			writable := string(writableBits[i]) == "1"
-			meta.IsWritable = writable
-			poolAccounts = append(poolAccounts, meta)
-		}
-	}
+	//for _, table := range poolTables {
+	//	tokenAdminRegistryPDA := table[1].PublicKey
+	//
+	//	// load token admin registry
+	//	resp, err := client.GetAccountInfoWithOpts(ctx, tokenAdminRegistryPDA, &rpc.GetAccountInfoOpts{
+	//		Encoding:   "base64",
+	//		Commitment: rpc.CommitmentFinalized,
+	//	})
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to fetch token admin registry account: %w", err)
+	//	}
+	//	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+	//	err = bin.NewBorshDecoder(resp.GetBinary()).Decode(&tokenAdminRegistry)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to borsh decode token admin registry account: %w", err)
+	//	}
+	//
+	//	// lookup tables can store 256 addresses
+	//	// token admin registry's WritableIndexes field is the binary representation of indexes that are writable stored in 2 separate uint128 on-chain
+	//	writableBytes := append(tokenAdminRegistry.WritableIndexes[0].Bytes(), tokenAdminRegistry.WritableIndexes[1].Bytes()...)
+	//	writableBits := ""
+	//	for _, b := range writableBytes {
+	//		writableBits += fmt.Sprintf("%08b", b)
+	//	}
+	//	// set IsWritable according to token admin registry's WritableIndexes
+	//	for i, meta := range table {
+	//		writable := string(writableBits[i]) == "1"
+	//		meta.IsWritable = writable
+	//		poolAccounts = append(poolAccounts, meta)
+	//	}
+	//}
 	return poolAccounts, nil
 }
 

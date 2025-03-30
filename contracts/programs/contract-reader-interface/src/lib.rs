@@ -19,10 +19,13 @@ pub mod contract_reader_interface {
     }
 
     pub fn initializemultiread(ctx: Context<InitializeMultiReadOnce>) -> Result<()> {
-        let multi_read1 = &mut ctx.accounts.multi_read1;
-        multi_read1.a = 1;
-        multi_read1.b = 2;
-        multi_read1.c = true;
+        let curses = &mut ctx.accounts.curses;
+        curses.version = 1;
+        curses.cursed_subjects = Vec::new();
+        curses.cursed_subjects.push(CurseSubject::GLOBAL);
+        curses
+           .cursed_subjects
+           .push(CurseSubject::from_chain_selector(42));
 
         let multi_read2 = &mut ctx.accounts.multi_read2;
         multi_read2.u = "Hello".to_string();
@@ -148,17 +151,19 @@ pub struct InitializeMultiReadOnce<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = size_of::<MultiRead1>() + 8,
-        seeds = [b"multi_read1"],
-        bump)]
-    pub multi_read1: Account<'info, MultiRead1>,
+        space = 8 + Curses::INIT_SPACE + (2 * CurseSubject::INIT_SPACE),
+        seeds = [b"curses"],
+        bump 
+     )]
+    pub curses: Account<'info, Curses>,
 
-    #[account(
+     #[account(
         init_if_needed,
         payer = signer,
         space = size_of::<MultiRead2>() + 8,
         seeds = [b"multi_read2"],
-        bump)]
+        bump 
+     )]
     pub multi_read2: Account<'info, MultiRead2>,
 
     pub system_program: Program<'info, System>,
@@ -475,3 +480,53 @@ pub enum TokenAccountError {
     #[msg("Uninitialized token account")]
     UninitializedTokenAccount,
 }
+
+/// Abstract curse subject.
+///
+/// In particular, a curse subject can be constructed from a chain
+/// selector to signify that any lane involving that chain as `destination` or `source` is
+/// cursed.
+///
+/// The above is not exhaustive: there may be other ways to define subjects.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, InitSpace, AnchorDeserialize, AnchorSerialize)]
+pub struct CurseSubject {
+    pub value: [u8; 16],
+}
+
+impl CurseSubject {
+    // Global curse subject, standardized across chains and chain families. If this subject is
+    // cursed, all lanes starting to or ending in this chain are disabled.
+    pub const GLOBAL: Self = {
+        Self {
+            value: [
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01,
+            ],
+        }
+    };
+
+    pub const fn from_chain_selector(selector: u64) -> Self {
+        Self {
+            value: (selector as u128).to_le_bytes(),
+        }
+    }
+
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self { value: bytes }
+    }
+}
+
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct Curses {
+    pub version: u8,
+    #[max_len(0)]
+    pub cursed_subjects: Vec<CurseSubject>,
+}
+
+impl Curses {
+    pub fn dynamic_len(&self) -> usize {
+        Self::INIT_SPACE + self.cursed_subjects.len() * CurseSubject::INIT_SPACE
+    }
+}
+

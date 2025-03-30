@@ -23,7 +23,7 @@ type StoreTokenAccount struct {
 	//
 	// [3] = [] systemProgram
 	// ··········· System Program required for PDA creation
-	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewStoreTokenAccountInstructionBuilder creates a new `StoreTokenAccount` instruction builder.
@@ -50,7 +50,7 @@ func (inst *StoreTokenAccount) SetAdminAccount(admin ag_solanago.PublicKey) *Sto
 // GetAdminAccount gets the "admin" account.
 // Admin account that pays for PDA creation and signs the transaction
 func (inst *StoreTokenAccount) GetAdminAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
+	return inst.AccountMetaSlice.Get(0)
 }
 
 // SetTokenAccountAccount sets the "tokenAccount" account.
@@ -61,7 +61,7 @@ func (inst *StoreTokenAccount) SetTokenAccountAccount(tokenAccount ag_solanago.P
 
 // GetTokenAccountAccount gets the "tokenAccount" account.
 func (inst *StoreTokenAccount) GetTokenAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice.Get(1)
 }
 
 // SetDataAccount sets the "data" account.
@@ -72,7 +72,7 @@ func (inst *StoreTokenAccount) SetDataAccount(data ag_solanago.PublicKey) *Store
 
 // GetDataAccount gets the "data" account.
 func (inst *StoreTokenAccount) GetDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice.Get(2)
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -85,7 +85,7 @@ func (inst *StoreTokenAccount) SetSystemProgramAccount(systemProgram ag_solanago
 // GetSystemProgramAccount gets the "systemProgram" account.
 // System Program required for PDA creation
 func (inst *StoreTokenAccount) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice.Get(3)
 }
 
 func (inst StoreTokenAccount) Build() *Instruction {
@@ -146,10 +146,10 @@ func (inst *StoreTokenAccount) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        token", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice.Get(0)))
+						accountsBranch.Child(ag_format.Meta("        token", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(3)))
 					})
 				})
 		})
