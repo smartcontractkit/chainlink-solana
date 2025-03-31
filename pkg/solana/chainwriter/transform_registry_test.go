@@ -89,7 +89,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		ExtraData: ccipsolana.ExtraDataDecoded{
 			ExtraArgsDecoded: map[string]any{
 				"computeUnits":            uint32(500),
-				"accounts":                extraArgsUserAccount,
+				"accounts":                []solana.PublicKey{extraArgsUserAccount},
 				"accountIsWritableBitmap": uint64(1),
 			},
 			DestExecDataDecoded: []map[string]any{
@@ -131,7 +131,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
-		// mandatory accounts + 1 for msg.Receiver + 1 for the extra args user account + user accounts  + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
+		// mandatory accounts + 1 for msg.Receiver + 1 for the extra args user account + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
 		require.Len(t, newAccounts, len(mandatoryAccounts)+2+len(userAccounts)+3+len(poolKeys)+3+len(poolKeys))
 		// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
 		remainingAccounts := newAccounts[chainwriter.MandatoryExecuteAccounts:]
