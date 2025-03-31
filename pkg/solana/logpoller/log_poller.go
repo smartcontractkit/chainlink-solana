@@ -336,7 +336,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 			addressesSet[filter.Address] = struct{}{}
 			addresses = append(addresses, filter.Address)
 		}
-		if filter.StartingBlock < minSlot {
+		if filter.StartingBlock != 0 && filter.StartingBlock < minSlot {
 			minSlot = filter.StartingBlock
 		}
 	}

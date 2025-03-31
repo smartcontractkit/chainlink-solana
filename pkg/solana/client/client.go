@@ -17,15 +17,15 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
-// MaxSupportTransactionVersion defines max transaction version to return in responses.
-// If the requested block contains a transaction with a higher version, an error will be returned.
-const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
-
 const (
 	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
 	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 )
+
+// MaxSupportTransactionVersion defines max transaction version to return in responses.
+// If the requested block contains a transaction with a higher version, an error will be returned.
+const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
 
 type ReaderWriter interface {
 	Writer
@@ -242,27 +242,21 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
+
 	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
 		return c.rpc.GetGenesisHash(ctx)
 	})
 	if err != nil {
 		return "", err
 	}
-	hash := v.(solana.Hash)
 
-	var network string
-	switch hash.String() {
-	case DevnetGenesisHash:
-		network = "devnet"
-	case TestnetGenesisHash:
-		network = "testnet"
-	case MainnetGenesisHash:
-		network = "mainnet"
-	default:
-		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
-		network = "localnet"
+	hash := v.(solana.Hash).String()
+	if hash == MainnetGenesisHash || hash == TestnetGenesisHash || hash == DevnetGenesisHash {
+		return mn.StringID(hash), nil
 	}
-	return mn.StringID(network), nil
+
+	// use 'localnet' instead of a genesis hash for chainID for localnet, as it's non-deterministic for each run
+	return "localnet", nil
 }
 
 func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
