@@ -105,7 +105,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 			userAccountsLookup := AccountLookup{
 				Name:       "UserAccounts",
 				Location:   "ExtraData.ExtraArgsDecoded.accounts",
-				IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap", StartIndex: 0},
+				IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap"},
 				IsSigner:   MetaBool{Value: false},
 			}
 			userAccounts, err := userAccountsLookup.Resolve(args)
