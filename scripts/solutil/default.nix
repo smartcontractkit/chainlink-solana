@@ -6,6 +6,6 @@
 pkgs.buildGo123Module {
   name = "solutil";
   src = ./.;
-  vendorHash = "sha256-onIj3yhEc8UOeKyFGXkVCo7QLsvXb8tmgjEECmbg9iU=";
+  vendorHash = "sha256-LsDgarKEv1ge0y/mk+TUtGSCGKCVX0L7gBY3mRR8KLk=";
 }
 

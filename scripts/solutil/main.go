@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"crypto/ecdsa"
 	_ "embed"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"solutil/utils"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/urfave/cli/v2"
@@ -149,6 +151,27 @@ func main() {
 						fmt.Fprintln(ctx.App.Writer, sha)
 						return nil
 					}
+				},
+			},
+			{
+				Name: "get-eth-address",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "private-key", Aliases: []string{"p"}, Required: true},
+				},
+				Action: func(ctx *cli.Context) error {
+					privateKey, err := crypto.HexToECDSA(ctx.String("private-key"))
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+
+					publicKeyECDSA, ok := privateKey.Public().(*ecdsa.PublicKey)
+					if !ok {
+						return cli.Exit("failed to get EDCSA public key from private key", 1)
+					}
+
+					address := crypto.PubkeyToAddress(*publicKeyECDSA)
+					fmt.Fprintln(ctx.App.Writer, address.Hex())
+					return nil
 				},
 			},
 		},
