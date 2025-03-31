@@ -35,6 +35,8 @@ const (
 	// Additional lengths for data packed into tx (transmitter.go)
 	StoreNonceLen    = 1
 	ReportContextLen = 3 * 32 // https://github.com/smartcontractkit/chainlink-common/blob/acef4a2b681f9e05bffd70d212ceee1ea1e526dd/pkg/utils/report.go#L12
+
+	NativeTokenDecimals = 9
 )
 
 // State is the struct representing the contract state

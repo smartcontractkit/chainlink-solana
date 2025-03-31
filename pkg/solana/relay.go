@@ -99,6 +99,10 @@ func (r *Relayer) LatestHead(ctx context.Context) (relaytypes.Head, error) {
 	return r.chain.LatestHead(ctx)
 }
 
+func (r *Relayer) GetBalance(ctx context.Context, address string) (relaytypes.TokenBalance, error) {
+	return r.chain.GetBalance(ctx, address)
+}
+
 func (r *Relayer) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
 	return r.chain.GetChainStatus(ctx)
 }

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	solanago "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -381,6 +382,30 @@ func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
 		Hash:      hashBytes,
 		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()), //nolint:gosec // blocktime will never be negative (pre 1970)
 	}, nil
+}
+
+func (c *chain) GetBalance(ctx context.Context, address string) (types.TokenBalance, error) {
+	pubKey, err := solana.PublicKeyFromBase58(address)
+	if err != nil {
+		return types.TokenBalance{}, err
+	}
+
+	sc, err := c.getClient(ctx)
+	if err != nil {
+		return types.TokenBalance{}, err
+	}
+
+	bal, err := sc.Balance(ctx, pubKey)
+	if err != nil {
+		return types.TokenBalance{}, err
+	}
+
+	balance := new(big.Int).SetUint64(bal)
+	return types.TokenBalance{
+		Balance:  balance,
+		Decimals: NativeTokenDecimals,
+	}, nil
+
 }
 
 // Implement [types.GetChainStatus] interface
