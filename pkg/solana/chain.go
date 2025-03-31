@@ -405,7 +405,6 @@ func (c *chain) GetBalance(ctx context.Context, address string) (types.TokenBala
 		Balance:  balance,
 		Decimals: NativeTokenDecimals,
 	}, nil
-
 }
 
 // Implement [types.GetChainStatus] interface
