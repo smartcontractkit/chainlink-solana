@@ -92,7 +92,19 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
+
+	chainID := *cfg.ChainID
+	switch chainID {
+	case "devnet":
+		chainID = client.DevnetGenesisHash
+	case "testnet":
+		chainID = client.TestnetGenesisHash
+	case "mainnet":
+		chainID = client.MainnetGenesisHash
+	default:
+	}
+
+	c, err := newChain(chainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -153,24 +165,8 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 	}
 
 	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.expectedChainID == "localnet"
-
-	if !ignore {
-		var matches bool
-		// v.expectedChainID comes from the configuration, though it should be genesis block hash, "devnet", "testnet", "mainnet" are the legacy chainIDs
-		switch v.expectedChainID {
-		case "devnet":
-			matches = v.chainID == client.DevnetGenesisHash
-		case "testnet":
-			matches = v.chainID == client.TestnetGenesisHash
-		case "mainnet":
-			matches = v.chainID == client.MainnetGenesisHash
-		default:
-			// check if the genesis hash is match with the provided ChainID
-			matches = v.chainID == v.expectedChainID
-		}
-
-		if !matches {
+	if v.expectedChainID != "localnet" {
+		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
 			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
 		}
