@@ -59,7 +59,6 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		computeUnits += destGasAmount
 	}
 	options := []txmutils.SetTxConfig{
-		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
 		txmutils.SetEstimateComputeUnitLimit(false),
 		txmutils.SetComputeUnitLimit(computeUnits),
 	}
@@ -148,7 +147,6 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 	}
 
 	options := []txmutils.SetTxConfig{
-		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
 		txmutils.SetEstimateComputeUnitLimit(true),
 	}
 
