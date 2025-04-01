@@ -93,6 +93,7 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
+	// Use genesis hash for known ChainIDs
 	chainID := *cfg.ChainID
 	switch chainID {
 	case "devnet":
@@ -137,11 +138,24 @@ type verifiedCachedClient struct {
 	chainID         string
 	expectedChainID string
 	nodeURL         string
+	lggr            logger.Logger
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
 
 	client.ReaderWriter
+}
+
+func IsKnownChainID(chainID string) bool {
+	switch chainID {
+	case
+		client.MainnetGenesisHash,
+		client.TestnetGenesisHash,
+		client.DevnetGenesisHash:
+		return true
+	default:
+		return false
+	}
 }
 
 func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
@@ -164,12 +178,14 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	if v.expectedChainID != "localnet" {
+	if IsKnownChainID(v.expectedChainID) {
 		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
 			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
 		}
+	} else {
+		v.lggr.Warnf("Configured chainID %s does not match genesis hash for mainnet, testnet, or devnet. "+
+			"Assuming localnet setup and skipping verification.", v.expectedChainID)
 	}
 
 	v.chainIDVerified = true
@@ -528,6 +544,7 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 		cl = &verifiedCachedClient{
 			nodeURL:         url,
 			expectedChainID: c.id,
+			lggr:            logger.Named(c.lggr, "verifiedCachedClient"),
 		}
 		// create client
 		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
