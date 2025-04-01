@@ -146,16 +146,9 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
-func IsKnownChainID(chainID string) bool {
-	switch chainID {
-	case
-		client.MainnetGenesisHash,
-		client.TestnetGenesisHash,
-		client.DevnetGenesisHash:
-		return true
-	default:
-		return false
-	}
+func isValid32ByteBase58String(chainID string) bool {
+	_, err := solanago.PublicKeyFromBase58(chainID)
+	return err == nil
 }
 
 func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
@@ -178,13 +171,14 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	if IsKnownChainID(v.expectedChainID) {
+	// Check if configured chain ID could be a genesis hash
+	if isValid32ByteBase58String(v.expectedChainID) {
 		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
 			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
 		}
 	} else {
-		v.lggr.Warnf("Configured chainID %s does not match genesis hash for mainnet, testnet, or devnet. "+
+		v.lggr.Warnf("Configured chainID %s is not a valid genesis hash (must be a base58-encoded 32-byte string)."+
 			"Assuming localnet setup and skipping verification.", v.expectedChainID)
 	}
 
