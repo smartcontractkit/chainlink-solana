@@ -178,7 +178,7 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	_, err = chainsel.GetChainDetailsByChainIDAndFamily(v.expectedChainID, "solana")
+	_, err = chainsel.GetChainDetailsByChainIDAndFamily(v.expectedChainID, chainsel.FamilySolana)
 	if err != nil {
 		v.chainIDVerified = false
 		return v.chainIDVerified, err
