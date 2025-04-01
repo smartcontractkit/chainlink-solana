@@ -201,13 +201,14 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			assert.Equal(t, uint64(1234), slot)
 
 			node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
-			testChain.id = "incorrect"
+			invalidGenesisHash := "7eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+			testChain.id = invalidGenesisHash
 			c, err = testChain.verifiedClient(node)
 			assert.NoError(t, err)
 			_, err = c.ChainID(t.Context())
 			// expect error from id mismatch (even if using a cached client) when performing RPC calls
 			assert.Error(t, err)
-			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", tc.genesisHash, node.URL), err.Error())
+			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", invalidGenesisHash, tc.genesisHash, node.URL), err.Error())
 		})
 	}
 }
