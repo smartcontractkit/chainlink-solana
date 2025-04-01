@@ -15,6 +15,7 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -138,7 +139,6 @@ type verifiedCachedClient struct {
 	chainID         string
 	expectedChainID string
 	nodeURL         string
-	lggr            logger.Logger
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
@@ -146,9 +146,16 @@ type verifiedCachedClient struct {
 	client.ReaderWriter
 }
 
-func isValid32ByteBase58String(chainID string) bool {
-	_, err := solanago.PublicKeyFromBase58(chainID)
-	return err == nil
+func IsKnownChainID(chainID string) bool {
+	switch chainID {
+	case
+		client.MainnetGenesisHash,
+		client.TestnetGenesisHash,
+		client.DevnetGenesisHash:
+		return true
+	default:
+		return false
+	}
 }
 
 func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) {
@@ -171,15 +178,17 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// Check if configured chain ID could be a genesis hash
-	if isValid32ByteBase58String(v.expectedChainID) {
+	_, err = chainsel.GetChainDetailsByChainIDAndFamily(v.expectedChainID, "solana")
+	if err != nil {
+		v.chainIDVerified = false
+		return v.chainIDVerified, err
+	}
+
+	if IsKnownChainID(v.expectedChainID) {
 		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
 			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
 		}
-	} else {
-		v.lggr.Warnf("Configured chainID %s is not a valid genesis hash (must be a base58-encoded 32-byte string)."+
-			"Assuming localnet setup and skipping verification.", v.expectedChainID)
 	}
 
 	v.chainIDVerified = true
@@ -538,7 +547,6 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 		cl = &verifiedCachedClient{
 			nodeURL:         url,
 			expectedChainID: c.id,
-			lggr:            logger.Named(c.lggr, "verifiedCachedClient"),
 		}
 		// create client
 		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
