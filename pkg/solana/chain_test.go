@@ -132,71 +132,84 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSolanaChain_VerifiedClient(t *testing.T) {
-	ctx := t.Context()
-	called := false
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
+func TestSolanaChain_VerifiedClients(t *testing.T) {
+	testCases := []struct {
+		name        string
+		chainID     string
+		genesisHash string
+	}{
+		{"Mainnet", "mainnet", client.MainnetGenesisHash},
+		{"Testnet", "testnet", client.TestnetGenesisHash},
+		{"Devnet", "devnet", client.DevnetGenesisHash},
+	}
 
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				out := `{ "jsonrpc": "2.0", "result": 1234, "id": 1 }` // getSlot response
 
-		// handle getGenesisHash request
-		if strings.Contains(string(body), "getGenesisHash") {
-			// should only be called once, chainID will be cached in chain
-			// allowing `mismatch` to be ignored, since invalid nodes will try to verify the chain ID
-			// if it is not verified
-			if !strings.Contains(r.URL.Path, "/mismatch") && called {
-				assert.NoError(t, errors.New("rpc has been called once already"))
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				// handle getGenesisHash request
+				if strings.Contains(string(body), "getGenesisHash") {
+					// should only be called once, chainID will be cached in chain
+					// allowing `mismatch` to be ignored, since invalid nodes will try to verify the chain ID
+					// if it is not verified
+					if !strings.Contains(r.URL.Path, "/mismatch") && called {
+						assert.NoError(t, errors.New("rpc has been called once already"))
+					}
+					// return the appropriate genesis hash based on the test case
+					out = fmt.Sprintf(TestSolanaGenesisHashTemplate, tc.genesisHash)
+				}
+				_, err = w.Write([]byte(out))
+				require.NoError(t, err)
+				called = true
+			}))
+			defer mockServer.Close()
+
+			ch := solcfg.Chain{}
+			ch.SetDefaults()
+			cfg := &solcfg.TOMLConfig{
+				ChainID: ptr(tc.chainID),
+				Chain:   ch,
 			}
-			// devnet genesis hash
-			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
-		}
-		_, err = w.Write([]byte(out))
-		require.NoError(t, err)
-		called = true
-	}))
-	defer mockServer.Close()
+			cfg.SetDefaults()
 
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
-	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Chain:   ch,
+			testChain := chain{
+				cfg:         cfg,
+				lggr:        logger.Test(t),
+				clientCache: map[string]*verifiedCachedClient{},
+			}
+			nName := t.Name() + "-" + uuid.NewString()
+			node := &solcfg.Node{
+				Name: &nName,
+				URL:  config.MustParseURL(mockServer.URL),
+			}
+
+			// happy path
+			testChain.id = tc.genesisHash
+			_, err := testChain.verifiedClient(node)
+			require.NoError(t, err)
+
+			// retrieve cached client and retrieve slot height
+			c, err := testChain.verifiedClient(node)
+			require.NoError(t, err)
+			slot, err := c.SlotHeight(t.Context())
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(1234), slot)
+
+			node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
+			testChain.id = "incorrect"
+			c, err = testChain.verifiedClient(node)
+			assert.NoError(t, err)
+			_, err = c.ChainID(t.Context())
+			// expect error from id mismatch (even if using a cached client) when performing RPC calls
+			assert.Error(t, err)
+			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", tc.genesisHash, node.URL), err.Error())
+		})
 	}
-	cfg.SetDefaults()
-
-	testChain := chain{
-		cfg:         cfg,
-		lggr:        logger.Test(t),
-		clientCache: map[string]*verifiedCachedClient{},
-	}
-	nName := t.Name() + "-" + uuid.NewString()
-	node := &solcfg.Node{
-		Name: &nName,
-		URL:  config.MustParseURL(mockServer.URL),
-	}
-
-	// happy path
-	testChain.id = "devnet"
-	_, err := testChain.verifiedClient(node)
-	require.NoError(t, err)
-
-	// retrieve cached client and retrieve slot height
-	c, err := testChain.verifiedClient(node)
-	require.NoError(t, err)
-	slot, err := c.SlotHeight(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1234), slot)
-
-	node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
-	testChain.id = "incorrect"
-	c, err = testChain.verifiedClient(node)
-	assert.NoError(t, err)
-	_, err = c.ChainID(t.Context())
-	// expect error from id mismatch (even if using a cached client) when performing RPC calls
-	assert.Error(t, err)
-	assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", "devnet", node.URL), err.Error())
 }
 
 func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
@@ -341,7 +354,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	mnCfg.MultiNode.Enabled = ptr(true)
 
 	cfg := &solcfg.TOMLConfig{
-		ChainID:   ptr("devnet"),
+		ChainID:   ptr(client.DevnetGenesisHash),
 		Chain:     ch,
 		MultiNode: mnCfg,
 	}
@@ -356,7 +369,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 		},
 	}
 
-	testChain, err := newChain("devnet", cfg, nil, logger.Test(t), sqltest.NewNoOpDataSource())
+	testChain, err := newChain(client.DevnetGenesisHash, cfg, nil, logger.Test(t), sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 
 	servicetest.Run(t, testChain)
@@ -371,7 +384,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 	id, err := selectedClient.ChainID(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, "devnet", id.String())
+	assert.Equal(t, client.DevnetGenesisHash, id.String())
 }
 
 func TestChain_MultiNode_TransactionSender(t *testing.T) {
@@ -392,7 +405,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	cfg.Nodes = append(cfg.Nodes,
 		&solcfg.Node{
 			Name:     ptr("localnet-" + t.Name() + "-primary"),
-			URL:      config.MustParseURL(client.SetupLocalSolNode(t)),
+			URL:      config.MustParseURL(url),
 			SendOnly: false,
 		})
 

@@ -7,9 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
-	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -94,7 +92,19 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
+
+	chainID := *cfg.ChainID
+	switch chainID {
+	case "devnet":
+		chainID = client.DevnetGenesisHash
+	case "testnet":
+		chainID = client.TestnetGenesisHash
+	case "mainnet":
+		chainID = client.MainnetGenesisHash
+	default:
+	}
+
+	c, err := newChain(chainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -154,13 +164,12 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// check chainID matches expected chainID
-	expectedChainID := strings.ToLower(v.expectedChainID)
 	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.chainID == "localnet" && !slices.Contains([]string{"mainnet", "testnet", "devnet"}, expectedChainID)
-	if !ignore && v.chainID != expectedChainID {
-		v.chainIDVerified = false
-		return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", expectedChainID, v.chainID, v.nodeURL)
+	if v.expectedChainID != "localnet" {
+		if v.chainID != v.expectedChainID {
+			v.chainIDVerified = false
+			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+		}
 	}
 
 	v.chainIDVerified = true
