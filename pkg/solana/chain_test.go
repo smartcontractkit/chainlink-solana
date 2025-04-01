@@ -208,7 +208,7 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			_, err = c.ChainID(t.Context())
 			// expect error from id mismatch (even if using a cached client) when performing RPC calls
 			assert.Error(t, err)
-			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", invalidGenesisHash, tc.genesisHash, node.URL), err.Error())
+			assert.Equal(t, fmt.Sprintf("invalid chain id %s for solana", invalidGenesisHash), err.Error())
 		})
 	}
 }
