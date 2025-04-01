@@ -178,12 +178,6 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	_, err = chainsel.GetChainDetailsByChainIDAndFamily(v.expectedChainID, chainsel.FamilySolana)
-	if err != nil {
-		v.chainIDVerified = false
-		return v.chainIDVerified, err
-	}
-
 	if IsKnownChainID(v.expectedChainID) {
 		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
@@ -280,6 +274,12 @@ func (v *verifiedCachedClient) GetAccountInfoWithOpts(ctx context.Context, addr 
 func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.Logger, ds sqlutil.DataSource) (*chain, error) {
 	lggr = logger.Named(lggr, "Chain")
 	lggr = logger.With(lggr, "chainID", id, "chain", "solana")
+
+	_, err := chainsel.GetChainDetailsByChainIDAndFamily(id, chainsel.FamilySolana)
+	if err != nil {
+		return nil, err
+	}
+
 	var ch = chain{
 		stopCh:      make(services.StopChan),
 		id:          id,
