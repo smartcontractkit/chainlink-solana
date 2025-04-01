@@ -515,7 +515,6 @@ func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Express
 }
 
 func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
-
 	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
