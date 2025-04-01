@@ -314,6 +314,8 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 		return nil, err
 	}
 
+	s.lggr.Debugw("QueryKey", "filter", filter, "limitAndSort", limitAndSort, "sequenceDataType", sequenceDataType, "dataTypeFromReadIdentifier", dataTypeFromReadIdentifier)
+
 	sequence, err := eBinding.QueryKey(ctx, filter, limitAndSort, dataTypeFromReadIdentifier)
 	if err != nil {
 		return nil, err

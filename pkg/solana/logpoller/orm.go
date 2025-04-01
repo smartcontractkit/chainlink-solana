@@ -255,10 +255,14 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 		return nil, err
 	}
 
+	o.lggr.Debugw("FilteredLogs", "filter", filter, "query", query, "values", values, "sqlArgs", sqlArgs)
+
 	var logs []Log
 	if err = o.ds.SelectContext(ctx, &logs, query, sqlArgs...); err != nil {
 		return nil, err
 	}
+
+	o.lggr.Debugw("FilteredLogs results", "logs", logs, "err", err)
 
 	// We want each log returned to have a unique (BlockNumber, LogIndex)
 	// There can be duplicates if more than one filter is tracking the same log events.
