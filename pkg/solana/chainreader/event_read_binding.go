@@ -353,18 +353,6 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
 
-	itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+comparator.Name)
-
-	for idx, comp := range comparator.ValueComparators {
-		// need to do a transform and then extract the value for the subkey
-		newValue, err := b.modifier.TransformToOnChain(comp.Value, itemType)
-		if err != nil {
-			return query.Expression{}, err
-		}
-
-		comparator.ValueComparators[idx].Value = reflect.Indirect(reflect.ValueOf(newValue)).Interface()
-	}
-
 	return logpoller.NewEventBySubKeyFilter(subKeyIndex, comparator.ValueComparators)
 }
 
