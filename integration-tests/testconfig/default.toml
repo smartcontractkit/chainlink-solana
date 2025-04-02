@@ -51,6 +51,3 @@ enabled = true
 [OCR2.Soak]
 enabled = false
 
-[Solana.MultiNode]
-VerifyChainId = false
-
