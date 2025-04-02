@@ -250,13 +250,7 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 		return "", err
 	}
 
-	hash := v.(solana.Hash).String()
-	if hash == MainnetGenesisHash || hash == TestnetGenesisHash || hash == DevnetGenesisHash {
-		return mn.StringID(hash), nil
-	}
-
-	// use 'localnet' instead of a genesis hash for chainID for localnet, as it's non-deterministic for each run
-	return "localnet", nil
+	return mn.StringID(v.(solana.Hash).String()), nil
 }
 
 func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {

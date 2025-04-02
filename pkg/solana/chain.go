@@ -164,12 +164,34 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	if v.expectedChainID != "localnet" {
+	// if expectedChainID is a base58 encoded public key, verify it matches with genesis hash got from rpc client
+	_, err = solanago.PublicKeyFromBase58(v.expectedChainID)
+	if err == nil {
 		if v.chainID != v.expectedChainID {
 			v.chainIDVerified = false
 			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
 		}
+	}
+
+	// for mainnet/testnet/devnet, verify genesis hash got from rpc client matches with the corresponding chain
+	switch v.expectedChainID {
+	case "mainnet":
+		if v.chainID != client.MainnetGenesisHash {
+			v.chainIDVerified = false
+			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.MainnetGenesisHash, v.chainID, v.nodeURL)
+		}
+	case "testnet":
+		if v.chainID != client.TestnetGenesisHash {
+			v.chainIDVerified = false
+			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.TestnetGenesisHash, v.chainID, v.nodeURL)
+		}
+	case "devnet":
+		if v.chainID != client.DevnetGenesisHash {
+			v.chainIDVerified = false
+			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.DevnetGenesisHash, v.chainID, v.nodeURL)
+		}
+	default:
+		// ignore for localnet
 	}
 
 	v.chainIDVerified = true
