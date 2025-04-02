@@ -32,6 +32,9 @@ store_program_id = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 link_token_address = "7CF1GrsZsny5j9JESPj98MdYVZK38RE8ZpmTEMwECK4c"
 vault_address = "FdM4dnhVpFQfjPqNG6LEfzArhuGhUjtidYu89qtGwJCS"
 
+[Solana.MultiNode]
+VerifyChainID = false
+
 [Common]
 internal_docker_repo = "public.ecr.aws/chainlink"
 inside_k8 = false 
