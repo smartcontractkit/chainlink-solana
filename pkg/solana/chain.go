@@ -174,25 +174,21 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 	}
 
 	// for mainnet/testnet/devnet, verify genesis hash got from rpc client matches with the corresponding chain
-	switch v.expectedChainID {
-	case "mainnet":
-		if v.chainID != client.MainnetGenesisHash {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.MainnetGenesisHash, v.chainID, v.nodeURL)
-		}
-	case "testnet":
-		if v.chainID != client.TestnetGenesisHash {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.TestnetGenesisHash, v.chainID, v.nodeURL)
-		}
-	case "devnet":
-		if v.chainID != client.DevnetGenesisHash {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", client.DevnetGenesisHash, v.chainID, v.nodeURL)
-		}
-	default:
-		// ignore for localnet
+genesisHashes := map[string]string{
+	"mainnet": client.MainnetGenesisHash,
+	"testnet": client.TestnetGenesisHash,
+	"devnet":  client.DevnetGenesisHash,
+}
+
+if expectedHash, ok := genesisHashes[v.expectedChainID]; ok {
+	if v.chainID != expectedHash {
+		v.chainIDVerified = false
+		return v.chainIDVerified, fmt.Errorf(
+			"client returned mismatched chain id (expected: %s, got: %s): %s",
+			expectedHash, v.chainID, v.nodeURL,
+		)
 	}
+}
 
 	v.chainIDVerified = true
 
