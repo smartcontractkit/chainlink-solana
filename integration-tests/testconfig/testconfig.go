@@ -268,6 +268,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 	mnConfig := solcfg.NewDefaultMultiNodeConfig()
 	mnConfig.MultiNode.Enabled = ptr.Ptr(true)
 	mnConfig.MultiNode.SyncThreshold = ptr.Ptr(uint32(170))
+	mnConfig.MultiNode.VerifyChainID = ptr.Ptr(false)
 
 	var nodes []*solcfg.Node
 	for i, u := range url {
