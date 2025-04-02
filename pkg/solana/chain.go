@@ -164,14 +164,6 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	if v.expectedChainID != "localnet" {
-		if v.chainID != v.expectedChainID {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
-		}
-	}
-
 	v.chainIDVerified = true
 
 	return v.chainIDVerified, nil
