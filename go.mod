@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250321174931-193fcd25d0c1
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250322131411-c7a8d6a077bf
 	github.com/smartcontractkit/chainlink-common v0.5.1-0.20250326142120-b155bad9aee1
-	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250211162441-3d6cea220efb
+	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
 	github.com/smartcontractkit/libocr v0.0.0-20250220133800-f3b940c4f298
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
