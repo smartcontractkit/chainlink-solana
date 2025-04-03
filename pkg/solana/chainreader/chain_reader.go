@@ -304,6 +304,8 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 		return nil, fmt.Errorf("%w: invalid binding type for %s", types.ErrInvalidType, contract.Name)
 	}
 
+	s.lggr.Debugw("QueryKey", "filter", filter, "limitAndSort", limitAndSort, "sequenceDataType", sequenceDataType, "dataTypeFromReadIdentifier", dataTypeFromReadIdentifier)
+
 	_, isValuePtr := sequenceDataType.(*values.Value)
 	if !isValuePtr {
 		return eBinding.QueryKey(ctx, filter, limitAndSort, sequenceDataType)
@@ -313,8 +315,6 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 	if err != nil {
 		return nil, err
 	}
-
-	s.lggr.Debugw("QueryKey", "filter", filter, "limitAndSort", limitAndSort, "sequenceDataType", sequenceDataType, "dataTypeFromReadIdentifier", dataTypeFromReadIdentifier)
 
 	sequence, err := eBinding.QueryKey(ctx, filter, limitAndSort, dataTypeFromReadIdentifier)
 	if err != nil {
