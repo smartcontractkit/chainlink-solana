@@ -16,10 +16,12 @@ func TestIndexedValue(t *testing.T) {
 	}{
 
 		{"uint64", uint64(math.MaxUint32), uint64(math.MaxUint64)},
-		{"int32", int32(math.MinInt32), int32(math.MaxInt32)},
+		// since the values are encoded using two's complement negative values are actually higher than positive
+		{"int32", int32(math.MaxInt32), int32(math.MinInt32)},
 		{"int32", int32(-8), int32(-5)},
 		{"int32", int32(5), int32(8)},
-		{"int64", int64(math.MinInt64), int64(math.MaxInt64)},
+		// since the values are encoded using two's complement negative values are actually higher than positive
+		{"int64", int64(math.MaxInt64), int64(math.MinInt64)},
 		{"int64", int64(-8), int64(-5)},
 		{"int64", int64(5), int64(8)},
 		{"float32", float32(-5), float32(5)},

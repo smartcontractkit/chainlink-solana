@@ -134,9 +134,10 @@ type chain struct {
 }
 
 type verifiedCachedClient struct {
-	chainID         string
-	expectedChainID string
-	nodeURL         string
+	skipVerification bool
+	chainID          string
+	expectedChainID  string
+	nodeURL          string
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
@@ -164,12 +165,14 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// if expectedChainID is a base58 encoded public key, verify it matches with genesis hash got from rpc client
-	_, err = solanago.PublicKeyFromBase58(v.expectedChainID)
-	if err == nil {
-		if v.chainID != v.expectedChainID {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+	if !v.skipVerification {
+		// if expectedChainID is a base58 encoded public key, verify it matches with genesis hash got from rpc client
+		_, err = solanago.PublicKeyFromBase58(v.expectedChainID)
+		if err == nil {
+			if v.chainID != v.expectedChainID {
+				v.chainIDVerified = false
+				return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+			}
 		}
 	}
 
@@ -524,10 +527,17 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 	cl, exists := c.clientCache[url]
 	c.clientLock.RUnlock()
 
+	var skipVerification bool
+	verifyCfg := c.cfg.MultiNode.MultiNode.VerifyChainID
+	if verifyCfg != nil && !*verifyCfg {
+		skipVerification = true
+	}
+
 	if !exists {
 		cl = &verifiedCachedClient{
-			nodeURL:         url,
-			expectedChainID: c.id,
+			nodeURL:          url,
+			expectedChainID:  c.id,
+			skipVerification: skipVerification,
 		}
 		// create client
 		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
