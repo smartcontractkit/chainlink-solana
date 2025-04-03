@@ -93,15 +93,17 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
 	}
 
-	var tokenIndexes []uint8
+	tokenIndexes := []uint8{}
 	// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
+	if len(poolLookupAccounts) < 7 {
+		return nil, nil, nil, fmt.Errorf("unexpected number of accounts in pool lookup table %d, expected at least 7", len(poolLookupAccounts))
+	}
 	poolProgram := poolLookupAccounts[2]
 	tokenProgram := poolLookupAccounts[6]
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
-		receiver := message.Receiver
-
-		if !receiver.IsZeroOrEmpty() {
+		logicReceiver := message.Receiver
+		if !logicReceiver.IsZeroOrEmpty() {
 			userAccountsLookup := AccountLookup{
 				Name:       "UserAccounts",
 				Location:   "ExtraData.ExtraArgsDecoded.accounts",
@@ -113,17 +115,27 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 				return nil, nil, nil, fmt.Errorf("failed to resolve user accounts: %w", err)
 			}
 			accounts = append(accounts, &solana.AccountMeta{
-				PublicKey:  solana.PublicKeyFromBytes(receiver),
+				PublicKey:  solana.PublicKeyFromBytes(logicReceiver),
 				IsWritable: false,
 				IsSigner:   false,
 			})
 			accounts = append(accounts, userAccounts...)
 		}
+
+		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
+		tokenReceivers, err := tokenReceiverLookup.Resolve(args)
+		if err != nil || len(tokenReceivers) == 0 {
+			break // If token receiver not defined, token transfer accounts are not needed so cut loop short
+		}
+		if len(tokenReceivers) > 1 {
+			return nil, nil, nil, fmt.Errorf("unexpected number of token receivers found %d, expected 1", len(tokenReceivers))
+		}
+		tokenReceiver := tokenReceivers[0].PublicKey
 		sourceChainSelector := make([]byte, 8)
 		binary.LittleEndian.PutUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
 		for _, tokenAmount := range message.TokenAmounts {
 			destTokenAddress := tokenAmount.DestTokenAddress
-			userTokenAccount, err := getUserTokenAccount(receiver, tokenProgram.PublicKey, destTokenAddress)
+			userTokenAccount, err := getUserTokenAccount(tokenReceiver.Bytes(), tokenProgram.PublicKey, destTokenAddress)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to calculate user token account PDA: %w", err)
 			}

@@ -952,6 +952,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					"computeUnits":            uint32(500),
 					"accounts":                utils.GetRandomPubKey(t),
 					"accountIsWritableBitmap": uint64(1),
+					"tokenReceiver":           utils.GetRandomPubKey(t),
 				},
 				DestExecDataDecoded: []map[string]any{
 					{"destGasAmount": uint32(200)},
