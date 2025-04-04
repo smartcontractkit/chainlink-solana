@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -23,7 +24,7 @@ func main() {
 	s := loop.MustNewStartedServer(loggerName)
 	defer s.Stop()
 
-	p := &pluginRelayer{Plugin: loop.Plugin{Logger: s.Logger}}
+	p := &pluginRelayer{Plugin: loop.Plugin{Logger: s.Logger}, ds: s.DataSource}
 	defer s.Logger.ErrorIfFn(p.Close, "Failed to close")
 
 	s.MustRegister(p)
@@ -49,6 +50,7 @@ func main() {
 
 type pluginRelayer struct {
 	loop.Plugin
+	ds sqlutil.DataSource
 }
 
 func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore loop.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
@@ -65,6 +67,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 	opts := solana.ChainOpts{
 		Logger:   c.Logger,
 		KeyStore: keystore,
+		DS:       c.ds,
 	}
 
 	chain, err := solana.NewChain(&cfg.Solana, opts)

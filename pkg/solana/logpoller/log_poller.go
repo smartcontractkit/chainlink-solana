@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -82,19 +83,18 @@ type Service struct {
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
-	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &Service{
-		orm:     orm,
-		client:  cl,
-		filters: newFilters(lggr, orm),
+		orm:    orm,
+		client: cl,
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
-		Name:  "LogPollerService",
+		Name:  "LogPoller",
 		Start: lp.start,
-		NewSubServices: func(l logger.Logger) []services.Service {
+		NewSubServices: func(lggr logger.Logger) []services.Service {
+			lp.filters = newFilters(lggr, orm)
 			loader := NewEncodedLogCollector(cl, lggr)
 			lp.loader = loader
 			return []services.Service{loader}
@@ -253,7 +253,7 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 // LogPoller run loop it will backfill all filters starting from fromBlock. If there
 // are new filters in the backfill queue, with an earlier StartingBlock, then they
 // will get backfilled from there instead.
-func (lp *Service) Replay(fromBlock int64) error {
+func (lp *Service) Replay(fromBlock int64) {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
@@ -261,15 +261,13 @@ func (lp *Service) Replay(fromBlock int64) error {
 		// Already requested, no further action required
 		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
 			fromBlock, lp.replay.requestBlock)
-		return nil
+		return
 	}
 	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
 	if lp.replay.status != ReplayStatusPending {
 		lp.replay.status = ReplayStatusRequested
 	}
-
-	return nil
 }
 
 // ReplayStatus returns the current replay status of LogPoller:
@@ -338,7 +336,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 			addressesSet[filter.Address] = struct{}{}
 			addresses = append(addresses, filter.Address)
 		}
-		if filter.StartingBlock < minSlot {
+		if filter.StartingBlock != 0 && filter.StartingBlock < minSlot {
 			minSlot = filter.StartingBlock
 		}
 	}

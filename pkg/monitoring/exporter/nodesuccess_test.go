@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics/mocks"
@@ -21,7 +20,7 @@ import (
 
 func TestNodeSuccess(t *testing.T) {
 	zeroAddress := solana.PublicKey{}
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	m := mocks.NewNodeSuccess(t)
 	m.On("Add", mock.Anything, mock.Anything).Once()

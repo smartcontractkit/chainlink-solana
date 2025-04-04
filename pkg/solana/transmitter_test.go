@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -107,5 +106,5 @@ func TestTransmitter_TxSize(t *testing.T) {
 			Signature: make([]byte, 65), // expected length of signature
 		})
 	}
-	require.NoError(t, transmitter.Transmit(tests.Context(t), types.ReportContext{}, make([]byte, ReportLen), sigs))
+	require.NoError(t, transmitter.Transmit(t.Context(), types.ReportContext{}, make([]byte, ReportLen), sigs))
 }

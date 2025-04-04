@@ -13,7 +13,6 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -200,7 +199,7 @@ func Test_namespaceBinding_BindReaders(t *testing.T) {
 				readers: tt.fields.readers,
 				bound:   tt.fields.bound,
 			}
-			err := b.BindReaders(tests.Context(t), tt.address)
+			err := b.BindReaders(t.Context(), tt.address)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

@@ -7,13 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestBlocksSorter(t *testing.T) {
 	t.Parallel()
 	t.Run("Properly closes even if there is still work to do", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		sorter, ch := newBlocksSorter(make(chan Block), logger.Test(t), []uint64{1, 2})
 		require.NoError(t, sorter.Start(ctx))
 		require.NoError(t, sorter.Close())
@@ -24,7 +23,7 @@ func TestBlocksSorter(t *testing.T) {
 		}
 	})
 	t.Run("Writes blocks in specified order defined by expectedBlocks", func(t *testing.T) {
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		inCh := make(chan Block)
 		expectedBlocks := []uint64{1, 2, 10, 3}
 		sorter, ch := newBlocksSorter(inCh, logger.Test(t), expectedBlocks)

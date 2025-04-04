@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
@@ -51,7 +50,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(expectedErr).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
 	t.Run("Aborts backfill if loader fails", func(t *testing.T) {
@@ -61,7 +60,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{{StartingBlock: 16}}).Once()
 		expectedErr := errors.New("loaderFailed")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
 	t.Run("Backfill happy path", func(t *testing.T) {
@@ -88,7 +87,7 @@ func TestLogPoller_run(t *testing.T) {
 				return nil
 			}
 		}).Times(3)
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed to mark filter 1 backfilled: filter no longer exists")
 	})
 	t.Run("Returns error, if failed to get address for global backfill", func(t *testing.T) {
@@ -98,7 +97,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, expectedErr).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed getting addresses: failed to load filters")
 	})
 	t.Run("Aborts if there is no addresses", func(t *testing.T) {
@@ -107,7 +106,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, nil).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 	})
 	t.Run("Returns error, if failed to get latest slot", func(t *testing.T) {
@@ -118,7 +117,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
 	t.Run("Returns error, if last processed slot is higher than latest finalized", func(t *testing.T) {
@@ -128,7 +127,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "last processed slot 128 is higher than highest RPC slot 16")
 	})
 	t.Run("Returns error, if fails to do block backfill", func(t *testing.T) {
@@ -140,7 +139,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed processing block range [129, 130]: error backfilling filters: failed to start backfill")
 	})
 	t.Run("Happy path", func(t *testing.T) {
@@ -153,7 +152,7 @@ func TestLogPoller_run(t *testing.T) {
 		blocks := make(chan Block)
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
-		err := lp.LogPoller.run(tests.Context(t))
+		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, int64(130), lp.LogPoller.lastProcessedSlot)
 	})
@@ -163,7 +162,7 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 	t.Run("Returns cached value if available", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 10
-		result, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		result, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, int64(10), result)
 	})
@@ -171,14 +170,14 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to read from db")
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, expectedErr).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
 	t.Run("Reads latest processed from db", func(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedValue := int64(10)
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(expectedValue, nil).Once()
-		result, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		result, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, expectedValue, result)
 	})
@@ -187,14 +186,14 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
 		expectedError := errors.New("RPC failed")
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedError).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
 	t.Run("Returns error if genesis block is the latest finalized", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, nil).Once()
-		_, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		_, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.ErrorContains(t, err, "latest finalized slot is 0 - waiting for next slot to start processing")
 	})
 	t.Run("Returns block before latest finalized as last processed if using RPC", func(t *testing.T) {
@@ -202,7 +201,7 @@ func TestLogPoller_getLastProcessedSlot(t *testing.T) {
 		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows).Once()
 		const latestFinalized = uint64(10)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
-		actual, err := lp.LogPoller.getLastProcessedSlot(tests.Context(t))
+		actual, err := lp.LogPoller.getLastProcessedSlot(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, int64(latestFinalized-1), actual)
 	})
@@ -214,7 +213,7 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, expectedErr).Once()
-		err := lp.LogPoller.processBlocksRange(tests.Context(t), nil, 10, 20)
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
 		require.ErrorIs(t, err, expectedErr)
 	})
 	funcWithCallExpectation := func(t *testing.T) func() {
@@ -225,7 +224,7 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		return func() { called.Store(true) }
 	}
 	t.Run("Can abort by cancelling context", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(tests.Context(t))
+		ctx, cancel := context.WithCancel(t.Context())
 		lp := newMockedLP(t)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, []PublicKey, uint64, uint64) (<-chan Block, func(), error) {
 			cancel()
@@ -241,13 +240,13 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		blocks <- Block{}
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
-		err := lp.LogPoller.processBlocksRange(tests.Context(t), nil, 10, 20)
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
 		require.NoError(t, err)
 	})
 }
 
 func TestProcess(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
@@ -413,24 +412,21 @@ func Test_LogPoller_Replay(t *testing.T) {
 
 	t.Run("ordinary replay request", func(t *testing.T) {
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock).Once()
-		err := lp.LogPoller.Replay(fromBlock)
-		require.NoError(t, err)
+		lp.LogPoller.Replay(fromBlock)
 		assertReplayInfo(fromBlock, ReplayStatusRequested)
 	})
 
 	t.Run("redundant replay request", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = fromBlock
 		lp.LogPoller.replay.status = ReplayStatusRequested
-		err := lp.LogPoller.Replay(fromBlock + 10)
-		require.NoError(t, err)
+		lp.LogPoller.Replay(fromBlock + 10)
 		assertReplayInfo(fromBlock, ReplayStatusRequested)
 	})
 
 	t.Run("replay request updated", func(t *testing.T) {
 		lp.LogPoller.replay.status = ReplayStatusNoRequest
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
-		err := lp.LogPoller.Replay(fromBlock - 1)
-		require.NoError(t, err)
+		lp.LogPoller.Replay(fromBlock - 1)
 		assertReplayInfo(fromBlock-1, ReplayStatusRequested)
 	})
 
@@ -438,8 +434,7 @@ func Test_LogPoller_Replay(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = fromBlock
 		lp.LogPoller.replay.status = ReplayStatusPending
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
-		err := lp.LogPoller.Replay(fromBlock - 1)
-		require.NoError(t, err)
+		lp.LogPoller.Replay(fromBlock - 1)
 		assertReplayInfo(fromBlock-1, ReplayStatusPending)
 	})
 

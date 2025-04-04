@@ -15,7 +15,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmock "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -43,7 +42,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	defaultPrice := uint64(100)
 	depth := uint64(1) // 1 is LatestBlockEstimator
 	pollPeriod := 100 * time.Millisecond
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Grabbing last block of multiple_blocks file to use as latest block
 	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")
@@ -167,7 +166,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	depth := uint64(3)
 	defaultPrice := uint64(100)
 	pollPeriod := 3 * time.Second
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Read multiple blocks from JSON file
 	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")

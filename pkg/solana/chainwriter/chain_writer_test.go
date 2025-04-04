@@ -20,12 +20,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
@@ -46,11 +45,11 @@ type Arguments struct {
 }
 
 var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipRouterIDL = idl.FetchCCIPRouterIDL()
+var ccipCommonIDL = idl.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
@@ -398,7 +397,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 }
 
 func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
@@ -556,7 +555,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
@@ -818,8 +817,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 											InternalField: chainwriter.InternalField{
 												TypeName: "TokenAdminRegistry",
 												Location: "LookupTable",
-												// TokenAdminRegistry is in the router program so need to provide the router's IDL
-												IDL: ccipRouterIDL,
+												// TokenAdminRegistry is defined in the ccip common module so need to provide common's IDL
+												IDL: ccipCommonIDL,
 											},
 										},
 									},
@@ -863,7 +862,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		},
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// mock client
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
@@ -971,19 +970,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		recentBlockHash := solana.Hash{}
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 
-		type CommitArgs struct {
-			ReportContext [2][32]byte
-			Report        []byte
-			Rs            [][32]byte
-			Ss            [][32]byte
-			RawVs         [32]byte
-			Info          ccipocr3.CommitReportInfo
-		}
-
 		txID := uuid.NewString()
 
-		// TODO: Replace with actual type from ccipocr3
-		args := CommitArgs{
+		args := ccipsolana.SVMCommitCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
 			Report:        []byte{0x01, 0x02},
 			Rs:            [][32]byte{{0x01, 0x02}},
@@ -1022,7 +1011,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 func TestChainWriter_GetTransactionStatus(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
 		return rw, nil
@@ -1089,7 +1078,7 @@ func TestChainWriter_GetTransactionStatus(t *testing.T) {
 func TestChainWriter_GetFeeComponents(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	rw := clientmocks.NewReaderWriter(t)
 	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
 		return rw, nil
@@ -1151,7 +1140,7 @@ func mockDataAccountLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda 
 
 func mockTokenAdminRegistryLookupTable(t *testing.T, rw *clientmocks.ReaderWriter, pda solana.PublicKey) solana.PublicKey {
 	lookupTablePubkey := utils.GetRandomPubKey(t)
-	tokenAdminRegistry := ccip_router.TokenAdminRegistry{
+	tokenAdminRegistry := ccip_common.TokenAdminRegistry{
 		Version:              1,
 		Administrator:        utils.GetRandomPubKey(t),
 		PendingAdministrator: utils.GetRandomPubKey(t),

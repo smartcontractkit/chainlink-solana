@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -19,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -27,7 +25,7 @@ import (
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
@@ -77,11 +75,6 @@ func TestClient_Reader_Integration(t *testing.T) {
 	fee, err := c.GetFeeForMessage(ctx, tx.Message.ToBase64())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(5000), fee)
-
-	// get chain ID based on gensis hash
-	network, err := c.ChainID(context.Background())
-	assert.NoError(t, err)
-	assert.Equal(t, mn.StringID("localnet"), network)
 
 	// get account info (also tested inside contract_test)
 	res, err := c.GetAccountInfoWithOpts(ctx, solana.PublicKey{}, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentFinalized})
@@ -134,14 +127,13 @@ func TestClient_Reader_Integration(t *testing.T) {
 }
 
 func TestClient_Reader_ChainID(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	genesisHashes := []string{
 		DevnetGenesisHash,  // devnet
 		TestnetGenesisHash, // testnet
 		MainnetGenesisHash, // mainnet
 		"GH7ome3EiwEr7tu9JuTh2dpYWBJK3z69Xm1ZE3MEE6JC", // localnet (random)
 	}
-	networks := []string{"devnet", "testnet", "mainnet", "localnet"}
 	hashCounter := 0
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,10 +151,13 @@ func TestClient_Reader_ChainID(t *testing.T) {
 	require.NoError(t, err)
 
 	// get chain ID based on gensis hash
-	for _, n := range networks {
+	for _, hash := range genesisHashes {
 		network, err := c.ChainID(ctx)
 		assert.NoError(t, err)
-		assert.Equal(t, mn.StringID(n), network)
+		if network == "localnet" {
+			continue
+		}
+		assert.Equal(t, mn.StringID(hash), network)
 	}
 }
 
@@ -177,7 +172,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -278,7 +273,7 @@ func TestClient_GetBlocks(t *testing.T) {
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c, err := NewClient(url, cfg, requestTimeout, lggr)
 	require.NoError(t, err)
 
@@ -297,7 +292,7 @@ func TestClient_GetBlocks(t *testing.T) {
 func TestClient_GetLatestBlockHeight(t *testing.T) {
 	t.Parallel()
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	url := SetupLocalSolNode(t)
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -321,7 +316,7 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 }
 
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// set up environment
 	url := SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()

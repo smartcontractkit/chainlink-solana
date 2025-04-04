@@ -11,7 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -58,7 +58,6 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		}
 		computeUnits += destGasAmount
 	}
-
 	options := []txmutils.SetTxConfig{
 		txmutils.SetEstimateComputeUnitLimit(false),
 		txmutils.SetComputeUnitLimit(computeUnits),
@@ -146,7 +145,12 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
 		transformedAccounts = accounts[:len(accounts)-1]
 	}
-	return args, transformedAccounts, []txmutils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(true)}, nil
+
+	options := []txmutils.SetTxConfig{
+		txmutils.SetEstimateComputeUnitLimit(true),
+	}
+
+	return args, transformedAccounts, options, nil
 }
 
 func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poolTables map[string][]*solana.AccountMeta) ([]*solana.AccountMeta, error) {
@@ -163,7 +167,7 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch token admin registry account: %w", err)
 		}
-		tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+		tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
 		err = bin.NewBorshDecoder(resp.GetBinary()).Decode(&tokenAdminRegistry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to borsh decode token admin registry account: %w", err)

@@ -340,8 +340,13 @@ func (b *eventReadBinding) remapPrimitive(expression query.Expression) (query.Ex
 		if comp, err = b.encodeComparator(primitive); err != nil {
 			return query.Expression{}, fmt.Errorf("failed to encode comparator %q: %w", primitive.Name, err)
 		}
+	case *primitives.Timestamp, *primitives.TxHash, *primitives.Block:
+		// these seem to work without remapping
+		return expression, nil
 	case *primitives.Confidence:
 		// confidence is ignored in solana
+	default:
+		return comp, fmt.Errorf("unsupported primitive type: %T", expression.Primitive)
 	}
 
 	return comp, nil
@@ -456,7 +461,7 @@ type remapHelper struct {
 }
 
 func (r remapHelper) remap(filter query.KeyFilter) (query.KeyFilter, error) {
-	var remapped query.KeyFilter
+	remapped := query.KeyFilter{Key: filter.Key}
 
 	for _, expression := range filter.Expressions {
 		remappedExpression, err := r.remapExpression(filter.Key, expression)

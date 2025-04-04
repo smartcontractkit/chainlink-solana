@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -22,7 +21,7 @@ func TestEncodeDecodeBigInt(t *testing.T) {
 		B *big.Int
 	}
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	types := newTestCodec(t)
 	typedCodec, err := types.ToCodec()
 

@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
@@ -41,7 +39,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 				return nil, expectedError
 			}).Once()
 		job := newGetSlotsForAddress(client, nil, nil, address, from, to)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
 	requireJobIsDone := func(t *testing.T, done <-chan struct{}, msg string) {
@@ -55,7 +53,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		client := mocks.NewRPCClient(t)
 		client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).Return([]*rpc.TransactionSignature{}, nil).Once()
 		job := newGetSlotsForAddress(client, nil, nil, address, from, to)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
 	})
@@ -64,7 +62,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		var signatures []*rpc.TransactionSignature
 		for _, slot := range []uint64{21, 20, 11, 10, 9} {
 			if slot == 20 {
-				// must be skipped due to error
+				// must be included even though tx has failed
 				signatures = append(signatures, &rpc.TransactionSignature{Slot: 19, Err: errors.New("transaction failed")})
 			}
 			if slot == 10 {
@@ -78,10 +76,10 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		job := newGetSlotsForAddress(client, nil, func(s uint64) {
 			actualSlots = append(actualSlots, s)
 		}, address, from, to)
-		err := job.Run(tests.Context(t))
+		err := job.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
-		require.Equal(t, []uint64{20, 11, 10}, actualSlots)
+		require.Equal(t, []uint64{19, 20, 11, 10, 10}, actualSlots)
 	})
 	t.Run("If slot range may have more signatures, schedules a new job", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)
@@ -103,7 +101,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		firstJob := newGetSlotsForAddress(client, workers, func(s uint64) {
 			actualSlots = append(actualSlots, s)
 		}, address, from, to)
-		err := firstJob.Run(tests.Context(t))
+		err := firstJob.Run(t.Context())
 		require.NoError(t, err)
 		select {
 		case <-firstJob.Done():
@@ -112,7 +110,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		}
 		require.NotNil(t, secondJob)
 		client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).Return([]*rpc.TransactionSignature{{Slot: 18}, {Slot: 9}}, nil).Once()
-		err = secondJob.Run(tests.Context(t))
+		err = secondJob.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, firstJob.Done(), "expected fist job to be done")
 		requireJobIsDone(t, secondJob.Done(), "expected second job to be done")
