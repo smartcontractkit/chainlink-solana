@@ -601,7 +601,7 @@ func TestLookupTables(t *testing.T) {
 
 	t.Run("StaticLookup table resolves properly", func(t *testing.T) {
 		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
-		table := utils.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		table := utils.CreateTestLookupTable(t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
 			StaticLookupTables:  []solana.PublicKey{table},
@@ -612,7 +612,7 @@ func TestLookupTables(t *testing.T) {
 	})
 	t.Run("Derived lookup table resolves properly with constant address", func(t *testing.T) {
 		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
-		table := utils.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		table := utils.CreateTestLookupTable(t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
@@ -691,7 +691,7 @@ func TestLookupTables(t *testing.T) {
 
 	t.Run("Derived lookup table resolves properly with account lookup address", func(t *testing.T) {
 		pubKeys := chainwriter.CreateTestPubKeys(t, 8)
-		table := utils.CreateTestLookupTable(ctx, t, rpcClient, sender, pubKeys)
+		table := utils.CreateTestLookupTable(t, rpcClient, sender, pubKeys)
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
@@ -734,7 +734,7 @@ func TestLookupTables(t *testing.T) {
 		programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 
 		lookupKeys := chainwriter.CreateTestPubKeys(t, 5)
-		lookupTable := utils.CreateTestLookupTable(ctx, t, rpcClient, sender, lookupKeys)
+		lookupTable := utils.CreateTestLookupTable(t, rpcClient, sender, lookupKeys)
 
 		chainwriter.InitializeDataAccount(ctx, t, rpcClient, programID, sender, lookupTable)
 
