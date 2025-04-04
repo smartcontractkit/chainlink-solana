@@ -5,7 +5,7 @@
 
 # Solana integration
 let
-  version = "v2.1.16";
+  version = "v2.1.17";
   getBinDerivation =
     {
       name,
@@ -37,14 +37,14 @@ let
       name = "solana-cli-x86_64-linux";
       filename = "solana-release-x86_64-unknown-linux-gnu.tar.bz2";
       ### BEGIN_LINUX_SHA256 ###
-      sha256 = "sha256-HmifvD4pvHNOxF3erafwWBC9HznqtdSiAsEuM2rVdEU=";
+      sha256 = "sha256-qo79y14ZHQVYP6WLpcvckiB04+VmKgrV6IFZfry/7j8=";
       ### END_LINUX_SHA256 ###
     };
     aarch64-apple-darwin = getBinDerivation {
       name = "solana-cli-aarch64-apple-darwin";
       filename = "solana-release-aarch64-apple-darwin.tar.bz2";
       ### BEGIN_DARWIN_SHA256 ###
-      sha256 = "sha256-K1CBQyxBSFeO+sTB6UKBJ+kd6No/BTdaeqbSXKMPtIU=";
+      sha256 = "sha256-dOZgM5SRiriuhHzgNlaN1Vm6OatkgA4to7BngvUkYVA=";
       ### END_DARWIN_SHA256 ###
     };
   };
