@@ -21,7 +21,7 @@ import (
 )
 
 // TODO: replace with exact value after CCIP testing is completed.
-const StaticCuOverhead uint32 = 100000
+const StaticCuOverhead uint32 = 150000
 const MandatoryExecuteAccounts = 14
 
 func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
