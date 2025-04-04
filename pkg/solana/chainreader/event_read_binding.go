@@ -460,13 +460,6 @@ func (b *eventReadBinding) unsetBinding() {
 	b.bound = false
 }
 
-func (b *eventReadBinding) registered() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	return b.registerCalled
-}
-
 func (b *eventReadBinding) wrapDecoderForValuer(log *logpoller.Log) func(context.Context, any) error {
 	return func(ctx context.Context, returnVal any) error {
 		return b.decodeLog(ctx, log, returnVal)

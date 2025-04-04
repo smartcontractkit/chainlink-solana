@@ -43,7 +43,7 @@ func TestBind(t *testing.T) {
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
 		ctx := t.Context()
 
-		reader.Register(ctx)
+		require.NoError(t, reader.Register(ctx))
 		require.NoError(t, reader.Bind(ctx, address1))
 		require.NoError(t, reader.Bind(ctx, address1))
 		require.NoError(t, reader.Bind(ctx, address1))
@@ -60,7 +60,7 @@ func TestBind(t *testing.T) {
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
 		ctx := t.Context()
 
-		reader.Register(ctx)
+		require.NoError(t, reader.Register(ctx))
 
 		var ret bool
 		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, str string) bool {
