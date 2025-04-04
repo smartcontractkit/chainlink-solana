@@ -525,19 +525,25 @@ func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
 	}
 
 	lookback := lp.filters.MaxRetention()
-	if lookback == 0 { // Use default lookback if all filters have permanent retention or less than
+	if lookback == 0 { // Use default lookback if all filters have permanent retention
 		lookback = DefaultLookbackWindow
 	}
 
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	latestSlot := int64(latestFinalizedSlot)
+	lookbackSlot := latestSlot - int64((lookback-1)/lp.blockTime) - 1 // = latestSlot - ceil(lookback/blockTime)
+
 	firstAvailableSlot, err := lp.client.GetFirstAvailableBlock(ctx) // Despite the name, this returns slot # not block number
+	if err != nil {
+		// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
+		return lookbackSlot, nil
+	}
 
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
-	latestSlot, firstSlot := int64(latestFinalizedSlot), int64(firstAvailableSlot)
-	lookbackSlot := latestSlot - int64((lookback-1)/lp.blockTime) - 1 // = latestSlot - ceil(lookback/blockTime)
-
-	// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
-	if err == nil && firstSlot > lookbackSlot {
+	firstSlot := int64(firstAvailableSlot)
+	if firstSlot > lookbackSlot {
 		lookbackSlot = firstSlot
 	}
 	return lookbackSlot, nil
