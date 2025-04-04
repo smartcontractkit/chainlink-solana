@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -44,8 +43,8 @@ type Arguments struct {
 	Seed2       []byte
 }
 
-var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipCommonIDL = idl.FetchCommonIDL()
+var ccipOfframpIDL = ccipsolana.FetchCCIPOfframpIDL()
+var ccipCommonIDL = ccipsolana.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {

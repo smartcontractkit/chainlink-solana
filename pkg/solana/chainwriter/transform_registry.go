@@ -63,41 +63,63 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		txmutils.SetComputeUnitLimit(computeUnits),
 	}
 
-	registryTables, exists := tableMap["PoolLookupTable"]
-	// If PoolLookupTable does not exist in the table map, token indexes are not needed
-	// Return with empty TokenIndexes
-	if !exists {
-		argsTransformed.TokenIndexes = []byte{}
-		return argsTransformed, accounts, options, nil
-	}
-
-	// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
-	poolLookupAccounts, err := fetchPoolLookupAccounts(ctx, client, registryTables)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags: %w", err)
-	}
-
-	var aggregatedMessages []ccipocr3.Message
-	for _, report := range argsTransformed.Info.AbstractReports {
-		aggregatedMessages = append(aggregatedMessages, report.Messages...)
-	}
-
-	feeQuoterAddress, err := getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch fee quoter address: %w", err)
-	}
-
 	if len(accounts) < MandatoryExecuteAccounts {
 		return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
 	}
 
-	tokenIndexes := []uint8{}
-	// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
-	if len(poolLookupAccounts) < 7 {
-		return nil, nil, nil, fmt.Errorf("unexpected number of accounts in pool lookup table %d, expected at least 7", len(poolLookupAccounts))
+	var aggregatedMessages []ccipocr3.Message
+	tokenAccountsRequired := false
+	// Aggregate all report messages and track if token transfer accounts are required
+	for _, report := range argsTransformed.Info.AbstractReports {
+		aggregatedMessages = append(aggregatedMessages, report.Messages...)
+		if tokenAccountsRequired {
+			continue
+		}
+		// Token accounts are required if any message contains token amounts 
+		for _, message := range report.Messages {
+			if len(message.TokenAmounts) > 0 {
+				tokenAccountsRequired = true
+			}
+		}
 	}
-	poolProgram := poolLookupAccounts[2]
-	tokenProgram := poolLookupAccounts[6]
+
+	tokenIndexes := []uint8{}
+	var poolLookupAccounts []*solana.AccountMeta
+	var poolProgram, tokenProgram *solana.AccountMeta
+	var tokenReceiver, feeQuoterAddress solana.PublicKey
+	if tokenAccountsRequired {
+		registryTables, exists := tableMap["PoolLookupTable"]
+		if !exists {
+			return nil, nil, nil, fmt.Errorf("failed to find PoolLookupTable in table map, required for token transfer")
+		}
+		// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
+		poolLookupAccounts, err = fetchPoolLookupAccounts(ctx, client, registryTables)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags, required for token transfer: %w", err)
+		}
+		// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
+		if len(poolLookupAccounts) < 7 {
+			return nil, nil, nil, fmt.Errorf("unexpected number of accounts in pool lookup table %d, expected at least 7", len(poolLookupAccounts))
+		}
+		poolProgram = poolLookupAccounts[2]
+		tokenProgram = poolLookupAccounts[6]
+
+		feeQuoterAddress, err = getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch fee quoter address, required for token transfer: %w", err)
+		}
+
+		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
+		tokenReceivers, err := tokenReceiverLookup.Resolve(args)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to find token receiver, required for token transfers: %w", err)
+		}
+		if len(tokenReceivers) != 1 {
+			return nil, nil, nil, fmt.Errorf("unexpected number of token receivers found %d, expected 1", len(tokenReceivers))
+		}
+		tokenReceiver = tokenReceivers[0].PublicKey
+	}
+
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
 		logicReceiver := message.Receiver
@@ -120,15 +142,9 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 			accounts = append(accounts, userAccounts...)
 		}
 
-		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
-		tokenReceivers, err := tokenReceiverLookup.Resolve(args)
-		if err != nil || len(tokenReceivers) == 0 {
-			break // If token receiver not defined, token transfer accounts are not needed so cut loop short
+		if !tokenAccountsRequired {
+			continue
 		}
-		if len(tokenReceivers) > 1 {
-			return nil, nil, nil, fmt.Errorf("unexpected number of token receivers found %d, expected 1", len(tokenReceivers))
-		}
-		tokenReceiver := tokenReceivers[0].PublicKey
 		sourceChainSelector := make([]byte, 8)
 		binary.LittleEndian.PutUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
 		for _, tokenAmount := range message.TokenAmounts {
