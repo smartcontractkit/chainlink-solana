@@ -35,29 +35,28 @@ func FindTransform(id string) (func(context.Context, client.MultiClient, any, so
 	}
 }
 
+type tokenTransferAccounts struct {
+	poolLookupAccounts []*solana.AccountMeta
+	poolProgram        *solana.AccountMeta
+	tokenProgram       *solana.AccountMeta
+	tokenReceiver      solana.PublicKey
+	feeQuoterAddress   solana.PublicKey
+}
+
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
 func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
-		return nil, nil, []txmutils.SetTxConfig{}, err
+		return nil, nil, nil, err
 	}
 
-	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
-	if !ok {
-		return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("computeUnits not found in ExtraData")
+	computeUnits, err := calculateComputeUnitLimit(argsTransformed)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to calculate compute unit limit: %w", err)
 	}
 
-	computeUnits := StaticCuOverhead + cu
-
-	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
-		destGasAmount, ok := execData["destGasAmount"].(uint32)
-		if !ok {
-			return nil, nil, []txmutils.SetTxConfig{}, fmt.Errorf("DestGasAmount not found in ExtraData")
-		}
-		computeUnits += destGasAmount
-	}
 	options := []txmutils.SetTxConfig{
 		txmutils.SetEstimateComputeUnitLimit(false),
 		txmutils.SetComputeUnitLimit(computeUnits),
@@ -75,7 +74,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		if tokenAccountsRequired {
 			continue
 		}
-		// Token accounts are required if any message contains token amounts 
+		// Token accounts are required if any message contains token amounts
 		for _, message := range report.Messages {
 			if len(message.TokenAmounts) > 0 {
 				tokenAccountsRequired = true
@@ -84,93 +83,22 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	}
 
 	tokenIndexes := []uint8{}
-	var poolLookupAccounts []*solana.AccountMeta
-	var poolProgram, tokenProgram *solana.AccountMeta
-	var tokenReceiver, feeQuoterAddress solana.PublicKey
-	if tokenAccountsRequired {
-		registryTables, exists := tableMap["PoolLookupTable"]
-		if !exists {
-			return nil, nil, nil, fmt.Errorf("failed to find PoolLookupTable in table map, required for token transfer")
-		}
-		// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
-		poolLookupAccounts, err = fetchPoolLookupAccounts(ctx, client, registryTables)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags, required for token transfer: %w", err)
-		}
-		// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
-		if len(poolLookupAccounts) < 7 {
-			return nil, nil, nil, fmt.Errorf("unexpected number of accounts in pool lookup table %d, expected at least 7", len(poolLookupAccounts))
-		}
-		poolProgram = poolLookupAccounts[2]
-		tokenProgram = poolLookupAccounts[6]
-
-		feeQuoterAddress, err = getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to fetch fee quoter address, required for token transfer: %w", err)
-		}
-
-		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
-		tokenReceivers, err := tokenReceiverLookup.Resolve(args)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to find token receiver, required for token transfers: %w", err)
-		}
-		if len(tokenReceivers) != 1 {
-			return nil, nil, nil, fmt.Errorf("unexpected number of token receivers found %d, expected 1", len(tokenReceivers))
-		}
-		tokenReceiver = tokenReceivers[0].PublicKey
+	commonTTAccounts, err := resolveCommonTokenTransferAccounts(ctx, tokenAccountsRequired, client, toAddress, args, tableMap)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to resolve accounts required for token transfer: %w", err)
 	}
 
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
-		logicReceiver := message.Receiver
-		if !logicReceiver.IsZeroOrEmpty() {
-			userAccountsLookup := AccountLookup{
-				Name:       "UserAccounts",
-				Location:   "ExtraData.ExtraArgsDecoded.accounts",
-				IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap"},
-				IsSigner:   MetaBool{Value: false},
-			}
-			userAccounts, err := userAccountsLookup.Resolve(args)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to resolve user accounts: %w", err)
-			}
-			accounts = append(accounts, &solana.AccountMeta{
-				PublicKey:  solana.PublicKeyFromBytes(logicReceiver),
-				IsWritable: false,
-				IsSigner:   false,
-			})
-			accounts = append(accounts, userAccounts...)
+		// Append the logic receiver and the user defined messaging accounts to list
+		accounts, err = appendMessagingAccounts(accounts, message.Receiver, args)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to append user messaging accounts to list: %w", err)
 		}
-
-		if !tokenAccountsRequired {
-			continue
-		}
-		sourceChainSelector := make([]byte, 8)
-		binary.LittleEndian.PutUint64(sourceChainSelector, uint64(message.Header.SourceChainSelector))
-		for _, tokenAmount := range message.TokenAmounts {
-			destTokenAddress := tokenAmount.DestTokenAddress
-			userTokenAccount, err := getUserTokenAccount(tokenReceiver.Bytes(), tokenProgram.PublicKey, destTokenAddress)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to calculate user token account PDA: %w", err)
-			}
-			perChainTokenConfig, err := getPerChainTokenConfig(sourceChainSelector, destTokenAddress, feeQuoterAddress)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to calculate per chain per token config PDA: %w", err)
-			}
-			poolChainConfig, err := getPoolChainConfig(sourceChainSelector, destTokenAddress, poolProgram.PublicKey)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
-			}
-			// Token indexes are relative to the remaining accounts which exclude mandatory accounts
-			tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
-			// Append all token accounts for transfer
-			accounts = append(accounts,
-				&solana.AccountMeta{PublicKey: userTokenAccount, IsWritable: true},
-				&solana.AccountMeta{PublicKey: perChainTokenConfig},
-				&solana.AccountMeta{PublicKey: poolChainConfig, IsWritable: true},
-			)
-			// Append all pool lookup accounts needed for pool interaction
-			accounts = append(accounts, poolLookupAccounts...)
+		// Append token transfer accounts for each TokenAmount if required
+		accounts, tokenIndexes, err = appendTokenTransferAccounts(tokenAccountsRequired, accounts, message.Header.SourceChainSelector, message.TokenAmounts, commonTTAccounts, tokenIndexes)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to append token transfer accounts to list: %w", err)
 		}
 	}
 
@@ -236,6 +164,127 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 		}
 	}
 	return poolAccounts, nil
+}
+
+func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs) (uint32, error) {
+	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
+	if !ok {
+		return 0, fmt.Errorf("computeUnits not found in ExtraData")
+	}
+
+	computeUnits := StaticCuOverhead + cu
+
+	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
+		destGasAmount, ok := execData["destGasAmount"].(uint32)
+		if !ok {
+			return 0, fmt.Errorf("DestGasAmount not found in ExtraData")
+		}
+		computeUnits += destGasAmount
+	}
+	return computeUnits, nil
+}
+
+func resolveCommonTokenTransferAccounts(ctx context.Context, tokenAccountsRequired bool, client client.MultiClient, toAddress string, args any, tableMap map[string]map[string][]*solana.AccountMeta) (tokenTransferAccounts, error) {
+	// Return empty struct if token accounts are not required
+	if !tokenAccountsRequired {
+		return tokenTransferAccounts{}, nil
+	}
+	registryTables, exists := tableMap["PoolLookupTable"]
+	if !exists {
+		return tokenTransferAccounts{}, fmt.Errorf("failed to find PoolLookupTable in table map, required for token transfer")
+	}
+	// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
+	poolLookupAccounts, err := fetchPoolLookupAccounts(ctx, client, registryTables)
+	if err != nil {
+		return tokenTransferAccounts{}, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags, required for token transfer: %w", err)
+	}
+	// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
+	if len(poolLookupAccounts) < 7 {
+		return tokenTransferAccounts{}, fmt.Errorf("unexpected number of accounts in pool lookup table %d, expected at least 7", len(poolLookupAccounts))
+	}
+	poolProgram := poolLookupAccounts[2]
+	tokenProgram := poolLookupAccounts[6]
+
+	feeQuoterAddress, err := getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
+	if err != nil {
+		return tokenTransferAccounts{}, fmt.Errorf("failed to fetch fee quoter address, required for token transfer: %w", err)
+	}
+
+	tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
+	tokenReceivers, err := tokenReceiverLookup.Resolve(args)
+	if err != nil {
+		return tokenTransferAccounts{}, fmt.Errorf("failed to find token receiver, required for token transfers: %w", err)
+	}
+	if len(tokenReceivers) != 1 {
+		return tokenTransferAccounts{}, fmt.Errorf("unexpected number of token receivers found %d, expected 1", len(tokenReceivers))
+	}
+	tokenReceiver := tokenReceivers[0].PublicKey
+
+	return tokenTransferAccounts{
+		poolLookupAccounts: poolLookupAccounts,
+		poolProgram:        poolProgram,
+		tokenProgram:       tokenProgram,
+		feeQuoterAddress:   feeQuoterAddress,
+		tokenReceiver:      tokenReceiver,
+	}, nil
+}
+
+func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver ccipocr3.UnknownAddress, args any) (solana.AccountMetaSlice, error) {
+	// Messaging accounts do not need to be appended if logic receiver is zero or empty. Return accounts as is
+	if !logicReceiver.IsZeroOrEmpty() {
+		userAccountsLookup := AccountLookup{
+			Name:       "UserAccounts",
+			Location:   "ExtraData.ExtraArgsDecoded.accounts",
+			IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap"},
+			IsSigner:   MetaBool{Value: false},
+		}
+		userAccounts, err := userAccountsLookup.Resolve(args)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve user accounts: %w", err)
+		}
+		accounts = append(accounts, &solana.AccountMeta{
+			PublicKey:  solana.PublicKeyFromBytes(logicReceiver),
+			IsWritable: false,
+			IsSigner:   false,
+		})
+		accounts = append(accounts, userAccounts...)
+	}
+	return accounts, nil
+}
+
+func appendTokenTransferAccounts(tokenAccountsRequired bool, accounts solana.AccountMetaSlice, sourceChainSel ccipocr3.ChainSelector, tokenAmounts []ccipocr3.RampTokenAmount, commonTTAccounts tokenTransferAccounts, tokenIndexes []uint8) (solana.AccountMetaSlice, []uint8, error) {
+	// Return accounts and token indexes as is if token accounts are not required
+	if !tokenAccountsRequired {
+		return accounts, tokenIndexes, nil
+	}
+	sourceChainSelector := make([]byte, 8)
+	binary.LittleEndian.PutUint64(sourceChainSelector, uint64(sourceChainSel))
+	for _, tokenAmount := range tokenAmounts {
+		destTokenAddress := tokenAmount.DestTokenAddress
+		userTokenAccount, err := getUserTokenAccount(commonTTAccounts.tokenReceiver.Bytes(), commonTTAccounts.tokenProgram.PublicKey, destTokenAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to calculate user token account PDA: %w", err)
+		}
+		perChainTokenConfig, err := getPerChainTokenConfig(sourceChainSelector, destTokenAddress, commonTTAccounts.feeQuoterAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to calculate per chain per token config PDA: %w", err)
+		}
+		poolChainConfig, err := getPoolChainConfig(sourceChainSelector, destTokenAddress, commonTTAccounts.poolProgram.PublicKey)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
+		}
+		// Token indexes are relative to the remaining accounts which exclude mandatory accounts
+		tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
+		// Append all token accounts for transfer
+		accounts = append(accounts,
+			&solana.AccountMeta{PublicKey: userTokenAccount, IsWritable: true},
+			&solana.AccountMeta{PublicKey: perChainTokenConfig},
+			&solana.AccountMeta{PublicKey: poolChainConfig, IsWritable: true},
+		)
+		// Append all pool lookup accounts needed for pool interaction
+		accounts = append(accounts, commonTTAccounts.poolLookupAccounts...)
+	}
+	return accounts, tokenIndexes, nil
 }
 
 func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, tableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) (solana.PublicKey, error) {

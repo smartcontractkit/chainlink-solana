@@ -228,7 +228,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 					Messages: []ccipocr3.Message{
 						{
 							Receiver: logicReceiver.Bytes(),
-							Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
 						},
 					},
 				}},
