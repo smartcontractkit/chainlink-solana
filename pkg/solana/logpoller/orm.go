@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -303,4 +304,23 @@ func (o *DSORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
 		seqNums[row.FilterID] = row.SequenceNum
 	}
 	return seqNums, nil
+}
+
+func (o *DSORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	query := `DELETE FROM solana.logs AS l
+		  		 WHERE chain_id = $1 AND filter_id = $2 AND
+		  		       ( l.expires_at <= NOW() OR $3 > 0 AND
+		  		        	( SELECT MAX(sequence_num) FROM solana.logs
+		  		    			WHERE chain_id = $1 AND filter_id = $2
+							) - l.sequence_num >= $3
+					   )`
+	res, err := o.ds.ExecContext(ctx, query, o.chainID, filter.ID, filter.MaxLogsKept)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
 }
