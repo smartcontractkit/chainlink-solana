@@ -5,18 +5,19 @@ import (
 )
 
 type Filter struct {
-	ID            int64 // only for internal usage. Values set externally are ignored.
-	Name          string
-	Address       PublicKey
-	EventName     string
-	EventSig      EventSignature
-	StartingBlock int64
-	EventIdl      EventIdl
-	SubkeyPaths   SubKeyPaths
-	Retention     time.Duration
-	MaxLogsKept   int64
-	IsDeleted     bool // only for internal usage. Values set externally are ignored.
-	IsBackfilled  bool // only for internal usage. Values set externally are ignored.
+	ID              int64 // only for internal usage. Values set externally are ignored.
+	Name            string
+	Address         PublicKey
+	EventName       string
+	EventSig        EventSignature
+	StartingBlock   int64
+	EventIdl        EventIdl
+	SubkeyPaths     SubKeyPaths
+	Retention       time.Duration
+	MaxLogsKept     int64
+	IsDeleted       bool // only for internal usage. Values set externally are ignored.
+	IsBackfilled    bool // only for internal usage. Values set externally are ignored.
+	IncludeReverted bool
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
@@ -40,4 +41,5 @@ type Log struct {
 	CreatedAt      time.Time
 	ExpiresAt      *time.Time
 	SequenceNum    int64
+	Error          *string
 }

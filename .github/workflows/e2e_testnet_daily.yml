@@ -155,7 +155,7 @@ jobs:
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fdaf56b1df7248d18e30ad09982d03ec67d6b71c # v2.3.29
+        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -171,10 +171,10 @@ jobs:
           artifacts_location: ./integration-tests/smoke/logs/
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+          enable-gap: false
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
-          DEFAULT_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
+          default_e2e_test_chainlink_image: ${{ env.CL_ECR }}
         env:
           E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
           E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url

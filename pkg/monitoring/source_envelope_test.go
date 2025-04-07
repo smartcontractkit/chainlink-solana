@@ -237,7 +237,7 @@ func TestEnvelopeSource(t *testing.T) {
 		require.True(t, ok)
 		cacheValue := envSource.readJuelsPerLamport()
 
-		v, err := envSource.getJuelsPerLamport(tests.Context(t))
+		v, err := envSource.getJuelsPerLamport(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, cacheValue, v.Uint64())
 		tests.AssertLogEventually(t, logs.FilterLevelExact(zapcore.WarnLevel), "no transactions found, falling back to cached value - history may have been pruned (cached_value=0 indicates pruned txs encountered on startup)")

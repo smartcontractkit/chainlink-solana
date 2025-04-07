@@ -55,7 +55,7 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 			// exit on GetTransaction error
 			// if this occurs, solana-go was unable to parse a transaction
 			// further investigation is required to determine if there is incompatibility
-			return out, fmt.Errorf("failed to GetTransaction (blockhash: %s): %w", res.Blockhash, err)
+			return out, fmt.Errorf("failed to GetTransaction (blockhash: %s): %w", res.Blockhash, getTxErr)
 		}
 		if baseTx == nil {
 			continue

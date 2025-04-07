@@ -7,7 +7,6 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -69,6 +68,25 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		},
 	)
 	if err != nil {
+		oldestAvailableSlot, err2 := j.client.GetFirstAvailableBlock(ctx)
+		if err2 != nil {
+			return fmt.Errorf("failed to get first available slot: %w", err2)
+		}
+		if oldestAvailableSlot > j.slotNumber {
+			j.lggr.Warnf("slot %d is pruned away, as oldest available slot is %d. skipping this slot", j.slotNumber, oldestAvailableSlot)
+			result := Block{
+				SlotNumber: j.slotNumber,
+				BlockHash:  nil,
+				Events:     []ProgramEvent{},
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case j.blocks <- result:
+				close(j.done)
+			}
+			return nil
+		}
 		return err
 	}
 
@@ -103,11 +121,8 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		if txWithMeta.Meta == nil {
 			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
 		}
-		if txWithMeta.Meta.Err != nil {
-			// silently skip as at the moment there is no way for us to filter transactions produced by our contracts
-			continue
-		}
 		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
+		detail.err = txWithMeta.Meta.Err
 
 		txEvents := j.messagesToEvents(txWithMeta.Meta.LogMessages, detail)
 		events = append(events, txEvents...)
@@ -115,7 +130,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 
 	result := Block{
 		SlotNumber: j.slotNumber,
-		BlockHash:  block.Blockhash,
+		BlockHash:  &block.Blockhash,
 		Events:     events,
 	}
 	select {
@@ -140,6 +155,7 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 			event.TransactionHash = detail.trxSig
 			event.TransactionIndex = detail.trxIdx
 			event.TransactionLogIndex = logIdx
+			event.Error = detail.err
 
 			logIdx++
 			outputs.Events[i] = event
@@ -158,4 +174,5 @@ type eventDetail struct {
 	blockTime   solana.UnixTimeSeconds
 	trxIdx      int
 	trxSig      solana.Signature
+	err         interface{}
 }

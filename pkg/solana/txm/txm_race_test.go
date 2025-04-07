@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -70,7 +69,7 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 		msg.cfg = txm.defaultTxConfig()
 		err := txm.txs.New(msg)
 		require.NoError(t, err)
-		_, _, _, err = txm.sendWithRetry(tests.Context(t), msg)
+		_, _, _, err = txm.sendWithRetry(t.Context(), msg)
 		require.NoError(t, err)
 
 		time.Sleep(txRetryDuration / 4 * 5)                                     // wait 1.25x longer of tx life to capture all logs

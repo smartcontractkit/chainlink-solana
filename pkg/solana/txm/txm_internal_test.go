@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -123,7 +122,7 @@ func TestTxm(t *testing.T) {
 			id := "mocknet-" + estimator + "-" + uuid.NewString()
 			t.Logf("Starting new iteration: %s", id)
 
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			lggr := logger.Test(t)
 			cfg := config.NewDefault()
 			cfg.Chain.FeeEstimatorMode = &estimator
@@ -781,7 +780,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -986,7 +985,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -1040,11 +1039,11 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
 		// First simulation before broadcast with signature and max compute unit limit set
-		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 		// Second simulation after broadcast with signature and compute unit limit set
-		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 
@@ -1142,12 +1141,12 @@ func TestTxm_Enqueue(t *testing.T) {
 			return out
 		}, nil,
 	).Maybe()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
-	validKey := solana.PublicKeyFromBytes([]byte{1})
-	invalidKey := solana.PublicKeyFromBytes([]byte{2})
+	validKey := utils.GetRandomPubKey(t)
+	invalidKey := utils.GetRandomPubKey(t)
 	mkey.On("Sign", mock.Anything, validKey.String(), mock.Anything).Return([]byte{1}, nil)
 	mkey.On("Sign", mock.Anything, invalidKey.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: invalidKey.String(), KeyType: "Solana"})
 
@@ -1218,7 +1217,7 @@ func TestTxm_Enqueue(t *testing.T) {
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
-	txCopy := tx
+	txCopy := deepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)
@@ -1240,7 +1239,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(5 * time.Second)
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second) // Enable retention to keep transactions after finality and be able to check their statuses.
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper function to set up common test environment
 	setupTxmTest := func(
@@ -1632,7 +1631,7 @@ func TestTxm_OnReorg(t *testing.T) {
 	// Enable retention to keep transactions after finality and be able to check their statuses.
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second)
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper that sets up a Txm and mocks.
 	setupTxmTest := func(
@@ -1713,7 +1712,7 @@ func TestTxm_OnReorg(t *testing.T) {
 			latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
 				return &rpc.GetLatestBlockhashResult{
 					Value: &rpc.LatestBlockhashResult{
-						Blockhash:            solana.HashFromBytes([]byte{2}),
+						Blockhash:            solana.HashFromBytes(utils.GetRandomPubKey(t).Bytes()),
 						LastValidBlockHeight: 2001,
 					},
 				}, nil
@@ -1802,7 +1801,7 @@ func TestTxm_OnReorg(t *testing.T) {
 func TestTxm_GetTransactionStatus(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	_, cancel := context.WithCancel(ctx)
 
 	// set up configs needed in txm
@@ -1887,7 +1886,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 }
 
 func TestTxm_DependencyTx(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	estimator := "fixed"
 	id := "mocknet-dep-" + uuid.NewString()

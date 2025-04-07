@@ -20,6 +20,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,10 +32,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
@@ -45,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	solanautils "github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -56,24 +59,26 @@ const (
 	AnyContractNameWithSharedAddress3 = AnyContractName + "Shared3"
 )
 
+var trueVal = true
+
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
 
-	//t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
-	//	t.Parallel()
-	//	helper := &helper{}
-	//	helper.Init(t)
-	//	it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
-	//	DisableTests(it)
-	//	it.Setup(t)
-	//	RunChainComponentsSolanaTests(t, it)
-	//})
+	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
+		t.Parallel()
+		helper := &helper{}
+		helper.Init(t)
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
+		DisableTests(it)
+		it.Setup(t)
+		RunChainComponentsSolanaTests(t, it)
+	})
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
 		t.Parallel()
 		helper := &helper{}
 		helper.Init(t)
-		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}}
+		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
 		DisableTests(it)
 		wrapped := commontestutils.WrapContractReaderTesterForLoop(it)
 		wrapped.Setup(t)
@@ -93,11 +98,12 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
-		// events not yet supported
+		// events not supported yet
 		ContractReaderGetLatestValueGetsLatestForEvent,
 		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
+
 		// query key not implemented yet
 		ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
@@ -111,6 +117,9 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderQueryKeysCanFilterWithValueComparator,
 		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
+	if it.inMemoryDB {
+		it.DisableTests([]string{ContractReaderGetLatestValueIncludeReverted})
+	}
 }
 
 func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInterfaceTester[T]) {
@@ -118,7 +127,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 		{
 			Name: "Test address groups where first namespace shares address with second namespace",
 			Test: func(t T) {
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				cfg := it.buildContractReaderConfig(t)
 				cfg.AddressShareGroups = [][]string{{AnyContractNameWithSharedAddress1, AnyContractNameWithSharedAddress2, AnyContractNameWithSharedAddress3}}
 				cr := it.GetContractReaderWithCustomCfg(t, cfg)
@@ -191,7 +200,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
@@ -244,7 +253,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				contracts := it.GetBindings(t)
 
 				idx := it.getTestIdx(t.Name())
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(contracts, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, contracts))
 
@@ -295,13 +304,13 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 				contracts := it.GetBindings(t)
 
 				idx := it.getTestIdx(t.Name())
-				ctx := tests.Context(t)
+				ctx := t.Context()
 				bound := BindingsByName(contracts, AnyContractName)[0]
 				require.NoError(t, cr.Bind(ctx, contracts))
 
 				tokenProgram := solana.Token2022ProgramID
 				feePayerPk := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
-				mint := utils.CreateRandomToken(t, feePayerPk, tokenProgram, it.Helper.RPC())
+				mint := utils.CreateRandomToken(t.Context(), t, feePayerPk, tokenProgram, it.Helper.RPC())
 
 				wallet, err := solana.NewRandomPrivateKey()
 				require.NoError(t, err)
@@ -335,6 +344,7 @@ const (
 	ContractReaderGetLatestValueWithAddressHardcodedIntoResponse = "Get latest value with AddressHardcoded into response"
 	ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse   = "Get latest value using multi reader with params reuse"
 	ContractReaderGetLatestValueGetTokenPrices                   = "Get latest value handles get token prices edge case"
+	ContractReaderGetLatestValueIncludeReverted                  = "GetLatestValue includes reverted transactions when asked"
 	ChainWriterLookupTableTest                                   = "Set contract value using a lookup table for addresses"
 	ChainWriterATASupportTest                                    = "Initialize ATA if one does not exist"
 )
@@ -343,138 +353,255 @@ func RunContractReaderInLoopTests[T WrappedTestingT[T]](t T, it ChainComponentsI
 	//RunContractReaderInterfaceTests(t, it, false, true)
 	testCases := []Testcase[T]{
 		{
+			Name: ContractReaderNotFoundReadsReturnZeroedResponses,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				dAccRes := contractprimary.DataAccount{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadUninitializedPDA), primitives.Unconfirmed, nil, &dAccRes))
+				require.Equal(t, contractprimary.DataAccount{}, dAccRes)
+
+				mR3Res := contractprimary.MultiRead3{}
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  ReadUninitializedPDA,
+						Params:    nil,
+						ReturnVal: &dAccRes,
+					},
+					{
+						ReadName:  MultiReadWithParamsReuse,
+						Params:    map[string]any{"ID": 999},
+						ReturnVal: &mR3Res,
+					},
+				}
+
+				batchResult, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				result, err := batchResult[bound][0].GetResult()
+				require.NoError(t, err)
+				require.Equal(t, &contractprimary.DataAccount{}, result)
+
+				result, err = batchResult[bound][1].GetResult()
+				require.NoError(t, err)
+				require.Equal(t, &contractprimary.MultiRead3{}, result)
+			},
+		},
+		{
+			Name: ContractReaderGetLatestValueWithAddressHardcodedIntoResponse,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				boundAddress, err := solana.PublicKeyFromBase58(bound.Address)
+				require.NoError(t, err)
+
+				type MultiReadResult struct {
+					A              uint8
+					B              int16
+					SharedAddress  []byte
+					AddressToShare []byte
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(ReadWithAddressHardCodedIntoResponse), primitives.Unconfirmed, nil, &mRR))
+
+				expectedMRR := MultiReadResult{A: 1, B: 2, SharedAddress: boundAddress.Bytes(), AddressToShare: boundAddress.Bytes()}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
+		{
 			Name: ContractReaderGetLatestValueUsingMultiReader,
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
-				ctx := tests.Context(t)
+				ctx := t.Context()
 
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
 				require.NoError(t, cr.Bind(ctx, bindings))
 
-				type RMNCurseResponse struct {
-					CursedSubjects [][16]byte
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
 				}
 
-				retVal := RMNCurseResponse{CursedSubjects: make([][16]byte, 0)}
-				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(Curses), primitives.Unconfirmed, map[string]any{}, &retVal))
-				fmt.Println("ret val is ", retVal)
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiRead), primitives.Unconfirmed, nil, &mRR))
+
+				expectedMRR := MultiReadResult{A: 1, B: 2, U: "Hello", V: true}
+				require.Equal(t, expectedMRR, mRR)
 			},
 		},
-		//{
-		//	Name: ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse,
-		//	Test: func(t T) {
-		//		cr := it.GetContractReader(t)
-		//		bindings := it.GetBindings(t)
-		//		ctx := tests.Context(t)
-		//
-		//		bound := BindingsByName(bindings, AnyContractName)[0]
-		//
-		//		require.NoError(t, cr.Bind(ctx, bindings))
-		//
-		//		type MultiReadResult struct {
-		//			A uint8
-		//			B int16
-		//			U string
-		//			V bool
-		//		}
-		//
-		//		mRR := MultiReadResult{}
-		//		require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiReadWithParamsReuse), primitives.Unconfirmed, map[string]any{"ID": 1}, &mRR))
-		//
-		//		expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
-		//		require.Equal(t, expectedMRR, mRR)
-		//	},
-		//},
-		//{
-		//	Name: ContractReaderGetLatestValueGetTokenPrices,
-		//	Test: func(t T) {
-		//		cr := it.GetContractReader(t)
-		//		bindings := it.GetBindings(t)
-		//		ctx := tests.Context(t)
-		//
-		//		bound := BindingsByName(bindings, AnyContractName)[0]
-		//
-		//		require.NoError(t, cr.Bind(ctx, bindings))
-		//
-		//		type TimestampedUnixBig struct {
-		//			Value     *big.Int `json:"value"`
-		//			Timestamp uint32   `json:"timestamp"`
-		//		}
-		//
-		//		res := make([]TimestampedUnixBig, 2)
-		//
-		//		byteTokens := make([][]byte, 0, 2)
-		//		pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
-		//		require.NoError(t, err)
-		//		pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
-		//		require.NoError(t, err)
-		//
-		//		byteTokens = append(byteTokens, pubKey1.Bytes())
-		//		byteTokens = append(byteTokens, pubKey2.Bytes())
-		//		require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(GetTokenPrices), primitives.Unconfirmed, map[string]any{"tokens": byteTokens}, &res))
-		//		require.Equal(t, "7048352069843304521481572571769838000081483315549204879493368331", res[0].Value.String())
-		//		require.Equal(t, uint32(1700000001), res[0].Timestamp)
-		//		require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
-		//		require.Equal(t, uint32(1800000002), res[1].Timestamp)
-		//	},
-		//},
-		//{
-		//	Name: ContractReaderBatchGetLatestValueUsingMultiReader,
-		//	Test: func(t T) {
-		//		cr := it.GetContractReader(t)
-		//		bindings := it.GetBindings(t)
-		//		ctx := tests.Context(t)
-		//		bound := BindingsByName(bindings, AnyContractName)[0]
-		//
-		//		require.NoError(t, cr.Bind(ctx, bindings))
-		//
-		//		type MultiReadResult struct {
-		//			A uint8
-		//			B int16
-		//			U string
-		//			V bool
-		//		}
-		//
-		//		// setup call data
-		//		actual := uint64(0)
-		//		multiParams, multiActual := map[string]any{"ID": 1}, &MultiReadResult{}
-		//
-		//		batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
-		//		batchGetLatestValueRequest[bound] = []types.BatchRead{
-		//			{
-		//				ReadName:  MethodReturningUint64,
-		//				Params:    nil,
-		//				ReturnVal: &actual,
-		//			},
-		//			{
-		//				ReadName:  MultiReadWithParamsReuse,
-		//				Params:    multiParams,
-		//				ReturnVal: multiActual,
-		//			},
-		//		}
-		//
-		//		result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
-		//
-		//		require.NoError(t, err)
-		//
-		//		expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
-		//		anyContractBatch := result[bound]
-		//
-		//		returnValue, err := anyContractBatch[1].GetResult()
-		//		assert.NoError(t, err)
-		//		assert.Contains(t, anyContractBatch[1].ReadName, MultiReadWithParamsReuse)
-		//		require.Equal(t, &expectedMRR, returnValue)
-		//
-		//		returnValue, err = anyContractBatch[0].GetResult()
-		//		assert.NoError(t, err)
-		//		assert.Contains(t, anyContractBatch[0].ReadName, MethodReturningUint64)
-		//		assert.Equal(t, AnyValueToReadWithoutAnArgument, *returnValue.(*uint64))
-		//	},
-		//},
+		{
+			Name: ContractReaderGetLatestValueUsingMultiReaderWithParmsReuse,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				mRR := MultiReadResult{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MultiReadWithParamsReuse), primitives.Unconfirmed, map[string]any{"ID": 1}, &mRR))
+
+				expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
+				require.Equal(t, expectedMRR, mRR)
+			},
+		},
+		{
+			Name: ContractReaderGetLatestValueGetTokenPrices,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type TimestampedUnixBig struct {
+					Value     *big.Int `json:"value"`
+					Timestamp uint32   `json:"timestamp"`
+				}
+
+				res := make([]TimestampedUnixBig, 2)
+
+				byteTokens := make([][]byte, 0, 2)
+				pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
+				require.NoError(t, err)
+				pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
+				require.NoError(t, err)
+
+				byteTokens = append(byteTokens, pubKey1.Bytes())
+				byteTokens = append(byteTokens, pubKey2.Bytes())
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(GetTokenPrices), primitives.Unconfirmed, map[string]any{"tokens": byteTokens}, &res))
+				require.Equal(t, "7048352069843304521481572571769838000081483315549204879493368331", res[0].Value.String())
+				require.Equal(t, uint32(1700000001), res[0].Timestamp)
+				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
+				require.Equal(t, uint32(1800000002), res[1].Timestamp)
+			},
+		},
+		{
+			Name: ContractReaderBatchGetLatestValueUsingMultiReader,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				type MultiReadResult struct {
+					A uint8
+					B int16
+					U string
+					V bool
+				}
+
+				// setup call data
+				actual := uint64(0)
+				multiParams, multiActual := map[string]any{"ID": 1}, &MultiReadResult{}
+
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  MethodReturningUint64,
+						Params:    nil,
+						ReturnVal: &actual,
+					},
+					{
+						ReadName:  MultiReadWithParamsReuse,
+						Params:    multiParams,
+						ReturnVal: multiActual,
+					},
+				}
+
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+
+				require.NoError(t, err)
+
+				expectedMRR := MultiReadResult{A: 10, B: 20, U: "olleH", V: true}
+				anyContractBatch := result[bound]
+
+				returnValue, err := anyContractBatch[1].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[1].ReadName, MultiReadWithParamsReuse)
+				require.Equal(t, &expectedMRR, returnValue)
+
+				returnValue, err = anyContractBatch[0].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[0].ReadName, MethodReturningUint64)
+				assert.Equal(t, AnyValueToReadWithoutAnArgument, *returnValue.(*uint64))
+			},
+		},
+		{
+			Name: ContractReaderGetLatestValueIncludeReverted,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				require.NoError(t, cr.Bind(ctx, bindings))
+
+				stateChangedEvent := struct {
+					NewState string
+				}{}
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &stateChangedEvent)
+				require.ErrorContains(t, err, "NotFound")
+
+				SubmitTransactionAndExpectFailure(t, it, cw, MethodTriggeringEventBeforeFailing, nil, bound)
+
+				assert.Eventually(t, func() bool {
+					err = cr.GetLatestValue(ctx, bound.ReadIdentifier(StateChangedEventName), primitives.Finalized, nil, &stateChangedEvent)
+					if err != nil {
+						//it.Helper.Logger().Debugw("Waiting for GetLatestValue to return successfully:", "err", err)
+						return false
+					}
+					assert.Equal(t, "Pending", stateChangedEvent.NewState)
+					return true
+				}, 5*time.Minute, time.Second, "Timed out while waiting for StateChangedEvent to show up on chain")
+				assert.NoError(t, err)
+			},
+		},
 	}
 	RunTests(t, it, testCases)
+}
+
+// Similar to SubmitTransactionToCW, but requires that the tx fails instead of succeeds.
+func SubmitTransactionAndExpectFailure[T TestingT[T]](t T, tester ChainComponentsInterfaceTester[T], cw types.ContractWriter, method string, args any, contract types.BoundContract) string {
+	tester.DirtyContracts()
+	txID := uuid.New().String()
+	err := cw.SubmitTransaction(t.Context(), contract.Name, method, args, txID, contract.Address, nil, big.NewInt(0))
+	require.NoError(t, err)
+
+	err = WaitForTransactionStatus(t, tester, cw, txID, types.Failed, false)
+	require.ErrorContains(t, err, "has failed or is fatal")
+
+	return txID
 }
 
 type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface {
@@ -490,6 +617,7 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	MultiClient() *client.MultiClient
 	SolanaClient() *client.Client
 	Sender() solana.PrivateKey
+	Database() *sqlx.DB
 }
 
 type WrappedTestingT[T any] interface {
@@ -503,6 +631,7 @@ type SolanaChainComponentsInterfaceTester[T WrappedTestingT[T]] struct {
 	testContext   map[string]uint64
 	testContextMu *sync.RWMutex
 	testIdx       *atomic.Uint64
+	inMemoryDB    bool
 }
 
 // ContractReaderConfig and ContractWriterConfig are created when GetContractReader and GetContractWriter are called, respectively,
@@ -529,13 +658,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetAccountString(i int) strin
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.ContractReader {
 	contractReaderConfig := it.buildContractReaderConfig(t)
-	var events chainreader.EventsReader
+	chainID, err := it.Helper.MultiClient().ChainID(it.Helper.Context(t))
 
+	require.NoError(t, err)
+
+	orm := logpoller.NewORM(chainID.String(), it.Helper.Database(), it.Helper.Logger(t))
 	svc, err := chainreader.NewContractReaderService(
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		events)
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
 
 	require.NoError(t, err)
 	servicetest.Run(t, svc)
@@ -545,13 +677,16 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCfg(t T, contractReaderConfig config.ContractReader) types.ContractReader {
 	ctx := it.Helper.Context(t)
-	var events chainreader.EventsReader
+	chainID, err := it.Helper.MultiClient().ChainID(it.Helper.Context(t))
 
+	require.NoError(t, err)
+
+	orm := logpoller.NewORM(chainID.String(), it.Helper.Database(), it.Helper.Logger(t))
 	svc, err := chainreader.NewContractReaderService(
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		events)
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
@@ -611,18 +746,28 @@ type helper struct {
 	txm                txm.TxManager
 	sc                 *client.Client
 	sender             solana.PrivateKey
+	db                 *sqlx.DB
+	inMemoryDB         bool
 }
 
 func (h *helper) Init(t *testing.T) {
 	t.Helper()
+
+	dbURL := sqltest.TestURL(t)
+	h.db = sqltest.NewDB(t, dbURL)
+
+	if dbURL == pg.DriverInMemoryPostgres {
+		h.inMemoryDB = true
+	}
 
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 	h.sender = privateKey
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
-	h.wsClient, err = ws.Connect(tests.Context(t), h.wsURL)
+	h.wsClient, err = ws.Connect(t.Context(), h.wsURL)
 	h.rpcClient = rpc.New(h.rpcURL)
+	lggr := logger.Test(t)
 
 	require.NoError(t, err)
 
@@ -630,7 +775,7 @@ func (h *helper) Init(t *testing.T) {
 
 	cfg := config.NewDefault()
 	cfg.Chain.TxRetentionTimeout = commonconfig.MustNewDuration(10 * time.Minute)
-	solanaClient, err := client.NewClient(h.rpcURL, cfg, 5*time.Second, nil)
+	solanaClient, err := client.NewClient(h.rpcURL, cfg, 5*time.Second, lggr)
 	require.NoError(t, err)
 
 	h.sc = solanaClient
@@ -641,10 +786,9 @@ func (h *helper) Init(t *testing.T) {
 		sig, _ := privateKey.Sign(data)
 		return sig[:]
 	}, nil)
-	lggr := logger.Test(t)
 
 	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
-	err = txm.Start(tests.Context(t))
+	err = txm.Start(t.Context())
 	require.NoError(t, err)
 
 	h.txm = txm
@@ -659,6 +803,10 @@ func (h *helper) Init(t *testing.T) {
 
 	h.primaryProgramID = primaryPubkey
 	h.secondaryProgramID = secondaryPubkey
+}
+
+func (h *helper) InMemoryDB() bool {
+	return h.inMemoryDB
 }
 
 func (h *helper) RPCClient() *chainreader.RPCClientWrapper {
@@ -684,7 +832,7 @@ func (h *helper) SolanaClient() *client.Client {
 }
 
 func (h *helper) Context(t *testing.T) context.Context {
-	return tests.Context(t)
+	return t.Context()
 }
 
 func (h *helper) Logger(t *testing.T) logger.Logger {
@@ -757,6 +905,10 @@ func (h *helper) Sender() solana.PrivateKey {
 	return h.sender
 }
 
+func (h *helper) Database() *sqlx.DB {
+	return h.db
+}
+
 type DataAccountArgs struct {
 	TestIdx uint64
 	Value   uint64
@@ -820,10 +972,11 @@ func (h *helper) runInitialize(
 const (
 	ReadUninitializedPDA                 = "ReadUninitializedPDA"
 	MultiRead                            = "MultiRead"
-	Curses                               = "Curses"
 	ReadWithAddressHardCodedIntoResponse = "ReadWithAddressHardCodedIntoResponse"
 	MultiReadWithParamsReuse             = "MultiReadWithParamsReuse"
 	GetTokenPrices                       = "GetTokenPrices"
+	StateChangedEventName                = "StateChangedEvent"
+	MethodTriggeringEventBeforeFailing   = "triggerEventAndFail"
 )
 
 func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T) config.ContractReader {
@@ -896,7 +1049,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 		},
 	})
 
-	return config.ContractReader{
+	cfg := config.ContractReader{
 		Namespaces: map[string]config.ChainContractReader{
 			AnyContractName: {
 				IDL: idl,
@@ -927,21 +1080,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "TokenPrices"},
-						},
-					},
-					Curses: {
-						ChainSpecificName: "Curses",
-						ReadType:          config.Account,
-						PDADefinition: codec.PDATypeDef{
-							Prefix: []byte("curses"),
-						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.PropertyExtractorConfig{
-								FieldName: "CursedSubjects.Value",
-							},
-							&commoncodec.WrapperModifierConfig{
-								Fields: map[string]string{"": "CursedSubjects"},
-							},
 						},
 					},
 					MultiRead: multiReadDef,
@@ -1036,6 +1174,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							},
 						},
 					},
+					StateChangedEventName: {
+						ChainSpecificName: "StateChangedEvent",
+						ReadType:          config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							PollingFilter: &config.PollingFilter{
+								IncludeReverted: &trueVal,
+							},
+						},
+					},
 				},
 			},
 			AnySecondContractName: {
@@ -1058,6 +1205,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			AnyContractNameWithSharedAddress3: basicContractDef,
 		},
 	}
+	if it.inMemoryDB {
+		delete(cfg.Namespaces[AnyContractName].Reads, StateChangedEventName)
+	}
+	return cfg
 }
 
 const (
@@ -1126,13 +1277,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 							}},
 							{PDALookups: &chainwriter.PDALookups{
-								Name: "Curses",
+								Name: "MultiRead1",
 								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
 								Seeds: []chainwriter.Seed{
-									{Static: []byte("curses")},
+									{Static: []byte("multi_read1")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
@@ -1424,6 +1575,26 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 								IsWritable: true,
 								IsSigner:   false,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							}},
+						},
+						DebugIDLocation: "",
+					},
+					MethodTriggeringEventBeforeFailing: {
+						FromAddress:       fromAddress,
+						ChainSpecificName: "createEventAndFail",
+						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
 							}},
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "SystemProgram",

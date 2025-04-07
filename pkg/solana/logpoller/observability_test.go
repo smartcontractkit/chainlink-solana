@@ -14,12 +14,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestShouldPublishDurationInCaseOfError(t *testing.T) {
 	sqltest.SkipInMemory(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	orm := createObservedORM(t, "testChainID")
 	t.Cleanup(func() { resetMetrics(*orm) })
 	require.Equal(t, 0, testutil.CollectAndCount(orm.queryDuration))
@@ -73,9 +72,9 @@ func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 	sqltest.SkipInMemory(t)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	orm := createObservedORM(t, chainID)
-	filterID, err := orm.InsertFilter(tests.Context(t), newRandomFilter(t))
+	filterID, err := orm.InsertFilter(t.Context(), newRandomFilter(t))
 	require.NoError(t, err)
 
 	logs := generateRandomLogs(t, filterID, 20)

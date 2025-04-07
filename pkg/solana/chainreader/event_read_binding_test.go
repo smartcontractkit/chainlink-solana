@@ -12,7 +12,6 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -52,7 +51,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)
@@ -70,7 +69,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)
@@ -88,7 +87,7 @@ func TestGetLatestValue(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 
 		require.NoError(t, reader.Bind(ctx, address))
 		reader.SetCodec(testCodec)

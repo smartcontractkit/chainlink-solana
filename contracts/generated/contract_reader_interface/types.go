@@ -425,24 +425,17 @@ func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	return nil
 }
 
-type CurseSubject struct {
-	Value [16]uint8
-}
+type ErrorCode ag_binary.BorshEnum
 
-func (obj CurseSubject) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Value` param:
-	err = encoder.Encode(obj.Value)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+const (
+	IntentionalFailure_ErrorCode ErrorCode = iota
+)
 
-func (obj *CurseSubject) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Value`:
-	err = decoder.Decode(&obj.Value)
-	if err != nil {
-		return err
+func (value ErrorCode) String() string {
+	switch value {
+	case IntentionalFailure_ErrorCode:
+		return "IntentionalFailure"
+	default:
+		return ""
 	}
-	return nil
 }

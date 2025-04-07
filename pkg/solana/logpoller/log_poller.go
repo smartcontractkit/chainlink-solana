@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
@@ -34,6 +36,7 @@ type ORM interface {
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
+	PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error)
 }
 
 type logsLoader interface {
@@ -46,6 +49,7 @@ type filtersI interface {
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
 	PruneFilters(ctx context.Context) error
+	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
@@ -82,19 +86,18 @@ type Service struct {
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
-	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
 	lp := &Service{
-		orm:     orm,
-		client:  cl,
-		filters: newFilters(lggr, orm),
+		orm:    orm,
+		client: cl,
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
-		Name:  "LogPollerService",
+		Name:  "LogPoller",
 		Start: lp.start,
-		NewSubServices: func(l logger.Logger) []services.Service {
+		NewSubServices: func(lggr logger.Logger) []services.Service {
+			lp.filters = newFilters(lggr, orm)
 			loader := NewEncodedLogCollector(cl, lggr)
 			lp.loader = loader
 			return []services.Service{loader}
@@ -112,6 +115,8 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 	return lp
 }
 
+const BackgroundWorkerInterval = 10 * time.Minute
+
 func (lp *Service) start(_ context.Context) error {
 	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
 		err := lp.run(ctx)
@@ -119,7 +124,7 @@ func (lp *Service) start(_ context.Context) error {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
 		}
 	})
-	lp.eng.GoTick(services.NewTicker(time.Minute), lp.backgroundWorkerRun)
+	lp.eng.GoTick(services.NewTicker(BackgroundWorkerInterval), lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -147,27 +152,43 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 
 	var logs []Log
 	for filter := range matchingFilters {
+		var revertErr *string
+		if blockData.Error != nil {
+			if !filter.IncludeReverted {
+				continue
+			}
+			revertErr = new(string)
+			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+				*revertErr = fmt.Sprintf("%v", blockData.Error)
+				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+			} else {
+				*revertErr = string(j)
+			}
+		}
+
 		var logIndex int64
 		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
 		if err != nil {
 			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
 			return err
 		}
-		if blockData.SlotNumber == math.MaxInt64 {
+		if blockData.SlotNumber > math.MaxInt64 {
 			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
 			lp.lggr.Critical(err.Error())
 			return err
 		}
+
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       logIndex,
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
+			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
+			Error:          revertErr,
 		}
 
 		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
@@ -237,7 +258,7 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 // LogPoller run loop it will backfill all filters starting from fromBlock. If there
 // are new filters in the backfill queue, with an earlier StartingBlock, then they
 // will get backfilled from there instead.
-func (lp *Service) Replay(fromBlock int64) error {
+func (lp *Service) Replay(fromBlock int64) {
 	lp.replay.mut.Lock()
 	defer lp.replay.mut.Unlock()
 
@@ -245,15 +266,13 @@ func (lp *Service) Replay(fromBlock int64) error {
 		// Already requested, no further action required
 		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
 			fromBlock, lp.replay.requestBlock)
-		return nil
+		return
 	}
 	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
 	if lp.replay.status != ReplayStatusPending {
 		lp.replay.status = ReplayStatusRequested
 	}
-
-	return nil
 }
 
 // ReplayStatus returns the current replay status of LogPoller:
@@ -322,7 +341,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 			addressesSet[filter.Address] = struct{}{}
 			addresses = append(addresses, filter.Address)
 		}
-		if filter.StartingBlock < minSlot {
+		if filter.StartingBlock != 0 && filter.StartingBlock < minSlot {
 			minSlot = filter.StartingBlock
 		}
 	}
@@ -487,9 +506,19 @@ func appendBuffered(ch <-chan Block, maxNum int, blocks []Block) []Block {
 }
 
 func (lp *Service) backgroundWorkerRun(ctx context.Context) {
+	// Set deadline for log pruning to 90% of the time left until the next scheduled BackgroundWorkerRun
+	logsCtx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), 9*BackgroundWorkerInterval/10)
+	defer cancel()
+
+	// Filters table is much smaller, so default timeout makes the most sense for that
 	err := lp.filters.PruneFilters(ctx)
 	if err != nil {
 		lp.lggr.Errorw("Failed to prune filters", "err", err)
+	}
+
+	err = lp.filters.PruneLogs(logsCtx)
+	if err != nil {
+		lp.lggr.Errorw("Failed to prune logs", "err", err)
 	}
 }
 

@@ -349,6 +349,8 @@ var defaultMultiNodeConfig = &mnCfg.MultiNodeConfig{
 		EnforceRepeatableRead: ptr(true),
 		// The delay before declaring a node dead is set to 20 seconds to give nodes time to recover from temporary issues.
 		DeathDeclarationDelay: config.MustNewDuration(20 * time.Second),
+		// If set to true nodes will verify configured the ChainID against RPC Client ChainID
+		VerifyChainID: ptr(true),
 		/* Chain Configs */
 		// Threshold for no new heads is set to 20 seconds, assuming that heads should update at a reasonable pace.
 		NodeNoNewHeadsThreshold: config.MustNewDuration(20 * time.Second),

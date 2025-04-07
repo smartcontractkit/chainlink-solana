@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func SetupLocalSolNode(t *testing.T) string {
@@ -63,7 +62,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
 		client := rpc.New(url)
-		out, err := client.GetHealth(tests.Context(t))
+		out, err := client.GetHealth(t.Context())
 		if err != nil || out != rpc.HealthOk {
 			t.Logf("API server not ready yet (attempt %d)\n", i+1)
 			t.Logf("Cmd output: %s\nCmd error: %s\n", stdOut.String(), stdErr.String())

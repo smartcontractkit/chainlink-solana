@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
@@ -34,9 +33,9 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	t.Parallel()
 
 	client := mocks.NewRPCClient(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
-	collector := logpoller.NewEncodedLogCollector(client, logger.TestSugared(t))
+	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t))
 
 	require.NoError(t, collector.Start(ctx))
 	t.Cleanup(func() {
@@ -108,7 +107,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			}, nil
 		})
 
-	results, cleanUp, err := collector.BackfillForAddresses(tests.Context(t), []logpoller.PublicKey{logpoller.PublicKey(address)}, 41, 44)
+	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), []logpoller.PublicKey{logpoller.PublicKey(address)}, 41, 44)
 	require.NoError(t, err)
 	defer cleanUp()
 	var events []logpoller.ProgramEvent
