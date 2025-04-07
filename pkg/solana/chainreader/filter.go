@@ -85,7 +85,6 @@ func (r *syncedFilter) Unregister(ctx context.Context, registrar filterRegistrar
 
 func (r *syncedFilter) unregister(ctx context.Context, registrar filterRegistrar, name string) error {
 	if !registrar.HasFilter(ctx, name) {
-		fmt.Println("333")
 		return nil
 	}
 
