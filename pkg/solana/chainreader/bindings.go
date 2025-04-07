@@ -207,7 +207,6 @@ func (r *bindingsRegistry) Unbind(ctx context.Context, reg filterRegistrar, bind
 	)
 }
 
-// TODO inject type from cfg as code
 func (r *bindingsRegistry) CreateType(namespace, readName string, forEncoding bool) (any, error) {
 	rBinding, err := r.GetReader(namespace, readName)
 	if err != nil {

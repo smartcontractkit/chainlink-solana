@@ -89,8 +89,6 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 	eventMap := make(map[int]struct{})
 
 	for idx, batchCall := range batch {
-		fmt.Println("aaaaa")
-
 		rBinding, err := bdRegistry.GetReader(batchCall.Namespace, batchCall.ReadName)
 		if err != nil {
 			return nil, fmt.Errorf("%w: read binding not found for contract: %q read: %q: %w", types.ErrInvalidConfig, batchCall.Namespace, batchCall.ReadName, err)
@@ -196,7 +194,6 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 			continue
 		}
 
-		fmt.Println("return val format is ", reflect.TypeOf(results[dataIdx].returnVal).String())
 		results[idx].err = asValueDotValue(
 			ctx,
 			rBinding,
@@ -240,13 +237,7 @@ func asValueDotValue(
 }
 
 func wrapDecodeValuer(binding readBinding, data []byte) func(context.Context, any) error {
-	fmt.Println("wrap decoder value")
-
 	return func(ctx context.Context, returnVal any) error {
-		err := binding.Decode(ctx, data, returnVal)
-
-		fmt.Println("return val is ", reflect.TypeOf(returnVal).String())
-		fmt.Println("err is here", err)
-		return err
+		return binding.Decode(ctx, data, returnVal)
 	}
 }

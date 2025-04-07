@@ -22,7 +22,7 @@ type Initializelookuptable struct {
 	//
 	// [2] = [] systemProgram
 	// ··········· System Program required for PDA creation
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializelookuptableInstructionBuilder creates a new `Initializelookuptable` instruction builder.
@@ -49,7 +49,7 @@ func (inst *Initializelookuptable) SetAdminAccount(admin ag_solanago.PublicKey) 
 // GetAdminAccount gets the "admin" account.
 // Admin account that pays for PDA creation and signs the transaction
 func (inst *Initializelookuptable) GetAdminAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetWriteDataAccountAccount sets the "writeDataAccount" account.
@@ -62,7 +62,7 @@ func (inst *Initializelookuptable) SetWriteDataAccountAccount(writeDataAccount a
 // GetWriteDataAccountAccount gets the "writeDataAccount" account.
 // PDA for LookupTableDataAccount, derived from seeds and created by the System Program
 func (inst *Initializelookuptable) GetWriteDataAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -75,7 +75,7 @@ func (inst *Initializelookuptable) SetSystemProgramAccount(systemProgram ag_sola
 // GetSystemProgramAccount gets the "systemProgram" account.
 // System Program required for PDA creation
 func (inst *Initializelookuptable) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Initializelookuptable) Build() *Instruction {
@@ -133,9 +133,9 @@ func (inst *Initializelookuptable) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("    writeData", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    writeData", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})

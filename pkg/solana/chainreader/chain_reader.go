@@ -174,7 +174,6 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		return err
 	}
 
-	fmt.Println("11111")
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -219,12 +218,8 @@ func (s *ContractReaderService) GetLatestValue(ctx context.Context, readIdentifi
 		},
 	}
 
-	fmt.Println("22222")
-
 	results, err := doMethodBatchCall(ctx, s.lggr, s.client, s.bdRegistry, batch)
 	if err != nil {
-		fmt.Println("3333")
-
 		return err
 	}
 
@@ -784,10 +779,6 @@ func (s *ContractReaderService) getTokenPricesAdapter(
 	}
 
 	return nil
-}
-
-func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values readValues) ([]solana.PublicKey, error) {
-
 }
 
 func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*config.PollingFilter) config.PollingFilter {

@@ -20,7 +20,7 @@ type Initialize struct {
 	// [1] = [WRITE] data
 	//
 	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
@@ -51,7 +51,7 @@ func (inst *Initialize) SetSignerAccount(signer ag_solanago.PublicKey) *Initiali
 
 // GetSignerAccount gets the "signer" account.
 func (inst *Initialize) GetSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetDataAccount sets the "data" account.
@@ -62,7 +62,7 @@ func (inst *Initialize) SetDataAccount(data ag_solanago.PublicKey) *Initialize {
 
 // GetDataAccount gets the "data" account.
 func (inst *Initialize) GetDataAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -73,7 +73,7 @@ func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.Public
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -135,9 +135,9 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("       signer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("         data", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})

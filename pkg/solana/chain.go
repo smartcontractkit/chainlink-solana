@@ -133,11 +133,6 @@ type chain struct {
 	clientLock  sync.RWMutex
 }
 
-func (c *chain) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 type verifiedCachedClient struct {
 	skipVerification bool
 	chainID          string
