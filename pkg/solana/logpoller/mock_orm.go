@@ -486,6 +486,63 @@ func (_c *MockORM_MarkFilterDeleted_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// PruneLogsForFilter provides a mock function with given fields: ctx, filter
+func (_m *MockORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+	ret := _m.Called(ctx, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PruneLogsForFilter")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, Filter) (int64, error)); ok {
+		return rf(ctx, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, Filter) int64); ok {
+		r0 = rf(ctx, filter)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, Filter) error); ok {
+		r1 = rf(ctx, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockORM_PruneLogsForFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PruneLogsForFilter'
+type MockORM_PruneLogsForFilter_Call struct {
+	*mock.Call
+}
+
+// PruneLogsForFilter is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter Filter
+func (_e *MockORM_Expecter) PruneLogsForFilter(ctx interface{}, filter interface{}) *MockORM_PruneLogsForFilter_Call {
+	return &MockORM_PruneLogsForFilter_Call{Call: _e.mock.On("PruneLogsForFilter", ctx, filter)}
+}
+
+func (_c *MockORM_PruneLogsForFilter_Call) Run(run func(ctx context.Context, filter Filter)) *MockORM_PruneLogsForFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(Filter))
+	})
+	return _c
+}
+
+func (_c *MockORM_PruneLogsForFilter_Call) Return(_a0 int64, _a1 error) *MockORM_PruneLogsForFilter_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockORM_PruneLogsForFilter_Call) RunAndReturn(run func(context.Context, Filter) (int64, error)) *MockORM_PruneLogsForFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SelectFilters provides a mock function with given fields: ctx
 func (_m *MockORM) SelectFilters(ctx context.Context) ([]Filter, error) {
 	ret := _m.Called(ctx)
