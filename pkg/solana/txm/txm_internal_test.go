@@ -1039,11 +1039,11 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
 		// First simulation before broadcast with signature and max compute unit limit set
-		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 		// Second simulation after broadcast with signature and compute unit limit set
-		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 
@@ -1217,7 +1217,7 @@ func TestTxm_Enqueue(t *testing.T) {
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
-	txCopy := tx
+	txCopy := deepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)

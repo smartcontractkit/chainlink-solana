@@ -86,13 +86,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 			require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
 
 			// Wait for the transaction to reach the expected status
-			require.Eventually(t, func() bool {
-				status, statusErr := txmInstance.GetTransactionStatus(ctx, txID)
-				if statusErr != nil {
-					return false
-				}
-				return status == tc.expectTransactionStatus
-			}, 60*time.Second, 1*time.Second, "Transaction should eventually reach expected status")
+			waitForStatus(t, txmInstance, txID, tc.expectTransactionStatus, 60*time.Second, 1*time.Second)
 
 			// Verify balances
 			finalSenderBalance, err := client.Balance(ctx, senderPubKey)
@@ -208,13 +202,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		txID := "no-reorg"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
-		require.Eventually(t, func() bool {
-			status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
-			if errGetStatus != nil {
-				return false
-			}
-			return status == types.Finalized
-		}, 60*time.Second, 1*time.Second, "Transaction should eventually reach Finalized status")
+		waitForStatus(t, txmInstance, txID, types.Finalized, 60*time.Second, 1*time.Second)
 
 		// Verify that reorg was not detected and final balances are correct
 		reorgLogs := observer.FilterMessageSnippet("re-org detected for transaction").Len()
@@ -249,25 +237,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		txID := "reorg-test-tx"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, cl, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
-		require.Eventually(t, func() bool {
-			status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
-			if errGetStatus != nil {
-				return false
-			}
-			if status == types.Unconfirmed {
-				pTx, errPtx := txmInstance.txs.GetPendingTx(txID)
-				if errPtx != nil || len(pTx.signatures) == 0 {
-					return false
-				}
-
-				sigStatus, errStat := cl.SignatureStatuses(ctx, pTx.signatures)
-				if errStat != nil || len(sigStatus) == 0 || sigStatus[0] == nil {
-					return false
-				}
-				return sigStatus[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed
-			}
-			return false
-		}, 60*time.Second, 1*time.Second, "Transaction should reach Confirmed status")
+		waitForStatus(t, txmInstance, txID, types.Unconfirmed, 60*time.Second, 1*time.Second) // common Unconfirmed state maps to confirmed for Solana
 
 		// Simulate reorg: kill current validator and restart validator with backuped ledger before the tx.
 		// we want ledger as provided, omit --reset
@@ -287,13 +257,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		require.Equal(t, rebroadcastReorgLogs, 1, "re-org tx should be rebroadcasted with new blockhash")
 
 		// Wait rebroadcasted tx to be finalized and check final balances
-		require.Eventually(t, func() bool {
-			finalStatus, errAgain := txmInstance.GetTransactionStatus(ctx, txID)
-			if errAgain != nil {
-				return false
-			}
-			return finalStatus == types.Finalized
-		}, 120*time.Second, 5*time.Second, "tx should finalize again after reorg handling")
+		waitForStatus(t, txmInstance, txID, types.Finalized, 120*time.Second, 5*time.Second)
 		finalSenderBalance, err := cl.Balance(ctx, senderPubKey)
 		require.NoError(t, err)
 		finalReceiverBalance, err := cl.Balance(ctx, receiverPubKey)
@@ -428,4 +392,14 @@ func copyDir(src, dst string) error {
 
 		return os.WriteFile(dstPath, data, info.Mode())
 	})
+}
+
+func waitForStatus(t *testing.T, txmInstance *Txm, txID string, targetStatus types.TransactionStatus, waitFor time.Duration, tick time.Duration) {
+	require.Eventually(t, func() bool {
+		status, errGetStatus := txmInstance.GetTransactionStatus(t.Context(), txID)
+		if errGetStatus != nil {
+			return false
+		}
+		return status == targetStatus
+	}, waitFor, tick, "Transaction failed to eventually reach target status")
 }
