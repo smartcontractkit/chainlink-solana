@@ -201,13 +201,13 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			assert.Equal(t, uint64(1234), slot)
 
 			node.URL = config.MustParseURL(mockServer.URL + "/mismatch")
-			testChain.id = "incorrect"
+			testChain.id = "2pBWR2WJmPutYHiheewYP3M6XdVWxTBWAWinStSUXGoa" // some random block hash
 			c, err = testChain.verifiedClient(node)
 			assert.NoError(t, err)
 			_, err = c.ChainID(t.Context())
 			// expect error from id mismatch (even if using a cached client) when performing RPC calls
 			assert.Error(t, err)
-			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", "incorrect", tc.genesisHash, node.URL), err.Error())
+			assert.Equal(t, fmt.Sprintf("client returned mismatched chain id (expected: %s, got: %s): %s", testChain.id, tc.genesisHash, node.URL), err.Error())
 		})
 	}
 }
@@ -299,7 +299,12 @@ func TestChain_Transact(t *testing.T) {
 		return sig[:]
 	}, nil)
 
-	c, err := newChain("localnet", cfg, mkey, lgr, sqltest.NewNoOpDataSource())
+	// get genesis hash and use it as chainID
+	solClient := rpc.New(url)
+	genesisHash, err := solClient.GetGenesisHash(ctx)
+	require.NoError(t, err)
+
+	c, err := newChain(genesisHash.String(), cfg, mkey, lgr, sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 	require.NoError(t, c.txm.Start(ctx))
 
@@ -314,7 +319,7 @@ func TestChain_Transact(t *testing.T) {
 	require.True(t, ok)
 
 	// inspect transaction
-	solClient := rpc.New(url)
+	solClient = rpc.New(url)
 	res, err := solClient.GetTransaction(ctx, solana.MustSignatureFromBase58(sig.(string)), &rpc.GetTransactionOpts{Commitment: "confirmed"})
 	require.NoError(t, err)
 	require.Nil(t, res.Meta.Err) // no error
@@ -409,9 +414,14 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 			SendOnly: false,
 		})
 
+	// get genesis hash and use it as chainID
+	solClient := rpc.New(url)
+	genesisHash, err := solClient.GetGenesisHash(ctx)
+	require.NoError(t, err)
+
 	// mocked keystore
 	mkey := mocks.NewSimpleKeystore(t)
-	c, err := newChain("localnet", cfg, mkey, lgr, sqltest.NewNoOpDataSource())
+	c, err := newChain(genesisHash.String(), cfg, mkey, lgr, sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 	servicetest.Run(t, c)
 

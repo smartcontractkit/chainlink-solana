@@ -144,9 +144,9 @@ func SetupTestValidatorWithAnchorPrograms(t *testing.T, upgradeAuthority string,
 	return rpcURL, wsURL
 }
 
-func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
+func CreateTestLookupTable(t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
 	// Create lookup tables
-	slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
+	slot, serr := c.GetSlot(t.Context(), rpc.CommitmentFinalized)
 	require.NoError(t, serr)
 	table, instruction, ierr := NewCreateLookupTableInstruction(
 		sender.PublicKey(),
@@ -154,10 +154,10 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 		slot,
 	)
 	require.NoError(t, ierr)
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
+	utils.SendAndConfirm(t.Context(), t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
 
 	// add entries to lookup table
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{
+	utils.SendAndConfirm(t.Context(), t, c, []solana.Instruction{
 		NewExtendLookupTableInstruction(
 			table, sender.PublicKey(), sender.PublicKey(),
 			addresses,

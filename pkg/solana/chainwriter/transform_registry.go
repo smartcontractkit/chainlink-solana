@@ -21,7 +21,7 @@ import (
 )
 
 // TODO: replace with exact value after CCIP testing is completed.
-const StaticCuOverhead uint32 = 100000
+const StaticCuOverhead uint32 = 150000
 const MandatoryExecuteAccounts = 14
 
 func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
@@ -58,11 +58,9 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		}
 		computeUnits += destGasAmount
 	}
-
 	options := []txmutils.SetTxConfig{
-		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
-		// txmutils.SetEstimateComputeUnitLimit(false),
-		// txmutils.SetComputeUnitLimit(computeUnits),
+		txmutils.SetEstimateComputeUnitLimit(false),
+		txmutils.SetComputeUnitLimit(computeUnits),
 	}
 
 	registryTables, exists := tableMap["PoolLookupTable"]
@@ -149,8 +147,7 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 	}
 
 	options := []txmutils.SetTxConfig{
-		// TODO: enabling this currently causes a SanitizeFailure, re-enable when fixed
-		// txmutils.SetEstimateComputeUnitLimit(true)
+		txmutils.SetEstimateComputeUnitLimit(true),
 	}
 
 	return args, transformedAccounts, options, nil

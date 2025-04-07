@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	solanaGo "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
@@ -17,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
@@ -785,11 +783,11 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if cfg.DependencyTxID != "" {
 		go func(msg pendingTx, depID string) {
-			status, err := txm.waitForTxStatus(ctx, depID, types.Finalized)
+			status, err := txm.waitForTxStatus(ctx, depID, commontypes.Finalized)
 			if err != nil {
 				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
 				errorStatus := txmutils.Errored
-				if status == types.Fatal {
+				if status == commontypes.Fatal {
 					errorStatus = txmutils.FatallyErrored
 				}
 				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
@@ -817,7 +815,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus types.TransactionStatus) (types.TransactionStatus, error) {
+func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus commontypes.TransactionStatus) (commontypes.TransactionStatus, error) {
 	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
 	defer cancel()
 
@@ -827,14 +825,14 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desir
 	for {
 		select {
 		case <-waitCtx.Done():
-			return types.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
+			return commontypes.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
 		case <-time.After(backoff):
 			status, err := txm.GetTransactionStatus(waitCtx, transactionID)
 			if err != nil {
 				return status, fmt.Errorf("error fetching transaction status: %w", err)
 			}
 			switch status {
-			case types.Failed, types.Fatal:
+			case commontypes.Failed, commontypes.Fatal:
 				return status, fmt.Errorf("transaction %s failed", transactionID)
 			default:
 				if status >= desiredStatus {
@@ -875,10 +873,59 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 }
 
+func deepCopyTx(tx solanaGo.Transaction) solanaGo.Transaction {
+	// Clone the signatures.
+	sigs := make([]solanaGo.Signature, len(tx.Signatures))
+	copy(sigs, tx.Signatures)
+
+	// Clone the message.
+	msg := tx.Message
+
+	// Deep-copy AccountKeys.
+	accountKeys := make([]solanaGo.PublicKey, len(msg.AccountKeys))
+	copy(accountKeys, msg.AccountKeys)
+
+	// Deep-copy Instructions.
+	instructions := make([]solanaGo.CompiledInstruction, len(msg.Instructions))
+	for i, instr := range msg.Instructions {
+		newInstr := solanaGo.CompiledInstruction{
+			ProgramIDIndex: instr.ProgramIDIndex,
+			Accounts:       make([]uint16, len(instr.Accounts)),
+			Data:           make([]byte, len(instr.Data)),
+		}
+		copy(newInstr.Accounts, instr.Accounts)
+		copy(newInstr.Data, instr.Data)
+		instructions[i] = newInstr
+	}
+
+	// Deep-copy AddressTableLookups.
+	lookups := make([]solanaGo.MessageAddressTableLookup, len(msg.AddressTableLookups))
+	for i, lookup := range msg.AddressTableLookups {
+		newLookup := solanaGo.MessageAddressTableLookup{
+			AccountKey:      lookup.AccountKey,
+			WritableIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.WritableIndexes)),
+			ReadonlyIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
+		}
+		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
+		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
+		lookups[i] = newLookup
+	}
+
+	// Reassemble the cloned message.
+	msg.AccountKeys = accountKeys
+	msg.Instructions = instructions
+	msg.AddressTableLookups = lookups
+
+	return solanaGo.Transaction{
+		Signatures: sigs,
+		Message:    msg,
+	}
+}
+
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
-	txCopy := *tx
+	txCopy := deepCopyTx(*tx)
 
 	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
 	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
@@ -1051,12 +1098,12 @@ func (txm *Txm) InflightTxs() int {
 // rebroadcastWithGivenBlockhash attempts to rebroadcast a pending tx with a new blockhash.
 // Removes all signatures associated with the prior tx, cancels prior ctx, updates compute unit price and sets given blockhash for rebroadcasting.
 // Calls sendWithRetry directly to avoid enqueuing the transaction. It logs the error when rebroadcast fails and returns the new signature when successful.
-func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solana.Hash, lastValidBlockHeight uint64) (solana.Signature, error) {
+func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solanaGo.Hash, lastValidBlockHeight uint64) (solanaGo.Signature, error) {
 	// Revert tx state back to AwaitingBroadcast
 	err := txm.txs.RevertToAwaitingBroadcast(pTx.id)
 	if err != nil {
 		txm.lggr.Errorw("failed to remove tx", "id", pTx.id, "error", err)
-		return solana.Signature{}, err
+		return solanaGo.Signature{}, err
 	}
 
 	// Set new blockhash, lastValidBlockHeight and update compute unit price for rebroadcast
@@ -1070,7 +1117,7 @@ func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx
 		stateTransitionErr := txm.txs.OnPrebroadcastError(pTx.id, txm.cfg.TxRetentionTimeout(), txmutils.Errored, TxFailReject)
 		combinedErr := errors.Join(sendErr, stateTransitionErr)
 		txm.lggr.Errorw("failed to rebroadcast tx with new blockhash", "id", pTx.id, "error", combinedErr)
-		return solana.Signature{}, combinedErr
+		return solanaGo.Signature{}, combinedErr
 	}
 
 	return newSig, nil
@@ -1078,7 +1125,7 @@ func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx
 
 // fetchTransactionLogs will fetch the logs for a transaction for better debugging
 // Do not fail or return error to avoid affecting normal processes just for better debug logs
-func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solana.Signature) {
+func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solanaGo.Signature) {
 	client, err := txm.client.Get(ctx)
 	if err != nil {
 		txm.lggr.Errorw("failed to get client", "error", err)

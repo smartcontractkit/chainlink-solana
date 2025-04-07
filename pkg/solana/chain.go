@@ -92,7 +92,19 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
+
+	chainID := *cfg.ChainID
+	switch chainID {
+	case "devnet":
+		chainID = client.DevnetGenesisHash
+	case "testnet":
+		chainID = client.TestnetGenesisHash
+	case "mainnet":
+		chainID = client.MainnetGenesisHash
+	default:
+	}
+
+	c, err := newChain(chainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +134,10 @@ type chain struct {
 }
 
 type verifiedCachedClient struct {
-	chainID         string
-	expectedChainID string
-	nodeURL         string
+	skipVerification bool
+	chainID          string
+	expectedChainID  string
+	nodeURL          string
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
@@ -152,32 +165,18 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.expectedChainID == "localnet"
-
-	if !ignore {
-		var matches bool
-		// v.expectedChainID comes from the configuration, though it should be genesis block hash, "devnet", "testnet", "mainnet" are the legacy chainIDs
-		switch v.expectedChainID {
-		case "devnet":
-			matches = v.chainID == client.DevnetGenesisHash
-		case "testnet":
-			matches = v.chainID == client.TestnetGenesisHash
-		case "mainnet":
-			matches = v.chainID == client.MainnetGenesisHash
-		default:
-			// check if the genesis hash is match with the provided ChainID
-			matches = v.chainID == v.expectedChainID
-		}
-
-		if !matches {
-			v.chainIDVerified = false
-			return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+	if !v.skipVerification {
+		// if expectedChainID is a base58 encoded public key, verify it matches with genesis hash got from rpc client
+		_, err = solanago.PublicKeyFromBase58(v.expectedChainID)
+		if err == nil {
+			if v.chainID != v.expectedChainID {
+				v.chainIDVerified = false
+				return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+			}
 		}
 	}
 
 	v.chainIDVerified = true
-
 	return v.chainIDVerified, nil
 }
 
@@ -528,10 +527,17 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 	cl, exists := c.clientCache[url]
 	c.clientLock.RUnlock()
 
+	var skipVerification bool
+	verifyCfg := c.cfg.MultiNode.MultiNode.VerifyChainID
+	if verifyCfg != nil && !*verifyCfg {
+		skipVerification = true
+	}
+
 	if !exists {
 		cl = &verifiedCachedClient{
-			nodeURL:         url,
-			expectedChainID: c.id,
+			nodeURL:          url,
+			expectedChainID:  c.id,
+			skipVerification: skipVerification,
 		}
 		// create client
 		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
