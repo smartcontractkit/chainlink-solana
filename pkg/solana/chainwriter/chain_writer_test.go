@@ -885,8 +885,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 
 		lookupTable := mockTokenAdminRegistryLookupTable(t, rw, pda)
 
-		mockFetchRouterAddress(t, rw, routerAddr, offrampAddr)
-		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddr)
+		mockReferenceAddress(t, rw, routerAddr, feeQuoterAddr, solana.PublicKey{}, offrampAddr)
 		mockFetchLookupTableAddresses(t, rw, lookupTable, poolKeys)
 		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
 
@@ -1153,7 +1152,7 @@ func mockTokenAdminRegistryLookupTable(t *testing.T, rw *clientmocks.ReaderWrite
 	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
 		RPCContext: rpc.RPCContext{},
 		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(registryBytes)},
-	}, nil)
+	}, nil).Once()
 	return lookupTablePubkey
 }
 
@@ -1170,14 +1169,14 @@ func mockFetchLookupTableAddresses(t *testing.T, rw *clientmocks.ReaderWriter, l
 	}, nil)
 }
 
-func mockFetchRouterAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAddr, offrampAddr solana.PublicKey) {
+func mockReferenceAddress(t *testing.T, rw *clientmocks.ReaderWriter, routerAddr, feeQuoterAddr, lookupTableAddr, offrampAddr solana.PublicKey) {
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("reference_addresses")}, offrampAddr)
 	require.NoError(t, err)
 	referenceAddresses := ccip_offramp.ReferenceAddresses{
 		Version:            1,
 		Router:             routerAddr,
-		FeeQuoter:          solana.PublicKey{},
-		OfframpLookupTable: solana.PublicKey{},
+		FeeQuoter:          feeQuoterAddr,
+		OfframpLookupTable: lookupTableAddr,
 	}
 	referenceAddressesBytes := mustBorshEncodeStruct(t, referenceAddresses)
 	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
