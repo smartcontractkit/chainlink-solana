@@ -195,10 +195,14 @@ func resolveCommonTokenTransferAccounts(ctx context.Context, tokenAccountsRequir
 	if !exists {
 		return commonTokenTransferAccounts{}, fmt.Errorf("failed to find PoolLookupTable in table map, required for token transfer")
 	}
+	// Expect only one table for token admin registry
+	if len(registryTables) != 1 {
+		return commonTokenTransferAccounts{}, fmt.Errorf("unexpected number of registry tables %d, expected 1", len(registryTables))
+	}
 	// Fetch all of the accounts in the pool lookup table with the proper IsWritable flag set
 	poolLookupAccounts, err := fetchPoolLookupAccounts(ctx, client, registryTables)
 	if err != nil {
-		return commonTokenTransferAccounts{}, fmt.Errorf("failed to fetch pool lookup accounts and set wrtiable flags, required for token transfer: %w", err)
+		return commonTokenTransferAccounts{}, fmt.Errorf("failed to fetch pool lookup accounts and set writable flags, required for token transfer: %w", err)
 	}
 	// Accounts below are maintained to be in particular indexes in the Token Admin registry lookup table
 	if len(poolLookupAccounts) < 7 {
