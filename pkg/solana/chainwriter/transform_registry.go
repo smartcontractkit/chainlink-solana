@@ -242,7 +242,7 @@ func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver cci
 		}
 		userAccounts, err := userAccountsLookup.Resolve(args)
 		// If err is ErrLookupNotFoundAtLocation, allow process to continue in case only logic receiver is needed for messaging
-		if err != nil && !errors.Is(err, ErrLookupNotFoundAtLocation){
+		if err != nil && !errors.Is(err, ErrLookupNotFoundAtLocation) {
 			return nil, fmt.Errorf("failed to resolve user accounts: %w", err)
 		}
 		accounts = append(accounts, &solana.AccountMeta{
