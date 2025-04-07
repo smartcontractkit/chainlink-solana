@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.53.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250313143026-98173c12b682
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250313143026-98173c12b682
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250328194934-d435d9118dd1
 	github.com/smartcontractkit/chainlink/v2 v2.22.0-test-beta.0.0.20250402143418-3fcce4af55f7
 	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
 	github.com/stretchr/testify v1.10.0
