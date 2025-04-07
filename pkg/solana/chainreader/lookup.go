@@ -75,6 +75,27 @@ func (l *lookup) bindAddressForContract(contract, address string) {
 	}
 }
 
+func (l *lookup) hasAddress(contract, address string) bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	for _, reads := range l.contractReadNames[contract] {
+		readIdentifier := ""
+		if len(reads) > 0 {
+			readIdentifier = types.BoundContract{
+				Address: address,
+				Name:    contract,
+			}.ReadIdentifier(reads[0].readName)
+		}
+
+		if val, ok := l.readIdentifiers[readIdentifier]; ok && val.address == address {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (l *lookup) unbindAddressForContract(contract, address string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
