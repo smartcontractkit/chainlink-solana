@@ -901,7 +901,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			tokenIndexes := *decoded.TokenIndexes
 
 			require.Len(t, tokenIndexes, 1)
-			require.Equal(t, uint8(2), tokenIndexes[0]) // 2 user accounts, msg.Receiver and the extra args user acccount
+			require.Equal(t, uint8(3), tokenIndexes[0]) // logic receiver, external execution signer, and the extra args user acccount
 			return true
 		}), &txID, mock.Anything, mock.AnythingOfType("utils.SetTxConfig"), mock.AnythingOfType("utils.SetTxConfig")).Return(nil).Run(func(args mock.Arguments) {
 			opt1, ok := args[5].(txmutils.SetTxConfig)
