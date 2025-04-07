@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 )
 
@@ -35,6 +36,7 @@ type ORM interface {
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
+	PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error)
 }
 
 type logsLoader interface {
@@ -47,6 +49,7 @@ type filtersI interface {
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
 	PruneFilters(ctx context.Context) error
+	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
@@ -112,6 +115,8 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 	return lp
 }
 
+const BackgroundWorkerInterval = 10 * time.Minute
+
 func (lp *Service) start(_ context.Context) error {
 	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
 		err := lp.run(ctx)
@@ -119,7 +124,7 @@ func (lp *Service) start(_ context.Context) error {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
 		}
 	})
-	lp.eng.GoTick(services.NewTicker(time.Minute), lp.backgroundWorkerRun)
+	lp.eng.GoTick(services.NewTicker(BackgroundWorkerInterval), lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -501,9 +506,19 @@ func appendBuffered(ch <-chan Block, maxNum int, blocks []Block) []Block {
 }
 
 func (lp *Service) backgroundWorkerRun(ctx context.Context) {
+	// Set deadline for log pruning to 90% of the time left until the next scheduled BackgroundWorkerRun
+	logsCtx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), 9*BackgroundWorkerInterval/10)
+	defer cancel()
+
+	// Filters table is much smaller, so default timeout makes the most sense for that
 	err := lp.filters.PruneFilters(ctx)
 	if err != nil {
 		lp.lggr.Errorw("Failed to prune filters", "err", err)
+	}
+
+	err = lp.filters.PruneLogs(logsCtx)
+	if err != nil {
+		lp.lggr.Errorw("Failed to prune logs", "err", err)
 	}
 }
 
