@@ -93,7 +93,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
 		// Append the logic receiver and the user defined messaging accounts to list
-		accounts, err = appendMessagingAccounts(accounts, message.Receiver, args)
+		accounts, err = appendMessagingAccounts(accounts, message.Receiver, args, toAddress)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to append user messaging accounts to list: %w", err)
 		}
@@ -246,7 +246,7 @@ func resolveCommonTokenTransferAccounts(ctx context.Context, tokenAccountsRequir
 	}, nil
 }
 
-func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver ccipocr3.UnknownAddress, args any) (solana.AccountMetaSlice, error) {
+func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver ccipocr3.UnknownAddress, args any, toAddress string) (solana.AccountMetaSlice, error) {
 	// Messaging accounts do not need to be appended if logic receiver is zero or empty. Return accounts as is
 	if !logicReceiver.IsZeroOrEmpty() {
 		logicReceiverAddr := solana.PublicKeyFromBytes(logicReceiver)
@@ -255,7 +255,11 @@ func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver cci
 			IsWritable: false,
 			IsSigner:   false,
 		})
-		externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, logicReceiverAddr)
+		offrampAddr, err := solana.PublicKeyFromBase58(toAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse offramp address: %w", err)
+		}
+		externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiverAddr.Bytes()}, offrampAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate external execution signer: %w", err)
 		}

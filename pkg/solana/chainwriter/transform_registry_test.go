@@ -80,7 +80,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	}
 	tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 
-	externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, logicReceiver)
+	externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, offrampAddress)
 	require.NoError(t, err)
 	userMessagingAccounts := chainwriter.CreateTestPubKeys(t, 3) // arbitrary number of user accounts
 
