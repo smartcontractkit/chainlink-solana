@@ -470,6 +470,52 @@ func (_c *mockFilters_PruneFilters_Call) RunAndReturn(run func(context.Context) 
 	return _c
 }
 
+// PruneLogs provides a mock function with given fields: ctx
+func (_m *mockFilters) PruneLogs(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PruneLogs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// mockFilters_PruneLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PruneLogs'
+type mockFilters_PruneLogs_Call struct {
+	*mock.Call
+}
+
+// PruneLogs is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *mockFilters_Expecter) PruneLogs(ctx interface{}) *mockFilters_PruneLogs_Call {
+	return &mockFilters_PruneLogs_Call{Call: _e.mock.On("PruneLogs", ctx)}
+}
+
+func (_c *mockFilters_PruneLogs_Call) Run(run func(ctx context.Context)) *mockFilters_PruneLogs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *mockFilters_PruneLogs_Call) Return(_a0 error) *mockFilters_PruneLogs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *mockFilters_PruneLogs_Call) RunAndReturn(run func(context.Context) error) *mockFilters_PruneLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegisterFilter provides a mock function with given fields: ctx, filter
 func (_m *mockFilters) RegisterFilter(ctx context.Context, filter Filter) error {
 	ret := _m.Called(ctx, filter)

@@ -47,7 +47,6 @@ type AccountLookup struct {
 type MetaBool struct {
 	Value          bool   `json:"value,omitempty"`          // bool value
 	BitmapLocation string `json:"bitmapLocation,omitempty"` // dot separated location of the bitmap
-	StartIndex     int    `json:"startIndex,omitempty"`     // used to specify which account the bitmap starts to correspond with
 }
 
 type Seed struct {
@@ -207,15 +206,9 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 		return []bool{}, fmt.Errorf("bitmap value is not a single value: %v, length: %d", bitmapVals, len(bitmapVals))
 	}
 
-	if mb.StartIndex < 0 || mb.StartIndex >= length {
-		return nil, fmt.Errorf("invalid MetaBool start index specified. startIndex: %d, derivedValuesLen: %d", mb.StartIndex, length)
-	}
-
 	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
-	// Results default to false for indexes up to StartIndex
-	for i := mb.StartIndex; i < length; i++ {
-		// Offset index into bitmap by StartIndex so start of bitmap correlates to the StartIndex account
-		result[i] = bitmapInt&(1<<(i-mb.StartIndex)) > 0
+	for i := 0; i < length; i++ {
+		result[i] = bitmapInt&(1<<i) > 0
 	}
 
 	return result, nil

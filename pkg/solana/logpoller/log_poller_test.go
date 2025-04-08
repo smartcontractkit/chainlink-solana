@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -349,6 +350,27 @@ func TestProcess(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("populates expiresAt field when retention is set", func(t *testing.T) {
+		filter.Retention = 30 * time.Minute
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+			require.Equal(t, f, filter)
+			return filterID, nil
+		}).Once()
+		err = lp.RegisterFilter(ctx, filter)
+		require.NoError(t, err)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+			require.Len(t, logs, 1)
+			log := logs[0]
+			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
+			assert.Greater(t, time.Until(*log.ExpiresAt), 29*time.Minute)
+			return nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+		filter.Retention = 0
+	})
+
 	jsonErr := []byte("{\"InstructionError\":[2,{\"Custom\":6001}]}")
 	err = json.Unmarshal(jsonErr, &ev.Error)
 	require.NoError(t, err)
@@ -467,4 +489,49 @@ func Test_LogPoller_Replay(t *testing.T) {
 		lp.LogPoller.replayComplete(8, 20)
 		assertReplayInfo(3, ReplayStatusRequested)
 	})
+}
+
+func TestShuffledFilters(t *testing.T) {
+	fl := &filters{
+		filtersByID: map[int64]*Filter{
+			0: {Name: "Filter A"},
+			1: {Name: "Filter B"},
+			2: {Name: "Filter C"},
+		},
+	}
+
+	seen := map[string]bool{}
+	for filter := range fl.shuffledFilters() {
+		seen[filter.Name] = true
+	}
+
+	require.Len(t, seen, 3)
+
+	for _, filter := range fl.filtersByID {
+		assert.Contains(t, seen, filter.Name)
+	}
+}
+
+func TestBackgroundWorkerRun(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	lggr := logger.TestSugared(t)
+	orm := NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lp := New(lggr, orm, cl)
+
+	filter1 := Filter{ID: 1, Name: "Filter A"}
+	filter2 := Filter{ID: 2, Name: "Filter B"}
+	filter3 := Filter{ID: 3, Name: "Filter C"}
+
+	filters := []Filter{
+		filter1, filter2, filter3,
+	}
+
+	orm.EXPECT().SelectFilters(mock.Anything).Return(filters, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil)
+	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(1), nil)
+
+	lp.backgroundWorkerRun(ctx)
+	orm.AssertNumberOfCalls(t, "PruneLogsForFilter", 3)
 }

@@ -187,51 +187,6 @@ func TestAccountLookups(t *testing.T) {
 		}
 	})
 
-	t.Run("AccountLookup works with MetaBool bitmap lookups with start index", func(t *testing.T) {
-		accounts := [5]*solana.AccountMeta{}
-		startIndex := 2
-
-		// First 2 accounts are skipped because of startIndex
-		for i := 0; i < startIndex; i++ {
-			accounts[i] = &solana.AccountMeta{
-				PublicKey:  solanautils.GetRandomPubKey(t),
-				IsSigner:   false,
-				IsWritable: false,
-			}
-		}
-
-		// Bitmap values only applied after startIndex
-		for i := startIndex; i < len(accounts); i++ {
-			accounts[i] = &solana.AccountMeta{
-				PublicKey:  solanautils.GetRandomPubKey(t),
-				IsSigner:   (i)%2 == 0,
-				IsWritable: (i)%2 == 0,
-			}
-		}
-
-		lookupConfig := chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
-			Name:       "Accounts",
-			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap", StartIndex: startIndex},
-			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap", StartIndex: startIndex},
-		}}
-
-		args := TestAccountArgs{
-			Inner: InnerAccountArgs{
-				Accounts: accounts[:],
-				// should be 101... so {true, false, true}
-				Bitmap: 5,
-			},
-		}
-
-		result, err := lookupConfig.AccountLookup.Resolve(args)
-		require.NoError(t, err)
-
-		for i, meta := range result {
-			require.Equal(t, accounts[i], meta)
-		}
-	})
-
 	t.Run("AccountLookup fails with MetaBool due to an invalid number of bitmaps", func(t *testing.T) {
 		type TestAccountArgsExtended struct {
 			Inner   InnerAccountArgs
@@ -318,40 +273,6 @@ func TestAccountLookups(t *testing.T) {
 
 		_, err := lookupConfig.AccountLookup.Resolve(args)
 		require.Contains(t, err.Error(), "invalid value format at path")
-	})
-
-	t.Run("AccountLookup fails with invalid MetaBool start index", func(t *testing.T) {
-		accounts := [3]*solana.AccountMeta{}
-		for i := 0; i < 3; i++ {
-			accounts[i] = &solana.AccountMeta{
-				PublicKey:  solanautils.GetRandomPubKey(t),
-				IsWritable: true,
-			}
-		}
-
-		args := TestAccountArgs{
-			Inner: InnerAccountArgs{
-				Accounts: accounts[:],
-				// should be 101... so {true, false, true}
-				Bitmap: 5,
-			},
-		}
-
-		// Set negative start index for IsSigner meta bool
-		lookupConfig := chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
-			Location:   "Inner.Accounts.PublicKey",
-			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap", StartIndex: -1},
-			IsWritable: chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap"},
-		}}
-
-		_, err := lookupConfig.AccountLookup.Resolve(args)
-		require.Contains(t, err.Error(), "invalid MetaBool start index specified")
-
-		// Set start index greater than account length for IsSigner meta bool
-		lookupConfig.AccountLookup.IsSigner = chainwriter.MetaBool{BitmapLocation: "Inner.Bitmap", StartIndex: 10}
-
-		_, err = lookupConfig.AccountLookup.Resolve(args)
-		require.Contains(t, err.Error(), "invalid MetaBool start index specified")
 	})
 }
 

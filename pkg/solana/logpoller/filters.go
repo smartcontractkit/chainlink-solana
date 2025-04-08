@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -76,6 +77,52 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 		defer fl.filtersMutex.Unlock()
 		maps.Copy(fl.filtersToDelete, filtersToDelete)
 		return fmt.Errorf("failed to delete filters: %w", err)
+	}
+
+	return nil
+}
+
+// Returns a randomly shuffled snapshot of all currently registered filters
+func (fl *filters) shuffledFilters() iter.Seq[Filter] {
+	fl.filtersMutex.Lock()
+	filterSlice := make([]*Filter, 0, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		filterSlice = append(filterSlice, filter)
+	}
+	fl.filtersMutex.Unlock()
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec // disable G404
+	r.Shuffle(len(filterSlice), func(i, j int) {
+		filterSlice[i], filterSlice[j] = filterSlice[j], filterSlice[i]
+	})
+
+	return func(yield func(Filter) bool) {
+		for _, filter := range filterSlice {
+			if !yield(*filter) {
+				return
+			}
+		}
+	}
+}
+
+func (fl *filters) PruneLogs(ctx context.Context) error {
+	err := fl.LoadFilters(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load filters: %w", err)
+	}
+
+	for filter := range fl.shuffledFilters() {
+		// Intentionally not holding the filtersMutex lock here, since getting through all of these DELETE
+		// operations could take a while. New filters may be added while we are pruning the old ones, but
+		// those won't be eligible yet for pruning anyway. Some may be removed (along with their logs) while
+		// we're iterating through the snapshot we have. For those, the DELETE will succeed immediately
+		// since there are no rows to delete.
+
+		_, err = fl.orm.PruneLogsForFilter(ctx, filter)
+		if err != nil {
+			return fmt.Errorf("failed to prune logs for filter %s: %w", filter.Name, err)
+		}
+		time.Sleep(1 * time.Second) // pause for a moment to avoid overwhelming the database
 	}
 
 	return nil

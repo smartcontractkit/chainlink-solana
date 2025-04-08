@@ -110,7 +110,7 @@ func (o *ObservedORM) DeleteFilters(ctx context.Context, filters map[int64]Filte
 }
 
 func (o *ObservedORM) MarkFilterDeleted(ctx context.Context, id int64) error {
-	return withObservedExec(o, "MarkFilterDeleted", del, func() error {
+	return withObservedExec(o, "MarkFilterDeleted", create, func() error {
 		return o.ORM.MarkFilterDeleted(ctx, id)
 	})
 }
@@ -136,6 +136,12 @@ func (o *ObservedORM) FilteredLogs(ctx context.Context, filter []query.Expressio
 func (o *ObservedORM) GetLatestBlock(ctx context.Context) (int64, error) {
 	return withObservedQuery(o, "GetLatestBlack", func() (int64, error) {
 		return o.ORM.GetLatestBlock(ctx)
+	})
+}
+
+func (o *ObservedORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+	return withObservedExecAndRowsAffected(o, "PruneLogsForFilter", del, func() (int64, error) {
+		return o.ORM.PruneLogsForFilter(ctx, filter)
 	})
 }
 
@@ -167,6 +173,22 @@ func withObservedExec(o *ObservedORM, query string, queryType queryType, exec fu
 			Observe(float64(time.Since(queryStarted)))
 	}()
 	return exec()
+}
+
+func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType queryType, exec func() (int64, error)) (int64, error) {
+	queryStarted := time.Now()
+	rowsAffected, err := exec()
+	o.queryDuration.
+		WithLabelValues(o.chainID, queryName, string(queryType)).
+		Observe(float64(time.Since(queryStarted)))
+
+	if err == nil {
+		o.datasetSize.
+			WithLabelValues(o.chainID, queryName, string(queryType)).
+			Set(float64(rowsAffected))
+	}
+
+	return rowsAffected, err
 }
 
 func trackInsertedLogs(o *ObservedORM, logs []Log, err error) {

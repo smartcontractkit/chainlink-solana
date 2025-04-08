@@ -373,6 +373,96 @@ func TestFilteredLogs(t *testing.T) {
 	}
 }
 
+func TestPruneLogsForFilter(t *testing.T) {
+	t.Parallel()
+	sqltest.SkipInMemory(t)
+	lggr := logger.Test(t)
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+	orm := NewORM(chainID, dbx, lggr)
+	ctx := t.Context()
+
+	filter := newRandomFilter(t)
+	filter.MaxLogsKept = 0
+	filterID, err := orm.InsertFilter(ctx, filter)
+	require.NoError(t, err)
+
+	filter.ID = filterID
+
+	logs := make([]Log, 7)
+
+	for i := range logs {
+		logs[i].FilterID = filterID
+		logs[i].ChainID = chainID
+		logs[i].BlockNumber = int64(i + 1)
+		logs[i].SequenceNum = int64(i + 1)
+		logs[i].EventSig = filter.EventSig
+		logs[i].Address = filter.Address
+		logs[i].Data = []byte{}
+	}
+
+	moreLogs := logs[5:]
+	logs = logs[:5]
+
+	err = orm.InsertLogs(ctx, logs)
+	require.NoError(t, err)
+
+	t.Run("default setting is permanent retention", func(t *testing.T) {
+		deleted, err2 := orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err2)
+
+		assert.Equal(t, int64(0), deleted)
+		//require.NoError(t, orm.DeleteFilter(ctx, filterID))
+	})
+
+	t.Run("MaxLogsKept=3 should keep last three logs", func(t *testing.T) {
+		filter.MaxLogsKept = 3
+		filterID, err = orm.InsertFilter(ctx, filter)
+		require.NoError(t, err)
+
+		var deleted int64
+		deleted, err = orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(2), deleted)
+
+		var actual []Log
+		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+
+		require.Len(t, actual, 3)
+		for i := range actual {
+			sanitize(&logs[2+i], &actual[i])
+			assert.Equal(t, logs[2+i].BlockNumber, actual[i].BlockNumber)
+		}
+	})
+
+	t.Run("Expired logs should be pruned", func(t *testing.T) {
+		filter.MaxLogsKept = 18
+		var initial []Log
+		initial, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+
+		past := time.Now().Add(-40 * time.Minute).UTC()
+		moreLogs[0].ExpiresAt = &past
+
+		future := time.Now().Add(40 * time.Minute).UTC()
+		moreLogs[1].ExpiresAt = &future
+
+		err = orm.InsertLogs(ctx, moreLogs)
+		require.NoError(t, err)
+
+		deleted, err := orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(1), deleted)
+
+		var actual []Log
+		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+		assert.Len(t, actual, len(initial)+1)
+	})
+}
+
 func sanitize(expected, actual *Log) {
 	// TODO: override ScanLocation with custom TimestamptzCodec?
 	// See: https://github.com/jackc/pgx/issues/2117
