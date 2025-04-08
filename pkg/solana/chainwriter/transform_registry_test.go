@@ -53,6 +53,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	sourceChainSelBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(sourceChainSelBytes, uint64(sourceChainSelector))
 
+	offrampPoolsSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer"), poolProgram.Bytes()}, offrampAddress)
+	require.NoError(t, err)
+
 	userTokenAccount1, _, err := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram.Bytes(), destTokenAddr1.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
 	require.NoError(t, err)
 	perChainTokenConfig1, _, err := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr1.Bytes()}, feeQuoterAddr)
@@ -77,6 +80,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	}
 	tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
 
+	externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, offrampAddress)
+	require.NoError(t, err)
 	userMessagingAccounts := chainwriter.CreateTestPubKeys(t, 3) // arbitrary number of user accounts
 
 	args := ccipsolana.SVMExecCallArgs{
@@ -109,6 +114,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		},
 	}
 
+	requiredMessagingAccountsLen := 2
+	nonPoolTTAccountsLen := 4
+
 	t.Run("CCIPExecute ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
 		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
 		// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
@@ -128,13 +136,15 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 2)
-		// mandatory accounts + 1 for logic receiver + 3 for user messaging accounts + 3 token accounts for TokenAmounts[0] + 7 pool keys + 3 token accounts for TokenAmounts[1] + 7 pool keys
-		require.Len(t, newAccounts, len(mandatoryAccounts)+1+len(userMessagingAccounts)+3+len(poolKeys)+3+len(poolKeys))
+		// mandatory accounts + required messaging accounts + arbitrary user messaging accounts + nonPoolTTAccountsLen for TokenAmounts[0]+ pool keys + nonPoolTTAccountsLen for TokenAmounts[1] + pool keys
+		require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys)+nonPoolTTAccountsLen+len(poolKeys))
 		// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
 		remainingAccounts := newAccounts[chainwriter.MandatoryExecuteAccounts:]
-		require.Len(t, remainingAccounts, 1+len(userMessagingAccounts)+3+len(poolKeys)+3+len(poolKeys))
+		require.Len(t, remainingAccounts, requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys)+nonPoolTTAccountsLen+len(poolKeys))
 		// logic receiver is the first account in remaining accounts
 		require.Equal(t, logicReceiver, remainingAccounts[0].PublicKey)
+		// external execution signer is the second account in remaining accounts
+		require.Equal(t, externalExecutionSigner, remainingAccounts[1].PublicKey)
 		for i, tokenIdx := range typedArgs.TokenIndexes {
 			startIdx := tokenIdx
 			var endIdx uint8
@@ -144,25 +154,27 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				endIdx = uint8(len(remainingAccounts))
 			}
 			tokenAccounts := remainingAccounts[startIdx:endIdx]
-			require.Len(t, tokenAccounts, 3+len(poolKeys)) // user token account + per chain token config + pool chain config + 7 pool keys
+			require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
 			if i == 0 {
-				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[0])
-				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[1])
-				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig1, IsWritable: true}, tokenAccounts[2])
+				require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner, IsWritable: false, IsSigner: false}, tokenAccounts[0])
+				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[1])
+				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[2])
+				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig1, IsWritable: true}, tokenAccounts[3])
 			} else {
-				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount2, IsWritable: true}, tokenAccounts[0])
-				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig2}, tokenAccounts[1])
-				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig2, IsWritable: true}, tokenAccounts[2])
+				require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner, IsWritable: false, IsSigner: false}, tokenAccounts[0])
+				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount2, IsWritable: true}, tokenAccounts[1])
+				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig2}, tokenAccounts[2])
+				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig2, IsWritable: true}, tokenAccounts[3])
 			}
 			// Pool lookup accounts should have the proper write flags set for token accounts
 			for j := 3; j < len(tokenAccounts); j++ {
 				require.True(t, tokenAccounts[j].IsWritable)
 			}
 		}
-		// Token addresses shifted by logic receiver + user messaging accounts since token index is relative to remaining accounts
-		require.Equal(t, uint8(1+len(userMessagingAccounts)), typedArgs.TokenIndexes[0])
-		// Token addresses shifted by logic receiver + user messaging accounts + the previous token accounts
-		require.Equal(t, uint8(1+len(userMessagingAccounts)+10), typedArgs.TokenIndexes[1])
+		// Token addresses shifted by logic receiver + external execution signer + user messaging accounts since token index is relative to remaining accounts
+		require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)), typedArgs.TokenIndexes[0])
+		// Token addresses shifted by logic receiver + external execution signer + user messaging accounts + the previous token accounts
+		require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys)), typedArgs.TokenIndexes[1])
 	})
 
 	t.Run("CCIPExecute ArgsTransform ignores user messaging accounts if logic receiver is empty", func(t *testing.T) {
@@ -211,8 +223,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		require.NotNil(t, typedArgs.TokenIndexes)
 		require.Len(t, typedArgs.TokenIndexes, 1)
 		require.Equal(t, uint8(0), typedArgs.TokenIndexes[0]) // Token index is 0 because no user messaging accounts precede token transfer accounts
-		// mandatory accounts + 3 token accounts for TokenAmounts[0] + 7 pool keys
-		require.Len(t, newAccounts, len(mandatoryAccounts)+3+len(poolKeys))
+		// mandatory accounts + 4 token accounts for TokenAmounts[0] + 7 pool keys
+		require.Len(t, newAccounts, len(mandatoryAccounts)+nonPoolTTAccountsLen+len(poolKeys))
 	})
 
 	t.Run("CCIPExecute ArgsTransform ignores token transfer related errors if accounts not required", func(t *testing.T) {
@@ -253,8 +265,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			require.True(t, ok)
 			require.NotNil(t, typedArgs.TokenIndexes)
 			require.Len(t, typedArgs.TokenIndexes, 0)
-			// mandatory accounts + 1 for logic receiver + 3 for user messaging accounts
-			require.Len(t, newAccounts, len(mandatoryAccounts)+1+len(userMessagingAccounts))
+			// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+			require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts))
 		})
 		t.Run("CCIPExecute ArgsTransform ignores missing token receiver error", func(t *testing.T) {
 			transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, messagingOnlyArgs, accounts, tableMap, offrampAddress.String())
@@ -265,8 +277,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			require.True(t, ok)
 			require.NotNil(t, typedArgs.TokenIndexes)
 			require.Len(t, typedArgs.TokenIndexes, 0)
-			// mandatory accounts + 1 for logic receiver + 3 for user messaging accounts
-			require.Len(t, newAccounts, len(mandatoryAccounts)+1+len(userMessagingAccounts))
+			// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+			require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts))
 		})
 	})
 

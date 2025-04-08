@@ -23,7 +23,7 @@ import (
 
 // TODO: replace with exact value after CCIP testing is completed.
 const StaticCuOverhead uint32 = 150000
-const MandatoryExecuteAccounts = 14
+const MandatoryExecuteAccounts = 12
 
 func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
@@ -42,6 +42,7 @@ type commonTokenTransferAccounts struct {
 	tokenProgram       *solana.AccountMeta
 	tokenReceiver      solana.PublicKey
 	feeQuoterAddress   solana.PublicKey
+	offrampPoolsSigner solana.PublicKey
 }
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
@@ -92,7 +93,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	// Append token accounts to the account list and track at which index accounts for each token transfer starts
 	for _, message := range aggregatedMessages {
 		// Append the logic receiver and the user defined messaging accounts to list
-		accounts, err = appendMessagingAccounts(accounts, message.Receiver, args)
+		accounts, err = appendMessagingAccounts(accounts, message.Receiver, args, toAddress)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to append user messaging accounts to list: %w", err)
 		}
@@ -226,18 +227,47 @@ func resolveCommonTokenTransferAccounts(ctx context.Context, tokenAccountsRequir
 	}
 	tokenReceiver := tokenReceivers[0].PublicKey
 
+	offrampAddr, err := solana.PublicKeyFromBase58(toAddress)
+	if err != nil {
+		return commonTokenTransferAccounts{}, fmt.Errorf("failed to parse offramp address: %w", err)
+	}
+	offrampPoolsSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer"), poolProgram.PublicKey.Bytes()}, offrampAddr)
+	if err != nil {
+		return commonTokenTransferAccounts{}, fmt.Errorf("failed to calculate offramp pools signer PDA: %w", err)
+	}
+
 	return commonTokenTransferAccounts{
 		poolLookupAccounts: poolLookupAccounts,
 		poolProgram:        poolProgram,
 		tokenProgram:       tokenProgram,
 		feeQuoterAddress:   feeQuoterAddress,
 		tokenReceiver:      tokenReceiver,
+		offrampPoolsSigner: offrampPoolsSigner,
 	}, nil
 }
 
-func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver ccipocr3.UnknownAddress, args any) (solana.AccountMetaSlice, error) {
+func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver ccipocr3.UnknownAddress, args any, toAddress string) (solana.AccountMetaSlice, error) {
 	// Messaging accounts do not need to be appended if logic receiver is zero or empty. Return accounts as is
 	if !logicReceiver.IsZeroOrEmpty() {
+		logicReceiverAddr := solana.PublicKeyFromBytes(logicReceiver)
+		accounts = append(accounts, &solana.AccountMeta{
+			PublicKey:  logicReceiverAddr,
+			IsWritable: false,
+			IsSigner:   false,
+		})
+		offrampAddr, err := solana.PublicKeyFromBase58(toAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse offramp address: %w", err)
+		}
+		externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiverAddr.Bytes()}, offrampAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate external execution signer: %w", err)
+		}
+		accounts = append(accounts, &solana.AccountMeta{
+			PublicKey:  externalExecutionSigner,
+			IsWritable: false,
+			IsSigner:   false,
+		})
 		userAccountsLookup := AccountLookup{
 			Name:       "UserAccounts",
 			Location:   "ExtraData.ExtraArgsDecoded.accounts",
@@ -249,11 +279,6 @@ func appendMessagingAccounts(accounts solana.AccountMetaSlice, logicReceiver cci
 		if err != nil && !errors.Is(err, ErrLookupNotFoundAtLocation) {
 			return nil, fmt.Errorf("failed to resolve user accounts: %w", err)
 		}
-		accounts = append(accounts, &solana.AccountMeta{
-			PublicKey:  solana.PublicKeyFromBytes(logicReceiver),
-			IsWritable: false,
-			IsSigner:   false,
-		})
 		accounts = append(accounts, userAccounts...)
 	}
 	return accounts, nil
@@ -284,6 +309,7 @@ func appendTokenTransferAccounts(tokenAccountsRequired bool, accounts solana.Acc
 		tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
 		// Append all token accounts for transfer
 		accounts = append(accounts,
+			&solana.AccountMeta{PublicKey: commonTTAccounts.offrampPoolsSigner},
 			&solana.AccountMeta{PublicKey: userTokenAccount, IsWritable: true},
 			&solana.AccountMeta{PublicKey: perChainTokenConfig},
 			&solana.AccountMeta{PublicKey: poolChainConfig, IsWritable: true},
