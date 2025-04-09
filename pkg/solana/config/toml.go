@@ -136,6 +136,9 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 }
 
 func setFromChain(c, f *Chain) {
+	if f.BlockTime != nil {
+		c.BlockTime = f.BlockTime
+	}
 	if f.BalancePollPeriod != nil {
 		c.BalancePollPeriod = f.BalancePollPeriod
 	}
@@ -208,6 +211,10 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	if len(c.Nodes) == 0 {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
+
+	if c.BlockTime != nil && c.BlockTime() <= 0 {
+		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
+	}
 	return
 }
 
@@ -220,6 +227,10 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 var _ Config = &TOMLConfig{}
+
+func (c *TOMLConfig) BlockTime() time.Duration {
+	return c.Chain.BlockTime.Duration()
+}
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
 	return c.Chain.BalancePollPeriod.Duration()
@@ -312,7 +323,7 @@ func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 }
 
 func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
-	return *c.Chain.LogPollerStartingLookback
+	return c.Chain.LogPollerStartingLookback.Duration()
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commoncfg "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -233,9 +234,9 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 	}
 
 	cfg := config.NewDefault()
-	cfg.Chain.LogPollerStartingLookback = ptr(600 * time.Second)
+	cfg.Chain.BlockTime = commoncfg.MustNewDuration(600 * time.Millisecond)
+	cfg.Chain.LogPollerStartingLookback = commoncfg.MustNewDuration(600 * time.Second)
 	lp := newMockedLPwithConfig(t, cfg)
-	lp.LogPoller.blockTime = 600 * time.Millisecond
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

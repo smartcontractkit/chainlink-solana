@@ -109,8 +109,9 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
 	lp.replay.status = ReplayStatusNoRequest
-	lp.blockTime = 600 * time.Millisecond // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
+
 	lp.startingLookback = cfg.LogPollerStartingLookback()
+	lp.blockTime = cfg.BlockTime()
 
 	return lp
 }
@@ -124,7 +125,7 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 const BackgroundWorkerInterval = 10 * time.Minute
 
 func (lp *Service) start(_ context.Context) error {
-	lp.eng.GoTick(services.NewTicker(lp.blockTime), func(ctx context.Context) {
+	lp.eng.GoTick(services.NewTicker(2*lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)

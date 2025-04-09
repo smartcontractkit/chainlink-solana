@@ -11,6 +11,10 @@ import (
 
 // Global solana defaults.
 var defaultConfigSet = Chain{
+	// general chain properties
+	BlockTime: config.MustNewDuration(500 * time.Millisecond), // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
+
+	// tx mgr
 	BalancePollPeriod:       config.MustNewDuration(5 * time.Second),        // poll period for balance monitoring
 	ConfirmPollPeriod:       config.MustNewDuration(500 * time.Millisecond), // polling for tx confirmation
 	OCR2CachePollPeriod:     config.MustNewDuration(time.Second),            // cache polling rate
@@ -36,10 +40,14 @@ var defaultConfigSet = Chain{
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
 
 	// log poller
-	LogPollerStartingLookback: ptr(24 * time.Hour),
+	LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
 }
 
 type Config interface {
+	// general chain properties
+	BlockTime() time.Duration
+
+	// tx mgr
 	BalancePollPeriod() time.Duration
 	ConfirmPollPeriod() time.Duration
 	OCR2CachePollPeriod() time.Duration
@@ -69,6 +77,7 @@ type Config interface {
 }
 
 type Chain struct {
+	BlockTime                 *config.Duration
 	BalancePollPeriod         *config.Duration
 	ConfirmPollPeriod         *config.Duration
 	OCR2CachePollPeriod       *config.Duration
@@ -90,10 +99,13 @@ type Chain struct {
 	BlockHistorySize          *uint64
 	ComputeUnitLimitDefault   *uint32
 	EstimateComputeUnitLimit  *bool
-	LogPollerStartingLookback *time.Duration
+	LogPollerStartingLookback *config.Duration
 }
 
 func (c *Chain) SetDefaults() {
+	if c.BlockTime == nil {
+		c.BlockTime = defaultConfigSet.BlockTime
+	}
 	if c.BalancePollPeriod == nil {
 		c.BalancePollPeriod = defaultConfigSet.BalancePollPeriod
 	}
