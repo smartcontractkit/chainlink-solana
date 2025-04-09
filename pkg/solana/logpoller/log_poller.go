@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 var (
@@ -59,7 +61,6 @@ type filtersI interface {
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
-	MaxRetention() time.Duration
 }
 
 type ReplayInfo struct {
@@ -87,9 +88,10 @@ type Service struct {
 	filters           filtersI
 	processBlocks     func(ctx context.Context, blocks []Block) error
 	blockTime         time.Duration
+	startingLookback  time.Duration
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
+func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *Service {
 	lp := &Service{
 		orm:    orm,
 		client: cl,
@@ -114,8 +116,8 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 	return lp
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
-	lp := New(lggr, orm, client)
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
+	lp := New(lggr, orm, client, cfg)
 	lp.processBlocks = processBlocks
 	return lp
 }
@@ -539,10 +541,7 @@ func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
 	}
 
-	lookback := lp.filters.MaxRetention()
-	if lookback == 0 { // Use default lookback if all filters have permanent retention
-		lookback = DefaultLookbackWindow
-	}
+	lookback := lp.startingLookback
 
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64

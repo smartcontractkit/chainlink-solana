@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 )
 
@@ -40,7 +41,7 @@ func newMockedLP(t *testing.T) mockedLP {
 		Loader:  newMockLogsLoader(t),
 		Filters: newMockFilters(t),
 	}
-	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client)
+	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client, config.NewDefault())
 	result.LogPoller.loader = result.Loader
 	result.LogPoller.filters = result.Filters
 	return result
@@ -50,7 +51,6 @@ func TestLogPoller_run(t *testing.T) {
 	expectLookback := func(lp mockedLP, latestFinalized uint64) {
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
 		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
-		lp.Filters.EXPECT().MaxRetention().Return(600 * time.Second).Once()
 	}
 
 	t.Run("Abort run if failed to load filters", func(t *testing.T) {
@@ -185,7 +185,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 		finalizedSlot     uint64
 		firstAvailable    uint64
 		lookbackErr       error
-		maxRetention      time.Duration
 		expectedSlot      int64
 		expectError       bool
 	}
@@ -196,7 +195,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			lastProcessedSlot: 12000,
 			finalizedSlot:     11400, // so computed lookback = 11400 - 1000 = 10400 < 12000
 			firstAvailable:    0,
-			maxRetention:      600 * time.Second,
 			expectedSlot:      12000,
 		},
 		{
@@ -205,7 +203,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			dbErr:          nil,
 			finalizedSlot:  11100, // computed lookback = 10500
 			firstAvailable: 0,
-			maxRetention:   600 * time.Second,
 			expectedSlot:   11500,
 		},
 		{
@@ -214,7 +211,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			dbErr:          nil,
 			finalizedSlot:  13100, // computed lookback = 12500
 			firstAvailable: 0,
-			maxRetention:   600 * time.Second,
 			expectedSlot:   12100,
 		},
 		{
@@ -222,7 +218,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			dbErr:          sql.ErrNoRows,
 			finalizedSlot:  10100, // lookback = 9100
 			firstAvailable: 0,
-			maxRetention:   600 * time.Second,
 			expectedSlot:   9100,
 		},
 		{
@@ -242,7 +237,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			dbErr:          sql.ErrNoRows,
 			finalizedSlot:  10600,
 			firstAvailable: 10100, // should take precedence over computed lookback
-			maxRetention:   600 * time.Second,
 			expectedSlot:   10100,
 		},
 	}
@@ -268,7 +262,6 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 					}
 					lp.Client.On("GetFirstAvailableBlock", mock.Anything).
 						Return(tc.firstAvailable, nil).Once()
-					lp.Filters.On("MaxRetention").Return(tc.maxRetention).Once()
 				} else {
 					lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
 						Return(uint64(0), tc.lookbackErr).Once()
@@ -379,7 +372,7 @@ func TestProcess(t *testing.T) {
 	orm := NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
 	lggr := logger.Sugared(logger.Test(t))
-	lp := New(lggr, orm, cl)
+	lp := New(lggr, orm, cl, config.NewDefault())
 
 	var idlTypeInt64 codec.IdlType
 	var idlTypeString codec.IdlType
@@ -601,7 +594,7 @@ func TestBackgroundWorkerRun(t *testing.T) {
 	lggr := logger.TestSugared(t)
 	orm := NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
-	lp := New(lggr, orm, cl)
+	lp := New(lggr, orm, cl, config.NewDefault())
 
 	filter1 := Filter{ID: 1, Name: "Filter A"}
 	filter2 := Filter{ID: 2, Name: "Filter B"}
