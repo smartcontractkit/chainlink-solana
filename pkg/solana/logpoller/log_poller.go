@@ -26,8 +26,6 @@ var (
 	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
 
-const DefaultLookbackWindow = 30 * 24 * time.Hour
-
 type ORM interface {
 	ChainID() string
 	HasFilter(ctx context.Context, name string) (bool, error)
@@ -112,6 +110,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 	lp.lggr = lp.eng.SugaredLogger
 	lp.replay.status = ReplayStatusNoRequest
 	lp.blockTime = 600 * time.Millisecond // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
+	lp.startingLookback = cfg.LogPollerStartingLookback()
 
 	return lp
 }
@@ -296,10 +295,11 @@ func (lp *Service) ReplayStatus() ReplayStatus {
 
 func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int64, err error) {
 	lastProcessed = lp.lastProcessedSlot
-	if lastProcessed == 0 {
-		lastProcessed, err = lp.orm.GetLatestBlock(ctx)
+	if lastProcessed > 0 {
+		return lastProcessed, nil
 	}
 
+	lastProcessed, err = lp.orm.GetLatestBlock(ctx)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return 0, fmt.Errorf("error getting latest block from db: %w", err)

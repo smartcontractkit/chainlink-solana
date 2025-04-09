@@ -34,25 +34,24 @@ type mockedLP struct {
 	LogPoller *Service
 }
 
-func newMockedLP(t *testing.T) mockedLP {
+func newMockedLPwithConfig(t *testing.T, cfg config.Config) mockedLP {
 	result := mockedLP{
 		ORM:     NewMockORM(t),
 		Client:  mocks.NewRPCClient(t),
 		Loader:  newMockLogsLoader(t),
 		Filters: newMockFilters(t),
 	}
-	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client, config.NewDefault())
+	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client, cfg)
 	result.LogPoller.loader = result.Loader
 	result.LogPoller.filters = result.Filters
 	return result
 }
 
-func TestLogPoller_run(t *testing.T) {
-	expectLookback := func(lp mockedLP, latestFinalized uint64) {
-		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(latestFinalized, nil).Once()
-		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
-	}
+func newMockedLP(t *testing.T) mockedLP {
+	return newMockedLPwithConfig(t, config.NewDefault())
+}
 
+func TestLogPoller_run(t *testing.T) {
 	t.Run("Abort run if failed to load filters", func(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to load filters")
@@ -65,7 +64,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{{StartingBlock: 16}}).Once()
-		expectLookback(lp, 128)
 
 		expectedErr := errors.New("loaderFailed")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
@@ -81,7 +79,6 @@ func TestLogPoller_run(t *testing.T) {
 			{ID: 2, StartingBlock: 12, Address: PublicKey{1, 2, 3}},
 			{ID: 3, StartingBlock: 14, Address: PublicKey{3, 2, 1}},
 		}).Once()
-		expectLookback(lp, 128)
 		done := func() {}
 		blocks := make(chan Block)
 		close(blocks)
@@ -107,7 +104,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, expectedErr).Once()
-		expectLookback(lp, 128)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed getting addresses: failed to load filters")
 	})
@@ -117,7 +113,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, nil).Once()
-		expectLookback(lp, 128)
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 	})
@@ -128,7 +123,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
-		expectLookback(lp, 128)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
@@ -140,7 +134,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
-		expectLookback(lp, 16)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "last processed slot 128 is higher than highest RPC slot 16")
 	})
@@ -153,7 +146,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
-		expectLookback(lp, 130)
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed processing block range [129, 130]: error backfilling filters: failed to start backfill")
 	})
@@ -164,7 +156,6 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
-		expectLookback(lp, 130)
 		blocks := make(chan Block)
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
@@ -241,8 +232,9 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 		},
 	}
 
-	lp := newMockedLP(t)
-
+	cfg := config.NewDefault()
+	cfg.Chain.LogPollerStartingLookback = ptr(600 * time.Second)
+	lp := newMockedLPwithConfig(t, cfg)
 	lp.LogPoller.blockTime = 600 * time.Millisecond
 
 	for _, tc := range testCases {
@@ -250,21 +242,21 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 			lp.LogPoller.lastProcessedSlot = tc.lastProcessedSlot
 			if tc.lastProcessedSlot == 0 {
 				lp.ORM.On("GetLatestBlock", mock.Anything).Return(tc.dbSlot, tc.dbErr).Once()
-			}
 
-			// Set up lookback window mocks *only if GetLatestBlock is expected to succeed or be sql.ErrNoRows*
-			shouldRunLookback := tc.lastProcessedSlot != 0 || tc.dbErr == nil || errors.Is(tc.dbErr, sql.ErrNoRows)
-			if shouldRunLookback {
-				if tc.lookbackErr == nil {
-					if tc.finalizedSlot != 0 {
+				// Set up lookback window mocks *only if GetLatestBlock is expected to succeed or be sql.ErrNoRows*
+				shouldRunLookback := tc.dbErr == nil || errors.Is(tc.dbErr, sql.ErrNoRows)
+				if shouldRunLookback {
+					if tc.lookbackErr == nil {
+						if tc.finalizedSlot != 0 {
+							lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
+								Return(tc.finalizedSlot, nil).Once()
+						}
+						lp.Client.On("GetFirstAvailableBlock", mock.Anything).
+							Return(tc.firstAvailable, nil).Once()
+					} else {
 						lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
-							Return(tc.finalizedSlot, nil).Once()
+							Return(uint64(0), tc.lookbackErr).Once()
 					}
-					lp.Client.On("GetFirstAvailableBlock", mock.Anything).
-						Return(tc.firstAvailable, nil).Once()
-				} else {
-					lp.Client.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).
-						Return(uint64(0), tc.lookbackErr).Once()
 				}
 			}
 
