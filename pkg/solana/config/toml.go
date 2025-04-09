@@ -212,7 +212,7 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
 
-	if c.BlockTime != nil && c.BlockTime() <= 0 {
+	if c.BlockTime() <= 0 {
 		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
 	}
 	return
