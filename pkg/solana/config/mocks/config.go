@@ -562,6 +562,51 @@ func (_c *Config_FeeEstimatorMode_Call) RunAndReturn(run func() string) *Config_
 	return _c
 }
 
+// LogPollerStartingLookback provides a mock function with no fields
+func (_m *Config) LogPollerStartingLookback() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerStartingLookback")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// Config_LogPollerStartingLookback_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerStartingLookback'
+type Config_LogPollerStartingLookback_Call struct {
+	*mock.Call
+}
+
+// LogPollerStartingLookback is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerStartingLookback() *Config_LogPollerStartingLookback_Call {
+	return &Config_LogPollerStartingLookback_Call{Call: _e.mock.On("LogPollerStartingLookback")}
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) Run(run func()) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) Return(_a0 time.Duration) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) RunAndReturn(run func() time.Duration) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MaxRetries provides a mock function with no fields
 func (_m *Config) MaxRetries() *uint {
 	ret := _m.Called()

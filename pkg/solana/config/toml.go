@@ -193,6 +193,9 @@ func setFromChain(c, f *Chain) {
 	if f.BlockHistorySize != nil {
 		c.BlockHistorySize = f.BlockHistorySize
 	}
+	if f.LogPollerStartingLookback != nil {
+		c.LogPollerStartingLookback = f.LogPollerStartingLookback
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -306,6 +309,10 @@ func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
 
 func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 	return *c.Chain.EstimateComputeUnitLimit
+}
+
+func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
+	return *c.Chain.LogPollerStartingLookback
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {

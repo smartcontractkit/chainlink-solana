@@ -34,6 +34,9 @@ var defaultConfigSet = Chain{
 	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
 	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
+
+	// log poller
+	LogPollerStartingLookback: ptr(24 * time.Hour),
 }
 
 type Config interface {
@@ -60,30 +63,34 @@ type Config interface {
 	BlockHistorySize() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
+
+	// log poller
+	LogPollerStartingLookback() time.Duration
 }
 
 type Chain struct {
-	BalancePollPeriod        *config.Duration
-	ConfirmPollPeriod        *config.Duration
-	OCR2CachePollPeriod      *config.Duration
-	OCR2CacheTTL             *config.Duration
-	TxTimeout                *config.Duration
-	TxRetryTimeout           *config.Duration
-	TxConfirmTimeout         *config.Duration
-	TxExpirationRebroadcast  *bool
-	TxRetentionTimeout       *config.Duration
-	SkipPreflight            *bool
-	Commitment               *string
-	MaxRetries               *int64
-	FeeEstimatorMode         *string
-	ComputeUnitPriceMax      *uint64
-	ComputeUnitPriceMin      *uint64
-	ComputeUnitPriceDefault  *uint64
-	FeeBumpPeriod            *config.Duration
-	BlockHistoryPollPeriod   *config.Duration
-	BlockHistorySize         *uint64
-	ComputeUnitLimitDefault  *uint32
-	EstimateComputeUnitLimit *bool
+	BalancePollPeriod         *config.Duration
+	ConfirmPollPeriod         *config.Duration
+	OCR2CachePollPeriod       *config.Duration
+	OCR2CacheTTL              *config.Duration
+	TxTimeout                 *config.Duration
+	TxRetryTimeout            *config.Duration
+	TxConfirmTimeout          *config.Duration
+	TxExpirationRebroadcast   *bool
+	TxRetentionTimeout        *config.Duration
+	SkipPreflight             *bool
+	Commitment                *string
+	MaxRetries                *int64
+	FeeEstimatorMode          *string
+	ComputeUnitPriceMax       *uint64
+	ComputeUnitPriceMin       *uint64
+	ComputeUnitPriceDefault   *uint64
+	FeeBumpPeriod             *config.Duration
+	BlockHistoryPollPeriod    *config.Duration
+	BlockHistorySize          *uint64
+	ComputeUnitLimitDefault   *uint32
+	EstimateComputeUnitLimit  *bool
+	LogPollerStartingLookback *time.Duration
 }
 
 func (c *Chain) SetDefaults() {
@@ -149,6 +156,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.EstimateComputeUnitLimit == nil {
 		c.EstimateComputeUnitLimit = defaultConfigSet.EstimateComputeUnitLimit
+	}
+	if c.LogPollerStartingLookback == nil {
+		c.LogPollerStartingLookback = defaultConfigSet.LogPollerStartingLookback
 	}
 }
 
