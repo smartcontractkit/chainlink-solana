@@ -308,14 +308,16 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 		lastProcessed = 0
 	}
 
-	var lookbackBlock int64
-	lookbackBlock, err = lp.computeLookbackWindow(ctx)
+	var lookbackSlot int64
+	lookbackSlot, err = lp.computeLookbackWindow(ctx)
 	if err != nil {
 		return 0, err
 	}
-	if lookbackBlock > lastProcessed {
-		return lookbackBlock, nil
+	if lookbackSlot > lastProcessed {
+		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		return lookbackSlot, nil
 	}
+	lp.lggr.Infof("last processed slot %d is older than lookback window, skipping ahead to slot %d", lastProcessed, lookbackSlot)
 
 	return lastProcessed, nil
 }
@@ -552,6 +554,7 @@ func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
 	firstAvailableSlot, err := lp.client.GetFirstAvailableBlock(ctx) // Despite the name, this returns slot # not block number
 	if err != nil {
 		// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
+		lp.lggr.Warnf("Failed to get first available slot, starting at lookback slot %d from %v ago: %s", lookbackSlot, lookback, err.Error())
 		return lookbackSlot, nil
 	}
 
@@ -560,6 +563,9 @@ func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
 	firstSlot := int64(firstAvailableSlot)
 	if firstSlot > lookbackSlot {
 		lookbackSlot = firstSlot
+		lp.lggr.Infof("First available slot %d is more recent than slot %d from %v ago, using first available slot as lookback slot", firstSlot, lookbackSlot, lookback)
+		return lookbackSlot, nil
 	}
+	lp.lggr.Infof("First available slot %d is older than lookback window, using lookback slot = %d from %v ago", firstSlot, lookbackSlot, lookback)
 	return lookbackSlot, nil
 }
