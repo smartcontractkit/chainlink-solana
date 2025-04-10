@@ -25,15 +25,16 @@ var defaultConfigSet = Chain{
 	MaxRetries:              ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
 
 	// fee estimator
-	FeeEstimatorMode:         ptr("fixed"), // "fixed" or "blockhistory"
-	ComputeUnitPriceMax:      ptr(uint64(1_000)),
-	ComputeUnitPriceMin:      ptr(uint64(0)),
-	ComputeUnitPriceDefault:  ptr(uint64(0)),
-	FeeBumpPeriod:            config.MustNewDuration(3 * time.Second), // WARNING: If FeeBumpPeriod is shorter than blockhash expiration, multiple valid transactions can exist in parallel. This can result in higher costs and can cause unexpected behaviors if contracts do not de-dupe txs. Set to 0 to disable fee bumping.
-	BlockHistoryPollPeriod:   config.MustNewDuration(5 * time.Second),
-	BlockHistorySize:         ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks. DISCLAIMER: 1:1 ratio between n and RPC calls.
-	ComputeUnitLimitDefault:  ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
-	EstimateComputeUnitLimit: ptr(false),           // set to false to disable compute unit limit estimation
+	FeeEstimatorMode:           ptr("fixed"), // "fixed" or "blockhistory"
+	ComputeUnitPriceMax:        ptr(uint64(1_000)),
+	ComputeUnitPriceMin:        ptr(uint64(0)),
+	ComputeUnitPriceDefault:    ptr(uint64(0)),
+	FeeBumpPeriod:              config.MustNewDuration(3 * time.Second), // WARNING: If FeeBumpPeriod is shorter than blockhash expiration, multiple valid transactions can exist in parallel. This can result in higher costs and can cause unexpected behaviors if contracts do not de-dupe txs. Set to 0 to disable fee bumping.
+	BlockHistoryPollPeriod:     config.MustNewDuration(5 * time.Second),
+	BlockHistorySize:           ptr(uint64(1)),       // 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks.
+	BlockHistoryCacheLoadBatch: ptr(uint64(20)),      // set to the number of blocks that should be loaded into the cache every poll period if BlockHistorySize > 1. Ensure this value is greater than the number of blocks that would be produced between each BlockHistoryPollPeriod to avoid block gaps. BlockHistorySize is used instead if BlockHistorySize <  BlockHistoryCacheLoadBatch.
+	ComputeUnitLimitDefault:    ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
+	EstimateComputeUnitLimit:   ptr(false),           // set to false to disable compute unit limit estimation
 }
 
 type Config interface {
@@ -58,32 +59,34 @@ type Config interface {
 	FeeBumpPeriod() time.Duration
 	BlockHistoryPollPeriod() time.Duration
 	BlockHistorySize() uint64
+	BlockHistoryCacheLoadBatch() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
 }
 
 type Chain struct {
-	BalancePollPeriod        *config.Duration
-	ConfirmPollPeriod        *config.Duration
-	OCR2CachePollPeriod      *config.Duration
-	OCR2CacheTTL             *config.Duration
-	TxTimeout                *config.Duration
-	TxRetryTimeout           *config.Duration
-	TxConfirmTimeout         *config.Duration
-	TxExpirationRebroadcast  *bool
-	TxRetentionTimeout       *config.Duration
-	SkipPreflight            *bool
-	Commitment               *string
-	MaxRetries               *int64
-	FeeEstimatorMode         *string
-	ComputeUnitPriceMax      *uint64
-	ComputeUnitPriceMin      *uint64
-	ComputeUnitPriceDefault  *uint64
-	FeeBumpPeriod            *config.Duration
-	BlockHistoryPollPeriod   *config.Duration
-	BlockHistorySize         *uint64
-	ComputeUnitLimitDefault  *uint32
-	EstimateComputeUnitLimit *bool
+	BalancePollPeriod          *config.Duration
+	ConfirmPollPeriod          *config.Duration
+	OCR2CachePollPeriod        *config.Duration
+	OCR2CacheTTL               *config.Duration
+	TxTimeout                  *config.Duration
+	TxRetryTimeout             *config.Duration
+	TxConfirmTimeout           *config.Duration
+	TxExpirationRebroadcast    *bool
+	TxRetentionTimeout         *config.Duration
+	SkipPreflight              *bool
+	Commitment                 *string
+	MaxRetries                 *int64
+	FeeEstimatorMode           *string
+	ComputeUnitPriceMax        *uint64
+	ComputeUnitPriceMin        *uint64
+	ComputeUnitPriceDefault    *uint64
+	FeeBumpPeriod              *config.Duration
+	BlockHistoryPollPeriod     *config.Duration
+	BlockHistorySize           *uint64
+	BlockHistoryCacheLoadBatch *uint64
+	ComputeUnitLimitDefault    *uint32
+	EstimateComputeUnitLimit   *bool
 }
 
 func (c *Chain) SetDefaults() {
@@ -143,6 +146,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.BlockHistorySize == nil {
 		c.BlockHistorySize = defaultConfigSet.BlockHistorySize
+	}
+	if c.BlockHistoryCacheLoadBatch == nil {
+		c.BlockHistoryCacheLoadBatch = defaultConfigSet.BlockHistoryCacheLoadBatch
 	}
 	if c.ComputeUnitLimitDefault == nil {
 		c.ComputeUnitLimitDefault = defaultConfigSet.ComputeUnitLimitDefault

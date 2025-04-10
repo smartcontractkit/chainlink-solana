@@ -193,6 +193,15 @@ func setFromChain(c, f *Chain) {
 	if f.BlockHistorySize != nil {
 		c.BlockHistorySize = f.BlockHistorySize
 	}
+	if f.BlockHistoryCacheLoadBatch != nil {
+		c.BlockHistoryCacheLoadBatch = f.BlockHistoryCacheLoadBatch
+	}
+	if f.ComputeUnitLimitDefault != nil {
+		c.ComputeUnitLimitDefault = f.ComputeUnitLimitDefault
+	}
+	if f.EstimateComputeUnitLimit != nil {
+		c.EstimateComputeUnitLimit = f.EstimateComputeUnitLimit
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -298,6 +307,10 @@ func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
 
 func (c *TOMLConfig) BlockHistorySize() uint64 {
 	return *c.Chain.BlockHistorySize
+}
+
+func (c *TOMLConfig) BlockHistoryCacheLoadBatch() uint64 {
+	return *c.Chain.BlockHistoryCacheLoadBatch
 }
 
 func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
