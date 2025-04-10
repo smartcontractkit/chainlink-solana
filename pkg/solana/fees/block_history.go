@@ -294,8 +294,8 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 
 	bhe.cacheMu.Lock()
 	defer bhe.cacheMu.Unlock()
-	excessBlocks := uint64(len(bhe.cache.storedBlockRange)) - desiredBlockCount
-	// Return early if block median cache does not exceed the desired block count
+	excessBlocks := len(bhe.cache.storedBlockRange) - int(desiredBlockCount) //nolint:gosec // block history size cannot reasonably exceed int max
+	// Return early if cache size does not exceed the desired block count
 	if excessBlocks <= 0 {
 		return nil
 	}
