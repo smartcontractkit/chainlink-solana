@@ -71,14 +71,7 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    // report context != report metadata
-    // signature will be report | report_context to avoid needing to create a new solana keyring
-    // requires creating new solana keyring to respect this concatenation order for the msg hash before signing
-    // data =  len_signatures (N) | signatures (N*65) | raw_report (arbitrary) | report_context (96) 
-
-    // new data =  bump | len_signatures (N) | signatures (N*65) | executiraw_report (arbitrary) | report_context (96)
-
-    // todo: add a bump into the data vector
+    // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(ctx: Context<'_, '_, '_, 'info, Report<'info>>, data: Vec<u8>) -> Result<()> {
         let len_signatures = data[1] as usize;
         require!(len_signatures <= MAX_REPORT_SIGNERS, ForwarderError::MaxSignersLimit);
@@ -107,43 +100,13 @@ pub mod keystone_forwarder {
         let data = &data[total_signature_len..];
         let hashed_report = hash::hash(&data).to_bytes();
 
-        // ensure MAX_SIGNERS fit in the bits of uniques
-        let mut uniques: u32 = 0;
-        assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_REPORT_SIGNERS as u32); 
-
-        for sig in signatures.chunks(SIGNATURE_LEN.into()) {
-            // sig is [R || S || V] format where V is 0 or 1
-            let v = sig[64];
-
-            let signer = secp256k1_recover(&hashed_report, v, &sig[..64])
-                .map_err(|_| ForwarderError::InvalidSignature)?;
-
-            let signer_eth_address: EthAddress = keccak::hash(&signer.0).to_bytes()[12..32]
-            .try_into()
-            .map_err(|_| ForwarderError::UnauthorizedSigner)?;
-
-            let index = oracles_config
-                .signer_addresses.binary_search_by(|addr| signer_eth_address.cmp(addr))
-                .map_err(|_| ForwarderError::UnauthorizedSigner)?;
-
-            uniques |= 1 << index;
-        };
-
-        require!(uniques.count_ones() as usize == total_signature_len, ForwarderError::DuplicateSignatures);
+        verify_signatures(&hashed_report, signatures, oracles_config, total_signature_len)?;
 
         // slice raw_report from the report context
         let raw_report_end = data.len() - REPORT_CONTEXT_LEN;
         let raw_report = &data[..raw_report_end];
 
-        // get select metadata from raw_report
-        let receiver =  ctx.accounts.receiver_program.key();
-        let workflow_execution_id = &raw_report[1..33];
-        let report_id =  &raw_report[107..109];
-
-        // get transmission id, use sha-256 bc it's cheaper
-        let transmission_id = hash::hash(
-            &[&receiver.to_bytes(), workflow_execution_id, report_id].concat()
-        ).to_bytes();
+        let transmission_id = extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
 
         let execution_state = &ctx.accounts.execution_state;
 
@@ -180,9 +143,7 @@ pub mod keystone_forwarder {
             require!(!state.success, ForwarderError::ExecutionAlreadySucceded)
         }
 
-         // forward to the receiver program
-        let receiver_program_id = ctx.accounts.receiver_program.key();
-
+        // forward to the receiver program
         let forwarder_authority_pda = ctx.accounts.forwarder_authority.clone();
       
         // Create AccountMeta list, with forwarder state and forwarder authority PDA
@@ -205,20 +166,22 @@ pub mod keystone_forwarder {
         .collect();
 
         let account_infos: Vec<AccountInfo> = std::iter::once(ctx.accounts.state.to_account_info())
-        .chain(std::iter::once(ctx.accounts.forwarder_authority.clone()))
+        .chain(std::iter::once(ctx.accounts.forwarder_authority.to_account_info()))
         .chain(ctx.remaining_accounts.iter().cloned())
         .collect();
 
         // payload begins with the Anchor discriminator
         let mut payload = hash::hash("global:on_report".as_bytes()).to_bytes()[..8].to_vec();
         // borsh serialization of metadata vector and report vector
+        // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
         let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
         let report = &raw_report[METADATA_LENGTH..].to_vec();
-        let args = (metadata, report).try_to_vec()?;
-        payload.extend(args);
+        // Borsh serialize each part separately
+        payload.extend(&metadata.try_to_vec()?);
+        payload.extend(&report.try_to_vec()?);
 
         let ix = Instruction::new_with_bytes(
-            receiver_program_id, 
+            ctx.accounts.receiver_program.key(), 
             &payload,
             metas,
         );
@@ -247,6 +210,40 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+}
+
+#[inline(never)]
+fn verify_signatures(
+    hashed_report: &[u8; 32],
+    signatures: &[u8],
+    oracles_config: &Account<OraclesConfig>,
+    total_signatures_len: usize
+) -> Result<()> {
+     // ensure MAX_SIGNERS fit in the bits of uniques
+     let mut uniques: u32 = 0;
+     assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_REPORT_SIGNERS as u32); 
+
+     for sig in signatures.chunks(SIGNATURE_LEN.into()) {
+         // sig is [R || S || V] format where V is 0 or 1
+         let v = sig[64];
+
+         let signer = secp256k1_recover(hashed_report, v, &sig[..64])
+             .map_err(|_| ForwarderError::InvalidSignature)?;
+
+         let signer_eth_address: EthAddress = keccak::hash(&signer.0).to_bytes()[12..32]
+         .try_into()
+         .map_err(|_| ForwarderError::UnauthorizedSigner)?;
+
+         let index = oracles_config
+             .signer_addresses.binary_search_by(|addr| signer_eth_address.cmp(addr))
+             .map_err(|_| ForwarderError::UnauthorizedSigner)?;
+
+         uniques |= 1 << index;
+     };
+
+     require!(uniques.count_ones() as usize == total_signatures_len, ForwarderError::DuplicateSignatures);
+
+     Ok(())
 }
 
 
@@ -399,30 +396,8 @@ pub struct CloseOraclesConfig<'info> {
     pub owner: Signer<'info>,  // must be the same owner as the one in the state account
 }
 
-// function _getMetadata(
-//     bytes memory rawReport
-//   ) internal pure returns (bytes32 workflowExecutionId, uint64 configId, bytes2 reportId) {
-//     // (first 32 bytes of memory contain length of the report)
-//     // version                offset  32, size  1
-//     // workflow_execution_id  offset  33, size 32
-//     // timestamp              offset  65, size  4
-//     // don_id                 offset  69, size  4  
-//     // don_config_version,    offset  73, size  4
-//     // workflow_cid           offset  77, size 32
-//     // workflow_name          offset 109, size 10
-//     // workflow_owner         offset 119, size 20
-//     // report_id              offset 139, size  2
-//     assembly {
-//       workflowExecutionId := mload(add(rawReport, 33))
-//       // shift right by 24 bytes to get the combined don_id and don_config_version
-//       configId := shr(mul(24, 8), mload(add(rawReport, 69)))
-//       reportId := mload(add(rawReport, 139))
-//     }
-//   }
-
-// data =  len_signatures (N) | signatures (N*65) | report_context (96) | raw_report (arbitrary)
-// new =  len_signatures (N) | signatures (N*65) | raw_report (arbitrary) | report_context (96) 
-fn extract_raw_report(data: Vec<u8>) -> Vec<u8> {
+// data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+fn extract_raw_report(data: &[u8]) -> Vec<u8> {
     let _execution_state_bump = data[0];
     let len = data[1] as usize;
     let data = &data[2..];
@@ -434,10 +409,31 @@ fn extract_raw_report(data: Vec<u8>) -> Vec<u8> {
     return raw_report.to_vec()
 }
 
-// TODO: change this in order to account 
-fn extract_config_id(raw_report: &Vec<u8>)  -> [u8; 8] {
+
+// version                offset   0, size  1  
+// workflow_execution_id  offset   1, size 32
+// timestamp              offset  33, size  4
+// don_id                 offset  37, size  4
+// don_config_version     offset  41, size  4
+// workflow_cid           offset  45, size 32
+// workflow_name          offset  77, size 10
+// workflow_owner         offset  87, size 20
+// report_id              offset 107, size  2
+
+
+fn extract_config_id(raw_report: &[u8])  -> [u8; 8] {
     // don_id | don_config_version
     raw_report[37..45].try_into().expect("Expected 8 bytes")
+}
+
+fn extract_transmission_id(raw_report: &[u8], receiver: &Pubkey) -> [u8; 32] {
+    let workflow_execution_id = &raw_report[1..33];
+    let report_id =  &raw_report[107..109];
+
+    // use sha-256 bc it's much cheaper than keccak-256
+     hash::hash(
+        &[&receiver.to_bytes(), workflow_execution_id, report_id].concat()
+    ).to_bytes()
 }
 
 #[derive(Accounts)]
@@ -447,7 +443,7 @@ pub struct Report<'info> {
 
     #[account(
         mut,
-        seeds = [b"config", state.key().as_ref(), &extract_config_id(&extract_raw_report(data))],
+        seeds = [b"config", state.key().as_ref(), &extract_config_id(&extract_raw_report(&data))],
         bump
     )]
     oracles_config: Account<'info, OraclesConfig>,
@@ -457,11 +453,18 @@ pub struct Report<'info> {
 
     /// CHECK: This is a PDA
     #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
-    pub forwarder_authority: AccountInfo<'info>,
+    pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
-    #[account(mut)]
     /// CHECK: existing account will be updated OR new account will be initialized
+    #[account(
+        mut, 
+        seeds = [
+            b"execution_state", 
+            &extract_transmission_id(&extract_raw_report(&data), receiver_program.key)
+        ], 
+        bump = data[0]
+    )]
     pub execution_state: UncheckedAccount<'info>,
 
     #[account(executable)]
@@ -483,7 +486,10 @@ pub struct ExecutionState {
     pub success: bool,
 }
 
-// receiver program implements
+//
+// Receiver contract will implement this in Anchor (or equivalent in pure Rust)
+// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
+// with the following declared accounts
 #[derive(Accounts)]
 pub struct OnReport<'info> {
     #[account(owner = ID)]
@@ -492,7 +498,7 @@ pub struct OnReport<'info> {
     /// CHECK: This is a PDA
     #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
     pub forwarder_authority: Signer<'info>,
+
+    // remaining accounts passed in as well
 }
 
-// receiver contract will implement something like this in Anchor or in pure Rust
-// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>

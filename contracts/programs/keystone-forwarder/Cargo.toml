@@ -17,3 +17,5 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
+# disables frozen-abi
+solana-program = { version = "1.17.25", default-features = false }
