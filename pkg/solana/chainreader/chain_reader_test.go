@@ -103,7 +103,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := logpoller.NewORM(uuid.NewString(), dbx, lggr)
-	lp := logpoller.New(logger.Sugared(lggr), orm, rpcClient)
+	lp := logpoller.New(logger.Sugared(lggr), orm, rpcClient, config.NewDefault())
 	err := lp.Start(ctx)
 	require.NoError(t, err)
 	alreadyStartedErr := lp.Start(ctx)

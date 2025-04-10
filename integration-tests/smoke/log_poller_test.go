@@ -72,7 +72,7 @@ func TestEventLoader(t *testing.T) {
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
-	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, parser.ProcessBlocks)
+	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, config.NewDefault(), parser.ProcessBlocks)
 
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() {

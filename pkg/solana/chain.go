@@ -345,7 +345,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		bc = utils.NewOnceLoader[monitor.BalanceClient](func(ctx context.Context) (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC(ctx) })
 	}
 
-	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewObservedORM(ch.ID(), ds, lggr), ch.multiClient)
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewObservedORM(ch.ID(), ds, lggr), ch.multiClient, cfg)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil

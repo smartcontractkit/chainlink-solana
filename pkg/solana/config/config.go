@@ -11,6 +11,10 @@ import (
 
 // Global solana defaults.
 var defaultConfigSet = Chain{
+	// general chain properties
+	BlockTime: config.MustNewDuration(500 * time.Millisecond), // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
+
+	// tx mgr
 	BalancePollPeriod:       config.MustNewDuration(5 * time.Second),        // poll period for balance monitoring
 	ConfirmPollPeriod:       config.MustNewDuration(500 * time.Millisecond), // polling for tx confirmation
 	OCR2CachePollPeriod:     config.MustNewDuration(time.Second),            // cache polling rate
@@ -35,9 +39,16 @@ var defaultConfigSet = Chain{
 	BlockHistoryCacheLoadBatch: ptr(uint64(20)),      // set to the number of blocks that should be loaded into the cache every poll period if BlockHistorySize > 1. Ensure this value is greater than the number of blocks that would be produced between each BlockHistoryPollPeriod to avoid block gaps. BlockHistorySize is used instead if BlockHistorySize <  BlockHistoryCacheLoadBatch.
 	ComputeUnitLimitDefault:    ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
 	EstimateComputeUnitLimit:   ptr(false),           // set to false to disable compute unit limit estimation
+
+	// log poller
+	LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
 }
 
 type Config interface {
+	// general chain properties
+	BlockTime() time.Duration
+
+	// tx mgr
 	BalancePollPeriod() time.Duration
 	ConfirmPollPeriod() time.Duration
 	OCR2CachePollPeriod() time.Duration
@@ -62,34 +73,42 @@ type Config interface {
 	BlockHistoryCacheLoadBatch() uint64
 	ComputeUnitLimitDefault() uint32
 	EstimateComputeUnitLimit() bool
+
+	// log poller
+	LogPollerStartingLookback() time.Duration
 }
 
 type Chain struct {
-	BalancePollPeriod          *config.Duration
-	ConfirmPollPeriod          *config.Duration
-	OCR2CachePollPeriod        *config.Duration
-	OCR2CacheTTL               *config.Duration
-	TxTimeout                  *config.Duration
-	TxRetryTimeout             *config.Duration
-	TxConfirmTimeout           *config.Duration
-	TxExpirationRebroadcast    *bool
-	TxRetentionTimeout         *config.Duration
-	SkipPreflight              *bool
-	Commitment                 *string
-	MaxRetries                 *int64
-	FeeEstimatorMode           *string
-	ComputeUnitPriceMax        *uint64
-	ComputeUnitPriceMin        *uint64
-	ComputeUnitPriceDefault    *uint64
-	FeeBumpPeriod              *config.Duration
-	BlockHistoryPollPeriod     *config.Duration
-	BlockHistorySize           *uint64
+	BlockTime                 *config.Duration
+	BalancePollPeriod           *config.Duration
+	ConfirmPollPeriod           *config.Duration
+	OCR2CachePollPeriod         *config.Duration
+	OCR2CacheTTL                *config.Duration
+	TxTimeout                   *config.Duration
+	TxRetryTimeout              *config.Duration
+	TxConfirmTimeout            *config.Duration
+	TxExpirationRebroadcast     *bool
+	TxRetentionTimeout          *config.Duration
+	SkipPreflight               *bool
+	Commitment                  *string
+	MaxRetries                  *int64
+	FeeEstimatorMode            *string
+	ComputeUnitPriceMax         *uint64
+	ComputeUnitPriceMin         *uint64
+	ComputeUnitPriceDefault     *uint64
+	FeeBumpPeriod               *config.Duration
+	BlockHistoryPollPeriod      *config.Duration
+	BlockHistorySize            *uint64
 	BlockHistoryCacheLoadBatch *uint64
-	ComputeUnitLimitDefault    *uint32
-	EstimateComputeUnitLimit   *bool
+	ComputeUnitLimitDefault     *uint32
+	EstimateComputeUnitLimit    *bool
+	LogPollerStartingLookback *config.Duration
 }
 
 func (c *Chain) SetDefaults() {
+	if c.BlockTime == nil {
+		c.BlockTime = defaultConfigSet.BlockTime
+	}
 	if c.BalancePollPeriod == nil {
 		c.BalancePollPeriod = defaultConfigSet.BalancePollPeriod
 	}
@@ -155,6 +174,9 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.EstimateComputeUnitLimit == nil {
 		c.EstimateComputeUnitLimit = defaultConfigSet.EstimateComputeUnitLimit
+	}
+	if c.LogPollerStartingLookback == nil {
+		c.LogPollerStartingLookback = defaultConfigSet.LogPollerStartingLookback
 	}
 }
 
