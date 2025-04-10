@@ -79,30 +79,30 @@ type Config interface {
 }
 
 type Chain struct {
-	BlockTime                 *config.Duration
-	BalancePollPeriod           *config.Duration
-	ConfirmPollPeriod           *config.Duration
-	OCR2CachePollPeriod         *config.Duration
-	OCR2CacheTTL                *config.Duration
-	TxTimeout                   *config.Duration
-	TxRetryTimeout              *config.Duration
-	TxConfirmTimeout            *config.Duration
-	TxExpirationRebroadcast     *bool
-	TxRetentionTimeout          *config.Duration
-	SkipPreflight               *bool
-	Commitment                  *string
-	MaxRetries                  *int64
-	FeeEstimatorMode            *string
-	ComputeUnitPriceMax         *uint64
-	ComputeUnitPriceMin         *uint64
-	ComputeUnitPriceDefault     *uint64
-	FeeBumpPeriod               *config.Duration
-	BlockHistoryPollPeriod      *config.Duration
-	BlockHistorySize            *uint64
+	BlockTime                  *config.Duration
+	BalancePollPeriod          *config.Duration
+	ConfirmPollPeriod          *config.Duration
+	OCR2CachePollPeriod        *config.Duration
+	OCR2CacheTTL               *config.Duration
+	TxTimeout                  *config.Duration
+	TxRetryTimeout             *config.Duration
+	TxConfirmTimeout           *config.Duration
+	TxExpirationRebroadcast    *bool
+	TxRetentionTimeout         *config.Duration
+	SkipPreflight              *bool
+	Commitment                 *string
+	MaxRetries                 *int64
+	FeeEstimatorMode           *string
+	ComputeUnitPriceMax        *uint64
+	ComputeUnitPriceMin        *uint64
+	ComputeUnitPriceDefault    *uint64
+	FeeBumpPeriod              *config.Duration
+	BlockHistoryPollPeriod     *config.Duration
+	BlockHistorySize           *uint64
 	BlockHistoryCacheLoadBatch *uint64
-	ComputeUnitLimitDefault     *uint32
-	EstimateComputeUnitLimit    *bool
-	LogPollerStartingLookback *config.Duration
+	ComputeUnitLimitDefault    *uint32
+	EstimateComputeUnitLimit   *bool
+	LogPollerStartingLookback  *config.Duration
 }
 
 func (c *Chain) SetDefaults() {
