@@ -166,7 +166,13 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
 			Path:               "/mockserver-bridge",
 			Method:             http.MethodGet,
-			ResponseBody:       "5",
+			ResponseBody:       5,
+			ResponseStatusCode: http.StatusOK,
+		})
+		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+			Path:               "/mockserver-bridge",
+			Method:             http.MethodPost,
+			ResponseBody:       5,
 			ResponseStatusCode: http.StatusOK,
 		})
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
