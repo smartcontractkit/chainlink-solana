@@ -21,8 +21,8 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250321174931-193fcd25d0c1
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250322131411-c7a8d6a077bf
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250410125236-08f79ba05c14
-	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250410125236-08f79ba05c14
+	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250411142347-07e018599eea
+	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250411142347-07e018599eea
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
 	github.com/smartcontractkit/libocr v0.0.0-20250220133800-f3b940c4f298
 	github.com/stretchr/testify v1.10.0
