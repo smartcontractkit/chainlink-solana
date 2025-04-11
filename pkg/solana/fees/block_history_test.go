@@ -238,7 +238,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
-		cfg.On("BlockHistoryCacheLoadBatch").Return(uint64(len(testBlocks)-1)) // Set cache load batch smaller than depth to simulate partial cache
+		cfg.On("BlockHistoryCacheLoadBatch").Return(uint64(len(testBlocks) - 1)) // Set cache load batch smaller than depth to simulate partial cache
 		estimator := initializeEstimator(ctx, t, partialCacheRWLoader, cfg, logger.Test(t))
 
 		// tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated") // wait for first run loop to finish
