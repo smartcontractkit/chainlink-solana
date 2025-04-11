@@ -12,10 +12,6 @@ import (
 	"github.com/lib/pq"
 	"gopkg.in/guregu/null.v4"
 
-	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
-	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
@@ -26,6 +22,11 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+
+	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
+	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 )
 
 type Common struct {

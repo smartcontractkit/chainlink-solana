@@ -18,10 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
@@ -29,6 +25,11 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+
+	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 )
 
 type OCRv2TestState struct {
