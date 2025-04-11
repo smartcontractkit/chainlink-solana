@@ -20,6 +20,7 @@ import (
 
 	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 
 	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -44,9 +45,10 @@ type OCRv2TestState struct {
 }
 
 type Clients struct {
-	SolanaClient    *solclient.Client
-	KillgraveClient *test_env_ctf.Killgrave
+	SolanaClient *solclient.Client
+	// KillgraveClient *test_env_ctf.Killgrave
 	ChainlinkClient *ChainlinkClient
+	ParrotClient    *test_env_ctf.Parrot
 }
 
 type ChainlinkClient struct {
@@ -158,13 +160,24 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
-			Killgrave:        env.MockAdapter,
+			// Killgrave:        env.MockAdapter,
+			Parrot: env.MockAdapter,
 		}
 		// Setting up Mock adapter
-		m.Clients.KillgraveClient = env.MockAdapter
-		m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		m.Clients.ParrotClient = env.MockAdapter
+		// m.Clients.KillgraveClient = env.MockAdapter
+		// m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
-		err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
+		for _, method := range []string{http.MethodGet, http.MethodPost} {
+			m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+				Method:             method,
+				Path:               "/mockserver-bridge",
+				RawResponseBody:    "5",
+				ResponseStatusCode: http.StatusOK,
+			})
+		}
+		// err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 	}
 
