@@ -46,7 +46,7 @@ type OCRv2TestState struct {
 
 type Clients struct {
 	SolanaClient    *solclient.Client
-	KillgraveClient *test_env_ctf.Parrot
+	ParrotClient *test_env_ctf.Parrot
 	ChainlinkClient *ChainlinkClient
 }
 
@@ -159,15 +159,18 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
-			Killgrave:        env.MockAdapter,
+			Parrot:        env.MockAdapter,
 		}
 		// Setting up Mock adapter
-		m.Clients.KillgraveClient = env.MockAdapter
-		m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		m.Clients.ParrotClient = env.MockAdapter
+		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
-		err = m.Clients.KillgraveClient.SetAdapterRoute(&parrot.Route{Method: "/mockserver-bridge", Path: http.MethodGet, ResponseBody: 5})
-		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
-		err = m.Clients.KillgraveClient.SetAdapterRoute(&parrot.Route{Method: "/mockserver-bridge", Path: http.MethodPost, ResponseBody: 5})
+		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+			Path:       "/mockserver-bridge",
+			Method:         http.MethodGet,
+			ResponseBody: 5,
+			ResponseStatusCode: http.StatusOK,
+		})
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 	}
 
