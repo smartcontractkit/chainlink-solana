@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -20,7 +21,7 @@ import (
 
 func TestNodeSuccess(t *testing.T) {
 	zeroAddress := solana.PublicKey{}
-	ctx := t.Context()
+	ctx := context.Background()
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	m := mocks.NewNodeSuccess(t)
 	m.On("Add", mock.Anything, mock.Anything).Once()

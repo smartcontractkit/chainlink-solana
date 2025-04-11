@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 func TestTxResultsSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	factory := NewTxResultsSourceFactory(cr, lgr)
 	assert.Equal(t, txresultsType, factory.GetType())

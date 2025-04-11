@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 func TestSlotHeightSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	factory := NewSlotHeightSourceFactory(cr, lgr)
 	assert.Equal(t, types.SlotHeightType, factory.GetType())

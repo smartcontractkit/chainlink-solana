@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -18,7 +19,7 @@ import (
 )
 
 func TestNodeBalances(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	factory := NewNodeBalancesFactory(lgr, metrics.NewNodeBalances)
 

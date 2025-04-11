@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -18,7 +19,7 @@ import (
 func TestNetworkFeesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	factory := NewNetworkFeesSourceFactory(cr, lgr)
 	assert.Equal(t, types.NetworkFeesType, factory.GetType())

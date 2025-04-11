@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestNetworkFees(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 	m := mocks.NewNetworkFees(t)
 	m.On("Set", mock.Anything, mock.Anything).Once()
 	m.On("Cleanup").Once()

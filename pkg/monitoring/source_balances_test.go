@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -25,7 +26,7 @@ import (
 func TestFeedBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	factory := NewFeedBalancesSourceFactory(cr, lgr)
 	assert.Equal(t, types.BalanceType, factory.GetType())
@@ -77,7 +78,7 @@ func TestFeedBalancesSource(t *testing.T) {
 func TestBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	b := balancesSource{
 		client: cr,
@@ -133,7 +134,7 @@ func TestBalancesSource(t *testing.T) {
 func TestNodeBalancesSource(t *testing.T) {
 	cr := mocks.NewChainReader(t)
 	lgr := logger.Test(t)
-	ctx := t.Context()
+	ctx := context.Background()
 	key := solana.PublicKey{1}
 
 	factory := NewNodeBalancesSourceFactory(cr, lgr)

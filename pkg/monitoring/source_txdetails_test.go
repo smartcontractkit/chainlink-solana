@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestTxDetailsSource(t *testing.T) {
 
 	// empty response
 	cr.On("GetSignaturesForAddressWithOpts", mock.Anything, mock.Anything, mock.Anything).Return([]*rpc.TransactionSignature{}, nil).Once()
-	res, err := s.Fetch(t.Context())
+	res, err := s.Fetch(context.Background())
 	require.NoError(t, err)
 	data := testutils.ParseTxDetails(t, res)
 	assert.Equal(t, 0, len(data))
@@ -46,7 +47,7 @@ func TestTxDetailsSource(t *testing.T) {
 		{},
 	}, nil).Once()
 	cr.On("GetTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
-	res, err = s.Fetch(t.Context())
+	res, err = s.Fetch(context.Background())
 	require.NoError(t, err)
 	data = testutils.ParseTxDetails(t, res)
 	assert.Equal(t, 0, len(data)) // ignores tx
@@ -62,7 +63,7 @@ func TestTxDetailsSource(t *testing.T) {
 		Transaction: &rpc.TransactionResultEnvelope{},
 		Meta:        &rpc.TransactionMeta{},
 	}, nil).Once()
-	res, err = s.Fetch(t.Context())
+	res, err = s.Fetch(context.Background())
 	require.NoError(t, err)
 	data = testutils.ParseTxDetails(t, res)
 	assert.Equal(t, 0, len(data)) // ignores tx
@@ -75,7 +76,7 @@ func TestTxDetailsSource(t *testing.T) {
 		{},
 	}, nil).Once()
 	cr.On("GetTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&rpcResponse, nil).Once()
-	res, err = s.Fetch(t.Context())
+	res, err = s.Fetch(context.Background())
 	require.NoError(t, err)
 	data = testutils.ParseTxDetails(t, res)
 	assert.Equal(t, 1, len(data))

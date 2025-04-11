@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestReportObservations(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	m := mocks.NewReportObservations(t)
 	m.On("SetCount", mock.Anything, mock.Anything).Once()
