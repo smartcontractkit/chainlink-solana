@@ -18,20 +18,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
-	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
-
-	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
+	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
+	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 type OCRv2TestState struct {
@@ -46,7 +43,7 @@ type OCRv2TestState struct {
 
 type Clients struct {
 	SolanaClient    *solclient.Client
-	KillgraveClient *test_env_ctf.Parrot
+	KillgraveClient *testenvctf.Parrot
 	ChainlinkClient *ChainlinkClient
 }
 
@@ -129,7 +126,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	} else {
 		env, err := test_env.NewTestEnv()
 		require.NoError(m.Config.T, err)
-		sol := test_env_sol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
+		sol := testenvsol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
 		err = sol.StartContainer()
 		require.NoError(m.Config.T, err)
 
