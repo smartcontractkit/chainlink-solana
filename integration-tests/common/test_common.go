@@ -167,18 +167,20 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Clients.ParrotClient = env.MockAdapter
 		// m.Clients.KillgraveClient = env.MockAdapter
 		// m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		// should we try external endpoint?
 		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
-			m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+			err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
 				Method:             method,
 				Path:               "/mockserver-bridge",
 				RawResponseBody:    "5",
 				ResponseStatusCode: http.StatusOK,
 			})
+			require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 		}
 		// err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
-		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
+
 	}
 
 	m.SetupClients()
