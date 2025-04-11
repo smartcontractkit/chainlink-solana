@@ -117,7 +117,7 @@ func (bhe *blockHistoryEstimator) readRawPrice() uint64 {
 func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 	switch {
 	case bhe.cfg.BlockHistorySize() > 1:
-		if err := bhe.populateCache(ctx, bhe.cfg.BlockHistoryCacheLoadBatch(), bhe.cfg.BlockHistorySize()); err != nil {
+		if err := bhe.populateCache(ctx, bhe.cfg.BlockHistoryBatchLoadSize(), bhe.cfg.BlockHistorySize()); err != nil {
 			return fmt.Errorf("failed to populate cache: %w", err)
 		}
 		return bhe.calculatePriceFromMultipleBlocks(bhe.cfg.BlockHistorySize())

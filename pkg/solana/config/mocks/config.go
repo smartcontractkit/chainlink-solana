@@ -67,12 +67,12 @@ func (_c *Config_BalancePollPeriod_Call) RunAndReturn(run func() time.Duration) 
 	return _c
 }
 
-// BlockHistoryCacheLoadBatch provides a mock function with no fields
-func (_m *Config) BlockHistoryCacheLoadBatch() uint64 {
+// BlockHistoryBatchLoadSize provides a mock function with no fields
+func (_m *Config) BlockHistoryBatchLoadSize() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for BlockHistoryCacheLoadBatch")
+		panic("no return value specified for BlockHistoryBatchLoadSize")
 	}
 
 	var r0 uint64
@@ -85,29 +85,29 @@ func (_m *Config) BlockHistoryCacheLoadBatch() uint64 {
 	return r0
 }
 
-// Config_BlockHistoryCacheLoadBatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockHistoryCacheLoadBatch'
-type Config_BlockHistoryCacheLoadBatch_Call struct {
+// Config_BlockHistoryBatchLoadSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockHistoryBatchLoadSize'
+type Config_BlockHistoryBatchLoadSize_Call struct {
 	*mock.Call
 }
 
-// BlockHistoryCacheLoadBatch is a helper method to define mock.On call
-func (_e *Config_Expecter) BlockHistoryCacheLoadBatch() *Config_BlockHistoryCacheLoadBatch_Call {
-	return &Config_BlockHistoryCacheLoadBatch_Call{Call: _e.mock.On("BlockHistoryCacheLoadBatch")}
+// BlockHistoryBatchLoadSize is a helper method to define mock.On call
+func (_e *Config_Expecter) BlockHistoryBatchLoadSize() *Config_BlockHistoryBatchLoadSize_Call {
+	return &Config_BlockHistoryBatchLoadSize_Call{Call: _e.mock.On("BlockHistoryBatchLoadSize")}
 }
 
-func (_c *Config_BlockHistoryCacheLoadBatch_Call) Run(run func()) *Config_BlockHistoryCacheLoadBatch_Call {
+func (_c *Config_BlockHistoryBatchLoadSize_Call) Run(run func()) *Config_BlockHistoryBatchLoadSize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *Config_BlockHistoryCacheLoadBatch_Call) Return(_a0 uint64) *Config_BlockHistoryCacheLoadBatch_Call {
+func (_c *Config_BlockHistoryBatchLoadSize_Call) Return(_a0 uint64) *Config_BlockHistoryBatchLoadSize_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *Config_BlockHistoryCacheLoadBatch_Call) RunAndReturn(run func() uint64) *Config_BlockHistoryCacheLoadBatch_Call {
+func (_c *Config_BlockHistoryBatchLoadSize_Call) RunAndReturn(run func() uint64) *Config_BlockHistoryBatchLoadSize_Call {
 	_c.Call.Return(run)
 	return _c
 }
