@@ -168,7 +168,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		// m.Clients.KillgraveClient = env.MockAdapter
 		// m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
 		// should we try external endpoint?
-		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
+		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.ExternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
