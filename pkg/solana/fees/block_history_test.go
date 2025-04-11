@@ -174,8 +174,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 	// Extract slots and compute unit prices from the blocks
 	// We'll consider the last 'BlockHistorySize' blocks
-	var testSlots []uint64
-	var testPrices []ComputeUnitPrice
+	testSlots := make([]uint64, 0, len(testBlocks))
+	testPrices := make([]ComputeUnitPrice, 0, len(testBlocks))
 	startIndex := len(testBlocks) - int(depth)
 	testBlocks = testBlocks[startIndex:]
 	for _, block := range testBlocks {
@@ -216,6 +216,39 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth))
 		assert.Equal(t, uint64(multipleBlocksAvg), estimator.BaseComputeUnitPrice())
+	})
+
+	t.Run("Successful Estimation with partial cache fill", func(t *testing.T) {
+		// lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
+		partialCacheRW := clientmock.NewReaderWriter(t)
+		partialCacheRWLoader := func(ctx context.Context) (client.ReaderWriter, error) { return partialCacheRW, nil }
+		partialCacheRW.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		testSlotsResult := rpc.BlocksResult(testSlots[1:])
+		partialCacheRW.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+		for i, slot := range testSlots {
+			// Skip mocking the oldest block fetch because of partial load
+			if i == 0 {
+				continue
+			}
+			partialCacheRW.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+		}
+
+		// Setup
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
+		cfg.On("BlockHistoryCacheLoadBatch").Return(uint64(len(testBlocks)-1)) // Set cache load batch smaller than depth to simulate partial cache
+		estimator := initializeEstimator(ctx, t, partialCacheRWLoader, cfg, logger.Test(t))
+
+		// tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated") // wait for first run loop to finish
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
+		// Calculated avg price should be equal to the one extracted manually from the blocks.
+		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth))
+		// Avg of block medians for the 2 latest blocks only due to partial cache fill
+		assert.Equal(t, uint64(30250), estimator.BaseComputeUnitPrice())
 	})
 
 	t.Run("Min Gate: Price Should Be Floored at Min", func(t *testing.T) {
