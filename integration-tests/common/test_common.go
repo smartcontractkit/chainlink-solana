@@ -166,6 +166,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		err = m.Clients.KillgraveClient.SetAdapterRoute(&parrot.Route{Method: "/mockserver-bridge", Path: http.MethodGet, ResponseBody: 5})
+		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 		err = m.Clients.KillgraveClient.SetAdapterRoute(&parrot.Route{Method: "/mockserver-bridge", Path: http.MethodPost, ResponseBody: 5})
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 	}
