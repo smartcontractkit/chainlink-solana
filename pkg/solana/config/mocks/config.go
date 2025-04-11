@@ -157,6 +157,51 @@ func (_c *Config_BlockHistorySize_Call) RunAndReturn(run func() uint64) *Config_
 	return _c
 }
 
+// BlockTime provides a mock function with no fields
+func (_m *Config) BlockTime() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BlockTime")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// Config_BlockTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockTime'
+type Config_BlockTime_Call struct {
+	*mock.Call
+}
+
+// BlockTime is a helper method to define mock.On call
+func (_e *Config_Expecter) BlockTime() *Config_BlockTime_Call {
+	return &Config_BlockTime_Call{Call: _e.mock.On("BlockTime")}
+}
+
+func (_c *Config_BlockTime_Call) Run(run func()) *Config_BlockTime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_BlockTime_Call) Return(_a0 time.Duration) *Config_BlockTime_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_BlockTime_Call) RunAndReturn(run func() time.Duration) *Config_BlockTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Commitment provides a mock function with no fields
 func (_m *Config) Commitment() rpc.CommitmentType {
 	ret := _m.Called()
@@ -558,6 +603,51 @@ func (_c *Config_FeeEstimatorMode_Call) Return(_a0 string) *Config_FeeEstimatorM
 }
 
 func (_c *Config_FeeEstimatorMode_Call) RunAndReturn(run func() string) *Config_FeeEstimatorMode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogPollerStartingLookback provides a mock function with no fields
+func (_m *Config) LogPollerStartingLookback() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerStartingLookback")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// Config_LogPollerStartingLookback_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerStartingLookback'
+type Config_LogPollerStartingLookback_Call struct {
+	*mock.Call
+}
+
+// LogPollerStartingLookback is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerStartingLookback() *Config_LogPollerStartingLookback_Call {
+	return &Config_LogPollerStartingLookback_Call{Call: _e.mock.On("LogPollerStartingLookback")}
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) Run(run func()) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) Return(_a0 time.Duration) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerStartingLookback_Call) RunAndReturn(run func() time.Duration) *Config_LogPollerStartingLookback_Call {
 	_c.Call.Return(run)
 	return _c
 }
