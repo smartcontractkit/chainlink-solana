@@ -219,7 +219,6 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	})
 
 	t.Run("Successful Estimation with partial cache fill", func(t *testing.T) {
-		// lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 		partialCacheRW := clientmock.NewReaderWriter(t)
 		partialCacheRWLoader := func(ctx context.Context) (client.ReaderWriter, error) { return partialCacheRW, nil }
 		partialCacheRW.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
@@ -241,7 +240,6 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg.On("BlockHistoryBatchLoadSize").Return(uint64(len(testBlocks) - 1)) // Set cache load batch smaller than depth to simulate partial cache
 		estimator := initializeEstimator(ctx, t, partialCacheRWLoader, cfg, logger.Test(t))
 
-		// tests.AssertLogEventually(t, logs, "BlockHistoryEstimator: updated") // wait for first run loop to finish
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, pollPeriod)
 
@@ -379,6 +377,62 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Price should remain unchanged
 		require.EqualError(t, estimator.calculatePriceFromMultipleBlocks(depth), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
+	})
+
+	t.Run("Cache successfully cleared of excess blocks", func(t *testing.T) {
+		block1Slot := testSlots[0]
+		block2Slot := testSlots[1]
+		block3Slot := testSlots[2]
+		olderEstimate := uint64(58750) // median price of oldest 2 blocks
+		newerEstimate := uint64(30250) // median price of latest 2 blocks
+		cleanCacheRw := clientmock.NewReaderWriter(t)
+		cleanCacheRWLoader := func(ctx context.Context) (client.ReaderWriter, error) { return cleanCacheRw, nil }
+		// Return second to last block as highest block
+		cleanCacheRw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-2], nil).Once()
+		// Return the oldest 2 blocks when get blocks is first called
+		testSlotsResult := rpc.BlocksResult(testSlots[:2])
+		cleanCacheRw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil).Once()
+		for i, slot := range testSlots {
+			cleanCacheRw.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+		}
+
+		// Setup
+		cfg := cfgmock.NewConfig(t)
+		smallerDepth := len(testSlots)-1
+		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, uint64(smallerDepth))
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
+		estimator := initializeEstimator(ctx, t, cleanCacheRWLoader, cfg, logger.Test(t))
+
+		// Wait for estimator to estimate price on the older 2 blocks
+		require.Eventually(t, func() bool {
+			return estimator.BaseComputeUnitPrice() == olderEstimate
+		}, 2*pollPeriod, 1*time.Second)
+
+		estimator.cacheMu.RLock()
+		require.Len(t, estimator.cache.storedBlockRange, smallerDepth)
+		require.Len(t, estimator.cache.medianMap, smallerDepth)
+		require.Contains(t, estimator.cache.medianMap, block1Slot)
+		require.Contains(t, estimator.cache.medianMap, block2Slot)
+		estimator.cacheMu.RUnlock()
+
+		// Return second to last block as highest block
+		cleanCacheRw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		// Return the latest 2 blocks when get blocks is called again
+		testSlotsResult = rpc.BlocksResult(testSlots[1:])
+		cleanCacheRw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+
+		// Wait for estimator to estimate price on the latest 2 blocks
+		require.Eventually(t, func() bool {
+			return estimator.BaseComputeUnitPrice() == newerEstimate
+		}, 2*pollPeriod, 1*time.Second)
+		estimator.cacheMu.RLock()
+		require.Len(t, estimator.cache.storedBlockRange, smallerDepth)
+		require.Len(t, estimator.cache.medianMap, smallerDepth)
+		require.Contains(t, estimator.cache.medianMap, block2Slot)
+		require.Contains(t, estimator.cache.medianMap, block3Slot)
+		estimator.cacheMu.RUnlock()
 	})
 }
 

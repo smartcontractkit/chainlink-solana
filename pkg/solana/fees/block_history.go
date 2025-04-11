@@ -54,7 +54,7 @@ func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, erro
 		cfg:    cfg,
 		lgr:    lgr,
 		price:  cfg.ComputeUnitPriceDefault(), // use default value
-		cache:  blockMedianCache{medianMap: make(map[uint64]ComputeUnitPrice)},
+		cache:  blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
 	}, nil
 }
 
@@ -188,7 +188,8 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(desiredBlockC
 		return fmt.Errorf("failed to calculate price from avg of medians: %w", err)
 	}
 
-	// Update the current price to the calculated average (avg of medians of the last desiredBlockCount)
+	// Update the current price to the calculated average
+	// The calculated average could be over a smaller range of blocks than desiredBlockCount if cache is partially filled during startup
 	bhe.lock.Lock()
 	bhe.price = uint64(avgOfMedians)
 	bhe.lock.Unlock()
@@ -209,7 +210,7 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 		return fmt.Errorf("failed to get client: %w", err)
 	}
 
-	// Fetch the latest slot
+	// Fetch the latest slot for processed commitment
 	currentSlot, err := c.SlotHeight(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current slot: %w", err)
@@ -221,7 +222,7 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 	}
 	startSlot := currentSlot - batch + 1
 
-	// Fetch the last confirmed block slots
+	// Fetch the latest slots with blocks for the configured commitment level
 	confirmedSlots, err := c.GetBlocksWithLimit(ctx, startSlot, batch)
 	if err != nil {
 		return fmt.Errorf("failed to get blocks with limit: %w", err)
