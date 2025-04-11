@@ -58,8 +58,8 @@ type ChainDetails struct {
 
 type SolCLClusterTestEnv struct {
 	*test_env.CLClusterTestEnv
-	Sol       *testenvsol.Solana
-	Killgrave *ctftestenv.Parrot
+	Sol    *testenvsol.Solana
+	Parrot *ctftestenv.Parrot
 }
 
 type AccountDetails struct {
