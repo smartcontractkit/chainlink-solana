@@ -159,16 +159,16 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
-			Parrot:        env.MockAdapter,
+			Parrot:           env.MockAdapter,
 		}
 		// Setting up Mock adapter
 		m.Clients.ParrotClient = env.MockAdapter
 		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
-			Path:       "/mockserver-bridge",
-			Method:         http.MethodGet,
-			ResponseBody: 5,
+			Path:               "/mockserver-bridge",
+			Method:             http.MethodGet,
+			ResponseBody:       "5",
 			ResponseStatusCode: http.StatusOK,
 		})
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
