@@ -75,9 +75,6 @@ func (b *eventReadBinding) Bind(ctx context.Context, address solana.PublicKey) e
 
 	b.filter.SetAddress(address)
 
-	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
-	b.filter.SetName(newName)
-
 	if !b.filter.Dirty() {
 		return nil
 	}
@@ -117,6 +114,9 @@ func (b *eventReadBinding) Register(ctx context.Context) error {
 	if !b.bound {
 		return nil
 	}
+
+	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	b.filter.SetName(newName)
 
 	return b.filter.Register(ctx, b.reader)
 }
