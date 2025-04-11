@@ -399,7 +399,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 		// Setup
 		cfg := cfgmock.NewConfig(t)
-		smallerDepth := len(testSlots)-1
+		smallerDepth := len(testSlots) - 1
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, uint64(smallerDepth))
 		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
 		estimator := initializeEstimator(ctx, t, cleanCacheRWLoader, cfg, logger.Test(t))
