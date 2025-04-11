@@ -199,6 +199,15 @@ func setFromChain(c, f *Chain) {
 	if f.LogPollerStartingLookback != nil {
 		c.LogPollerStartingLookback = f.LogPollerStartingLookback
 	}
+	if f.BlockHistoryBatchLoadSize != nil {
+		c.BlockHistoryBatchLoadSize = f.BlockHistoryBatchLoadSize
+	}
+	if f.ComputeUnitLimitDefault != nil {
+		c.ComputeUnitLimitDefault = f.ComputeUnitLimitDefault
+	}
+	if f.EstimateComputeUnitLimit != nil {
+		c.EstimateComputeUnitLimit = f.EstimateComputeUnitLimit
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -312,6 +321,10 @@ func (c *TOMLConfig) BlockHistoryPollPeriod() time.Duration {
 
 func (c *TOMLConfig) BlockHistorySize() uint64 {
 	return *c.Chain.BlockHistorySize
+}
+
+func (c *TOMLConfig) BlockHistoryBatchLoadSize() uint64 {
+	return *c.Chain.BlockHistoryBatchLoadSize
 }
 
 func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
