@@ -73,6 +73,7 @@ func (b *eventReadBinding) Bind(ctx context.Context, address solana.PublicKey) e
 		return nil
 	}
 
+	b.filter.SetName(fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString()))
 	b.filter.SetAddress(address)
 
 	if !b.filter.Dirty() {
