@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+	"github.com/smartcontractkit/chainlink-framework/metrics"
 )
 
 func TestShouldPublishDurationInCaseOfError(t *testing.T) {
@@ -64,8 +65,8 @@ func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
 
 func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 	orm := createObservedORM(t, chainID)
-	require.NoError(t, withObservedExec(orm, "execQuery", create, func() error { return nil }))
-	require.Error(t, withObservedExec(orm, "execQuery", create, func() error { return fmt.Errorf("error") }))
+	require.NoError(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return nil }))
+	require.Error(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return fmt.Errorf("error") }))
 	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, chainID, "execQuery", "create"))
 }
 

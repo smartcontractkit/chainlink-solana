@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.24.0
+go 1.24.1
 
 require (
 	github.com/cometbft/cometbft v0.38.17
@@ -17,11 +17,12 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4
 	github.com/pelletier/go-toml/v2 v2.2.3
-	github.com/prometheus/client_golang v1.21.0
+	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250321174931-193fcd25d0c1
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250322131411-c7a8d6a077bf
 	github.com/smartcontractkit/chainlink-common v0.5.1-0.20250326142120-b155bad9aee1
+	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250409154532-bd22b0ad92e9
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
 	github.com/smartcontractkit/libocr v0.0.0-20250220133800-f3b940c4f298
 	github.com/stretchr/testify v1.10.0
@@ -64,7 +65,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/flatbuffers v24.12.23+incompatible // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
