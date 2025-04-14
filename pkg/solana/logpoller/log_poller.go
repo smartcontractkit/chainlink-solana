@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 var (
@@ -83,9 +85,11 @@ type Service struct {
 	loader            logsLoader
 	filters           filtersI
 	processBlocks     func(ctx context.Context, blocks []Block) error
+	blockTime         time.Duration
+	startingLookback  time.Duration
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
+func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *Service {
 	lp := &Service{
 		orm:    orm,
 		client: cl,
@@ -106,11 +110,14 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
 	lp.lggr = lp.eng.SugaredLogger
 	lp.replay.status = ReplayStatusNoRequest
 
+	lp.startingLookback = cfg.LogPollerStartingLookback()
+	lp.blockTime = cfg.BlockTime()
+
 	return lp
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
-	lp := New(lggr, orm, client)
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
+	lp := New(lggr, orm, client, cfg)
 	lp.processBlocks = processBlocks
 	return lp
 }
@@ -118,7 +125,7 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 const BackgroundWorkerInterval = 10 * time.Minute
 
 func (lp *Service) start(_ context.Context) error {
-	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
+	lp.eng.GoTick(services.NewTicker(2*lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
@@ -287,31 +294,32 @@ func (lp *Service) ReplayStatus() ReplayStatus {
 	return lp.replay.status
 }
 
-func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
-	if lp.lastProcessedSlot != 0 {
-		return lp.lastProcessedSlot, nil
+func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int64, err error) {
+	lastProcessed = lp.lastProcessedSlot
+	if lastProcessed > 0 {
+		return lastProcessed, nil
 	}
 
-	latestDBBlock, err := lp.orm.GetLatestBlock(ctx)
-	if err == nil {
-		return latestDBBlock, nil
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("error getting latest block from db: %w", err)
-	}
-
-	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	lastProcessed, err = lp.orm.GetLatestBlock(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("error getting latest block from db: %w", err)
+		}
+		lastProcessed = 0
 	}
 
-	if latestFinalizedSlot == 0 {
-		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	var lookbackSlot int64
+	lookbackSlot, err = lp.computeLookbackWindow(ctx)
+	if err != nil {
+		return 0, err
 	}
-	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(latestFinalizedSlot) - 1, nil //
+	if lookbackSlot > lastProcessed {
+		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		return lookbackSlot, nil
+	}
+	lp.lggr.Infof("last processed slot %d is older than lookback window, skipping ahead to slot %d", lastProcessed, lookbackSlot)
+
+	return lastProcessed, nil
 }
 
 // checkForReplayRequest checks whether there have been any new replay requests since it was last called,
@@ -524,4 +532,40 @@ func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 
 func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
+}
+
+func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
+	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+	}
+
+	if latestFinalizedSlot == 0 {
+		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	}
+
+	lookback := lp.startingLookback
+
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	latestSlot := int64(latestFinalizedSlot)
+	lookbackSlot := latestSlot - int64((lookback-1)/lp.blockTime) - 1 // = latestSlot - ceil(lookback/blockTime)
+
+	firstAvailableSlot, err := lp.client.GetFirstAvailableBlock(ctx) // Despite the name, this returns slot # not block number
+	if err != nil {
+		// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
+		lp.lggr.Warnf("Failed to get first available slot, starting at lookback slot %d from %v ago: %s", lookbackSlot, lookback, err.Error())
+		return lookbackSlot, nil
+	}
+
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	firstSlot := int64(firstAvailableSlot)
+	if firstSlot > lookbackSlot {
+		lookbackSlot = firstSlot
+		lp.lggr.Infof("First available slot %d is more recent than slot %d from %v ago, using first available slot as lookback slot", firstSlot, lookbackSlot, lookback)
+		return lookbackSlot, nil
+	}
+	lp.lggr.Infof("First available slot %d is older than lookback window, using lookback slot = %d from %v ago", firstSlot, lookbackSlot, lookback)
+	return lookbackSlot, nil
 }

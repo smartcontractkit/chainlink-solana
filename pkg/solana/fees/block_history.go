@@ -3,6 +3,8 @@ package fees
 import (
 	"context"
 	"fmt"
+	"math"
+	"slices"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -28,6 +30,14 @@ type blockHistoryEstimator struct {
 
 	price uint64
 	lock  sync.RWMutex
+
+	cache   blockMedianCache
+	cacheMu sync.RWMutex
+}
+
+type blockMedianCache struct {
+	storedBlockRange []uint64
+	medianMap        map[uint64]ComputeUnitPrice // block num to median
 }
 
 // NewBlockHistoryEstimator creates a new fee estimator that parses historical fees from a fetched block
@@ -44,6 +54,7 @@ func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, erro
 		cfg:    cfg,
 		lgr:    lgr,
 		price:  cfg.ComputeUnitPriceDefault(), // use default value
+		cache:  blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
 	}, nil
 }
 
@@ -106,7 +117,10 @@ func (bhe *blockHistoryEstimator) readRawPrice() uint64 {
 func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 	switch {
 	case bhe.cfg.BlockHistorySize() > 1:
-		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistorySize())
+		if err := bhe.populateCache(ctx, bhe.cfg.BlockHistoryBatchLoadSize(), bhe.cfg.BlockHistorySize()); err != nil {
+			return fmt.Errorf("failed to populate cache: %w", err)
+		}
+		return bhe.calculatePriceFromMultipleBlocks(bhe.cfg.BlockHistorySize())
 	default:
 		return bhe.calculatePriceFromLatestBlock(ctx)
 	}
@@ -155,27 +169,61 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 	return nil
 }
 
-func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context, desiredBlockCount uint64) error {
+func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(desiredBlockCount uint64) error {
+	bhe.cacheMu.RLock()
+	defer bhe.cacheMu.RUnlock()
+	blockMedians := make([]ComputeUnitPrice, 0, desiredBlockCount)
+
+	if len(bhe.cache.medianMap) == 0 {
+		return errNoComputeUnitPriceCollected
+	}
+
+	for _, median := range bhe.cache.medianMap {
+		blockMedians = append(blockMedians, median)
+	}
+
+	// Calculate avg from medians of the blocks.
+	avgOfMedians, err := mathutil.Avg(blockMedians...)
+	if err != nil {
+		return fmt.Errorf("failed to calculate price from avg of medians: %w", err)
+	}
+
+	// Update the current price to the calculated average
+	// The calculated average could be over a smaller range of blocks than desiredBlockCount if cache is partially filled during startup
+	bhe.lock.Lock()
+	bhe.price = uint64(avgOfMedians)
+	bhe.lock.Unlock()
+
+	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
+		"computeUnitPriceAvg", avgOfMedians,
+		"numBlocks", len(blockMedians),
+	)
+
+	return nil
+}
+
+func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, desiredBlockCount uint64) error {
+	batch := uint64(math.Min(float64(loadBatch), float64(desiredBlockCount)))
 	// fetch client
 	c, err := bhe.client(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get client: %w", err)
 	}
 
-	// Fetch the latest slot
+	// Fetch the latest slot for processed commitment
 	currentSlot, err := c.SlotHeight(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current slot: %w", err)
 	}
 
 	// Determine the starting slot for fetching blocks
-	if currentSlot < desiredBlockCount {
+	if currentSlot < batch {
 		return fmt.Errorf("current slot is less than desired block count")
 	}
-	startSlot := currentSlot - desiredBlockCount + 1
+	startSlot := currentSlot - batch + 1
 
-	// Fetch the last confirmed block slots
-	confirmedSlots, err := c.GetBlocksWithLimit(ctx, startSlot, desiredBlockCount)
+	// Fetch the latest slots with blocks for the configured commitment level
+	confirmedSlots, err := c.GetBlocksWithLimit(ctx, startSlot, batch)
 	if err != nil {
 		return fmt.Errorf("failed to get blocks with limit: %w", err)
 	}
@@ -183,13 +231,19 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 	// limit concurrency (avoid hitting rate limits)
 	semaphore := make(chan struct{}, 10)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	blockMedians := make([]ComputeUnitPrice, 0, desiredBlockCount)
 
 	// Iterate over the confirmed slots in reverse order to fetch most recent blocks first
 	// Iterate until we run out of slots
 	for i := len(*confirmedSlots) - 1; i >= 0; i-- {
 		slot := (*confirmedSlots)[i]
+
+		// If median already exists for slot, skip fetching block
+		bhe.cacheMu.RLock()
+		_, exists := bhe.cache.medianMap[slot]
+		bhe.cacheMu.RUnlock()
+		if exists {
+			continue
+		}
 
 		wg.Add(1)
 		go func(s uint64) {
@@ -229,38 +283,30 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.C
 				return
 			}
 
-			// Append the median compute unit price if we haven't reached our desiredBlockCount
-			mu.Lock()
-			defer mu.Unlock()
-			if uint64(len(blockMedians)) < desiredBlockCount {
-				blockMedians = append(blockMedians, blockMedian)
-			}
+			// Store the block median price in cache
+			bhe.cacheMu.Lock()
+			bhe.cache.medianMap[s] = blockMedian
+			bhe.cache.storedBlockRange = append(bhe.cache.storedBlockRange, s)
+			bhe.cacheMu.Unlock()
 		}(slot)
 	}
 
 	wg.Wait()
 
-	if len(blockMedians) == 0 {
-		return errNoComputeUnitPriceCollected
+	bhe.cacheMu.Lock()
+	defer bhe.cacheMu.Unlock()
+	excessBlocks := len(bhe.cache.storedBlockRange) - int(desiredBlockCount) //nolint:gosec // block history size cannot reasonably exceed int max
+	// Return early if cache size does not exceed the desired block count
+	if excessBlocks <= 0 {
+		return nil
 	}
-
-	// Calculate avg from medians of the blocks.
-	avgOfMedians, err := mathutil.Avg(blockMedians...)
-	if err != nil {
-		return fmt.Errorf("failed to calculate price from avg of medians: %w", err)
+	// Sort stored block nums (oldest to newest)
+	slices.Sort(bhe.cache.storedBlockRange)
+	// Clear out the oldest blocks that exceed the desired block count
+	for i := range excessBlocks {
+		slot := bhe.cache.storedBlockRange[i]
+		delete(bhe.cache.medianMap, slot)
 	}
-
-	// Update the current price to the calculated average (avg of medians of the last desiredBlockCount)
-	bhe.lock.Lock()
-	bhe.price = uint64(avgOfMedians)
-	bhe.lock.Unlock()
-
-	bhe.lgr.Debugw("BlockHistoryEstimator: updated",
-		"computeUnitPriceMedian", avgOfMedians,
-		"latestSlot", currentSlot,
-		"numBlocks", len(blockMedians),
-		"pricesCollected", blockMedians,
-	)
-
+	bhe.cache.storedBlockRange = bhe.cache.storedBlockRange[excessBlocks:]
 	return nil
 }

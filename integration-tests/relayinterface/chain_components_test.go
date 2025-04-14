@@ -667,7 +667,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient(), config.NewDefault()))
 
 	require.NoError(t, err)
 	servicetest.Run(t, svc)
@@ -686,7 +686,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReaderWithCustomCf
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient()))
+		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient(), config.NewDefault()))
 
 	require.NoError(t, err)
 	require.NoError(t, svc.Start(ctx))
