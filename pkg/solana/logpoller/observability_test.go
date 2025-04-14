@@ -43,14 +43,14 @@ func TestMetricsAreProperlyPopulatedWithLabels(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.Equal(t, expectedCount, counterFromHistogramByLabels(t, orm.queryDuration, chainID, "query", "read"))
-	require.Equal(t, expectedSize, counterFromGaugeByLabels(orm.datasetSize, chainID, "query", "read"))
+	require.Equal(t, expectedCount, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "query", "read"))
+	require.Equal(t, expectedSize, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "query", "read"))
 
-	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, chainID, "other_query", "read"))
-	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, "5", "query", "read"))
+	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "other_query", "read"))
+	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, "5", "query", "read"))
 
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainID, "other_query", "read"))
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, "5", "query", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "other_query", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, "5", "query", "read"))
 }
 
 func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
@@ -59,15 +59,15 @@ func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
 	_, err := withObservedQueryAndResults(orm, "errorQuery", func() ([]string, error) { return nil, fmt.Errorf("error") })
 	require.Error(t, err)
 
-	require.Equal(t, 1, counterFromHistogramByLabels(t, orm.queryDuration, chainID, "errorQuery", "read"))
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainID, "errorQuery", "read"))
+	require.Equal(t, 1, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "errorQuery", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "errorQuery", "read"))
 }
 
 func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 	orm := createObservedORM(t, chainID)
 	require.NoError(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return nil }))
 	require.Error(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return fmt.Errorf("error") }))
-	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, chainID, "execQuery", "create"))
+	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "execQuery", "create"))
 }
 
 func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
