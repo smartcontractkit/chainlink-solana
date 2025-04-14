@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/smartcontractkit/chainlink-framework/metrics"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
