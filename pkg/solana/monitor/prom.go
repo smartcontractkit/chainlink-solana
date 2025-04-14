@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -22,10 +23,12 @@ var (
 		prometheus.GaugeOpts{Name: "solana_cache_last_update_unix", Help: "Solana relayer cache last update timestamp"},
 		[]string{"type", "chainID", "account"},
 	)
+	// Deprecated: Use github.com/smartcontractkit/chainlink-framework/metrics.RPCCallLatency instead.
 	promClientReq = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{Name: "solana_client_latency_ms", Help: "Solana client request latency"},
 		[]string{"request", "url"},
 	)
+	ChainFamily = "solana"
 )
 
 func (b *balanceMonitor) updateProm(acc solana.PublicKey, lamports uint64) {
@@ -42,16 +45,19 @@ func SetCacheTimestamp(t time.Time, cacheType, chainID, account string) {
 	}).Set(float64(t.Unix()))
 }
 
-func SetClientLatency(d time.Duration, request, url string) {
+func SetClientLatency(chainID string, d time.Duration, request, url string, err error) {
+	metrics.RPCCallLatency.WithLabelValues(
+		ChainFamily,
+		chainID,
+		url,
+		"false",                        // is send only
+		strconv.FormatBool(err == nil), // is successful
+		request,                        // rpc call name
+	).Observe(float64(d))
+
+	// TODO: Remove deprecated metric
 	promClientReq.With(prometheus.Labels{
 		"request": request,
 		"url":     url,
 	}).Set(float64(d.Milliseconds()))
-}
-
-func GetClientLatency(request, url string) (prometheus.Gauge, error) {
-	return promClientReq.GetMetricWith(prometheus.Labels{
-		"request": request,
-		"url":     url,
-	})
 }
