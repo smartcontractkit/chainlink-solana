@@ -121,11 +121,15 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		if txWithMeta.Meta == nil {
 			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
 		}
-		detail.trxSig = tx.Signatures[0] // according to Solana docs fist signature is used as ID
+		detail.trxSig = tx.Signatures[0] // according to Solana docs first signature is used as ID
 		detail.err = txWithMeta.Meta.Err
 
 		txEvents := j.messagesToEvents(txWithMeta.Meta.LogMessages, detail)
 		events = append(events, txEvents...)
+	}
+
+	if len(events) > 0 {
+		j.lggr.Debug("found %d matching events at slot %d", len(events), j.slotNumber)
 	}
 
 	result := Block{
