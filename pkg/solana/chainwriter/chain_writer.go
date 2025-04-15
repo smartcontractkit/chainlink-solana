@@ -376,6 +376,11 @@ func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, tra
 	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
+func (s *SolanaChainWriterService) GetTransactionFee(ctx context.Context, transactionID string) (*types.TransactionFee, error) {
+	s.lggr.Debugw("Fetching transaction fee", "transactionID", transactionID)
+	return nil, errors.New("getting transaction fee is not available")
+}
+
 // GetFeeComponents retrieves the associated gas costs for executing a transaction.
 func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types.ChainFeeComponents, error) {
 	if s.ge == nil {
