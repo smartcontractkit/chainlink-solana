@@ -21,11 +21,11 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 6 // start logging crit after 12m48s
+	DefaultMaxRetryCount = 13 // give up after 13m40s
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
-	DefaultNotifyRetryDepth = 200
+	DefaultNotifyRetryDepth = 2000
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
-	DefaultNotifyQueueDepth = 100
+	DefaultNotifyQueueDepth = 1000
 	// DefaultWorkerCount is the default number of workers in a Group.
 	DefaultWorkerCount = 10
 )
