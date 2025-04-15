@@ -54,6 +54,7 @@ func prefixBuilder(depth int) string {
 
 func parseProgramLogs(logs []string) []ProgramOutput {
 	var depth int
+	programs := []string{}
 
 	instLogs := []ProgramOutput{}
 	lastLogIdx := -1
@@ -80,7 +81,7 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 
 			if len(dataMatches) > 1 {
 				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
-					Program: instLogs[lastLogIdx].Program,
+					Program: programs[len(programs)-1],
 					Data:    dataMatches[1],
 				})
 			}
@@ -103,8 +104,10 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 				}
 
 				depth++
+				programs = append(programs, matches[1])
 			} else if strings.Contains(log, "success") {
 				depth--
+				programs = programs[:len(programs)-1]
 			} else if strings.Contains(log, "failed") {
 				if lastLogIdx < 0 {
 					continue
@@ -122,6 +125,7 @@ func parseProgramLogs(logs []string) []ProgramOutput {
 				instLogs[lastLogIdx].ErrorText = log[idx:]
 
 				depth--
+				programs = programs[:len(programs)-1]
 			} else {
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{})
