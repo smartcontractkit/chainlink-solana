@@ -241,5 +241,4 @@ func TestLogDataParse_NestedCCIPSend(t *testing.T) {
 	assert.Len(t, output[0].Events, 1)
 	event := output[0].Events[0]
 	require.Equal(t, event.Program, "Ccip8888888888888888888888888888888888888888")
-
 }
