@@ -21,10 +21,10 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
 	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250415202430-83cf01a447d2
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250415230606-1f8dc3a33428
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.0
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.53.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250313143026-98173c12b682
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250313143026-98173c12b682
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250402195829-918b2a02a926
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250416000146-32d1c64d0bec
 	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250415235232-2401aa039a56
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
@@ -69,7 +69,7 @@ require (
 	github.com/aptos-labs/aptos-go-sdk v1.5.0 // indirect
 	github.com/atombender/go-jsonschema v0.16.1-0.20240916205339-a74cd4e2851c // indirect
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
-	github.com/avast/retry-go/v4 v4.6.0 // indirect
+	github.com/avast/retry-go/v4 v4.6.1 // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.7 // indirect
@@ -108,6 +108,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20240821051457-da69c6d9617a // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
+	github.com/cli/go-gh/v2 v2.11.2 // indirect
+	github.com/cli/safeexec v1.0.0 // indirect
 	github.com/cloudevents/sdk-go/binding/format/protobuf/v2 v2.15.2 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.16.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
@@ -282,6 +285,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20250317134145-8bc96cf8fc35 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/manyminds/api2go v0.0.0-20171030193247-e7b693844a6f // indirect
 	github.com/marcboeker/go-duckdb v1.8.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -365,13 +369,13 @@ require (
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250408161305-721208f43882 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250415225858-7c161cbc9ef8 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3 // indirect
-	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250402142912-38edb9d0007e // indirect
+	github.com/smartcontractkit/chainlink-integrations/evm v0.0.0-20250402183906-b7e976bc0c24 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
-	github.com/smartcontractkit/mcms v0.13.0 // indirect
+	github.com/smartcontractkit/mcms v0.14.0 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250318131857-4568a0f8d12d // indirect
@@ -398,7 +402,7 @@ require (
 	github.com/urfave/cli v1.22.14 // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
 	github.com/valyala/fastjson v1.4.1 // indirect
-	github.com/vektah/gqlparser/v2 v2.5.11 // indirect
+	github.com/vektah/gqlparser/v2 v2.5.14 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
