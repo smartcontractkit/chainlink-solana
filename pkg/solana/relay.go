@@ -79,7 +79,8 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if r.chain.Config().WF() != nil {
+		//TODO only "enabled" check
+		if wfCfg := r.chain.Config().WF(); wfCfg.IsEnabled() {
 			if r.capabilitiesRegistry == nil {
 				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
 				return nil
@@ -87,7 +88,7 @@ func (r *Relayer) Start(ctx context.Context) error {
 
 			var info relaytypes.ChainInfo
 
-			if r.chain.Config().WF().Local() {
+			if wfCfg.Local() {
 				info = relaytypes.ChainInfo{
 					FamilyName:      "Solana",
 					ChainID:         r.chain.ID(),
@@ -106,7 +107,7 @@ func (r *Relayer) Start(ctx context.Context) error {
 				return fmt.Errorf("failed to initialise write target capability: %w", err)
 			}
 
-			dr, err := writetarget.NewDeriveRemaining(r.chain, r.chain.MultiClient(), r.chain.Config().WF(), r.lggr)
+			dr, err := writetarget.NewDeriveRemaining(r.chain, r.chain.MultiClient(), wfCfg, r.lggr)
 			if err != nil {
 				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
 			}

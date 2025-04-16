@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -58,6 +60,15 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 		return nil, fmt.Errorf("failed to create target strategy: %+w", err)
 	}
 
+	fromAddr := cfg.FromAddress()
+	if fromAddr == nil {
+		return nil, errors.New("missing from address")
+	}
+	fwdrAddr := cfg.ForwarderAddress()
+	if fwdrAddr == nil {
+		return nil, errors.New("missing forwarder address")
+	}
+
 	opts := writetarget.WriteTargetOpts{
 		ID:     id,
 		Logger: lggr,
@@ -69,8 +80,8 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 		Beholder:             beholder,
 		ChainService:         chain,
 		ConfigValidateFn:     evaluate,
-		NodeAddress:          cfg.FromAddress(),
-		ForwarderAddress:     cfg.ForwarderAddress(),
+		NodeAddress:          fromAddr.String(),
+		ForwarderAddress:     fwdrAddr.String(),
 		TargetStrategy:       ts,
 		WriteAcceptanceState: *cfg.TxAcceptanceState(),
 	}

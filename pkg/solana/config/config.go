@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -11,41 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
-
-// Global solana defaults.
-var defaultConfigSet = Chain{
-	// general chain properties
-	BlockTime: config.MustNewDuration(500 * time.Millisecond), // varies from 400-600ms on mainnet & testnet. May need to override for L2 chains
-
-	// tx mgr
-	BalancePollPeriod:       config.MustNewDuration(5 * time.Second),        // poll period for balance monitoring
-	ConfirmPollPeriod:       config.MustNewDuration(500 * time.Millisecond), // polling for tx confirmation
-	OCR2CachePollPeriod:     config.MustNewDuration(time.Second),            // cache polling rate
-	OCR2CacheTTL:            config.MustNewDuration(time.Minute),            // stale cache deadline
-	TxTimeout:               config.MustNewDuration(time.Minute),            // timeout for send tx method in client
-	TxRetryTimeout:          config.MustNewDuration(10 * time.Second),       // duration for tx rebroadcasting to RPC node
-	TxConfirmTimeout:        config.MustNewDuration(30 * time.Second),       // duration before discarding tx as unconfirmed. Set to 0 to disable discarding tx.
-	TxExpirationRebroadcast: ptr(false),                                     // to enable rebroadcasting of expired transactions
-	TxRetentionTimeout:      config.MustNewDuration(0 * time.Second),        // duration to retain transactions after being marked as finalized or errored. Set to 0 to immediately drop transactions.
-	SkipPreflight:           ptr(true),                                      // to enable or disable preflight checks
-	Commitment:              ptr(string(rpc.CommitmentConfirmed)),
-	MaxRetries:              ptr(int64(0)), // max number of retries (default = 0). when config.MaxRetries < 0), interpreted as MaxRetries = nil and rpc node will do a reasonable number of retries
-
-	// fee estimator
-	FeeEstimatorMode:          ptr("fixed"), // "fixed" or "blockhistory"
-	ComputeUnitPriceMax:       ptr(uint64(1_000)),
-	ComputeUnitPriceMin:       ptr(uint64(0)),
-	ComputeUnitPriceDefault:   ptr(uint64(0)),
-	FeeBumpPeriod:             config.MustNewDuration(3 * time.Second), // WARNING: If FeeBumpPeriod is shorter than blockhash expiration, multiple valid transactions can exist in parallel. This can result in higher costs and can cause unexpected behaviors if contracts do not de-dupe txs. Set to 0 to disable fee bumping.
-	BlockHistoryPollPeriod:    config.MustNewDuration(5 * time.Second),
-	BlockHistorySize:          ptr(uint64(1)),       // set to the number of blocks estimations should be made over. 1: uses latest block; >1: Uses multiple blocks, where n is number of blocks.
-	BlockHistoryBatchLoadSize: ptr(uint64(20)),      // set to the number of blocks that should be loaded into the cache every poll period if BlockHistorySize > 1. Ensure this value is greater than the number of blocks that would be produced between each BlockHistoryPollPeriod to avoid block gaps. BlockHistorySize is used instead if BlockHistorySize <  BlockHistoryBatchLoadSize.
-	ComputeUnitLimitDefault:   ptr(uint32(200_000)), // set to 0 to disable adding compute unit limit
-	EstimateComputeUnitLimit:  ptr(false),           // set to false to disable compute unit limit estimation
-
-	// log poller
-	LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
-}
 
 type Config interface {
 	// general chain properties
@@ -85,11 +49,12 @@ type Config interface {
 }
 
 type Workflow interface {
+	IsEnabled() bool
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-	ForwarderAddress() string
-	FromAddress() string
-	ForwarderState() string
+	ForwarderAddress() *solana.PublicKey
+	FromAddress() *solana.PublicKey
+	ForwarderState() *solana.PublicKey
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
 	Local() bool // shows if workflow is run against local network
@@ -97,30 +62,44 @@ type Workflow interface {
 
 type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
-	PollPeriod        *config.Duration
-
-	ForwarderAddress  *string
-	FromAddress       *string
-	ForwarderState    *string
+	ForwarderAddress  *solana.PublicKey
+	ForwarderState    *solana.PublicKey
+	FromAddress       *solana.PublicKey
 	GasLimitDefault   *uint64
+	Local             *bool
+	PollPeriod        *config.Duration
 	TxAcceptanceState *commontypes.TransactionStatus
-	Local             bool
 }
 
-func (w *WorkflowConfig) Validate() error {
-	var err error
-	addresses := map[string]string{
-		"ForwarderAddress": *w.ForwarderAddress,
-		"FromAddress":      *w.FromAddress,
-		"ForwarderState":   *w.ForwarderState,
-	}
-	for name, addr := range addresses {
-		if _, err2 := solana.PublicKeyFromBase58(addr); err2 != nil {
-			err = errors.Join(err, fmt.Errorf("%s invalid solana address: %w", name, err2))
-		}
-	}
+func (w *WorkflowConfig) IsEnabled() bool {
+	return w.ForwarderAddress != nil || w.ForwarderState != nil || w.FromAddress != nil
+}
 
-	return err
+func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
+	if f.AcceptanceTimeout != nil {
+		w.AcceptanceTimeout = f.AcceptanceTimeout
+	}
+	if f.ForwarderAddress != nil {
+		w.ForwarderAddress = f.ForwarderAddress
+	}
+	if f.ForwarderState != nil {
+		w.ForwarderState = f.ForwarderState
+	}
+	if f.FromAddress != nil {
+		w.FromAddress = f.FromAddress
+	}
+	if f.GasLimitDefault != nil {
+		w.GasLimitDefault = f.GasLimitDefault
+	}
+	if f.Local != nil {
+		w.Local = f.Local
+	}
+	if f.PollPeriod != nil {
+		w.PollPeriod = f.PollPeriod
+	}
+	if f.TxAcceptanceState != nil {
+		w.TxAcceptanceState = f.TxAcceptanceState
+	}
 }
 
 type Chain struct {
@@ -148,81 +127,6 @@ type Chain struct {
 	ComputeUnitLimitDefault   *uint32
 	EstimateComputeUnitLimit  *bool
 	LogPollerStartingLookback *config.Duration
-}
-
-func (c *Chain) SetDefaults() {
-	if c.BlockTime == nil {
-		c.BlockTime = defaultConfigSet.BlockTime
-	}
-	if c.BalancePollPeriod == nil {
-		c.BalancePollPeriod = defaultConfigSet.BalancePollPeriod
-	}
-	if c.ConfirmPollPeriod == nil {
-		c.ConfirmPollPeriod = defaultConfigSet.ConfirmPollPeriod
-	}
-	if c.OCR2CachePollPeriod == nil {
-		c.OCR2CachePollPeriod = defaultConfigSet.OCR2CachePollPeriod
-	}
-	if c.OCR2CacheTTL == nil {
-		c.OCR2CacheTTL = defaultConfigSet.OCR2CacheTTL
-	}
-	if c.TxTimeout == nil {
-		c.TxTimeout = defaultConfigSet.TxTimeout
-	}
-	if c.TxRetryTimeout == nil {
-		c.TxRetryTimeout = defaultConfigSet.TxRetryTimeout
-	}
-	if c.TxConfirmTimeout == nil {
-		c.TxConfirmTimeout = defaultConfigSet.TxConfirmTimeout
-	}
-	if c.TxExpirationRebroadcast == nil {
-		c.TxExpirationRebroadcast = defaultConfigSet.TxExpirationRebroadcast
-	}
-	if c.TxRetentionTimeout == nil {
-		c.TxRetentionTimeout = defaultConfigSet.TxRetentionTimeout
-	}
-	if c.SkipPreflight == nil {
-		c.SkipPreflight = defaultConfigSet.SkipPreflight
-	}
-	if c.Commitment == nil {
-		c.Commitment = defaultConfigSet.Commitment
-	}
-	if c.MaxRetries == nil {
-		c.MaxRetries = defaultConfigSet.MaxRetries
-	}
-	if c.FeeEstimatorMode == nil {
-		c.FeeEstimatorMode = defaultConfigSet.FeeEstimatorMode
-	}
-	if c.ComputeUnitPriceMax == nil {
-		c.ComputeUnitPriceMax = defaultConfigSet.ComputeUnitPriceMax
-	}
-	if c.ComputeUnitPriceMin == nil {
-		c.ComputeUnitPriceMin = defaultConfigSet.ComputeUnitPriceMin
-	}
-	if c.ComputeUnitPriceDefault == nil {
-		c.ComputeUnitPriceDefault = defaultConfigSet.ComputeUnitPriceDefault
-	}
-	if c.FeeBumpPeriod == nil {
-		c.FeeBumpPeriod = defaultConfigSet.FeeBumpPeriod
-	}
-	if c.BlockHistoryPollPeriod == nil {
-		c.BlockHistoryPollPeriod = defaultConfigSet.BlockHistoryPollPeriod
-	}
-	if c.BlockHistorySize == nil {
-		c.BlockHistorySize = defaultConfigSet.BlockHistorySize
-	}
-	if c.BlockHistoryBatchLoadSize == nil {
-		c.BlockHistoryBatchLoadSize = defaultConfigSet.BlockHistoryBatchLoadSize
-	}
-	if c.ComputeUnitLimitDefault == nil {
-		c.ComputeUnitLimitDefault = defaultConfigSet.ComputeUnitLimitDefault
-	}
-	if c.EstimateComputeUnitLimit == nil {
-		c.EstimateComputeUnitLimit = defaultConfigSet.EstimateComputeUnitLimit
-	}
-	if c.LogPollerStartingLookback == nil {
-		c.LogPollerStartingLookback = defaultConfigSet.LogPollerStartingLookback
-	}
 }
 
 type Node struct {

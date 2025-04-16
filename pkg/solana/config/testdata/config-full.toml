@@ -1,0 +1,76 @@
+ChainID = 'fake-chain'
+Enabled = true
+BlockTime = '1h0m0s'
+BalancePollPeriod = '1m0s'
+ConfirmPollPeriod = '1s'
+OCR2CachePollPeriod = '1m0s'
+OCR2CacheTTL = '1h0m0s'
+TxTimeout = '1h0m0s'
+TxRetryTimeout = '1m0s'
+TxConfirmTimeout = '1s'
+TxExpirationRebroadcast = false
+TxRetentionTimeout = '0s'
+SkipPreflight = true
+Commitment = 'banana'
+MaxRetries = 7
+FeeEstimatorMode = 'fixed'
+ComputeUnitPriceMax = 1000
+ComputeUnitPriceMin = 10
+ComputeUnitPriceDefault = 100
+FeeBumpPeriod = '1m0s'
+BlockHistoryPollPeriod = '1m0s'
+BlockHistorySize = 1
+BlockHistoryBatchLoadSize = 10
+ComputeUnitLimitDefault = 100000
+EstimateComputeUnitLimit = false
+LogPollerStartingLookback = '24h0m0s'
+
+[Workflow]
+AcceptanceTimeout = '42s'
+ForwarderAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5'
+ForwarderState = '4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e'
+FromAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5'
+GasLimitDefault = 3000000
+Local = true
+PollPeriod = '9s'
+TxAcceptanceState = 3
+
+[MultiNode]
+Enabled = false
+PollFailureThreshold = 5
+PollInterval = '1s'
+SelectionMode = 'HighestHead'
+SyncThreshold = 5
+NodeIsSyncingEnabled = false
+LeaseDuration = '1m0s'
+NewHeadsPollInterval = '2s'
+FinalizedBlockPollInterval = '3s'
+EnforceRepeatableRead = true
+DeathDeclarationDelay = '2m0s'
+VerifyChainID = true
+NodeNoNewHeadsThreshold = '3m0s'
+NoNewFinalizedHeadsThreshold = '1h0m0s'
+FinalityDepth = 0
+FinalityTagEnabled = true
+FinalizedBlockOffset = 0
+
+[[Nodes]]
+Name = 'primary'
+URL = 'http://solana.web'
+SendOnly = false
+Order = 1
+IsLoadBalancedRPC = false
+
+[[Nodes]]
+Name = 'foo'
+URL = 'http://solana.foo'
+SendOnly = true
+Order = 2
+IsLoadBalancedRPC = true
+
+[[Nodes]]
+Name = 'bar'
+URL = 'http://solana.bar'
+SendOnly = true
+Order = 2
+IsLoadBalancedRPC = true
