@@ -31,7 +31,7 @@ func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan Blo
 		blocks:           blocks,
 		slotNumber:       slotNumber,
 		done:             make(chan struct{}),
-		parseProgramLogs: parseProgramLogs,
+		parseProgramLogs: ParseProgramLogs,
 		lggr:             lggr,
 		stopCh:           stopCh,
 	}

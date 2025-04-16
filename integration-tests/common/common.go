@@ -13,20 +13,18 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/chainlink"
-	mock_adapter "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mock-adapter"
+	mockadapter "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/sol"
-
 	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
 	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 )
@@ -61,8 +59,8 @@ type ChainDetails struct {
 
 type SolCLClusterTestEnv struct {
 	*test_env.CLClusterTestEnv
-	Sol       *test_env_sol.Solana
-	Killgrave *ctf_test_env.Killgrave
+	Sol    *testenvsol.Solana
+	Parrot *ctftestenv.Parrot
 }
 
 type AccountDetails struct {
@@ -436,7 +434,7 @@ func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) 
 		}, c.TestConfig.ChainlinkImage, overrideFn)
 		c.Env = environment.New(c.TestEnvDetails.K8Config).
 			AddHelm(sol.New(nil)).
-			AddHelm(mock_adapter.New(nil)).
+			AddHelm(mockadapter.New(nil)).
 			AddHelm(cd)
 	}
 
