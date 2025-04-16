@@ -84,9 +84,14 @@ type Client struct {
 
 // Return both the client and the underlying rpc client for testing
 func NewTestClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, *rpc.Client, error) {
+	var chainID string
+	if cfg.ChainID != nil {
+		chainID = *cfg.ChainID
+	}
+
 	rpcClient := Client{
 		url:             endpoint,
-		chainID:         *cfg.ChainID,
+		chainID:         chainID,
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
