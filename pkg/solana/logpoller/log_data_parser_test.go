@@ -20,7 +20,7 @@ func TestLogDataParse_Error(t *testing.T) {
 		"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ failed: custom program error: 0x1773",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 2)
 
@@ -60,7 +60,7 @@ func TestLogDataParse_SuccessBasic(t *testing.T) {
 		"Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 2)
 
@@ -163,7 +163,7 @@ func TestLogDataParse_SuccessComplex(t *testing.T) {
 		"Program HQ2UUt18uJqKaQFJhgV9zaTdQxUZjNrsKFgoEDquBkcx success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 11)
 
@@ -196,8 +196,49 @@ func TestLogDataParse_Events(t *testing.T) {
 		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 1)
 	assert.Len(t, output[0].Events, 1)
+}
+
+func TestLogDataParse_NestedCCIPSend(t *testing.T) {
+	t.Parallel()
+
+	// example program log output from solana explorer
+	logs := []string{
+		"Program 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL invoke [1]",
+		"Program log: Instruction: StartPingPong",
+		"Program Ccip8888888888888888888888888888888888888888 invoke [2]",
+		"Program log: Instruction: CcipSend",
+		"Program 11111111111111111111111111111111 invoke [3]",
+		"Program 11111111111111111111111111111111 success",
+		"Program RmnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA invoke [3]",
+		"Program log: Instruction: VerifyNotCursed",
+		"Program RmnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA consumed 5353 of 117093 compute units",
+		"Program RmnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA success",
+		"Program FeeQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ invoke [3]",
+		"Program log: Instruction: GetFee",
+		"Program FeeQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ consumed 26059 of 106400 compute units",
+		"Program return: FeeQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ suG6JlKUMbSLTXQmSXm+3eln5seBIbgd1wizVTDAbEcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFQAAABgdzxBADQMAAAAAAAAAAAAAAAAAAEANAwAAAAAAAAAAAAAAAAAAAA==",
+		"Program FeeQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ success",
+		"Program TokenzQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ invoke [3]",
+		"Program log: Instruction: TransferChecked",
+		"Program TokenzQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ consumed 1900 of 75968 compute units",
+		"Program TokenzQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ success",
+		"Program data: F01Jt3u5cznZGtnJT7pB3lEGAAAAAAAAS9pilw25WRal2CYAvmIXJuQCq4gQGLxq+xIbdF3AUPXfN+OU4sfs49ka2clPukHeUQYAAAAAAAABAAAAAAAAAO+w8bNlBeDYJ6mAasw3PzgJHYDRC6PYjnR63SdS9S7sIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABIAAAAAAAAAAAAAAAAAAAANZ0+dAL9sca9f0xVxj5Lj6B9ubNFQAAABgdzxBADQMAAAAAAAAAAAAAAAAAALLhuiZSlDG0i010Jkl5vt3pZ+bHgSG4HdcIs1UwwGxHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+		"Program Ccip8888888888888888888888888888888888888888 consumed 95683 of 165338 compute units",
+		"Program return: Ccip8888888888888888888888888888888888888888 S9pilw25WRal2CYAvmIXJuQCq4gQGLxq+xIbdF3AUPU=",
+		"Program Ccip8888888888888888888888888888888888888888 success",
+		"Program 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL consumed 131843 of 200000 compute units",
+		"Program return: 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL S9pilw25WRal2CYAvmIXJuQCq4gQGLxq+xIbdF3AUPU=",
+		"Program 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL success",
+	}
+
+	output := ParseProgramLogs(logs)
+
+	require.Len(t, output, 1)
+	assert.Len(t, output[0].Events, 1)
+	event := output[0].Events[0]
+	require.Equal(t, event.Program, "Ccip8888888888888888888888888888888888888888")
 }
