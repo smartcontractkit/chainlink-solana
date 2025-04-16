@@ -21,7 +21,7 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 13 // give up after 13m40s
+	DefaultMaxRetryCount = 18 // give up after ~ 14 hours
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
 	DefaultNotifyRetryDepth = 2000
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
