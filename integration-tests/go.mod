@@ -18,13 +18,13 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250416111541-d25d5d65b1ff
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
 	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250415235644-8703639403c7
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250416143238-f7ec6b07efae
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250416144552-852eba0f8c68
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.53.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250416144153-60cf5a0ea162
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250416144153-60cf5a0ea162
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250416144153-60cf5a0ea162
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250416144655-50d078e9a432
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250416144655-50d078e9a432
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250416144655-50d078e9a432
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.35.0
