@@ -11,8 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-framework/metrics"
 )
 
-const chainFamily = "solana"
-
 // ObservedORM is a decorator layer for ORM used by LogPoller, responsible for pushing Prometheus metrics reporting duration and size of result set for the queries.
 // It doesn't change internal logic, because all calls are delegated to the origin ORM
 type ObservedORM struct {
@@ -104,7 +102,7 @@ func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query 
 	results, err := withObservedQuery(o, queryName, query)
 	if err == nil {
 		o.datasetSize.
-			WithLabelValues(chainFamily, o.chainID, queryName, string(metrics.Read)).
+			WithLabelValues(metrics.Solana, o.chainID, queryName, string(metrics.Read)).
 			Set(float64(len(results)))
 	}
 	return results, err
@@ -114,7 +112,7 @@ func withObservedQuery[T any](o *ObservedORM, queryName string, query func() (T,
 	queryStarted := time.Now()
 	defer func() {
 		o.queryDuration.
-			WithLabelValues(chainFamily, o.chainID, queryName, string(metrics.Read)).
+			WithLabelValues(metrics.Solana, o.chainID, queryName, string(metrics.Read)).
 			Observe(float64(time.Since(queryStarted)))
 	}()
 	return query()
@@ -124,7 +122,7 @@ func withObservedExec(o *ObservedORM, query string, queryType metrics.QueryType,
 	queryStarted := time.Now()
 	defer func() {
 		o.queryDuration.
-			WithLabelValues(chainFamily, o.chainID, query, string(queryType)).
+			WithLabelValues(metrics.Solana, o.chainID, query, string(queryType)).
 			Observe(float64(time.Since(queryStarted)))
 	}()
 	return exec()
@@ -134,12 +132,12 @@ func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType
 	queryStarted := time.Now()
 	rowsAffected, err := exec()
 	o.queryDuration.
-		WithLabelValues(chainFamily, o.chainID, queryName, string(queryType)).
+		WithLabelValues(metrics.Solana, o.chainID, queryName, string(queryType)).
 		Observe(float64(time.Since(queryStarted)))
 
 	if err == nil {
 		o.datasetSize.
-			WithLabelValues(chainFamily, o.chainID, queryName, string(queryType)).
+			WithLabelValues(metrics.Solana, o.chainID, queryName, string(queryType)).
 			Set(float64(rowsAffected))
 	}
 
@@ -151,6 +149,6 @@ func trackInsertedLogs(o *ObservedORM, logs []Log, err error) {
 		return
 	}
 	o.logsInserted.
-		WithLabelValues(chainFamily, o.chainID).
+		WithLabelValues(metrics.Solana, o.chainID).
 		Add(float64(len(logs)))
 }

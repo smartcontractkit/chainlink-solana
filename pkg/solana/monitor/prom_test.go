@@ -18,6 +18,6 @@ func TestPromSolBalance(t *testing.T) {
 	monitor.updateProm(key, balance)
 
 	// happy path test
-	promBalance := testutil.ToFloat64(metrics.NodeBalance.WithLabelValues(key.String(), monitor.chainID, "solana"))
+	promBalance := testutil.ToFloat64(metrics.NodeBalance.WithLabelValues(key.String(), monitor.chainID, metrics.Solana))
 	assert.Equal(t, float64(balance)/float64(solana.LAMPORTS_PER_SOL), promBalance)
 }

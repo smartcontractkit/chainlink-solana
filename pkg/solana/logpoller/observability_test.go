@@ -7,7 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	io_prometheus_client "github.com/prometheus/client_model/go"
+	ioprometheusclient "github.com/prometheus/client_model/go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,14 +43,14 @@ func TestMetricsAreProperlyPopulatedWithLabels(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.Equal(t, expectedCount, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "query", "read"))
-	require.Equal(t, expectedSize, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "query", "read"))
+	require.Equal(t, expectedCount, counterFromHistogramByLabels(t, orm.queryDuration, metrics.Solana, chainID, "query", "read"))
+	require.Equal(t, expectedSize, counterFromGaugeByLabels(orm.datasetSize, metrics.Solana, chainID, "query", "read"))
 
-	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "other_query", "read"))
-	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, "5", "query", "read"))
+	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, metrics.Solana, chainID, "other_query", "read"))
+	require.Equal(t, 0, counterFromHistogramByLabels(t, orm.queryDuration, metrics.Solana, "5", "query", "read"))
 
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "other_query", "read"))
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, "5", "query", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, metrics.Solana, chainID, "other_query", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, metrics.Solana, "5", "query", "read"))
 }
 
 func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
@@ -59,15 +59,15 @@ func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
 	_, err := withObservedQueryAndResults(orm, "errorQuery", func() ([]string, error) { return nil, fmt.Errorf("error") })
 	require.Error(t, err)
 
-	require.Equal(t, 1, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "errorQuery", "read"))
-	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, chainFamily, chainID, "errorQuery", "read"))
+	require.Equal(t, 1, counterFromHistogramByLabels(t, orm.queryDuration, metrics.Solana, chainID, "errorQuery", "read"))
+	require.Equal(t, 0, counterFromGaugeByLabels(orm.datasetSize, metrics.Solana, chainID, "errorQuery", "read"))
 }
 
 func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 	orm := createObservedORM(t, chainID)
 	require.NoError(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return nil }))
 	require.Error(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return fmt.Errorf("error") }))
-	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "execQuery", "create"))
+	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, metrics.Solana, chainID, "execQuery", "create"))
 }
 
 func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
@@ -127,7 +127,7 @@ func counterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 	close(metricCh)
 
 	metric := <-metricCh
-	pb := &io_prometheus_client.Metric{}
+	pb := &ioprometheusclient.Metric{}
 	err = metric.Write(pb)
 	require.NoError(t, err)
 

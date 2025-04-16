@@ -28,12 +28,11 @@ var (
 		prometheus.GaugeOpts{Name: "solana_client_latency_ms", Help: "Solana client request latency"},
 		[]string{"request", "url"},
 	)
-	ChainFamily = "solana"
 )
 
 func (b *balanceMonitor) updateProm(acc solana.PublicKey, lamports uint64) {
 	v := internal.LamportsToSol(lamports) // convert from lamports to SOL
-	metrics.NodeBalance.WithLabelValues(acc.String(), b.chainID, "solana").Set(v)
+	metrics.NodeBalance.WithLabelValues(acc.String(), b.chainID, metrics.Solana).Set(v)
 	promSolanaBalance.WithLabelValues(acc.String(), b.chainID, "solana", "SOL").Set(v)
 }
 
@@ -47,7 +46,7 @@ func SetCacheTimestamp(t time.Time, cacheType, chainID, account string) {
 
 func SetClientLatency(chainID string, d time.Duration, request, url string, err error) {
 	metrics.RPCCallLatency.WithLabelValues(
-		ChainFamily,
+		metrics.Solana,
 		chainID,
 		url,
 		"false",                        // is send only
