@@ -1,8 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.24.1
-
-toolchain go1.24.2
+go 1.24.0
 
 require (
 	github.com/cometbft/cometbft v0.38.17
@@ -21,11 +19,12 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/prometheus/client_golang v1.21.1
 	github.com/prometheus/client_model v0.6.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250411163110-21a13ceb3ac4
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
-	github.com/smartcontractkit/chainlink-common v0.6.1-0.20250415202430-83cf01a447d2
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250321174931-193fcd25d0c1
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250322131411-c7a8d6a077bf
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250416194222-a0332b4acdc4
+	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3
-	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
+	github.com/smartcontractkit/libocr v0.0.0-20250220133800-f3b940c4f298
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
@@ -36,7 +35,6 @@ require (
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/XSAM/otelsql v0.29.0 // indirect
 	github.com/apache/arrow-go/v18 v18.0.0 // indirect

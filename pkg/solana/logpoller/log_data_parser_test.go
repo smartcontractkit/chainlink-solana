@@ -20,7 +20,7 @@ func TestLogDataParse_Error(t *testing.T) {
 		"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ failed: custom program error: 0x1773",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 2)
 
@@ -60,7 +60,7 @@ func TestLogDataParse_SuccessBasic(t *testing.T) {
 		"Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 2)
 
@@ -163,7 +163,7 @@ func TestLogDataParse_SuccessComplex(t *testing.T) {
 		"Program HQ2UUt18uJqKaQFJhgV9zaTdQxUZjNrsKFgoEDquBkcx success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 11)
 
@@ -196,7 +196,7 @@ func TestLogDataParse_Events(t *testing.T) {
 		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 1)
 	assert.Len(t, output[0].Events, 1)
@@ -235,7 +235,7 @@ func TestLogDataParse_NestedCCIPSend(t *testing.T) {
 		"Program 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL success",
 	}
 
-	output := parseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
 
 	require.Len(t, output, 1)
 	assert.Len(t, output[0].Events, 1)

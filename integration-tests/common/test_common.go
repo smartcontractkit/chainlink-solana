@@ -18,16 +18,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	test_env_ctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
-
+	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
@@ -45,7 +44,7 @@ type OCRv2TestState struct {
 
 type Clients struct {
 	SolanaClient    *solclient.Client
-	KillgraveClient *test_env_ctf.Killgrave
+	ParrotClient    *testenvctf.Parrot
 	ChainlinkClient *ChainlinkClient
 }
 
@@ -128,7 +127,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	} else {
 		env, err := test_env.NewTestEnv()
 		require.NoError(m.Config.T, err)
-		sol := test_env_sol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
+		sol := testenvsol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
 		err = sol.StartContainer()
 		require.NoError(m.Config.T, err)
 
@@ -158,13 +157,25 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 		m.Common.DockerEnv = &SolCLClusterTestEnv{
 			CLClusterTestEnv: env,
 			Sol:              sol,
-			Killgrave:        env.MockAdapter,
+			Parrot:           env.MockAdapter,
 		}
 		// Setting up Mock adapter
-		m.Clients.KillgraveClient = env.MockAdapter
-		m.Common.ChainDetails.MockserverURLInternal = m.Clients.KillgraveClient.InternalEndpoint
+		m.Clients.ParrotClient = env.MockAdapter
+		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
-		err = m.Clients.KillgraveClient.SetAdapterBasedIntValuePath("/mockserver-bridge", []string{http.MethodGet, http.MethodPost}, 5)
+		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+			Path:               "/mockserver-bridge",
+			Method:             http.MethodGet,
+			ResponseBody:       5,
+			ResponseStatusCode: http.StatusOK,
+		})
+		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
+		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
+			Path:               "/mockserver-bridge",
+			Method:             http.MethodPost,
+			ResponseBody:       5,
+			ResponseStatusCode: http.StatusOK,
+		})
 		require.NoError(m.Config.T, err, "Failed to set mock adapter value")
 	}
 
