@@ -48,7 +48,6 @@ func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, up
 func (r *syncedFilter) Register(ctx context.Context, registrar filterRegistrar) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	return r.register(ctx, registrar)
 }
 
@@ -114,7 +113,6 @@ func (r *syncedFilter) SetName(name string) {
 }
 
 func (r *syncedFilter) setName(name string) {
-	r.dirty = true
 	r.filter.Name = name
 }
 

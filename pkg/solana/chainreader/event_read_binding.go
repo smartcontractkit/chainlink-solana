@@ -115,6 +115,9 @@ func (b *eventReadBinding) Register(ctx context.Context) error {
 		return nil
 	}
 
+	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	b.filter.SetName(newName)
+
 	return b.filter.Register(ctx, b.reader)
 }
 

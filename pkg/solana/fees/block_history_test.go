@@ -174,8 +174,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 	// Extract slots and compute unit prices from the blocks
 	// We'll consider the last 'BlockHistorySize' blocks
-	var testSlots []uint64
-	var testPrices []ComputeUnitPrice
+	testSlots := make([]uint64, 0, len(testBlocks))
+	testPrices := make([]ComputeUnitPrice, 0, len(testBlocks))
 	startIndex := len(testBlocks) - int(depth)
 	testBlocks = testBlocks[startIndex:]
 	for _, block := range testBlocks {
@@ -207,12 +207,46 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Setup
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
-		require.NoError(t, estimator.calculatePrice(ctx))
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth))
 		assert.Equal(t, uint64(multipleBlocksAvg), estimator.BaseComputeUnitPrice())
+	})
+
+	t.Run("Successful Estimation with partial cache fill", func(t *testing.T) {
+		partialCacheRW := clientmock.NewReaderWriter(t)
+		partialCacheRWLoader := func(ctx context.Context) (client.ReaderWriter, error) { return partialCacheRW, nil }
+		partialCacheRW.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		testSlotsResult := rpc.BlocksResult(testSlots[1:])
+		partialCacheRW.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+		for i, slot := range testSlots {
+			// Skip mocking the oldest block fetch because of partial load
+			if i == 0 {
+				continue
+			}
+			partialCacheRW.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+		}
+
+		// Setup
+		cfg := cfgmock.NewConfig(t)
+		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
+		cfg.On("BlockHistoryBatchLoadSize").Return(uint64(len(testBlocks) - 1)) // Set cache load batch smaller than depth to simulate partial cache
+		estimator := initializeEstimator(ctx, t, partialCacheRWLoader, cfg, logger.Test(t))
+
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
+		// Calculated avg price should be equal to the one extracted manually from the blocks.
+		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth))
+		// Avg of block medians for the 2 latest blocks only due to partial cache fill
+		assert.Equal(t, uint64(30250), estimator.BaseComputeUnitPrice())
 	})
 
 	t.Run("Min Gate: Price Should Be Floored at Min", func(t *testing.T) {
@@ -220,11 +254,14 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg := cfgmock.NewConfig(t)
 		tmpMin := uint64(multipleBlocksAvg) + 100 // Set min higher than the avg price
 		setupConfigMock(cfg, defaultPrice, tmpMin, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMin").Return(tmpMin)
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Compute unit price should be floored at min
-		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price below min")
-		cfg.On("ComputeUnitPriceMin").Return(tmpMin)
+		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth), "Failed to calculate price with price below min")
 		assert.Equal(t, tmpMin, estimator.BaseComputeUnitPrice(), "Price should be floored at min")
 	})
 
@@ -233,12 +270,15 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg := cfgmock.NewConfig(t)
 		tmpMax := uint64(multipleBlocksAvg) - 100 // Set tmpMax lower than the avg price
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
-		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
-
-		// Compute unit price should be capped at max
-		require.NoError(t, estimator.calculatePrice(ctx), "Failed to calculate price with price above max")
 		cfg.On("ComputeUnitPriceMax").Return(tmpMax)
 		cfg.On("ComputeUnitPriceMin").Return(minPrice)
+		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
+
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
+		// Compute unit price should be capped at max
+		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(depth), "Failed to calculate price with price above max")
 		assert.Equal(t, tmpMax, estimator.BaseComputeUnitPrice(), "Price should be capped at max")
 	})
 
@@ -251,11 +291,14 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		}
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		estimator := initializeEstimator(ctx, t, rwFailLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Price should remain unchanged
-		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting client fails")
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.Error(t, estimator.calculatePriceFromMultipleBlocks(depth), "Expected error when getting client fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
 	})
 
@@ -265,12 +308,15 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")) // Mock SlotHeight returning error
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Price should remain unchanged
-		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting current slot fails")
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.Error(t, estimator.calculatePriceFromMultipleBlocks(depth), "Expected error when getting current slot fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
 	})
 
@@ -280,12 +326,15 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		rw.On("SlotHeight", mock.Anything).Return(depth-1, nil) // Mock SlotHeight returning less than desiredBlockCount
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Price should remain unchanged
-		require.Error(t, estimator.calculatePrice(ctx), "Expected error when current slot is less than desired block count")
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.Error(t, estimator.calculatePriceFromMultipleBlocks(depth), "Expected error when current slot is less than desired block count")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
 	})
 
@@ -295,14 +344,17 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("failed to get blocks with limit")) // Mock GetBlocksWithLimit returning error
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Price should remain unchanged
-		require.Error(t, estimator.calculatePrice(ctx), "Expected error when getting blocks with limit fails")
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.Error(t, estimator.calculatePriceFromMultipleBlocks(depth), "Expected error when getting blocks with limit fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
 	})
 
@@ -312,25 +364,85 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		rw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
 		emptyBlocks := rpc.BlocksResult{} // No blocks with compute unit prices
 		rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 			Return(&emptyBlocks, nil)
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t))
 
+		// Wait for estimator to populate the cache and calculate the latest price
+		waitForEstimation(t, estimator, pollPeriod)
+
 		// Price should remain unchanged
-		require.EqualError(t, estimator.calculatePrice(ctx), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
-		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
+		require.EqualError(t, estimator.calculatePriceFromMultipleBlocks(depth), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
+	})
+
+	t.Run("Cache successfully cleared of excess blocks", func(t *testing.T) {
+		block1Slot := testSlots[0]
+		block2Slot := testSlots[1]
+		block3Slot := testSlots[2]
+		olderEstimate := uint64(58750) // median price of oldest 2 blocks
+		newerEstimate := uint64(30250) // median price of latest 2 blocks
+		cleanCacheRw := clientmock.NewReaderWriter(t)
+		cleanCacheRWLoader := func(ctx context.Context) (client.ReaderWriter, error) { return cleanCacheRw, nil }
+		// Return second to last block as highest block
+		cleanCacheRw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-2], nil).Once()
+		// Return the oldest 2 blocks when get blocks is first called
+		testSlotsResult := rpc.BlocksResult(testSlots[:2])
+		cleanCacheRw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil).Once()
+		for i, slot := range testSlots {
+			cleanCacheRw.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+		}
+
+		// Setup
+		cfg := cfgmock.NewConfig(t)
+		smallerDepth := len(testSlots) - 1
+		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, uint64(smallerDepth))
+		cfg.On("ComputeUnitPriceMax").Return(maxPrice).Maybe()
+		estimator := initializeEstimator(ctx, t, cleanCacheRWLoader, cfg, logger.Test(t))
+
+		// Wait for estimator to estimate price on the older 2 blocks
+		require.Eventually(t, func() bool {
+			return estimator.BaseComputeUnitPrice() == olderEstimate
+		}, 2*pollPeriod, 1*time.Second)
+
+		estimator.cacheMu.RLock()
+		require.Len(t, estimator.cache.storedBlockRange, smallerDepth)
+		require.Len(t, estimator.cache.medianMap, smallerDepth)
+		require.Contains(t, estimator.cache.medianMap, block1Slot)
+		require.Contains(t, estimator.cache.medianMap, block2Slot)
+		estimator.cacheMu.RUnlock()
+
+		// Return second to last block as highest block
+		cleanCacheRw.On("SlotHeight", mock.Anything).Return(testSlots[len(testSlots)-1], nil)
+		// Return the latest 2 blocks when get blocks is called again
+		testSlotsResult = rpc.BlocksResult(testSlots[1:])
+		cleanCacheRw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
+			Return(&testSlotsResult, nil)
+
+		// Wait for estimator to estimate price on the latest 2 blocks
+		require.Eventually(t, func() bool {
+			return estimator.BaseComputeUnitPrice() == newerEstimate
+		}, 2*pollPeriod, 1*time.Second)
+		estimator.cacheMu.RLock()
+		require.Len(t, estimator.cache.storedBlockRange, smallerDepth)
+		require.Len(t, estimator.cache.medianMap, smallerDepth)
+		require.Contains(t, estimator.cache.medianMap, block2Slot)
+		require.Contains(t, estimator.cache.medianMap, block3Slot)
+		estimator.cacheMu.RUnlock()
 	})
 }
 
 // setupConfigMock configures the Config mock with necessary return values.
 func setupConfigMock(cfg *cfgmock.Config, defaultPrice uint64, minPrice uint64, pollPeriod time.Duration, depth uint64) {
 	cfg.On("ComputeUnitPriceDefault").Return(defaultPrice).Once()
-	cfg.On("ComputeUnitPriceMin").Return(minPrice).Once()
+	cfg.On("ComputeUnitPriceMin").Return(minPrice).Maybe()
 	cfg.On("BlockHistoryPollPeriod").Return(pollPeriod).Once()
 	cfg.On("BlockHistorySize").Return(depth)
+	cfg.On("BlockHistoryBatchLoadSize").Return(uint64(20)).Maybe()
 }
 
 // initializeEstimator initializes, starts, and ensures cleanup of the BlockHistoryEstimator.
@@ -354,4 +466,11 @@ func readMultipleBlocksFromFile(t *testing.T, filePath string) []*rpc.GetBlockRe
 	var testBlocks []*rpc.GetBlockResult
 	require.NoError(t, json.Unmarshal(testBlocksData, &testBlocks))
 	return testBlocks
+}
+
+func waitForEstimation(t *testing.T, estimator *blockHistoryEstimator, pollPeriod time.Duration) {
+	// Wait for estimator to populate the cache and calculate the latest price
+	require.Eventually(t, func() bool {
+		return estimator.BaseComputeUnitPrice() != 0
+	}, 2*pollPeriod, 1*time.Second)
 }
