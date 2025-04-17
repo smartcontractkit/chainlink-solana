@@ -108,6 +108,16 @@ func (p SubKeyPaths) Equal(o SubKeyPaths) bool {
 	return slices.EqualFunc(p, o, slices.Equal)
 }
 
+func (p SubKeyPaths) String() string {
+	var groups []string
+
+	for _, subgroup := range p {
+		groups = append(groups, strings.Join(subgroup, ":"))
+	}
+
+	return strings.Join(groups, ";")
+}
+
 const EventSignatureLength = 8
 
 type EventSignature [EventSignatureLength]byte

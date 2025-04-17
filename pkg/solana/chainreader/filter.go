@@ -2,8 +2,13 @@ package chainreader
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -16,6 +21,7 @@ type syncedFilter struct {
 	mu         sync.RWMutex
 	addressSet bool
 	filter     logpoller.Filter
+	hash       string
 
 	dirty bool
 }
@@ -33,7 +39,7 @@ func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, up
 	}
 
 	oldName := r.filter.Name
-	r.filter.Name = updatedName
+	r.setName(updatedName)
 
 	if err := r.register(ctx, registrar); err != nil {
 		return err
@@ -98,11 +104,20 @@ func (r *syncedFilter) unregister(ctx context.Context, registrar filterRegistrar
 	return nil
 }
 
-func (r *syncedFilter) SetFilter(filter logpoller.Filter) {
+func (r *syncedFilter) SetFilter(filter logpoller.Filter) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.filter = filter
+
+	hash, err := filterHash(r.filter)
+	if err != nil {
+		return err
+	}
+
+	r.hash = hash
+
+	return nil
 }
 
 func (r *syncedFilter) SetName(name string) {
@@ -113,7 +128,7 @@ func (r *syncedFilter) SetName(name string) {
 }
 
 func (r *syncedFilter) setName(name string) {
-	r.filter.Name = name
+	r.filter.Name = fmt.Sprintf("%s.%s", name, r.hash)
 }
 
 func (r *syncedFilter) SetAddress(address solana.PublicKey) {
@@ -161,4 +176,48 @@ func (e FilterError) Error() string {
 
 func (e FilterError) Unwrap() error {
 	return e.Err
+}
+
+func filterHash(filter logpoller.Filter) (string, error) {
+	hasher := sha256.New()
+
+	if err := errors.Join(
+		onlyError(hasher.Write, putUint64(filter.ID)),
+		onlyError(hasher.Write, filter.Address.ToSolana().Bytes()),
+		onlyError(hasher.Write, []byte(filter.EventName)),
+		onlyError(hasher.Write, []byte(filter.EventSig.String())),
+		onlyError(hasher.Write, putUint64(filter.StartingBlock)), // not sure if we should include this
+		onlyError(hasher.Write, []byte(filter.SubkeyPaths.String())),
+		onlyError(hasher.Write, putUint64(filter.Retention)),
+		onlyError(hasher.Write, putUint64(filter.MaxLogsKept)),
+		onlyError(hasher.Write, putUint64(binBool(filter.IsDeleted))),
+		onlyError(hasher.Write, putUint64(binBool(filter.IsBackfilled))),
+		onlyError(hasher.Write, putUint64(binBool(filter.IncludeReverted))),
+	); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum([]byte{})), nil
+}
+
+func putUint64[T uint8 | int64 | int32 | time.Duration](val T) []byte {
+	buf := make([]byte, 8)
+
+	binary.BigEndian.PutUint64(buf, uint64(val))
+
+	return buf
+}
+
+func binBool(val bool) uint8 {
+	if val {
+		return 1
+	}
+
+	return 0
+}
+
+func onlyError(fnc func([]byte) (int, error), val []byte) error {
+	_, err := fnc(val)
+
+	return err
 }

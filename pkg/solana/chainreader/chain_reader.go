@@ -635,7 +635,9 @@ func (s *ContractReaderService) addEventRead(
 	)
 
 	s.shouldStartLP = true
-	reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], eventDef))
+	if err := reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], eventDef)); err != nil {
+		return err
+	}
 
 	s.bdRegistry.AddReader(namespace, genericName, reader)
 	s.lookup.addReadNameForContract(namespace, genericName, []read{{readName: genericName, useParams: false}})

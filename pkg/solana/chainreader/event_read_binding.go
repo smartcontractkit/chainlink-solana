@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/google/uuid"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -115,7 +114,7 @@ func (b *eventReadBinding) Register(ctx context.Context) error {
 		return nil
 	}
 
-	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	newName := fmt.Sprintf("%s.%s", b.namespace, b.genericName)
 	b.filter.SetName(newName)
 
 	return b.filter.Register(ctx, b.reader)
@@ -137,7 +136,7 @@ func (b *eventReadBinding) update(ctx context.Context) error {
 		return nil
 	}
 
-	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	newName := fmt.Sprintf("%s.%s", b.namespace, b.genericName)
 
 	return b.filter.Update(ctx, b.reader, newName)
 }
@@ -190,12 +189,17 @@ func (b *eventReadBinding) SetModifier(modifier commoncodec.Modifier) {
 	b.modifier = modifier
 }
 
-func (b *eventReadBinding) SetFilter(filter logpoller.Filter) {
+func (b *eventReadBinding) SetFilter(filter logpoller.Filter) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.filter.SetFilter(filter)
+	if err := b.filter.SetFilter(filter); err != nil {
+		return err
+	}
+
 	b.eventSig = filter.EventSig
+
+	return nil
 }
 
 func (b *eventReadBinding) CreateType(forEncoding bool) (any, error) {
