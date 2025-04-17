@@ -652,6 +652,96 @@ func (_c *Config_FeeEstimatorMode_Call) RunAndReturn(run func() string) *Config_
 	return _c
 }
 
+// LogPollerLargeQueueNotify provides a mock function with no fields
+func (_m *Config) LogPollerLargeQueueNotify() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerLargeQueueNotify")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// Config_LogPollerLargeQueueNotify_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerLargeQueueNotify'
+type Config_LogPollerLargeQueueNotify_Call struct {
+	*mock.Call
+}
+
+// LogPollerLargeQueueNotify is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerLargeQueueNotify() *Config_LogPollerLargeQueueNotify_Call {
+	return &Config_LogPollerLargeQueueNotify_Call{Call: _e.mock.On("LogPollerLargeQueueNotify")}
+}
+
+func (_c *Config_LogPollerLargeQueueNotify_Call) Run(run func()) *Config_LogPollerLargeQueueNotify_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerLargeQueueNotify_Call) Return(_a0 int) *Config_LogPollerLargeQueueNotify_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerLargeQueueNotify_Call) RunAndReturn(run func() int) *Config_LogPollerLargeQueueNotify_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogPollerMaxRetries provides a mock function with no fields
+func (_m *Config) LogPollerMaxRetries() uint8 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerMaxRetries")
+	}
+
+	var r0 uint8
+	if rf, ok := ret.Get(0).(func() uint8); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint8)
+	}
+
+	return r0
+}
+
+// Config_LogPollerMaxRetries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerMaxRetries'
+type Config_LogPollerMaxRetries_Call struct {
+	*mock.Call
+}
+
+// LogPollerMaxRetries is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerMaxRetries() *Config_LogPollerMaxRetries_Call {
+	return &Config_LogPollerMaxRetries_Call{Call: _e.mock.On("LogPollerMaxRetries")}
+}
+
+func (_c *Config_LogPollerMaxRetries_Call) Run(run func()) *Config_LogPollerMaxRetries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerMaxRetries_Call) Return(_a0 uint8) *Config_LogPollerMaxRetries_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerMaxRetries_Call) RunAndReturn(run func() uint8) *Config_LogPollerMaxRetries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogPollerStartingLookback provides a mock function with no fields
 func (_m *Config) LogPollerStartingLookback() time.Duration {
 	ret := _m.Called()
@@ -693,6 +783,51 @@ func (_c *Config_LogPollerStartingLookback_Call) Return(_a0 time.Duration) *Conf
 }
 
 func (_c *Config_LogPollerStartingLookback_Call) RunAndReturn(run func() time.Duration) *Config_LogPollerStartingLookback_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LogPollerWorkerCount provides a mock function with no fields
+func (_m *Config) LogPollerWorkerCount() uint64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerWorkerCount")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// Config_LogPollerWorkerCount_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerWorkerCount'
+type Config_LogPollerWorkerCount_Call struct {
+	*mock.Call
+}
+
+// LogPollerWorkerCount is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerWorkerCount() *Config_LogPollerWorkerCount_Call {
+	return &Config_LogPollerWorkerCount_Call{Call: _e.mock.On("LogPollerWorkerCount")}
+}
+
+func (_c *Config_LogPollerWorkerCount_Call) Run(run func()) *Config_LogPollerWorkerCount_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerWorkerCount_Call) Return(_a0 uint64) *Config_LogPollerWorkerCount_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerWorkerCount_Call) RunAndReturn(run func() uint64) *Config_LogPollerWorkerCount_Call {
 	_c.Call.Return(run)
 	return _c
 }

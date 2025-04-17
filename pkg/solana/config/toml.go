@@ -202,6 +202,15 @@ func setFromChain(c, f *Chain) {
 	if f.LogPollerStartingLookback != nil {
 		c.LogPollerStartingLookback = f.LogPollerStartingLookback
 	}
+	if f.LogPollerMaxRetries != nil {
+		c.LogPollerMaxRetries = f.LogPollerMaxRetries
+	}
+	if f.LogPollerLargeQueueNotify != nil {
+		c.LogPollerLargeQueueNotify = f.LogPollerLargeQueueNotify
+	}
+	if f.LogPollerWorkerCount != nil {
+		c.LogPollerWorkerCount = f.LogPollerWorkerCount
+	}
 	if f.BlockHistoryBatchLoadSize != nil {
 		c.BlockHistoryBatchLoadSize = f.BlockHistoryBatchLoadSize
 	}
@@ -340,6 +349,18 @@ func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 
 func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
 	return c.Chain.LogPollerStartingLookback.Duration()
+}
+
+func (c *TOMLConfig) LogPollerMaxRetries() uint8 {
+	return *c.Chain.LogPollerMaxRetries
+}
+
+func (c *TOMLConfig) LogPollerLargeQueueNotify() int {
+	return *c.Chain.LogPollerLargeQueueNotify
+}
+
+func (c *TOMLConfig) LogPollerWorkerCount() uint64 {
+	return *c.Chain.LogPollerWorkerCount
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {

@@ -42,6 +42,9 @@ var defaultConfigSet = Chain{
 
 	// log poller
 	LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
+	LogPollerMaxRetries:       ptr(uint8(18)), // max number of retries for log poller
+	LogPollerLargeQueueNotify: ptr(2000),      // queue depth at which the worker group will log a warning
+	LogPollerWorkerCount:      ptr(uint64(8)), // default number of workers for log poller
 }
 
 type Config interface {
@@ -76,6 +79,9 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+	LogPollerMaxRetries() uint8
+	LogPollerLargeQueueNotify() int
+	LogPollerWorkerCount() uint64
 }
 
 type Chain struct {
@@ -103,6 +109,9 @@ type Chain struct {
 	ComputeUnitLimitDefault   *uint32
 	EstimateComputeUnitLimit  *bool
 	LogPollerStartingLookback *config.Duration
+	LogPollerMaxRetries       *uint8
+	LogPollerLargeQueueNotify *int
+	LogPollerWorkerCount      *uint64
 }
 
 func (c *Chain) SetDefaults() {
@@ -177,6 +186,18 @@ func (c *Chain) SetDefaults() {
 	}
 	if c.LogPollerStartingLookback == nil {
 		c.LogPollerStartingLookback = defaultConfigSet.LogPollerStartingLookback
+	}
+
+	if c.LogPollerMaxRetries == nil {
+		c.LogPollerMaxRetries = defaultConfigSet.LogPollerMaxRetries
+	}
+
+	if c.LogPollerLargeQueueNotify == nil {
+		c.LogPollerLargeQueueNotify = defaultConfigSet.LogPollerLargeQueueNotify
+	}
+
+	if c.LogPollerWorkerCount == nil {
+		c.LogPollerWorkerCount = defaultConfigSet.LogPollerWorkerCount
 	}
 }
 

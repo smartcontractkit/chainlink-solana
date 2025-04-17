@@ -102,7 +102,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 		Start: lp.start,
 		NewSubServices: func(lggr logger.Logger) []services.Service {
 			lp.filters = newFilters(lggr, orm)
-			loader := NewEncodedLogCollector(cl, lggr)
+			loader := NewEncodedLogCollector(cl, lggr, cfg)
 			lp.loader = loader
 			return []services.Service{loader}
 		},

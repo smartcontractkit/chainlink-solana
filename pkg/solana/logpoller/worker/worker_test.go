@@ -15,13 +15,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
 func TestWorkerGroup(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
 
+	group := newTestGroup(5)
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
 		require.NoError(t, group.Close())
@@ -55,7 +56,7 @@ func TestWorkerGroup(t *testing.T) {
 
 func TestWorkerGroup_Retry(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
+	group := newTestGroup(5)
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -109,7 +110,7 @@ func TestWorkerGroup_Retry(t *testing.T) {
 
 func TestWorkerGroup_Close(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
+	group := newTestGroup(5)
 
 	require.NoError(t, group.Start(ctx))
 
@@ -176,7 +177,7 @@ func TestWorkerGroup_Close(t *testing.T) {
 func TestWorkerGroup_DoContext(t *testing.T) {
 	t.Run("will not add to queue", func(t *testing.T) {
 		ctx := t.Context()
-		group := worker.NewGroup(2, logger.Sugared(logger.Nop()))
+		group := newTestGroup(5)
 		job := testJob{job: func(ctx context.Context) error { return nil }}
 
 		require.NoError(t, group.Start(ctx))
@@ -201,7 +202,7 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 func BenchmarkWorkerGroup(b *testing.B) {
 	ctx := b.Context()
 
-	group := worker.NewGroup(100, logger.Sugared(logger.Nop()))
+	group := newTestGroup(100)
 	job := testJob{job: func(ctx context.Context) error { return nil }}
 
 	require.NoError(b, group.Start(ctx))
@@ -248,4 +249,9 @@ func (j *retryJob) Run(ctx context.Context) error {
 	}
 
 	return j.job(ctx)
+}
+
+func newTestGroup(workers uint64) *worker.Group {
+	cfg := config.TOMLConfig{Chain: config.Chain{LogPollerWorkerCount: &workers}}
+	return worker.NewGroup(logger.Sugared(logger.Nop()), &cfg)
 }

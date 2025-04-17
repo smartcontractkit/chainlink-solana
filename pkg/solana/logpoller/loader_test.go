@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 )
@@ -35,7 +36,8 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	client := mocks.NewRPCClient(t)
 	ctx := t.Context()
 
-	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t))
+	cfg := config.NewDefault()
+	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t), cfg)
 
 	require.NoError(t, collector.Start(ctx))
 	t.Cleanup(func() {

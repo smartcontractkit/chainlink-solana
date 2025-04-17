@@ -12,22 +12,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 var (
 	ErrProcessStopped   = fmt.Errorf("worker process has stopped")
 	ErrContextCancelled = fmt.Errorf("worker context cancelled")
-)
-
-const (
-	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 18 // give up after ~ 14 hours
-	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
-	DefaultNotifyRetryDepth = 2000
-	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
-	DefaultNotifyQueueDepth = 1000
-	// DefaultWorkerCount is the default number of workers in a Group.
-	DefaultWorkerCount = 10
 )
 
 type worker struct {
@@ -70,15 +61,16 @@ type Group struct {
 	engine *services.Engine
 
 	// dependencies and configuration
-	maxWorkers    int
+	maxWorkers    uint64
 	maxRetryCount uint8
 	lggr          logger.SugaredLogger
 
 	// worker group state
-	workers       chan *worker
-	queue         *queue[Job]
-	input         chan Job
-	chInputNotify chan struct{}
+	workers          chan *worker
+	queue            *queue[Job]
+	input            chan Job
+	chInputNotify    chan struct{}
+	notifyQueueDepth int
 
 	chStopInputs chan struct{}
 	queueClosed  atomic.Bool
@@ -89,11 +81,11 @@ type Group struct {
 	retryMap map[string]retryableJob
 }
 
-func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
+func NewGroup(lggr logger.SugaredLogger, cfg config.Config) *Group {
 	g := &Group{
-		maxWorkers:    workers,
-		maxRetryCount: DefaultMaxRetryCount,
-		workers:       make(chan *worker, workers),
+		maxWorkers:    cfg.LogPollerWorkerCount(),
+		maxRetryCount: cfg.LogPollerMaxRetries(),
+		workers:       make(chan *worker, cfg.LogPollerWorkerCount()),
 		lggr:          lggr,
 		queue:         newQueue[Job](0),
 		input:         make(chan Job, 1),
@@ -109,7 +101,7 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 		Close: g.close,
 	}.NewServiceEngine(lggr)
 
-	for idx := range workers {
+	for idx := range g.maxWorkers {
 		g.workers <- &worker{
 			Name:  fmt.Sprintf("worker-%d", idx+1),
 			Queue: g.workers,
@@ -233,7 +225,7 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 			g.mu.Lock()
 			g.retryMap[retry.name] = retry
 
-			if len(g.retryMap) >= DefaultNotifyRetryDepth {
+			if len(g.retryMap) >= 2*g.notifyQueueDepth {
 				g.lggr.Errorf("retry queue depth: %d", len(g.retryMap))
 			}
 			g.mu.Unlock()
@@ -283,7 +275,7 @@ func (g *Group) processQueue(ctx context.Context) {
 			break
 		}
 
-		if g.queue.Len() >= DefaultNotifyQueueDepth {
+		if g.queue.Len() >= g.notifyQueueDepth {
 			g.lggr.Warnf("queue depth is too large: %d", g.queue.Len())
 		}
 
