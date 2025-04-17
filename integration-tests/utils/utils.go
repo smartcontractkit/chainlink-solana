@@ -15,6 +15,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -87,7 +88,7 @@ func NewExtendLookupTableInstruction(
 }
 
 func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rpc.Client) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	sigs := []solana.Signature{}
 	for _, v := range accounts {
 		sig, err := solanaGoClient.RequestAirdrop(ctx, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
@@ -143,9 +144,9 @@ func SetupTestValidatorWithAnchorPrograms(t *testing.T, upgradeAuthority string,
 	return rpcURL, wsURL
 }
 
-func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
+func CreateTestLookupTable(t *testing.T, c *rpc.Client, sender solana.PrivateKey, addresses []solana.PublicKey) solana.PublicKey {
 	// Create lookup tables
-	slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
+	slot, serr := c.GetSlot(t.Context(), rpc.CommitmentFinalized)
 	require.NoError(t, serr)
 	table, instruction, ierr := NewCreateLookupTableInstruction(
 		sender.PublicKey(),
@@ -153,10 +154,10 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 		slot,
 	)
 	require.NoError(t, ierr)
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
+	utils.SendAndConfirm(t.Context(), t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
 
 	// add entries to lookup table
-	utils.SendAndConfirm(ctx, t, c, []solana.Instruction{
+	utils.SendAndConfirm(t.Context(), t, c, []solana.Instruction{
 		NewExtendLookupTableInstruction(
 			table, sender.PublicKey(), sender.PublicKey(),
 			addresses,
@@ -164,4 +165,20 @@ func CreateTestLookupTable(ctx context.Context, t *testing.T, c *rpc.Client, sen
 	}, sender, rpc.CommitmentConfirmed)
 
 	return table
+}
+
+func CreateRandomToken(ctx context.Context, t tests.TestingT, admin solana.PrivateKey, tokenProgram solana.PublicKey, client *rpc.Client) solana.PublicKey {
+	mint, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+
+	instructions, err := tokens.CreateToken(ctx, tokenProgram, mint.PublicKey(), admin.PublicKey(), uint8(0), client, rpc.CommitmentFinalized)
+	require.NoError(t, err)
+
+	addMintModifier := func(tx *solana.Transaction, signers map[solana.PublicKey]solana.PrivateKey) error {
+		signers[mint.PublicKey()] = mint
+		return nil
+	}
+
+	utils.SendAndConfirm(ctx, t, client, instructions, admin, rpc.CommitmentFinalized, addMintModifier)
+	return mint.PublicKey()
 }

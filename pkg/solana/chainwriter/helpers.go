@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -25,7 +26,8 @@ type TestArgs struct {
 }
 
 type InnerArgs struct {
-	Address []byte
+	Address       []byte
+	SecondAddress []byte
 }
 
 type DataAccount struct {
@@ -43,39 +45,60 @@ func FetchTestContractIDL() string {
 	return testContractIDL
 }
 
+var (
+	errFieldNotFound = errors.New("key not found")
+)
+
 // GetValuesAtLocation parses through nested types and arrays to find all locations of values
 func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 	var vals [][]byte
+	// If the user specified no location, just return empty (no-op).
+	if location == "" {
+		return nil, nil
+	}
+
 	path := strings.Split(location, ".")
 
-	addressList, err := traversePath(args, path)
+	items, err := traversePath(args, path)
 	if err != nil {
 		return nil, err
 	}
-	for _, value := range addressList {
-		// Dereference if it's a pointer
-		rv := reflect.ValueOf(value)
+
+	for _, item := range items {
+		rv := reflect.ValueOf(item)
 		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
-			value = rv.Elem().Interface()
+			item = rv.Elem().Interface()
 		}
 
-		if byteArray, ok := value.([]byte); ok {
-			vals = append(vals, byteArray)
-		} else if address, ok := value.(solana.PublicKey); ok {
-			vals = append(vals, address.Bytes())
-		} else if num, ok := value.(uint64); ok {
+		switch value := item.(type) {
+		case []byte:
+			vals = append(vals, value)
+		case solana.PublicKey:
+			vals = append(vals, value.Bytes())
+		case ccipocr3.UnknownAddress:
+			vals = append(vals, value)
+		case ccipocr3.UnknownEncodedAddress:
+			decoded, err := solana.PublicKeyFromBase58(string(value))
+			if err != nil {
+				return nil, err
+			}
+			vals = append(vals, decoded[:])
+		case uint64:
 			buf := make([]byte, 8)
-			binary.LittleEndian.PutUint64(buf, num)
+			binary.LittleEndian.PutUint64(buf, value)
 			vals = append(vals, buf)
-		} else if addr, ok := value.(ccipocr3.UnknownAddress); ok {
-			vals = append(vals, addr)
-		} else if arr, ok := value.([32]uint8); ok {
-			vals = append(vals, arr[:])
-		} else {
+		case ccipocr3.ChainSelector:
+			buf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(buf, uint64(value))
+			vals = append(vals, buf)
+		case ccipocr3.Bytes32:
+			vals = append(vals, value[:])
+		case [32]uint8:
+			vals = append(vals, value[:])
+		default:
 			return nil, fmt.Errorf("invalid value format at path: %s, type: %s", location, reflect.TypeOf(value).String())
 		}
 	}
-
 	return vals, nil
 }
 
@@ -89,16 +112,16 @@ func GetDebugIDAtLocation(args any, location string) (string, error) {
 		return "", errors.New("no debug ID found at location: " + location)
 	}
 	// there should only be one debug ID, others will be ignored.
-	debugID := string(debugIDList[0])
+	debugID := ccipocr3.Bytes32(debugIDList[0])
 
-	return debugID, nil
+	return debugID.String(), nil
 }
 
 func errorWithDebugID(err error, debugID string) error {
 	if debugID == "" {
 		return err
 	}
-	return fmt.Errorf("Debug ID: %s: Error: %s", debugID, err)
+	return fmt.Errorf("Debug ID: %s: Error: %w", debugID, err)
 }
 
 // traversePath recursively traverses the given structure based on the provided path.
@@ -135,7 +158,7 @@ func traversePath(data any, path []string) ([]any, error) {
 	case reflect.Struct:
 		field := val.FieldByName(path[0])
 		if !field.IsValid() {
-			return nil, errors.New("field not found: " + path[0])
+			return []any{}, errFieldNotFound
 		}
 		return traversePath(field.Interface(), path[1:])
 
@@ -150,13 +173,13 @@ func traversePath(data any, path []string) ([]any, error) {
 		if len(result) > 0 {
 			return result, nil
 		}
-		return nil, errors.New("no matching field found in array")
+		return []any{}, errFieldNotFound
 
 	case reflect.Map:
 		key := reflect.ValueOf(path[0])
 		value := val.MapIndex(key)
 		if !value.IsValid() {
-			return nil, errors.New("key not found: " + path[0])
+			return []any{}, errFieldNotFound
 		}
 		return traversePath(value.Interface(), path[1:])
 	default:
@@ -172,18 +195,18 @@ func InitializeDataAccount(
 	admin solana.PrivateKey,
 	lookupTable solana.PublicKey,
 ) {
-	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("data")}, programID)
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("lookup")}, programID)
 	require.NoError(t, err)
 
-	discriminator := GetDiscriminator("initialize_lookup_table")
+	discriminator := GetDiscriminator("initializelookuptable")
 
 	instructionData := append(discriminator[:], lookupTable.Bytes()...)
 
 	instruction := solana.NewInstruction(
 		programID,
 		solana.AccountMetaSlice{
-			solana.Meta(pda).WRITE(),
 			solana.Meta(admin.PublicKey()).SIGNER().WRITE(),
+			solana.Meta(pda).WRITE(),
 			solana.Meta(solana.SystemProgramID),
 		},
 		instructionData,
@@ -194,22 +217,22 @@ func InitializeDataAccount(
 }
 
 func GetDiscriminator(instruction string) [8]byte {
-	fullHash := sha256.Sum256([]byte("global:" + instruction))
+	fullHash := sha256.Sum256([]byte("global:" + ToSnakeCase(instruction)))
 	var discriminator [8]byte
 	copy(discriminator[:], fullHash[:8])
 	return discriminator
 }
 
-func GetRandomPubKey(t *testing.T) solana.PublicKey {
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	return privKey.PublicKey()
+func ToSnakeCase(s string) string {
+	s = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(s, "${1}_${2}")
+	s = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`).ReplaceAllString(s, "${1}_${2}")
+	return strings.ToLower(s)
 }
 
 func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 	addresses := make([]solana.PublicKey, num)
 	for i := 0; i < num; i++ {
-		addresses[i] = GetRandomPubKey(t)
+		addresses[i] = utils.GetRandomPubKey(t)
 	}
 	return addresses
 }

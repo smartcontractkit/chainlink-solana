@@ -7,9 +7,7 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
-	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -38,10 +36,13 @@ import (
 
 type LogPoller interface {
 	Start(context.Context) error
+	Ready() error
 	Close() error
+	HasFilter(context.Context, string) bool
 	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
+	Replay(fromBlock int64)
 }
 
 type Chain interface {
@@ -54,6 +55,7 @@ type Chain interface {
 	FeeEstimator() fees.Estimator
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
+	MultiClient() *client.MultiClient
 }
 
 // DefaultRequestTimeout is the default Solana client timeout.
@@ -90,7 +92,19 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 	if !cfg.IsEnabled() {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
-	c, err := newChain(*cfg.ChainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
+
+	chainID := *cfg.ChainID
+	switch chainID {
+	case "devnet":
+		chainID = client.DevnetGenesisHash
+	case "testnet":
+		chainID = client.TestnetGenesisHash
+	case "mainnet":
+		chainID = client.MainnetGenesisHash
+	default:
+	}
+
+	c, err := newChain(chainID, cfg, opts.KeyStore, opts.Logger, opts.DS)
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +134,10 @@ type chain struct {
 }
 
 type verifiedCachedClient struct {
-	chainID         string
-	expectedChainID string
-	nodeURL         string
+	skipVerification bool
+	chainID          string
+	expectedChainID  string
+	nodeURL          string
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
@@ -150,17 +165,18 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		return v.chainIDVerified, fmt.Errorf("failed to fetch ChainID in verifiedCachedClient: %w", err)
 	}
 
-	// check chainID matches expected chainID
-	expectedChainID := strings.ToLower(v.expectedChainID)
-	// if this is localnet, allow any chain ID as long as it's not spoofing an official network
-	ignore := v.chainID == "localnet" && !slices.Contains([]string{"mainnet", "testnet", "devnet"}, expectedChainID)
-	if !ignore && v.chainID != expectedChainID {
-		v.chainIDVerified = false
-		return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", expectedChainID, v.chainID, v.nodeURL)
+	if !v.skipVerification {
+		// if expectedChainID is a base58 encoded public key, verify it matches with genesis hash got from rpc client
+		_, err = solanago.PublicKeyFromBase58(v.expectedChainID)
+		if err == nil {
+			if v.chainID != v.expectedChainID {
+				v.chainIDVerified = false
+				return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+			}
+		}
 	}
 
 	v.chainIDVerified = true
-
 	return v.chainIDVerified, nil
 }
 
@@ -329,7 +345,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		bc = utils.NewOnceLoader[monitor.BalanceClient](func(ctx context.Context) (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC(ctx) })
 	}
 
-	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewORM(ch.ID(), ds, lggr), ch.multiClient)
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewObservedORM(ch.ID(), ds, lggr), ch.multiClient, cfg)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
@@ -387,6 +403,16 @@ func (c *chain) Transact(ctx context.Context, from, to string, amount *big.Int, 
 	return c.sendTx(ctx, from, to, amount, balanceCheck)
 }
 
+func (c *chain) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
+	from, err := strconv.ParseInt(fromBlock, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	c.LogPoller().Replay(from)
+	return nil
+}
+
 func (c *chain) listNodeStatuses(start, end int) ([]types.NodeStatus, int, error) {
 	stats := make([]types.NodeStatus, 0)
 	total := len(c.cfg.Nodes)
@@ -435,6 +461,10 @@ func (c *chain) Reader() (client.Reader, error) {
 	ctx, cancel := c.stopCh.NewCtx()
 	defer cancel()
 	return c.getClient(ctx)
+}
+
+func (c *chain) MultiClient() *client.MultiClient {
+	return c.multiClient
 }
 
 func (c *chain) ChainID() string {
@@ -497,10 +527,17 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 	cl, exists := c.clientCache[url]
 	c.clientLock.RUnlock()
 
+	var skipVerification bool
+	verifyCfg := c.cfg.MultiNode.MultiNode.VerifyChainID
+	if verifyCfg != nil && !*verifyCfg {
+		skipVerification = true
+	}
+
 	if !exists {
 		cl = &verifiedCachedClient{
-			nodeURL:         url,
-			expectedChainID: c.id,
+			nodeURL:          url,
+			expectedChainID:  c.id,
+			skipVerification: skipVerification,
 		}
 		// create client
 		cl.ReaderWriter, err = client.NewClient(url, c.cfg, DefaultRequestTimeout, logger.Named(c.lggr, "Client."+*node.Name))
@@ -546,6 +583,9 @@ func (c *chain) Close() error {
 		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Stopping multinode")
 			closeAll = append(closeAll, c.multiNode, c.txSender)
+		}
+		if c.lp.Ready() == nil {
+			c.lp.Close()
 		}
 		return services.CloseAll(closeAll...)
 	})

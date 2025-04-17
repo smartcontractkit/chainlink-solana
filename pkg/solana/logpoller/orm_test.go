@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
@@ -74,8 +73,7 @@ func TestLogPollerFilters(t *testing.T) {
 
 		for _, filter := range filters {
 			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
-				ctx := tests.Context(t)
-				chainID := uuid.NewString()
+				ctx := t.Context()
 				dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 				orm := NewORM(chainID, dbx, lggr)
 				id, err := orm.InsertFilter(ctx, filter)
@@ -84,6 +82,12 @@ func TestLogPollerFilters(t *testing.T) {
 				dbFilter, err := orm.GetFilterByID(ctx, id)
 				require.NoError(t, err)
 				require.Equal(t, filter, dbFilter)
+
+				exists, err := orm.HasFilter(ctx, dbFilter.Name)
+
+				require.NoError(t, err)
+				require.True(t, exists)
+
 				dbFilters, err := orm.SelectFilters(ctx)
 				require.NoError(t, err)
 				i := slices.IndexFunc(dbFilters, func(f Filter) bool {
@@ -95,11 +99,10 @@ func TestLogPollerFilters(t *testing.T) {
 		}
 	})
 	t.Run("Updates non primary fields if name and chainID is not unique", func(t *testing.T) {
-		chainID := uuid.NewString()
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		id, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		filter.EventName = uuid.NewString()
@@ -115,11 +118,10 @@ func TestLogPollerFilters(t *testing.T) {
 		require.Equal(t, filter, dbFilter)
 	})
 	t.Run("Allows reuse name of a filter marked as deleted", func(t *testing.T) {
-		chainID := uuid.NewString()
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		// mark deleted
@@ -138,7 +140,7 @@ func TestLogPollerFilters(t *testing.T) {
 		orm1 := NewORM(uuid.NewString(), dbx, lggr)
 		orm2 := NewORM(uuid.NewString(), dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID1, err := orm1.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		filterID2, err := orm2.InsertFilter(ctx, filter)
@@ -147,10 +149,9 @@ func TestLogPollerFilters(t *testing.T) {
 	})
 	t.Run("Deletes log on parent filter deletion", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
-		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filterID, err := orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
 		log := newRandomLog(t, filterID, chainID, "My Event")
@@ -172,31 +173,40 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, logs, 0)
 	})
-	t.Run("MarkBackfilled updated corresponding filed", func(t *testing.T) {
+
+	genEnsureIsBackfilled := func(ctx context.Context, orm *DSORM) func([]int64, bool) {
+		return func(filterIDs []int64, expectedIsBackfilled bool) {
+			for _, filterID := range filterIDs {
+				filter, err := orm.GetFilterByID(ctx, filterID)
+				require.NoError(t, err)
+				require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
+			}
+		}
+	}
+
+	t.Run("MarkBackfilled updated corresponding field", func(t *testing.T) {
 		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
-		chainID := uuid.NewString()
 		orm := NewORM(chainID, dbx, lggr)
 
 		filter := newRandomFilter(t)
-		ctx := tests.Context(t)
+		ctx := t.Context()
 		filter.IsBackfilled = true
 		filterID, err := orm.InsertFilter(ctx, filter)
+		filterIDs := []int64{filterID}
 		require.NoError(t, err)
-		ensureIsBackfilled := func(expectedIsBackfilled bool) {
-			filter, err = orm.GetFilterByID(ctx, filterID)
-			require.NoError(t, err)
-			require.Equal(t, expectedIsBackfilled, filter.IsBackfilled)
-		}
-		ensureIsBackfilled(true)
+
+		ensureIsBackfilled := genEnsureIsBackfilled(ctx, orm)
+
+		ensureIsBackfilled(filterIDs, true)
 		// insert overrides
 		filter.IsBackfilled = false
 		_, err = orm.InsertFilter(ctx, filter)
 		require.NoError(t, err)
-		ensureIsBackfilled(false)
+		ensureIsBackfilled(filterIDs, false)
 		// mark changes value to true
 		err = orm.MarkFilterBackfilled(ctx, filterID)
 		require.NoError(t, err)
-		ensureIsBackfilled(true)
+		ensureIsBackfilled(filterIDs, true)
 	})
 }
 
@@ -205,11 +215,10 @@ func TestLogPollerLogs(t *testing.T) {
 	t.Parallel()
 
 	lggr := logger.Test(t)
-	chainID := uuid.NewString()
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// create filter as it's required for a log
 	filterID, err := orm.InsertFilter(ctx, newRandomFilter(t))
 	require.NoError(t, err)
@@ -236,7 +245,7 @@ func TestLogPollerLogs(t *testing.T) {
 	require.Equal(t, log2, dbLogs[0])
 
 	t.Run("SelectSequenceNums", func(t *testing.T) {
-		seqNums, err := orm.SelectSeqNums(tests.Context(t))
+		seqNums, err := orm.SelectSeqNums(t.Context())
 		require.NoError(t, err)
 		require.Len(t, seqNums, 2)
 	})
@@ -258,9 +267,9 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	orm1 := NewORM(uuid.NewString(), dbx, lggr)
-	createLogsForBlocks(tests.Context(t), orm1, 10, 11, 12)
+	createLogsForBlocks(t.Context(), orm1, 10, 11, 12)
 	orm2 := NewORM(uuid.NewString(), dbx, lggr)
 	createLogsForBlocks(context.Background(), orm2, 100, 110, 120)
 	latestBlockChain1, err := orm1.GetLatestBlock(ctx)
@@ -290,7 +299,7 @@ func TestFilteredLogs(t *testing.T) {
 	lggr := logger.Test(t)
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := NewORM(chainID, dbx, lggr)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	tests := []struct {
 		name     string
@@ -306,10 +315,10 @@ func TestFilteredLogs(t *testing.T) {
 				{BlockNumber: 3, LogIndex: 0},
 			},
 			expected: []Log{
-				{BlockNumber: 1, LogIndex: 0},
-				{BlockNumber: 2, LogIndex: 1},
-				{BlockNumber: 2, LogIndex: 2},
 				{BlockNumber: 3, LogIndex: 0},
+				{BlockNumber: 2, LogIndex: 2},
+				{BlockNumber: 2, LogIndex: 1},
+				{BlockNumber: 1, LogIndex: 0},
 			},
 		},
 		{
@@ -320,11 +329,11 @@ func TestFilteredLogs(t *testing.T) {
 				{BlockNumber: 3, LogIndex: 2},
 			},
 			expected: []Log{
-				{BlockNumber: 1, LogIndex: 0},
-				{BlockNumber: 2, LogIndex: 1},
-				{BlockNumber: 2, LogIndex: 2},
-				{BlockNumber: 3, LogIndex: 0},
 				{BlockNumber: 3, LogIndex: 2},
+				{BlockNumber: 3, LogIndex: 0},
+				{BlockNumber: 2, LogIndex: 2},
+				{BlockNumber: 2, LogIndex: 1},
+				{BlockNumber: 1, LogIndex: 0},
 			},
 		},
 	}
@@ -348,7 +357,7 @@ func TestFilteredLogs(t *testing.T) {
 			l.ChainID = chainID
 			l.FilterID = filterID
 			l.BlockTimestamp = blockTimestamp
-			l.SubkeyValues = IndexedValues{}
+			l.SubkeyValues = nil
 			l.Data = data
 		}
 		t.Run(tt.name, func(t *testing.T) {
@@ -364,6 +373,96 @@ func TestFilteredLogs(t *testing.T) {
 	}
 }
 
+func TestPruneLogsForFilter(t *testing.T) {
+	t.Parallel()
+	sqltest.SkipInMemory(t)
+	lggr := logger.Test(t)
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+	orm := NewORM(chainID, dbx, lggr)
+	ctx := t.Context()
+
+	filter := newRandomFilter(t)
+	filter.MaxLogsKept = 0
+	filterID, err := orm.InsertFilter(ctx, filter)
+	require.NoError(t, err)
+
+	filter.ID = filterID
+
+	logs := make([]Log, 7)
+
+	for i := range logs {
+		logs[i].FilterID = filterID
+		logs[i].ChainID = chainID
+		logs[i].BlockNumber = int64(i + 1)
+		logs[i].SequenceNum = int64(i + 1)
+		logs[i].EventSig = filter.EventSig
+		logs[i].Address = filter.Address
+		logs[i].Data = []byte{}
+	}
+
+	moreLogs := logs[5:]
+	logs = logs[:5]
+
+	err = orm.InsertLogs(ctx, logs)
+	require.NoError(t, err)
+
+	t.Run("default setting is permanent retention", func(t *testing.T) {
+		deleted, err2 := orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err2)
+
+		assert.Equal(t, int64(0), deleted)
+		//require.NoError(t, orm.DeleteFilter(ctx, filterID))
+	})
+
+	t.Run("MaxLogsKept=3 should keep last three logs", func(t *testing.T) {
+		filter.MaxLogsKept = 3
+		filterID, err = orm.InsertFilter(ctx, filter)
+		require.NoError(t, err)
+
+		var deleted int64
+		deleted, err = orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(2), deleted)
+
+		var actual []Log
+		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+
+		require.Len(t, actual, 3)
+		for i := range actual {
+			sanitize(&logs[2+i], &actual[i])
+			assert.Equal(t, logs[2+i].BlockNumber, actual[i].BlockNumber)
+		}
+	})
+
+	t.Run("Expired logs should be pruned", func(t *testing.T) {
+		filter.MaxLogsKept = 18
+		var initial []Log
+		initial, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+
+		past := time.Now().Add(-40 * time.Minute).UTC()
+		moreLogs[0].ExpiresAt = &past
+
+		future := time.Now().Add(40 * time.Minute).UTC()
+		moreLogs[1].ExpiresAt = &future
+
+		err = orm.InsertLogs(ctx, moreLogs)
+		require.NoError(t, err)
+
+		deleted, err := orm.PruneLogsForFilter(ctx, filter)
+		require.NoError(t, err)
+
+		assert.Equal(t, int64(1), deleted)
+
+		var actual []Log
+		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
+		require.NoError(t, err)
+		assert.Len(t, actual, len(initial)+1)
+	})
+}
+
 func sanitize(expected, actual *Log) {
 	// TODO: override ScanLocation with custom TimestamptzCodec?
 	// See: https://github.com/jackc/pgx/issues/2117
@@ -373,4 +472,9 @@ func sanitize(expected, actual *Log) {
 	// fill in fields populated by db write itself
 	expected.ID = actual.ID
 	expected.CreatedAt = actual.CreatedAt
+
+	// These are not returned by FilteredLogs
+	actual.SequenceNum = expected.SequenceNum
+	actual.FilterID = expected.FilterID
+	actual.SubkeyValues = expected.SubkeyValues
 }

@@ -16,11 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestBuildReport(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c := ReportCodec{}
 	oo := []median.ParsedAttributedObservation{}
 
@@ -77,7 +76,7 @@ func TestMedianFromOnChainReport(t *testing.T) {
 		13, 224, 182, 179, 167, 100, 0, 0, // juels per luna (1 with 18 decimal places)
 	}
 
-	res, err := c.MedianFromReport(tests.Context(t), report)
+	res, err := c.MedianFromReport(t.Context(), report)
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", res.String())
 }
@@ -91,7 +90,7 @@ type medianTest struct {
 func TestMedianFromReport(t *testing.T) {
 	cdc := ReportCodec{}
 	// Requires at least one obs
-	_, err := cdc.BuildReport(tests.Context(t), nil)
+	_, err := cdc.BuildReport(t.Context(), nil)
 	require.Error(t, err)
 	var tt = []medianTest{
 		{
@@ -144,7 +143,7 @@ func TestMedianFromReport(t *testing.T) {
 
 	for idx := range tt {
 		t.Run(tt[idx].name, func(t *testing.T) {
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			var pos []median.ParsedAttributedObservation
 			for i, obs := range tt[idx].obs {
 				pos = append(pos, median.ParsedAttributedObservation{
@@ -204,7 +203,7 @@ func TestHashReport(t *testing.T) {
 }
 
 func TestNegativeMedianValue(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	c := ReportCodec{}
 	oo := []median.ParsedAttributedObservation{
 		median.ParsedAttributedObservation{
@@ -238,7 +237,7 @@ func TestNegativeMedianValue(t *testing.T) {
 }
 
 func TestReportHandleOverflow(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	// too large observation should not cause panic
 	c := ReportCodec{}
 	oo := []median.ParsedAttributedObservation{

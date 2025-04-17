@@ -10,92 +10,92 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitializeLookupTable is the `initializeLookupTable` instruction.
-type InitializeLookupTable struct {
+// Initializelookuptable is the `initializelookuptable` instruction.
+type Initializelookuptable struct {
 	LookupTable *ag_solanago.PublicKey
 
-	// [0] = [WRITE] writeDataAccount
-	// ··········· PDA for LookupTableDataAccount, derived from seeds and created by the System Program
-	//
-	// [1] = [WRITE, SIGNER] admin
+	// [0] = [WRITE, SIGNER] admin
 	// ··········· Admin account that pays for PDA creation and signs the transaction
+	//
+	// [1] = [WRITE] writeDataAccount
+	// ··········· PDA for LookupTableDataAccount, derived from seeds and created by the System Program
 	//
 	// [2] = [] systemProgram
 	// ··········· System Program required for PDA creation
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
-// NewInitializeLookupTableInstructionBuilder creates a new `InitializeLookupTable` instruction builder.
-func NewInitializeLookupTableInstructionBuilder() *InitializeLookupTable {
-	nd := &InitializeLookupTable{
+// NewInitializelookuptableInstructionBuilder creates a new `Initializelookuptable` instruction builder.
+func NewInitializelookuptableInstructionBuilder() *Initializelookuptable {
+	nd := &Initializelookuptable{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
 
 // SetLookupTable sets the "lookupTable" parameter.
-func (inst *InitializeLookupTable) SetLookupTable(lookupTable ag_solanago.PublicKey) *InitializeLookupTable {
+func (inst *Initializelookuptable) SetLookupTable(lookupTable ag_solanago.PublicKey) *Initializelookuptable {
 	inst.LookupTable = &lookupTable
 	return inst
 }
 
-// SetWriteDataAccountAccount sets the "writeDataAccount" account.
-// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
-func (inst *InitializeLookupTable) SetWriteDataAccountAccount(writeDataAccount ag_solanago.PublicKey) *InitializeLookupTable {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(writeDataAccount).WRITE()
-	return inst
-}
-
-// GetWriteDataAccountAccount gets the "writeDataAccount" account.
-// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
-func (inst *InitializeLookupTable) GetWriteDataAccountAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetAdminAccount sets the "admin" account.
 // Admin account that pays for PDA creation and signs the transaction
-func (inst *InitializeLookupTable) SetAdminAccount(admin ag_solanago.PublicKey) *InitializeLookupTable {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(admin).WRITE().SIGNER()
+func (inst *Initializelookuptable) SetAdminAccount(admin ag_solanago.PublicKey) *Initializelookuptable {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(admin).WRITE().SIGNER()
 	return inst
 }
 
 // GetAdminAccount gets the "admin" account.
 // Admin account that pays for PDA creation and signs the transaction
-func (inst *InitializeLookupTable) GetAdminAccount() *ag_solanago.AccountMeta {
+func (inst *Initializelookuptable) GetAdminAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetWriteDataAccountAccount sets the "writeDataAccount" account.
+// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
+func (inst *Initializelookuptable) SetWriteDataAccountAccount(writeDataAccount ag_solanago.PublicKey) *Initializelookuptable {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(writeDataAccount).WRITE()
+	return inst
+}
+
+// GetWriteDataAccountAccount gets the "writeDataAccount" account.
+// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
+func (inst *Initializelookuptable) GetWriteDataAccountAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 // System Program required for PDA creation
-func (inst *InitializeLookupTable) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeLookupTable {
+func (inst *Initializelookuptable) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initializelookuptable {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 // System Program required for PDA creation
-func (inst *InitializeLookupTable) GetSystemProgramAccount() *ag_solanago.AccountMeta {
+func (inst *Initializelookuptable) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-func (inst InitializeLookupTable) Build() *Instruction {
+func (inst Initializelookuptable) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: Instruction_InitializeLookupTable,
+		TypeID: Instruction_Initializelookuptable,
 	}}
 }
 
 // ValidateAndBuild validates the instruction parameters and accounts;
 // if there is a validation error, it returns the error.
 // Otherwise, it builds and returns the instruction.
-func (inst InitializeLookupTable) ValidateAndBuild() (*Instruction, error) {
+func (inst Initializelookuptable) ValidateAndBuild() (*Instruction, error) {
 	if err := inst.Validate(); err != nil {
 		return nil, err
 	}
 	return inst.Build(), nil
 }
 
-func (inst *InitializeLookupTable) Validate() error {
+func (inst *Initializelookuptable) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
 		if inst.LookupTable == nil {
@@ -106,10 +106,10 @@ func (inst *InitializeLookupTable) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.WriteDataAccount is not set")
+			return errors.New("accounts.Admin is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Admin is not set")
+			return errors.New("accounts.WriteDataAccount is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.SystemProgram is not set")
@@ -118,11 +118,11 @@ func (inst *InitializeLookupTable) Validate() error {
 	return nil
 }
 
-func (inst *InitializeLookupTable) EncodeToTree(parent ag_treeout.Branches) {
+func (inst *Initializelookuptable) EncodeToTree(parent ag_treeout.Branches) {
 	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
 		ParentFunc(func(programBranch ag_treeout.Branches) {
-			programBranch.Child(ag_format.Instruction("InitializeLookupTable")).
+			programBranch.Child(ag_format.Instruction("Initializelookuptable")).
 				//
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
@@ -133,15 +133,15 @@ func (inst *InitializeLookupTable) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    writeData", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("        admin", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    writeData", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
 }
 
-func (obj InitializeLookupTable) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj Initializelookuptable) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `LookupTable` param:
 	err = encoder.Encode(obj.LookupTable)
 	if err != nil {
@@ -149,7 +149,7 @@ func (obj InitializeLookupTable) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	}
 	return nil
 }
-func (obj *InitializeLookupTable) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *Initializelookuptable) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `LookupTable`:
 	err = decoder.Decode(&obj.LookupTable)
 	if err != nil {
@@ -158,17 +158,17 @@ func (obj *InitializeLookupTable) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	return nil
 }
 
-// NewInitializeLookupTableInstruction declares a new InitializeLookupTable instruction with the provided parameters and accounts.
-func NewInitializeLookupTableInstruction(
+// NewInitializelookuptableInstruction declares a new Initializelookuptable instruction with the provided parameters and accounts.
+func NewInitializelookuptableInstruction(
 	// Parameters:
 	lookupTable ag_solanago.PublicKey,
 	// Accounts:
-	writeDataAccount ag_solanago.PublicKey,
 	admin ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *InitializeLookupTable {
-	return NewInitializeLookupTableInstructionBuilder().
+	writeDataAccount ag_solanago.PublicKey,
+	systemProgram ag_solanago.PublicKey) *Initializelookuptable {
+	return NewInitializelookuptableInstructionBuilder().
 		SetLookupTable(lookupTable).
-		SetWriteDataAccountAccount(writeDataAccount).
 		SetAdminAccount(admin).
+		SetWriteDataAccountAccount(writeDataAccount).
 		SetSystemProgramAccount(systemProgram)
 }

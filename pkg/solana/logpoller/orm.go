@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -38,6 +39,29 @@ func (o *DSORM) Transact(ctx context.Context, fn func(*DSORM) error) (err error)
 // new returns a NewORM like o, but backed by ds.
 func (o *DSORM) new(ds sqlutil.DataSource) *DSORM { return NewORM(o.chainID, ds, o.lggr) }
 
+func (o *DSORM) HasFilter(ctx context.Context, name string) (bool, error) {
+	args, err := newQueryArgs(o.chainID).withField("name", name).toArgs()
+	if err != nil {
+		return false, err
+	}
+
+	query := `
+		SELECT id FROM solana.log_poller_filters
+			WHERE is_deleted = false AND chain_id = :chain_id AND name = :name LIMIT 1`
+
+	query, sqlArgs, err := o.ds.BindNamed(query, args)
+	if err != nil {
+		return false, err
+	}
+
+	var id int64
+	if err = o.ds.GetContext(ctx, &id, query, sqlArgs...); err != nil {
+		return false, err
+	}
+
+	return id >= 0, nil
+}
+
 // InsertFilter is idempotent.
 //
 // Each address/event pair must have a unique job id, so it may be removed when the job is deleted.
@@ -55,6 +79,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 		withEventIDL(filter.EventIdl).
 		withSubKeyPaths(filter.SubkeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
+		withIncludeReverted(filter.IncludeReverted).
 		toArgs()
 	if err != nil {
 		return 0, err
@@ -64,14 +89,15 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 	// https://github.com/jmoiron/sqlx/issues/91, https://github.com/jmoiron/sqlx/issues/428
 	query := `
 		INSERT INTO solana.log_poller_filters
-		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled)
-	  		VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled)
+		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled, include_reverted)
+			VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled, :include_reverted)
 	  	ON CONFLICT (chain_id, name) WHERE NOT is_deleted DO UPDATE SET 
 	  	                                                        event_name = EXCLUDED.event_name,
 	  	                                                        starting_block = EXCLUDED.starting_block,
 	  	                                                        retention = EXCLUDED.retention,
 	  	                                                        max_logs_kept = EXCLUDED.max_logs_kept,
-	  	                                                        is_backfilled = EXCLUDED.is_backfilled
+	  	                                                        is_backfilled = EXCLUDED.is_backfilled,
+	  	                                                        include_reverted = EXCLUDED.include_reverted
 		RETURNING id;`
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -147,9 +173,9 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 		}
 
 		query := `INSERT INTO solana.logs
-					(filter_id, chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, subkey_values, tx_hash, data, created_at, expires_at, sequence_num)
+					(filter_id, chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, subkey_values, tx_hash, data, created_at, expires_at, sequence_num, error)
 				VALUES
-					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num)
+					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num, :error)
 				ON CONFLICT DO NOTHING`
 
 		res, err := tx.NamedExecContext(ctx, query, logs[start:end])
@@ -278,4 +304,23 @@ func (o *DSORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
 		seqNums[row.FilterID] = row.SequenceNum
 	}
 	return seqNums, nil
+}
+
+func (o *DSORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	query := `DELETE FROM solana.logs AS l
+		  		 WHERE chain_id = $1 AND filter_id = $2 AND
+		  		       ( l.expires_at <= NOW() OR $3 > 0 AND
+		  		        	( SELECT MAX(sequence_num) FROM solana.logs
+		  		    			WHERE chain_id = $1 AND filter_id = $2
+							) - l.sequence_num >= $3
+					   )`
+	res, err := o.ds.ExecContext(ctx, query, o.chainID, filter.ID, filter.MaxLogsKept)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.RowsAffected()
 }

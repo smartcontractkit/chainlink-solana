@@ -5,13 +5,56 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
-
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
+
+const (
+	DefaultLogPollerRetention = 30 * 24 * time.Hour
+	DefaultMaxLogsKept        = 0
+	DefaultStartingBlock      = 0
+	DefaultIncludeReverted    = false
+)
+
+type PollingFilter struct {
+	Retention       *time.Duration `json:"retention,omitempty"`     // maximum amount of time to retain logs
+	MaxLogsKept     *int64         `json:"maxLogsKept,omitempty"`   // maximum number of logs to retain ( 0 = unlimited )
+	StartingBlock   *int64         `json:"startingBlock,omitempty"` // which block to start looking for logs
+	IncludeReverted *bool          `json:"includeReverted"`         // whether to include logs emitted by transactions which failed while executing on chain
+}
+
+func (f PollingFilter) GetRetention() time.Duration {
+	if f.Retention == nil {
+		return DefaultLogPollerRetention
+	}
+
+	return *f.Retention
+}
+
+func (f PollingFilter) GetMaxLogsKept() int64 {
+	if f.MaxLogsKept == nil {
+		return DefaultMaxLogsKept
+	}
+
+	return *f.MaxLogsKept
+}
+
+func (f PollingFilter) GetStartingBlock() int64 {
+	if f.StartingBlock == nil {
+		return DefaultStartingBlock
+	}
+
+	return *f.StartingBlock
+}
+
+func (f PollingFilter) GetIncludeReverted() bool {
+	if f.IncludeReverted == nil {
+		return DefaultIncludeReverted
+	}
+	return *f.IncludeReverted
+}
 
 type ContractReader struct {
 	Namespaces map[string]ChainContractReader `json:"namespaces"`
@@ -24,32 +67,45 @@ type ContractReader struct {
 }
 
 type ChainContractReader struct {
-	codec.IDL       `json:"anchorIDL"`
-	ContractAddress solana.PublicKey `json:"contractAddress"`
+	codec.IDL      `json:"anchorIDL"`
+	*PollingFilter `json:"pollingFilter,omitempty"`
 	// Reads key is the off-chain name for this read.
 	Reads map[string]ReadDefinition `json:"reads"`
-	// TODO ContractPollingFilter same as EVM?
+}
+
+type EventDefinitions struct {
+	IndexedField0 *IndexedField `json:"indexedField0"`
+	IndexedField1 *IndexedField `json:"indexedField1"`
+	IndexedField2 *IndexedField `json:"indexedField2"`
+	IndexedField3 *IndexedField `json:"indexedField3"`
+	// PollingFilter should be defined on a contract level in ContractPollingFilter, unless event needs to override the
+	// contract level filter options.
+	*PollingFilter `json:"pollingFilter,omitempty"`
 }
 
 type MultiReader struct {
 	// Reads is a list of reads that is sequentially read to fill out a complete response for the parent read.
 	// Parent ReadDefinition has to define codec modifiers which adds fields that are to be filled out by the reads in Reads.
 	Reads []ReadDefinition `json:"reads,omitempty"`
+	// ReuseParams If true, params from parent read will be reused for all MultiReader Reads.
+	ReuseParams bool `json:"reuseParams"`
 }
 
 type ReadDefinition struct {
-	ChainSpecificName   string                      `json:"chainSpecificName"`
-	ReadType            ReadType                    `json:"readType,omitempty"`
-	InputModifications  commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
-	OutputModifications commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDADefinition       codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
-	MultiReader         *MultiReader
-	IndexedField0       *IndexedField `json:"indexedField0"`
-	IndexedField1       *IndexedField `json:"indexedField1"`
-	IndexedField2       *IndexedField `json:"indexedField2"`
-	IndexedField3       *IndexedField `json:"indexedField3"`
-	// This will create a log poller filter for this event.
-	*PollingFilter `json:"pollingFilter,omitempty"`
+	ChainSpecificName       string                      `json:"chainSpecificName"`
+	ReadType                ReadType                    `json:"readType,omitempty"`
+	ErrOnMissingAccountData bool                        `json:"errOnMissingAccountData,omitempty"`
+	InputModifications      commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
+	OutputModifications     commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
+	PDADefinition           codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	MultiReader             *MultiReader                `json:"multiReader,omitempty"`
+	EventDefinitions        *EventDefinitions           `json:"eventDefinitions,omitempty"`
+	// ResponseAddressHardCoder hardcodes the address of the contract into the defined field in the response.
+	ResponseAddressHardCoder *commoncodec.HardCodeModifierConfig `json:"responseAddressHardCoder,omitempty"`
+}
+
+func (d ReadDefinition) HasPollingFilter() bool {
+	return d.EventDefinitions != nil && d.EventDefinitions.PollingFilter != nil
 }
 
 type ReadType int
@@ -140,10 +196,4 @@ func (c *ChainContractReader) UnmarshalJSON(bytes []byte) error {
 	}
 
 	return nil
-}
-
-type PollingFilter struct {
-	EventName   string        `json:"eventName"`
-	Retention   time.Duration `json:"retention"`   // maximum amount of time to retain logs
-	MaxLogsKept int64         `json:"maxLogsKept"` // maximum number of logs to retain ( 0 = unlimited )
 }

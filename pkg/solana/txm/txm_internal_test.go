@@ -23,9 +23,7 @@ import (
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
@@ -124,7 +122,7 @@ func TestTxm(t *testing.T) {
 			id := "mocknet-" + estimator + "-" + uuid.NewString()
 			t.Logf("Starting new iteration: %s", id)
 
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			lggr := logger.Test(t)
 			cfg := config.NewDefault()
 			cfg.Chain.FeeEstimatorMode = &estimator
@@ -782,7 +780,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -939,6 +937,11 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
+		mc.On("GetTransaction", mock.Anything, mock.Anything).Return(&rpc.GetTransactionResult{
+			Meta: &rpc.TransactionMeta{
+				LogMessages: []string{"tx error log"},
+			},
+		}, nil).Once()
 		statuses[sig] = func() (out *rpc.SignatureStatusesResult) {
 			defer wg.Done()
 			return &rpc.SignatureStatusesResult{Err: errors.New("InstructionError")}
@@ -982,7 +985,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	id := "mocknet-" + estimator + "-" + uuid.NewString()
 	t.Logf("Starting new iteration: %s", id)
 
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
 	cfg.Chain.FeeEstimatorMode = &estimator
@@ -1036,11 +1039,11 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		computeUnitLimit := fees.ComputeUnitLimit(uint32(bigmath.AddPercentage(new(big.Int).SetUint64(computeUnitConsumed), EstimateComputeUnitLimitBuffer).Uint64()))
 		mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimit)).Return(sig, nil)
 		// First simulation before broadcast with signature and max compute unit limit set
-		mc.On("SimulateTx", mock.Anything, simulateTx, mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, simulateTx, mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 		// Second simulation after broadcast with signature and compute unit limit set
-		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.Anything).Run(func(mock.Arguments) {
+		mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimit), mock.AnythingOfType("*rpc.SimulateTransactionOpts")).Run(func(mock.Arguments) {
 			wg.Done()
 		}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &computeUnitConsumed}, nil).Once()
 
@@ -1119,7 +1122,7 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		// tx should be stored in-memory and moved to errored state
 		status, err := txm.GetTransactionStatus(ctx, txID)
 		require.NoError(t, err)
-		require.Equal(t, commontypes.Fatal, status)
+		require.Equal(t, types.Fatal, status)
 	})
 }
 
@@ -1138,12 +1141,12 @@ func TestTxm_Enqueue(t *testing.T) {
 			return out
 		}, nil,
 	).Maybe()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
-	validKey := solana.PublicKeyFromBytes([]byte{1})
-	invalidKey := solana.PublicKeyFromBytes([]byte{2})
+	validKey := utils.GetRandomPubKey(t)
+	invalidKey := utils.GetRandomPubKey(t)
 	mkey.On("Sign", mock.Anything, validKey.String(), mock.Anything).Return([]byte{1}, nil)
 	mkey.On("Sign", mock.Anything, invalidKey.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: invalidKey.String(), KeyType: "Solana"})
 
@@ -1203,10 +1206,18 @@ func TestTxm_Enqueue(t *testing.T) {
 			assert.Error(t, txm.Enqueue(ctx, run.name, run.tx, nil, run.lastValidBlockHeight))
 		})
 	}
+
+	t.Run("duplicate tx ID does not error", func(t *testing.T) {
+		id := uuid.NewString()
+		err := txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+		err = txm.Enqueue(ctx, "", tx, &id, 100)
+		require.NoError(t, err)
+	})
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
-	txCopy := tx
+	txCopy := deepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)
@@ -1228,7 +1239,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(5 * time.Second)
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second) // Enable retention to keep transactions after finality and be able to check their statuses.
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper function to set up common test environment
 	setupTxmTest := func(
@@ -1620,7 +1631,7 @@ func TestTxm_OnReorg(t *testing.T) {
 	// Enable retention to keep transactions after finality and be able to check their statuses.
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(10 * time.Second)
 	lggr := logger.Test(t)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Helper that sets up a Txm and mocks.
 	setupTxmTest := func(
@@ -1701,7 +1712,7 @@ func TestTxm_OnReorg(t *testing.T) {
 			latestBlockhashFunc := func() (*rpc.GetLatestBlockhashResult, error) {
 				return &rpc.GetLatestBlockhashResult{
 					Value: &rpc.LatestBlockhashResult{
-						Blockhash:            solana.HashFromBytes([]byte{2}),
+						Blockhash:            solana.HashFromBytes(utils.GetRandomPubKey(t).Bytes()),
 						LastValidBlockHeight: 2001,
 					},
 				}, nil
@@ -1785,4 +1796,170 @@ func TestTxm_OnReorg(t *testing.T) {
 			require.Equal(t, types.Finalized, status)
 		})
 	}
+}
+
+func TestTxm_GetTransactionStatus(t *testing.T) {
+	// set up configs needed in txm
+	lggr := logger.Test(t)
+	ctx := t.Context()
+	_, cancel := context.WithCancel(ctx)
+
+	// set up configs needed in txm
+	estimator := "fixed"
+	id := "mocknet-" + estimator + "-" + uuid.NewString()
+
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	// Enable retention timeout to keep transactions after finality or error
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
+	mc := mocks.NewReaderWriter(t)
+
+	// mock solana keystore
+	mkey := keyMocks.NewSimpleKeystore(t)
+
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+
+	msg := pendingTx{id: uuid.NewString()}
+
+	// Create new tx in pending state
+	err := txm.txs.New(msg)
+	require.NoError(t, err)
+	state, err := txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	// Move tx to broadcasted state
+	err = txm.txs.OnBroadcasted(msg)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	sig := randomSignature(t)
+	txm.txs.AddSignature(cancel, msg.id, sig)
+
+	// Move tx to processed state
+	msgId, err := txm.txs.OnProcessed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Pending, state)
+
+	// Move tx to confirmed state
+	msgId, err = txm.txs.OnConfirmed(sig)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Unconfirmed, state)
+
+	// Move tx to finalized state
+	msgId, err = txm.txs.OnFinalized(sig, 1*time.Second)
+	require.NoError(t, err)
+	require.Equal(t, msg.id, msgId)
+	state, err = txm.GetTransactionStatus(ctx, msg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Finalized, state)
+
+	// Add errored tx
+	errMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(errMsg.id, 1*time.Second, txmutils.Errored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, errMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Failed, state)
+
+	// Add fatally errored tx
+	fatalMsg := pendingTx{id: uuid.NewString()}
+	err = txm.txs.OnPrebroadcastError(fatalMsg.id, 1*time.Second, txmutils.FatallyErrored, TxFailReject)
+	require.NoError(t, err)
+	state, err = txm.GetTransactionStatus(ctx, fatalMsg.id)
+	require.NoError(t, err)
+	require.Equal(t, types.Fatal, state)
+
+	// Unknown tx returns error
+	state, err = txm.GetTransactionStatus(ctx, uuid.NewString())
+	require.Error(t, err)
+	require.Equal(t, types.Unknown, state)
+}
+
+func TestTxm_DependencyTx(t *testing.T) {
+	ctx := t.Context()
+	lggr := logger.Test(t)
+	estimator := "fixed"
+	id := "mocknet-dep-" + uuid.NewString()
+	cfg := config.NewDefault()
+	cfg.Chain.FeeEstimatorMode = &estimator
+	cfg.Chain.TxConfirmTimeout = relayconfig.MustNewDuration(30 * time.Second)
+	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(50 * time.Second)
+
+	mc := mocks.NewReaderWriter(t)
+	mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+
+	mkey := keyMocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{1}, nil)
+	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+
+	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+	mc.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
+	mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := 0; i < len(sigs); i++ {
+				out = append(out, &rpc.SignatureStatusesResult{})
+			}
+			return out
+		}, nil,
+	).Maybe()
+
+	t.Run("DependencySuccess", func(t *testing.T) {
+		depID := "dep-tx-success"
+		depMsg := pendingTx{id: depID}
+		require.NoError(t, txm.txs.New(depMsg))
+
+		depSig := randomSignature(t)
+		dummyCancel := func() {}
+		err := txm.txs.OnBroadcasted(depMsg)
+		require.NoError(t, err)
+		require.NoError(t, txm.txs.AddSignature(dummyCancel, depID, depSig))
+		_, err = txm.txs.OnConfirmed(depSig)
+		require.NoError(t, err)
+		_, err = txm.txs.OnFinalized(depSig, 1*time.Second)
+		require.NoError(t, err)
+
+		mainTx, _ := getTx(t, 100, mkey)
+
+		mainTxID := uuid.NewString()
+		lastValidBlockHeight := uint64(100)
+		err = txm.Enqueue(ctx, "test-dep-success", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		require.NoError(t, err)
+
+		status, err := txm.GetTransactionStatus(ctx, mainTxID)
+		require.NoError(t, err)
+
+		require.Equal(t, status, types.Pending)
+	})
+
+	t.Run("DependencyFailure", func(t *testing.T) {
+		depID := "dep-tx-failure"
+		depMsg := pendingTx{id: depID}
+		require.NoError(t, txm.txs.New(depMsg))
+		require.NoError(t, txm.txs.OnPrebroadcastError(depID, 1*time.Second, txmutils.Errored, TxFailReject))
+
+		mainTx, _ := getTx(t, 200, mkey)
+		mainTxID := uuid.NewString()
+		lastValidBlockHeight := uint64(100)
+		err := txm.Enqueue(ctx, "test-dep-failure", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		require.NoError(t, err)
+
+		status, err := txm.waitForTxStatus(ctx, mainTxID, types.Finalized)
+		require.Error(t, err)
+
+		require.Equal(t, types.Failed, status)
+	})
 }

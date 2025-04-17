@@ -23,6 +23,7 @@ type TxState int
 const (
 	NotFound TxState = iota
 	Errored
+	AwaitingBroadcast
 	Broadcasted
 	Processed
 	Confirmed
@@ -36,6 +37,8 @@ func (s TxState) String() string {
 		return "NotFound"
 	case Errored:
 		return "Errored"
+	case AwaitingBroadcast:
+		return "AwaitingBroadcast"
 	case Broadcasted:
 		return "Broadcasted"
 	case Processed:
@@ -196,6 +199,8 @@ type TxConfig struct {
 
 	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
 	ComputeUnitLimit         uint32 // compute unit limit
+
+	DependencyTxID string // transaction ID to wait for before broadcasting
 }
 
 type SetTxConfig func(*TxConfig)
@@ -233,5 +238,10 @@ func SetComputeUnitLimit(v uint32) SetTxConfig {
 func SetEstimateComputeUnitLimit(v bool) SetTxConfig {
 	return func(cfg *TxConfig) {
 		cfg.EstimateComputeUnitLimit = v
+	}
+}
+func SetDependencyTxID(v string) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.DependencyTxID = v
 	}
 }

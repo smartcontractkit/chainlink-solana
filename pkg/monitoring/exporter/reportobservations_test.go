@@ -10,7 +10,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonMonitoring "github.com/smartcontractkit/chainlink-common/pkg/monitoring"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
@@ -18,7 +17,7 @@ import (
 )
 
 func TestReportObservations(t *testing.T) {
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	lgr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
 	m := mocks.NewReportObservations(t)
 	m.On("SetCount", mock.Anything, mock.Anything).Once()

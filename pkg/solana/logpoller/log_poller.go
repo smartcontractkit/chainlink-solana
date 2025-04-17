@@ -4,26 +4,31 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 var (
-	ErrFilterNameConflict   = errors.New("filter with such name already exists")
-	ErrMissingDiscriminator = errors.New("Solana log is missing discriminator")
+	ErrFilterNameConflict = errors.New("filter with such name already exists")
 )
 
 type ORM interface {
 	ChainID() string
+	HasFilter(ctx context.Context, name string) (bool, error)
 	InsertFilter(ctx context.Context, filter Filter) (id int64, err error)
 	SelectFilters(ctx context.Context) ([]Filter, error)
 	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
@@ -33,6 +38,7 @@ type ORM interface {
 	InsertLogs(context.Context, []Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
+	PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error)
 }
 
 type logsLoader interface {
@@ -40,70 +46,92 @@ type logsLoader interface {
 }
 
 type filtersI interface {
+	HasFilter(ctx context.Context, name string) bool
 	RegisterFilter(ctx context.Context, filter Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
 	PruneFilters(ctx context.Context) error
+	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
 	GetFiltersToBackfill() []Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
+	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
 }
 
+type ReplayInfo struct {
+	mut          sync.RWMutex
+	requestBlock int64
+	status       ReplayStatus
+}
+
+// hasRequest returns true if a new request has been received (since the last request completed),
+// whether or not it is pending yet
+func (r *ReplayInfo) hasRequest() bool {
+	return r.status == ReplayStatusRequested || r.status == ReplayStatusPending
+}
+
 type Service struct {
-	services.StateMachine
 	services.Service
 	eng *services.Engine
 
 	lggr              logger.SugaredLogger
 	orm               ORM
 	lastProcessedSlot int64
+	replay            ReplayInfo
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
 	processBlocks     func(ctx context.Context, blocks []Block) error
+	blockTime         time.Duration
+	startingLookback  time.Duration
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient) *Service {
-	lggr = logger.Sugared(logger.Named(lggr, "LogPoller"))
+func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *Service {
 	lp := &Service{
-		orm:     orm,
-		client:  cl,
-		filters: newFilters(lggr, orm),
+		orm:    orm,
+		client: cl,
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
-		Name:  "LogPollerService",
+		Name:  "LogPoller",
 		Start: lp.start,
-		NewSubServices: func(l logger.Logger) []services.Service {
+		NewSubServices: func(lggr logger.Logger) []services.Service {
+			lp.filters = newFilters(lggr, orm)
 			loader := NewEncodedLogCollector(cl, lggr)
 			lp.loader = loader
 			return []services.Service{loader}
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
+	lp.replay.status = ReplayStatusNoRequest
+
+	lp.startingLookback = cfg.LogPollerStartingLookback()
+	lp.blockTime = cfg.BlockTime()
 
 	return lp
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
-	lp := New(lggr, orm, client)
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
+	lp := New(lggr, orm, client, cfg)
 	lp.processBlocks = processBlocks
 	return lp
 }
 
+const BackgroundWorkerInterval = 10 * time.Minute
+
 func (lp *Service) start(_ context.Context) error {
-	lp.eng.GoTick(services.NewTicker(time.Second), func(ctx context.Context) {
+	lp.eng.GoTick(services.NewTicker(2*lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
 			lp.lggr.Errorw("log poller iteration failed - retrying", "err", err)
 		}
 	})
-	lp.eng.GoTick(services.NewTicker(time.Minute), lp.backgroundWorkerRun)
+	lp.eng.GoTick(services.NewTicker(BackgroundWorkerInterval), lp.backgroundWorkerRun)
 	return nil
 }
 
@@ -131,27 +159,43 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 
 	var logs []Log
 	for filter := range matchingFilters {
+		var revertErr *string
+		if blockData.Error != nil {
+			if !filter.IncludeReverted {
+				continue
+			}
+			revertErr = new(string)
+			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+				*revertErr = fmt.Sprintf("%v", blockData.Error)
+				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+			} else {
+				*revertErr = string(j)
+			}
+		}
+
 		var logIndex int64
 		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
 		if err != nil {
 			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
 			return err
 		}
-		if blockData.SlotNumber == math.MaxInt64 {
+		if blockData.SlotNumber > math.MaxInt64 {
 			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
 			lp.lggr.Critical(err.Error())
 			return err
 		}
+
 		log := Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       logIndex,
 			BlockHash:      Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber), //nolint:gosec
+			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
 			TxHash:         Signature(blockData.TransactionHash),
+			Error:          revertErr,
 		}
 
 		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
@@ -159,17 +203,23 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log.SubkeyValues = make([]IndexedValue, 0, len(filter.SubkeyPaths))
-		for _, path := range filter.SubkeyPaths {
+		log.SubkeyValues = make([]IndexedValue, len(filter.SubkeyPaths))
+		for idx, path := range filter.SubkeyPaths {
+			if len(path) == 0 {
+				continue
+			}
+
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
 				return decodeSubKeyErr
 			}
+
 			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}
-			log.SubkeyValues = append(log.SubkeyValues, indexedVal)
+
+			log.SubkeyValues[idx] = indexedVal
 		}
 
 		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
@@ -188,6 +238,13 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 	return lp.orm.InsertLogs(ctx, logs)
 }
 
+func (lp *Service) HasFilter(ctx context.Context, name string) bool {
+	ctx, cancel := lp.eng.Ctx(ctx)
+	defer cancel()
+
+	return lp.filters.HasFilter(ctx, name)
+}
+
 // RegisterFilter - refer to filters.RegisterFilter for details.
 func (lp *Service) RegisterFilter(ctx context.Context, filter Filter) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
@@ -202,43 +259,97 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	return lp.filters.UnregisterFilter(ctx, name)
 }
 
-func (lp *Service) getLastProcessedSlot(ctx context.Context) (int64, error) {
-	if lp.lastProcessedSlot != 0 {
-		return lp.lastProcessedSlot, nil
+// Replay submits a new replay request. If there was already a new replay request
+// submitted since the last replay completed, it will be updated to the earlier of the
+// two requested fromBlock's. The expectation is that, on the next timer tick of the
+// LogPoller run loop it will backfill all filters starting from fromBlock. If there
+// are new filters in the backfill queue, with an earlier StartingBlock, then they
+// will get backfilled from there instead.
+func (lp *Service) Replay(fromBlock int64) {
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	if lp.replay.hasRequest() && lp.replay.requestBlock <= fromBlock {
+		// Already requested, no further action required
+		lp.lggr.Warnf("Ignoring redundant request to replay from block %d, replay from block %d already requested",
+			fromBlock, lp.replay.requestBlock)
+		return
+	}
+	lp.filters.UpdateStartingBlocks(fromBlock)
+	lp.replay.requestBlock = fromBlock
+	if lp.replay.status != ReplayStatusPending {
+		lp.replay.status = ReplayStatusRequested
+	}
+}
+
+// ReplayStatus returns the current replay status of LogPoller:
+//
+// NoRequests - there have not been any replay requests yet since node startup
+// Requested - a replay has been requested, but has not started yet
+// Pending - a replay is currently in progress
+// Complete - there was at least one replay executed since startup, but all have since completed
+func (lp *Service) ReplayStatus() ReplayStatus {
+	lp.replay.mut.RLock()
+	defer lp.replay.mut.RUnlock()
+	return lp.replay.status
+}
+
+func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int64, err error) {
+	lastProcessed = lp.lastProcessedSlot
+	if lastProcessed > 0 {
+		return lastProcessed, nil
 	}
 
-	latestDBBlock, err := lp.orm.GetLatestBlock(ctx)
-	if err == nil {
-		return latestDBBlock, nil
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("error getting latest block from db: %w", err)
-	}
-
-	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	lastProcessed, err = lp.orm.GetLatestBlock(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("error getting latest block from db: %w", err)
+		}
+		lastProcessed = 0
 	}
 
-	if latestFinalizedSlot == 0 {
-		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	var lookbackSlot int64
+	lookbackSlot, err = lp.computeLookbackWindow(ctx)
+	if err != nil {
+		return 0, err
 	}
-	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(latestFinalizedSlot) - 1, nil //
+	if lookbackSlot > lastProcessed {
+		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		return lookbackSlot, nil
+	}
+	lp.lggr.Infof("last processed slot %d is older than lookback window, skipping ahead to slot %d", lastProcessed, lookbackSlot)
+
+	return lastProcessed, nil
+}
+
+// checkForReplayRequest checks whether there have been any new replay requests since it was last called,
+// and if so sets the pending flag to true and returns the block number
+func (lp *Service) checkForReplayRequest() bool {
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	if !lp.replay.hasRequest() {
+		return false
+	}
+
+	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
+	lp.replay.status = ReplayStatusPending
+	return true
 }
 
 func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
+	isReplay := lp.checkForReplayRequest()
+
 	addressesSet := make(map[PublicKey]struct{})
 	addresses := make([]PublicKey, 0, len(filters))
 	minSlot := to
+
 	for _, filter := range filters {
 		if _, ok := addressesSet[filter.Address]; !ok {
 			addressesSet[filter.Address] = struct{}{}
 			addresses = append(addresses, filter.Address)
 		}
-		if filter.StartingBlock < minSlot {
+		if filter.StartingBlock != 0 && filter.StartingBlock < minSlot {
 			minSlot = filter.StartingBlock
 		}
 	}
@@ -254,7 +365,11 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		lp.lggr.Infow("Starting block for filters backfill is greater than the latest processed block - marking filters as backfilled and starting global processing", "filters", len(filters), "from", minSlot, "to", to)
 	}
 
-	var err error
+	if isReplay {
+		lp.replayComplete(minSlot, to)
+	}
+
+  var err error
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
@@ -367,7 +482,26 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	return nil
 }
 
-func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
+// replayComplete is called when a backfill associated with a current pending replay has just completed.
+// Assuming there were no new requests to replay while the backfill was happening, it updates the replay
+// status to ReplayStatusComplete. If there was a request for a lower block number in the meantime, then
+// the status will revert to ReplayStatusRequested
+func (lp *Service) replayComplete(from, to int64) bool {
+	lp.replay.mut.Lock()
+	defer lp.replay.mut.Unlock()
+
+	lp.lggr.Infow("replay complete", "from", from, "to", to)
+
+	if lp.replay.requestBlock < from {
+		// received a new request with lower block number while replaying, we'll process that next time
+		lp.replay.status = ReplayStatusRequested
+		return false
+	}
+	lp.replay.status = ReplayStatusComplete
+	return true
+}
+
+func appendBuffered(ch <-chan Block, maxNum int, blocks []Block) []Block {
 	for {
 		select {
 		case block, ok := <-ch:
@@ -376,7 +510,7 @@ func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
 			}
 
 			blocks = append(blocks, block)
-			if len(blocks) >= max {
+			if len(blocks) >= maxNum {
 				return blocks
 			}
 		default:
@@ -386,12 +520,58 @@ func appendBuffered(ch <-chan Block, max int, blocks []Block) []Block {
 }
 
 func (lp *Service) backgroundWorkerRun(ctx context.Context) {
+	// Set deadline for log pruning to 90% of the time left until the next scheduled BackgroundWorkerRun
+	logsCtx, cancel := context.WithTimeout(sqlutil.WithoutDefaultTimeout(ctx), 9*BackgroundWorkerInterval/10)
+	defer cancel()
+
+	// Filters table is much smaller, so default timeout makes the most sense for that
 	err := lp.filters.PruneFilters(ctx)
 	if err != nil {
 		lp.lggr.Errorw("Failed to prune filters", "err", err)
+	}
+
+	err = lp.filters.PruneLogs(logsCtx)
+	if err != nil {
+		lp.lggr.Errorw("Failed to prune logs", "err", err)
 	}
 }
 
 func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
+}
+
+func (lp *Service) computeLookbackWindow(ctx context.Context) (int64, error) {
+	latestFinalizedSlot, err := lp.client.SlotHeightWithCommitment(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return 0, fmt.Errorf("error getting latest slot from RPC: %w", err)
+	}
+
+	if latestFinalizedSlot == 0 {
+		return 0, fmt.Errorf("latest finalized slot is 0 - waiting for next slot to start processing")
+	}
+
+	lookback := lp.startingLookback
+
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	latestSlot := int64(latestFinalizedSlot)
+	lookbackSlot := latestSlot - int64((lookback-1)/lp.blockTime) - 1 // = latestSlot - ceil(lookback/blockTime)
+
+	firstAvailableSlot, err := lp.client.GetFirstAvailableBlock(ctx) // Despite the name, this returns slot # not block number
+	if err != nil {
+		// This is an optimization to avoid requesting pruned blocks. If there's an err we can just ignore
+		lp.lggr.Warnf("Failed to get first available slot, starting at lookback slot %d from %v ago: %s", lookbackSlot, lookback, err.Error())
+		return lookbackSlot, nil
+	}
+
+	// nolint:gosec
+	// G115: integer overflow conversion uint64 -&gt; int64
+	firstSlot := int64(firstAvailableSlot)
+	if firstSlot > lookbackSlot {
+		lookbackSlot = firstSlot
+		lp.lggr.Infof("First available slot %d is more recent than slot %d from %v ago, using first available slot as lookback slot", firstSlot, lookbackSlot, lookback)
+		return lookbackSlot, nil
+	}
+	lp.lggr.Infof("First available slot %d is older than lookback window, using lookback slot = %d from %v ago", firstSlot, lookbackSlot, lookback)
+	return lookbackSlot, nil
 }

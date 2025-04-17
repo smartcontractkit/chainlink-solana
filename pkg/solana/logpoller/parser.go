@@ -21,7 +21,7 @@ const (
 	txHashFieldName       = "tx_hash"
 	addressFieldName      = "address"
 	eventSigFieldName     = "event_sig"
-	defaultSort           = "block_number ASC, log_index ASC"
+	defaultSort           = "block_number DESC, log_index DESC"
 	subKeyValuesFieldName = "subkey_values"
 	subKeyValueArg        = "subkey_value"
 	subKeyIndexArgName    = "subkey_index"
@@ -35,12 +35,11 @@ var (
 	ErrInvalidSortDir      = errors.New("invalid sort direction")
 	ErrInvalidSortType     = errors.New("invalid sort by type")
 
-	logsFields = [...]string{"id", "filter_id", "chain_id", "log_index", "block_hash", "block_number",
-		"block_timestamp", "address", "event_sig", "subkey_values", "tx_hash", "data", "created_at",
-		"expires_at", "sequence_num"}
+	logsFields = [...]string{"chain_id", "log_index", "block_hash", "block_number", "block_timestamp", "address",
+		"event_sig", "tx_hash", "data", "error"}
 
 	filterFields = [...]string{"id", "name", "address", "event_name", "event_sig", "starting_block",
-		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled"}
+		"event_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled", "include_reverted"}
 )
 
 type IndexedValueComparator struct {
@@ -231,7 +230,7 @@ func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.
 			return "", ErrInvalidCursorDir
 		}
 
-		block, logIdx, _, err := valuesFromCursor(limiter.Limit.Cursor)
+		block, logIdx, err := valuesFromCursor(limiter.Limit.Cursor)
 		if err != nil {
 			return "", err
 		}
@@ -374,30 +373,25 @@ func cmpOpToString(op primitives.ComparisonOperator) (string, error) {
 }
 
 // ensure valuesFromCursor remains consistent with the function above that creates a cursor
-func valuesFromCursor(cursor string) (int64, int, []byte, error) {
+func valuesFromCursor(cursor string) (int64, int64, error) {
 	partCount := 3
 
 	parts := strings.Split(cursor, "-")
 	if len(parts) != partCount {
-		return 0, 0, nil, fmt.Errorf("%w: must be composed as block-logindex-txHash", ErrInvalidCursorFormat)
+		return 0, 0, fmt.Errorf("%w: must be composed as block-logindex-txHash", ErrInvalidCursorFormat)
 	}
 
 	block, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("%w: block number not parsable as int64", ErrInvalidCursorFormat)
+		return 0, 0, fmt.Errorf("%w: block number not parsable as int64", ErrInvalidCursorFormat)
 	}
 
-	logIdx, err := strconv.ParseInt(parts[1], 10, 32)
+	logIdx, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("%w: log index not parsable as int", ErrInvalidCursorFormat)
+		return 0, 0, fmt.Errorf("%w: log index not parsable as int64", ErrInvalidCursorFormat)
 	}
 
-	txHash, err := solana.PublicKeyFromBase58(parts[2])
-	if err != nil {
-		return 0, 0, nil, fmt.Errorf("%w: invalid transaction hash: %s", ErrInvalidCursorFormat, err.Error())
-	}
-
-	return block, int(logIdx), txHash.Bytes(), nil
+	return block, logIdx, nil
 }
 
 func orderToString(dir query.SortDirection) (string, error) {
@@ -412,12 +406,12 @@ func orderToString(dir query.SortDirection) (string, error) {
 }
 
 type addressFilter struct {
-	address solana.PublicKey
+	address PublicKey
 }
 
 func NewAddressFilter(address solana.PublicKey) query.Expression {
 	return query.Expression{
-		Primitive: &addressFilter{address: address},
+		Primitive: &addressFilter{address: PublicKey(address)},
 	}
 }
 
@@ -429,10 +423,10 @@ func (f *addressFilter) Accept(visitor primitives.Visitor) {
 }
 
 type eventSigFilter struct {
-	eventSig []byte
+	eventSig EventSignature
 }
 
-func NewEventSigFilter(sig []byte) query.Expression {
+func NewEventSigFilter(sig EventSignature) query.Expression {
 	return query.Expression{
 		Primitive: &eventSigFilter{eventSig: sig},
 	}
@@ -480,7 +474,7 @@ func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
 
 // FormatContractReaderCursor is exported to ensure cursor structure remains consistent.
 func FormatContractReaderCursor(log Log) string {
-	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash)
+	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash.ToSolana().String())
 }
 
 func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pattern string) (string, error) {
@@ -495,4 +489,23 @@ func makeComp(comp IndexedValueComparator, args *queryArgs, field, subfield, pat
 		cmp,
 		args.withIndexedField(field, comp.Value),
 	), nil
+}
+
+// Where is a query.Where wrapper that ignores the Key and returns a slice of query.Expression rather than
+// query.KeyFilter. If no expressions are provided, or an error occurs, an empty slice is returned.
+func Where(expressions ...query.Expression) ([]query.Expression, error) {
+	filter, err := query.Where(
+		"",
+		expressions...,
+	)
+
+	if err != nil {
+		return []query.Expression{}, err
+	}
+
+	if filter.Expressions == nil {
+		return []query.Expression{}, nil
+	}
+
+	return filter.Expressions, nil
 }

@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_InitializeLookupTable(t *testing.T) {
+func TestEncodeDecode_Initializelookuptable(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("InitializeLookupTable"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("Initializelookuptable"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(InitializeLookupTable)
+				params := new(Initializelookuptable)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(InitializeLookupTable)
+				got := new(Initializelookuptable)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

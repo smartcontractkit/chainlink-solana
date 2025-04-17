@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-viper/mapstructure/v2"
+
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -67,4 +69,21 @@ func makeCodecFromDefs(definitions map[string]Entry) map[string]encodings.Lenien
 	}
 
 	return lenientFromTypeCodec
+}
+
+func MapstructureDecode(src, dest any) error {
+	mDecoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(DecoderHooks...),
+		Result:     dest,
+		Squash:     true,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %w", commontypes.ErrInvalidType, err)
+	}
+
+	if err = mDecoder.Decode(src); err != nil {
+		return fmt.Errorf("%w: %w", commontypes.ErrInvalidType, err)
+	}
+
+	return nil
 }

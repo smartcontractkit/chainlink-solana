@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"iter"
 	"maps"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -37,10 +38,10 @@ type filters struct {
 	discriminatorExtractor codec.DiscriminatorExtractor
 }
 
-func newFilters(lggr logger.SugaredLogger, orm ORM) *filters {
+func newFilters(lggr logger.Logger, orm ORM) *filters {
 	return &filters{
 		orm:                    orm,
-		lggr:                   lggr,
+		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]Decoder),
 		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
 	}
@@ -81,6 +82,61 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 	return nil
 }
 
+// Returns a randomly shuffled snapshot of all currently registered filters
+func (fl *filters) shuffledFilters() iter.Seq[Filter] {
+	fl.filtersMutex.Lock()
+	filterSlice := make([]*Filter, 0, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		filterSlice = append(filterSlice, filter)
+	}
+	fl.filtersMutex.Unlock()
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec // disable G404
+	r.Shuffle(len(filterSlice), func(i, j int) {
+		filterSlice[i], filterSlice[j] = filterSlice[j], filterSlice[i]
+	})
+
+	return func(yield func(Filter) bool) {
+		for _, filter := range filterSlice {
+			if !yield(*filter) {
+				return
+			}
+		}
+	}
+}
+
+func (fl *filters) PruneLogs(ctx context.Context) error {
+	err := fl.LoadFilters(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load filters: %w", err)
+	}
+
+	for filter := range fl.shuffledFilters() {
+		// Intentionally not holding the filtersMutex lock here, since getting through all of these DELETE
+		// operations could take a while. New filters may be added while we are pruning the old ones, but
+		// those won't be eligible yet for pruning anyway. Some may be removed (along with their logs) while
+		// we're iterating through the snapshot we have. For those, the DELETE will succeed immediately
+		// since there are no rows to delete.
+
+		_, err = fl.orm.PruneLogsForFilter(ctx, filter)
+		if err != nil {
+			return fmt.Errorf("failed to prune logs for filter %s: %w", filter.Name, err)
+		}
+		time.Sleep(1 * time.Second) // pause for a moment to avoid overwhelming the database
+	}
+
+	return nil
+}
+
+func (fl *filters) HasFilter(ctx context.Context, name string) bool {
+	exists, err := fl.orm.HasFilter(ctx, name)
+	if err != nil {
+		return false
+	}
+
+	return exists
+}
+
 // RegisterFilter persists provided filter and ensures that any log emitted by a contract with filter.Address
 // that matches filter.EventSig signature will be captured starting from filter.StartingBlock.
 // The filter may be unregistered later by filter.Name.
@@ -110,9 +166,26 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 		if existingFilter.IsBackfilled {
 			// if existing filter was already backfilled, but starting block was higher we need to backfill filter again
 			filter.IsBackfilled = existingFilter.StartingBlock <= filter.StartingBlock
+
+			// also trigger a backfill if IncludeReverted is being updated from false to true
+			if !existingFilter.IncludeReverted && filter.IncludeReverted {
+				filter.IsBackfilled = false
+			}
 		}
 
 		fl.removeFilterFromIndexes(*existingFilter)
+	}
+
+	// ensure that the value of IncludeReverted isn't different from any other filters with the same address and event type
+	if contractFilters, okAddr := fl.filtersByAddress[filter.Address]; okAddr {
+		if similarFilters, okEv := contractFilters[filter.EventSig]; okEv {
+			for id := range similarFilters {
+				if conflicting := fl.filtersByID[id]; conflicting.IncludeReverted != filter.IncludeReverted {
+					return fmt.Errorf("IncludeReverted=%v for filter %v conflicts with IncludeReverted=%v for filter %v",
+						conflicting.IncludeReverted, conflicting, filter.IncludeReverted, filter)
+				}
+			}
+		}
 	}
 
 	decoder, err := newDecoder(filter)
@@ -126,10 +199,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	}
 
 	filter.ID = filterID
-	err = fl.addToIndices(filter, decoder)
-	if err != nil {
-		return fmt.Errorf("failed to add filter to indices: %w", err)
-	}
+	fl.addToIndices(filter, decoder)
 
 	return nil
 }
@@ -143,13 +213,12 @@ func newDecoder(filter Filter) (Decoder, error) {
 	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
-func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
+func (fl *filters) addToIndices(filter Filter, decoder Decoder) {
 	fl.filtersByID[filter.ID] = &filter
 
 	if _, ok := fl.filtersByName[filter.Name]; ok {
 		errMsg := fmt.Sprintf("invariant violation while loading from db: expected filters to have unique name: %s ", filter.Name)
 		fl.lggr.Critical(errMsg)
-		return errors.New(errMsg)
 	}
 
 	fl.decoders[filter.ID] = decoder
@@ -169,7 +238,6 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
 	if _, ok := filtersForEventSig[filter.ID]; ok {
 		errMsg := fmt.Sprintf("invariant violation while loading from db: expected filters to have unique ID: %d ", filter.ID)
 		fl.lggr.Critical(errMsg)
-		return errors.New(errMsg)
 	}
 
 	filtersForEventSig[filter.ID] = struct{}{}
@@ -180,7 +248,6 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) error {
 	programID := filter.Address.ToSolana().String()
 	fl.knownPrograms[programID]++
 	fl.knownDiscriminators[filter.EventSig]++
-	return nil
 }
 
 // UnregisterFilter will mark the filter with the given name for pruning and async prune all corresponding logs.
@@ -217,6 +284,8 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 	return nil
 }
 
+// removeFilterFromIndexes removes the filter from all indexes
+// WARNING: not thread safe, should only be called while fl.filtersMutex is locked
 func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
@@ -393,6 +462,31 @@ func (fl *filters) MarkFilterBackfilled(ctx context.Context, filterID int64) err
 	return nil
 }
 
+// UpdateStartingBlocks will update the starting blocks of all backfilled filters to startingBlock
+// and set IsBackfilled=false for them. It will also update the starting blocks of any filters which
+// are already scheduled for backfilling, but only if the new startingBlock is less than the one they
+// currently have set. All filters will then be added to the filtersToBackfill index, so their logs will
+// be (re-)fetched from the specified starting point on the next iteration of the main LogPoller run loop.
+func (fl *filters) UpdateStartingBlocks(startingBlock int64) {
+	fl.filtersMutex.Lock()
+	defer fl.filtersMutex.Unlock()
+
+	startingBlocks := make(map[int64]int64, len(fl.filtersByID))
+	for id, filter := range fl.filtersByID {
+		newStartingBlock := filter.StartingBlock
+		if filter.IsBackfilled || startingBlock < newStartingBlock {
+			newStartingBlock = startingBlock
+		}
+		startingBlocks[id] = newStartingBlock
+	}
+
+	for id, blk := range startingBlocks {
+		fl.filtersByID[id].IsBackfilled = false
+		fl.filtersByID[id].StartingBlock = blk
+		fl.filtersToBackfill[id] = struct{}{}
+	}
+}
+
 // LoadFilters - loads filters from database. Can be called multiple times without side effects.
 func (fl *filters) LoadFilters(ctx context.Context) error {
 	if fl.loadedFilters.Load() {
@@ -432,10 +526,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 			return fmt.Errorf("failed to create decoder for filter %d: %w", filter.ID, err)
 		}
 
-		err = fl.addToIndices(filter, decoder)
-		if err != nil {
-			return fmt.Errorf("failed to add filter to indices: %w", err)
-		}
+		fl.addToIndices(filter, decoder)
 	}
 	fl.seqNums, err = fl.orm.SelectSeqNums(ctx)
 	if err != nil {

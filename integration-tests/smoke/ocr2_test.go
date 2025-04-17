@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
@@ -100,7 +102,7 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 	err = sg.InstallDependencies()
 	require.NoError(t, err, "Error installing gauntlet dependencies")
 
-	if *config.Common.Network == "devnet" {
+	if *config.Common.Network == client.DevnetGenesisHash {
 		state.Common.ChainDetails.ProgramAddresses.OCR2 = *config.SolanaConfig.OCR2ProgramID
 		state.Common.ChainDetails.ProgramAddresses.AccessController = *config.SolanaConfig.AccessControllerProgramID
 		state.Common.ChainDetails.ProgramAddresses.Store = *config.SolanaConfig.StoreProgramID

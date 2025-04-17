@@ -32,7 +32,7 @@ func TestTxm_Integration(t *testing.T) {
 		t.Run("estimator-"+estimator, func(t *testing.T) {
 			t.Parallel() // run estimator tests in parallel
 
-			ctx := tests.Context(t)
+			ctx := t.Context()
 			url := solanaClient.SetupLocalSolNode(t)
 
 			// setup key

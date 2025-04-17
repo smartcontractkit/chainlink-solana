@@ -17,15 +17,15 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
-// MaxSupportTransactionVersion defines max transaction version to return in responses.
-// If the requested block contains a transaction with a higher version, an error will be returned.
-const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
-
 const (
 	DevnetGenesisHash  = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 	TestnetGenesisHash = "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY"
 	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 )
+
+// MaxSupportTransactionVersion defines max transaction version to return in responses.
+// If the requested block contains a transaction with a higher version, an error will be returned.
+const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
 
 type ReaderWriter interface {
 	Writer
@@ -39,6 +39,7 @@ type Reader interface {
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
 	GetLatestBlockHeight(ctx context.Context) (uint64, error)
@@ -168,7 +169,8 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*
 	// Use txHash in the key so different signatures won't be merged on concurrent calls.
 	key := fmt.Sprintf("GetTransaction(%s)", txHash.String())
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
-		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment})
+		version := MaxSupportTransactionVersion
+		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment, MaxSupportedTransactionVersion: &version})
 	})
 	return v.(*rpc.GetTransactionResult), err
 }
@@ -191,6 +193,15 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
+func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {
+	done := c.latency("first_available_block")
+	defer done()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	return c.rpc.GetFirstAvailableBlock(ctx)
 }
 
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
@@ -231,27 +242,15 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
+
 	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
 		return c.rpc.GetGenesisHash(ctx)
 	})
 	if err != nil {
 		return "", err
 	}
-	hash := v.(solana.Hash)
 
-	var network string
-	switch hash.String() {
-	case DevnetGenesisHash:
-		network = "devnet"
-	case TestnetGenesisHash:
-		network = "testnet"
-	case MainnetGenesisHash:
-		network = "mainnet"
-	default:
-		c.log.Warnf("unknown genesis hash - assuming solana chain is 'localnet'")
-		network = "localnet"
-	}
-	return mn.StringID(network), nil
+	return mn.StringID(v.(solana.Hash).String()), nil
 }
 
 func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {

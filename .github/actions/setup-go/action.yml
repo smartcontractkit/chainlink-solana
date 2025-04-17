@@ -4,7 +4,7 @@ inputs:
   only-modules:
     description: Set to 'true' to only cache modules
     default: "false"
-  cache-version: 
+  cache-version:
     description: Set this to cache bust
     default: "1"
   go-version-file:
@@ -18,7 +18,7 @@ runs:
   using: composite
   steps:
     - name: Set up Go
-      uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+      uses: actions/setup-go@v5
       with:
         go-version-file: ${{ inputs.go-version-file }}
         cache: false
@@ -26,7 +26,7 @@ runs:
     - name: Get branch name
       if: ${{ inputs.only-modules == 'false' }}
       id: branch-name
-      uses: tj-actions/branch-names@6871f53176ad61624f978536bbf089c574dc19a2 # v8.0.1
+      uses: smartcontractkit/.github/actions/branch-names@branch-names/1.0.0
 
     - name: Set go cache keys
       shell: bash
@@ -40,7 +40,7 @@ runs:
       shell: bash
       run: echo "path=./${{ inputs.go-module-file }}" >> $GITHUB_OUTPUT
 
-    - uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+    - uses: actions/cache@v4
       name: Cache Go Modules
       with:
         path: |
@@ -51,7 +51,7 @@ runs:
         restore-keys: |
           ${{ runner.os }}-gomod-${{ inputs.cache-version }}-
 
-    - uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+    - uses: actions/cache@v4
       if: ${{ inputs.only-modules == 'false' }}
       name: Cache Go Build Outputs
       with:

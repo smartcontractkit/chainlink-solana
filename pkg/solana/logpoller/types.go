@@ -184,7 +184,9 @@ func (v *IndexedValue) FromUint64(u uint64) {
 }
 
 func (v *IndexedValue) FromInt64(i int64) {
-	v.FromUint64(uint64(i + math.MaxInt64 + 1)) //nolint gosec passing i=math.MaxInt64 and i=math.MinInt64 are proven safe in TestIndexedValue
+	// Golang signed integers are two's complement encoded, so the value will be stored with two's complement encoding.
+	// This also matches the EVM implementation that stores raw topics, EVM ABI encoding also uses two's complement
+	v.FromUint64(uint64(i)) // nolint gosec two's complement encoding
 }
 
 func (v *IndexedValue) FromFloat64(f float64) {
@@ -265,4 +267,28 @@ func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 		}
 	}
 	return nil, fmt.Errorf("can't create indexed value from type %T", typedVal)
+}
+
+type ReplayStatus int
+
+const (
+	ReplayStatusNoRequest ReplayStatus = iota
+	ReplayStatusRequested
+	ReplayStatusPending
+	ReplayStatusComplete
+)
+
+func (rs ReplayStatus) String() string {
+	switch rs {
+	case ReplayStatusNoRequest:
+		return "NoRequest"
+	case ReplayStatusRequested:
+		return "Requested"
+	case ReplayStatusPending:
+		return "Pending"
+	case ReplayStatusComplete:
+		return "Complete"
+	default:
+		return fmt.Sprintf("invalid status: %d", rs) // Handle unknown cases
+	}
 }

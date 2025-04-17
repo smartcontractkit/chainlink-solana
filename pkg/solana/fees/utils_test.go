@@ -36,11 +36,11 @@ func TestCalculateFee(t *testing.T) {
 
 func TestParseBlock(t *testing.T) {
 	testBlocks := readMultipleBlocksFromFile(t, "./multiple_blocks_data.json")
-	lastBlock := testBlocks[len(testBlocks)-1]
-	assert.Equal(t, 3, len(lastBlock.Transactions))
+	firstBlock := testBlocks[0]
+	assert.Equal(t, 3, len(firstBlock.Transactions))
 
 	// happy path - filtered for non-vote txs
-	out, err := ParseBlock(lastBlock)
+	out, err := ParseBlock(firstBlock)
 	require.NoError(t, err)
 	assert.Equal(t, len(out.Prices), len(out.Fees))
 	assert.Equal(t, 2, len(out.Prices))

@@ -32,6 +32,22 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
+    pub fn initializemultireadwithparams(
+        ctx: Context<InitializeMultiReadWithParamsOnce>,
+    ) -> Result<()> {
+        let multi_read3 = &mut ctx.accounts.multi_read3;
+        multi_read3.a = 10;
+        multi_read3.b = 20;
+        multi_read3.c = true;
+
+        let multi_read4 = &mut ctx.accounts.multi_read4;
+        multi_read4.u = "olleH".to_string();
+        multi_read4.v = true;
+        multi_read4.w = [321, 654];
+
+        Ok(())
+    }
+
     pub fn initializetokenprices(
         ctx: Context<InitializeBillingTokenConfigWrapperOnce>,
     ) -> Result<()> {
@@ -50,7 +66,7 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn initialize_lookup_table(
+    pub fn initializelookuptable(
         ctx: Context<InitializeLookupTableData>,
         lookup_table: Pubkey,
     ) -> Result<()> {
@@ -59,7 +75,16 @@ pub mod contract_reader_interface {
         account.administrator = ctx.accounts.admin.key();
         account.pending_administrator = Pubkey::default();
         account.lookup_table = lookup_table;
+        account.bump = ctx.bumps.write_data_account;
 
+        Ok(())
+    }
+
+    pub fn storeval(ctx: Context<StoreVal>, test_idx: u64, value: u64) -> Result<()> {
+        let data = &mut ctx.accounts.data;
+        data.bump = ctx.bumps.data;
+        data.idx = test_idx;
+        data.u64_value = value;
         Ok(())
     }
 
@@ -81,6 +106,36 @@ pub mod contract_reader_interface {
 
         Ok(())
     }
+
+    pub fn store_token_account(ctx: Context<StoreTokenAccount>, test_idx: u64) -> Result<()> {
+        let account = ctx.accounts.token_account.to_account_info();
+        require!(
+            !account.data_is_empty(),
+            TokenAccountError::UninitializedTokenAccount
+        );
+
+        let data = &mut ctx.accounts.data;
+        data.idx = test_idx;
+        data.account = account.key();
+        data.bump = ctx.bumps.data;
+
+        Ok(())
+    }
+
+    pub fn create_event_and_fail(_ctx: Context<Events>) -> Result<()> {
+        emit!(StateChangedEvent {
+            new_state: "Pending".to_string()
+        });
+
+        // Intentionally fail the transaction after emitting the event
+        Err(ErrorCode::IntentionalFailure.into())
+    }
+}
+
+#[derive(Accounts)]
+pub struct Events<'info> {
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -126,6 +181,36 @@ pub struct InitializeMultiReadOnce<'info> {
 }
 
 #[derive(Accounts)]
+pub struct InitializeMultiReadWithParamsOnce<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead3>() + 8,
+        seeds = [
+            b"multi_read_with_params3",
+            1u64.to_le_bytes().as_ref()
+        ],
+        bump)]
+    pub multi_read3: Account<'info, MultiRead3>,
+
+    #[account(
+        init_if_needed,
+        payer = signer,
+        space = size_of::<MultiRead4>() + 8,
+        seeds = [
+            b"multi_read_with_params4",
+            1u64.to_le_bytes().as_ref()
+        ],
+        bump)]
+    pub multi_read4: Account<'info, MultiRead4>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct InitializeBillingTokenConfigWrapperOnce<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
@@ -156,20 +241,21 @@ pub struct InitializeBillingTokenConfigWrapperOnce<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(test_idx: u64)]
 pub struct InitializeLookupTableData<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
     /// PDA for LookupTableDataAccount, derived from seeds and created by the System Program
     #[account(
         init_if_needed,
         payer = admin,
         space = size_of::<LookupTableDataAccount>() + 8,
-        seeds = [b"data"],
+        seeds = [b"lookup".as_ref()],
         bump
     )]
     pub write_data_account: Account<'info, LookupTableDataAccount>,
-
-    /// Admin account that pays for PDA creation and signs the transaction
-    #[account(mut)]
-    pub admin: Signer<'info>,
 
     /// System Program required for PDA creation
     pub system_program: Program<'info, System>,
@@ -193,12 +279,55 @@ pub struct StoreTestStruct<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(test_idx: u64)]
+pub struct StoreVal<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    // derived test PDA
+    #[account(
+        mut,
+        seeds=[b"data".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump)]
+    pub data: Account<'info, DataAccount>,
+
+    /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(test_idx: u64)]
+pub struct StoreTokenAccount<'info> {
+    /// Admin account that pays for PDA creation and signs the transaction
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    /// CHECK: test
+    #[account(mut)]
+    pub token_account: UncheckedAccount<'info>,
+
+    // derived test PDA
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = size_of::<TokenAccountData>() + 8,
+        seeds=[b"token_account".as_ref(), test_idx.to_le_bytes().as_ref()],
+        bump)]
+    pub data: Account<'info, TokenAccountData>,
+
+    /// System Program required for PDA creation
+    pub system_program: Program<'info, System>,
+}
+
 #[account]
 pub struct LookupTableDataAccount {
     pub version: u8,                   // Version of the data account
     pub administrator: Pubkey,         // Administrator public key
     pub pending_administrator: Pubkey, // Pending administrator public key
     pub lookup_table: Pubkey,          // Address of the lookup table
+    pub bump: u8,
 }
 
 #[account]
@@ -207,6 +336,13 @@ pub struct DataAccount {
     pub bump: u8,
     pub u64_value: u64,
     pub u64_slice: Vec<u64>,
+}
+
+#[account]
+pub struct TokenAccountData {
+    pub idx: u64,
+    pub bump: u8,
+    pub account: Pubkey,
 }
 
 #[account(zero_copy)]
@@ -299,6 +435,20 @@ pub struct MultiRead2 {
     pub w: [u64; 2],
 }
 
+#[account]
+pub struct MultiRead3 {
+    pub a: u8,
+    pub b: i16,
+    pub c: bool,
+}
+
+#[account]
+pub struct MultiRead4 {
+    pub u: String,
+    pub v: bool,
+    pub w: [u64; 2],
+}
+
 pub const ADDRESS_1: Pubkey = pubkey!("57FUKrjY7Dywph1bqNGztvtTGWcXvk5VLNCfAXtk6jqK");
 pub const ADDRESS_2: Pubkey = pubkey!("47XyyAALxH7WeNT1DGWsPeA8veSVJaF8MHFMqBM5DkP6");
 
@@ -334,4 +484,21 @@ pub struct BillingTokenConfig {
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64,
+}
+
+#[error_code]
+pub enum TokenAccountError {
+    #[msg("Uninitialized token account")]
+    UninitializedTokenAccount,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("This error is intentionally triggered for testing purposes.")]
+    IntentionalFailure,
+}
+
+#[event]
+pub struct StateChangedEvent {
+    pub new_state: String,
 }

@@ -1,5 +1,7 @@
 package config
 
+import "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+
 type Config struct {
 	ChainName        string
 	ChainID          string
@@ -18,7 +20,7 @@ type ProgramAddresses struct {
 func DevnetConfig() *Config {
 	return &Config{
 		ChainName: "solana",
-		ChainID:   "devnet",
+		ChainID:   client.DevnetGenesisHash,
 		// Will be overridden if set in toml
 		RPCUrls: []string{"https://api.devnet.solana.com"},
 		WSUrls:  []string{"wss://api.devnet.solana.com/"},

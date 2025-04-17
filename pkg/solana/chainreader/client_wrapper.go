@@ -16,7 +16,7 @@ type RPCClientWrapper struct {
 }
 
 // GetMultipleAccountData is a helper function that extracts byte data from a GetMultipleAccounts rpc call.
-func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...solana.PublicKey) ([][]byte, error) {
+func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...solana.PublicKey) ([]*rpc.Account, error) {
 	result, err := w.GetMultipleAccountsWithOpts(ctx, keys, &rpc.GetMultipleAccountsOpts{
 		Encoding:   solana.EncodingBase64,
 		Commitment: rpc.CommitmentFinalized,
@@ -25,23 +25,14 @@ func (w *RPCClientWrapper) GetMultipleAccountData(ctx context.Context, keys ...s
 		return nil, err
 	}
 
-	bts := make([][]byte, len(result.Value))
-
-	for idx, res := range result.Value {
-		if res == nil {
-			return nil, rpc.ErrNotFound
+	var accounts []*rpc.Account
+	for _, res := range result.Value {
+		if res == nil || res.Data == nil || res.Data.GetBinary() == nil {
+			accounts = append(accounts, &rpc.Account{Data: nil})
+			continue
 		}
-
-		if res.Data == nil {
-			return nil, rpc.ErrNotFound
-		}
-
-		if res.Data.GetBinary() == nil {
-			return nil, rpc.ErrNotFound
-		}
-
-		bts[idx] = res.Data.GetBinary()
+		accounts = append(accounts, res)
 	}
 
-	return bts, nil
+	return accounts, nil
 }

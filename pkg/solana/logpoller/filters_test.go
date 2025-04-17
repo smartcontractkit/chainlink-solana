@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,13 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 )
 
 func TestFilters_LoadFilters(t *testing.T) {
 	orm := NewMockORM(t)
 	fs := newFilters(logger.Sugared(logger.Test(t)), orm)
-	ctx := tests.Context(t)
+	ctx := t.Context()
 	orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
 	deleted := Filter{
 		ID:        3,
@@ -107,14 +107,14 @@ func TestFilters_RegisterFilter(t *testing.T) {
 	t.Run("Returns an error if name is empty", func(t *testing.T) {
 		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
-		err := fs.RegisterFilter(tests.Context(t), Filter{})
+		err := fs.RegisterFilter(t.Context(), Filter{})
 		require.EqualError(t, err, "name is required")
 	})
 	t.Run("Returns an error if fails to load filters from db", func(t *testing.T) {
 		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
-		err := fs.RegisterFilter(tests.Context(t), Filter{Name: "Filter"})
+		err := fs.RegisterFilter(t.Context(), Filter{Name: "Filter"})
 		require.EqualError(t, err, "failed to load filters: failed to select filters from db: db failed")
 	})
 	t.Run("Returns an error if trying to update primary fields", func(t *testing.T) {
@@ -153,10 +153,56 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil)
 				newFilter := dbFilter
 				tc.ModifyField(&newFilter)
-				err := fs.RegisterFilter(tests.Context(t), newFilter)
+				err := fs.RegisterFilter(t.Context(), newFilter)
 				require.EqualError(t, err, ErrFilterNameConflict.Error())
 			})
 		}
+	})
+	t.Run("properly handles IncludeReverted field", func(t *testing.T) {
+		orm := NewMockORM(t)
+		fs := newFilters(lggr, orm)
+		addr := newRandomPublicKey(t)
+		eventSig := newRandomEventSignature(t)
+
+		filter1 := Filter{
+			ID:              1,
+			Name:            "existingFilter",
+			Address:         addr,
+			EventSig:        eventSig,
+			IncludeReverted: false,
+			IsBackfilled:    true,
+		}
+		orm.EXPECT().SelectFilters(mock.Anything).Return(
+			[]Filter{filter1}, nil).Once()
+		filter2 := Filter{
+			Name:            "new filter",
+			Address:         addr,
+			EventSig:        eventSig,
+			IncludeReverted: true,
+			IsBackfilled:    true,
+		}
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(nil, nil).Once()
+		err := fs.RegisterFilter(t.Context(), filter2)
+		require.ErrorContains(t, err, "conflicts with IncludeReverted=true", "shouldn't allow more than one value for IncludeReverted for an event")
+
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter Filter) (int64, error) {
+			assert.True(t, filter.IncludeReverted, "IncludeReverted should be true now")
+			assert.False(t, filter.IsBackfilled, "new backfill should be triggered when IsReverted updated from false to true")
+			return 2, nil
+		}).Once()
+		filter1.IncludeReverted = true // update IncludeReverted field of filter1 to true
+		err = fs.RegisterFilter(t.Context(), filter1)
+		require.NoError(t, err)
+
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter Filter) (int64, error) {
+			assert.True(t, filter.IncludeReverted)
+			assert.False(t, filter.IsBackfilled, "backfill should happen when new filter is added") // should trigger new backfill since reverted has been updated to true
+			return 3, nil
+		}).Once()
+
+		// should succeed this time
+		err = fs.RegisterFilter(t.Context(), filter2)
+		assert.NoError(t, err)
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		orm := NewMockORM(t)
@@ -166,20 +212,21 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(0), errors.New("failed to insert")).Once()
 		filter := Filter{Name: filterName}
-		err := fs.RegisterFilter(tests.Context(t), filter)
+		err := fs.RegisterFilter(t.Context(), filter)
 		require.Error(t, err)
 
 		// can read after db issue is resolved
 		const filterID = int64(1)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
-		err = fs.RegisterFilter(tests.Context(t), filter)
+		err = fs.RegisterFilter(t.Context(), filter)
 		require.NoError(t, err)
 		// can update non-primary fields
 		filter.StartingBlock++
 		filter.Retention++
 		filter.MaxLogsKept++
+		filter.IncludeReverted = true
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
-		err = fs.RegisterFilter(tests.Context(t), filter)
+		err = fs.RegisterFilter(t.Context(), filter)
 		require.NoError(t, err)
 		storedFilters := slices.Collect(fs.matchingFilters(filter.Address, filter.EventSig))
 		require.Len(t, storedFilters, 1)
@@ -196,15 +243,15 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		const filterID = int64(10)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
-		err := fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
+		err := fs.RegisterFilter(t.Context(), Filter{Name: filterName})
 		require.NoError(t, err)
 		requireIndexed(t, fs, Filter{Name: filterName, ID: filterID})
 		orm.On("MarkFilterDeleted", mock.Anything, filterID).Return(nil).Once()
-		err = fs.UnregisterFilter(tests.Context(t), filterName)
+		err = fs.UnregisterFilter(t.Context(), filterName)
 		require.NoError(t, err)
 		requireNoInIndices(t, fs, Filter{Name: filterName, ID: filterID})
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID+1, nil).Once()
-		err = fs.RegisterFilter(tests.Context(t), Filter{Name: filterName})
+		err = fs.RegisterFilter(t.Context(), Filter{Name: filterName})
 		require.NoError(t, err)
 		require.Len(t, fs.filtersToDelete, 1)
 		require.Equal(t, Filter{Name: filterName, ID: filterID}, fs.filtersToDelete[filterID])
@@ -220,7 +267,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		orm := NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db failed")).Once()
-		err := fs.UnregisterFilter(tests.Context(t), "Filter")
+		err := fs.UnregisterFilter(t.Context(), "Filter")
 		require.EqualError(t, err, "failed to load filters: failed to select filters from db: db failed")
 	})
 	t.Run("Noop if filter is not present", func(t *testing.T) {
@@ -229,7 +276,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		const filterName = "Filter"
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
-		err := fs.UnregisterFilter(tests.Context(t), filterName)
+		err := fs.UnregisterFilter(t.Context(), filterName)
 		require.NoError(t, err)
 	})
 	t.Run("Returns error if fails to mark filter as deleted", func(t *testing.T) {
@@ -240,7 +287,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{{ID: id, Name: filterName}}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(errors.New("db query failed")).Once()
-		err := fs.UnregisterFilter(tests.Context(t), filterName)
+		err := fs.UnregisterFilter(t.Context(), filterName)
 		require.EqualError(t, err, "failed to mark filter deleted: db query failed")
 	})
 	t.Run("Happy path", func(t *testing.T) {
@@ -252,7 +299,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]Filter{f}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(nil).Once()
-		err := fs.UnregisterFilter(tests.Context(t), filterName)
+		err := fs.UnregisterFilter(t.Context(), filterName)
 		require.NoError(t, err)
 		require.Contains(t, fs.filtersToDelete, f.ID)
 		requireNoInIndices(t, fs, f)
@@ -280,7 +327,7 @@ func TestFilters_PruneFilters(t *testing.T) {
 			2: 25,
 		}, nil).Once()
 		orm.On("DeleteFilters", mock.Anything, map[int64]Filter{toDelete.ID: toDelete}).Return(nil).Once()
-		err := fs.PruneFilters(tests.Context(t))
+		err := fs.PruneFilters(t.Context())
 		require.NoError(t, err)
 		require.Len(t, fs.filtersToDelete, 0)
 	})
@@ -310,10 +357,10 @@ func TestFilters_PruneFilters(t *testing.T) {
 		orm.On("DeleteFilters", mock.Anything, map[int64]Filter{toDelete.ID: toDelete}).Return(errors.New("db failed")).Run(func(_ mock.Arguments) {
 			orm.On("MarkFilterDeleted", mock.Anything, newToDelete.ID).Return(nil).Once()
 			orm.On("InsertFilter", mock.Anything, mock.Anything).Return(newToDelete.ID, nil).Once()
-			require.NoError(t, fs.RegisterFilter(tests.Context(t), newToDelete))
-			require.NoError(t, fs.UnregisterFilter(tests.Context(t), newToDelete.Name))
+			require.NoError(t, fs.RegisterFilter(t.Context(), newToDelete))
+			require.NoError(t, fs.UnregisterFilter(t.Context(), newToDelete.Name))
 		}).Once()
-		err := fs.PruneFilters(tests.Context(t))
+		err := fs.PruneFilters(t.Context())
 		require.EqualError(t, err, "failed to delete filters: db failed")
 		require.Equal(t, fs.filtersToDelete, map[int64]Filter{newToDelete.ID: newToDelete, toDelete.ID: toDelete})
 	})
@@ -355,7 +402,7 @@ func TestFilters_MatchingFilters(t *testing.T) {
 		4: 0,
 	}, nil)
 	filters := newFilters(lggr, orm)
-	err := filters.LoadFilters(tests.Context(t))
+	err := filters.LoadFilters(t.Context())
 	require.NoError(t, err)
 	matchingFilters := slices.Collect(filters.matchingFilters(expectedFilter1.Address, expectedFilter1.EventSig))
 	require.Len(t, matchingFilters, 2)
@@ -387,7 +434,7 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 		2: 25,
 	}, nil)
 	filters := newFilters(lggr, orm)
-	err := filters.LoadFilters(tests.Context(t))
+	err := filters.LoadFilters(t.Context())
 	require.NoError(t, err)
 	// filters that were not backfilled are properly identified on load
 	ensureInQueue := func(expectedFilters ...Filter) {
@@ -400,33 +447,33 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	ensureInQueue(notBackfilled)
 	// filter remains in queue if failed to mark as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(errors.New("db call failed")).Once()
-	err = filters.MarkFilterBackfilled(tests.Context(t), notBackfilled.ID)
+	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
 	require.Error(t, err)
 	ensureInQueue(notBackfilled)
 	// filter is removed from queue, if marked as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(nil).Once()
-	err = filters.MarkFilterBackfilled(tests.Context(t), notBackfilled.ID)
+	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
 	require.NoError(t, err)
 	require.Empty(t, filters.GetFiltersToBackfill())
 	// re adding identical filter won't trigger backfill
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(backfilledFilter.ID, nil).Once()
-	require.NoError(t, filters.RegisterFilter(tests.Context(t), backfilledFilter))
+	require.NoError(t, filters.RegisterFilter(t.Context(), backfilledFilter))
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
-	require.NoError(t, filters.RegisterFilter(tests.Context(t), notBackfilled))
+	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
 	require.Empty(t, filters.GetFiltersToBackfill())
 	// older StartingBlock trigger backfill
 	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
-	require.NoError(t, filters.RegisterFilter(tests.Context(t), notBackfilled))
+	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
 	ensureInQueue(notBackfilled)
 	// new filter is always added to the queue
 	newFilter := Filter{Name: "new filter"}
 	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
-	require.NoError(t, filters.RegisterFilter(tests.Context(t), newFilter))
+	require.NoError(t, filters.RegisterFilter(t.Context(), newFilter))
 	ensureInQueue(notBackfilled, Filter{ID: 3, Name: "new filter"})
 }
 
-func TestExtractField(t *testing.T) {
+func TestFilters_ExtractField(t *testing.T) {
 	type innerInner struct {
 		P string
 		Q int
@@ -484,6 +531,79 @@ func TestExtractField(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, c.Result, result)
+		})
+	}
+}
+
+func TestFilters_UpdateStartingBlocks(t *testing.T) {
+	orm := NewMockORM(t)
+	lggr := logger.Sugared(logger.Test(t))
+	filters := newFilters(lggr, orm)
+
+	origFilters := []Filter{{
+		ID:            1,
+		Name:          "backfilled",
+		StartingBlock: 29500,
+		IsBackfilled:  true,
+	}, {
+		ID:            2,
+		StartingBlock: 52000,
+		Name:          "notBackfilled",
+	}}
+	ids := make([]int64, 2)
+	for i, filter := range origFilters {
+		ids[i] = filter.ID
+	}
+
+	var err error
+
+	cases := []struct {
+		name           string
+		replayBlock    int64
+		expectedBlocks []int64
+	}{
+		{
+			name:           "updates StartingBlock of both filters",
+			replayBlock:    51500,
+			expectedBlocks: []int64{51500, 51500}},
+		{
+			name:           "updates StartingBlock of backfilled filter",
+			replayBlock:    53000,
+			expectedBlocks: []int64{53000, origFilters[1].StartingBlock},
+		},
+	}
+
+	orm.EXPECT().SelectFilters(mock.Anything).Return(origFilters, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
+		1: 18,
+		2: 25,
+	}, nil)
+
+	err = filters.LoadFilters(t.Context())
+	require.NoError(t, err)
+	// ensure both filters were loaded
+	require.Equal(t, origFilters[0], *filters.filtersByID[ids[0]])
+	require.Equal(t, origFilters[1], *filters.filtersByID[ids[1]])
+	// ensure non-backfilled filters were added to filtersToBackfill
+	require.Len(t, filters.filtersToBackfill, 1)
+	require.Contains(t, filters.filtersToBackfill, origFilters[1].ID)
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			newFilters := make([]Filter, len(origFilters))
+			copy(newFilters, origFilters)
+			filters.filtersByID[ids[0]] = &newFilters[0]
+			filters.filtersByID[ids[1]] = &newFilters[1]
+			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
+			filters.UpdateStartingBlocks(tt.replayBlock)
+			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
+
+			for i, id := range ids {
+				assert.Equal(t, tt.expectedBlocks[i], filters.filtersByID[id].StartingBlock,
+					"unexpected starting block for \"%s\" filter", filters.filtersByID[id].Name)
+				assert.False(t, filters.filtersByID[id].IsBackfilled)
+				assert.Contains(t, filters.filtersToBackfill, id)
+			}
 		})
 	}
 }
