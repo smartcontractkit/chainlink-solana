@@ -1,6 +1,7 @@
 package chainreader
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -17,6 +18,67 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
+
+func TestBind(t *testing.T) {
+	address1 := solana.NewWallet().PublicKey()
+	address2 := solana.NewWallet().PublicKey()
+
+	subkeys := newIndexedSubkeys()
+	subkeys.addForIndex("A", "W", 0)
+	subkeys.addForIndex("B", "X", 1)
+	subkeys.addForIndex("C", "Y", 2)
+	subkeys.addForIndex("D", "Z", 3)
+
+	readDef := config.ReadDefinition{}
+	pollerConf := config.PollingFilter{}
+
+	t.Run("Bind twice is noop", func(t *testing.T) {
+		t.Parallel()
+
+		lpSource := new(mocks.EventsReader)
+
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false)
+		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Twice() // 1 per address 1 and 1 per address2
+
+		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
+		ctx := t.Context()
+
+		require.NoError(t, reader.Register(ctx))
+		require.NoError(t, reader.Bind(ctx, address1))
+		require.NoError(t, reader.Bind(ctx, address1))
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		require.NoError(t, reader.Bind(ctx, address2))
+		lpSource.AssertExpectations(t)
+	})
+
+	t.Run("Unbind works correctly", func(t *testing.T) {
+		t.Parallel()
+
+		lpSource := new(mocks.EventsReader)
+
+		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
+		ctx := t.Context()
+
+		require.NoError(t, reader.Register(ctx))
+
+		var ret bool
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, str string) bool {
+			return ret
+		})
+
+		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Once()
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		ret = true
+		lpSource.AssertExpectations(t)
+
+		lpSource.EXPECT().UnregisterFilter(mock.Anything, mock.Anything).Return(nil).Once()
+		require.NoError(t, reader.Unbind(ctx))
+
+		lpSource.AssertExpectations(t)
+	})
+}
 
 func TestGetLatestValue(t *testing.T) {
 	t.Parallel()

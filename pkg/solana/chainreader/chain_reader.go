@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -147,10 +146,7 @@ func (s *ContractReaderService) Close() error {
 	return s.StopOnce(ServiceName, func() error {
 		s.wg.Wait()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		return s.bdRegistry.UnregisterAll(ctx)
+		return nil
 	})
 }
 
@@ -342,6 +338,10 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 // part of a share group.
 func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.BoundContract) error {
 	for idx := range bindings {
+		if s.lookup.hasAddress(bindings[idx].Name, bindings[idx].Address) {
+			continue
+		}
+
 		if err := s.bdRegistry.Bind(ctx, s.reader, &bindings[idx]); err != nil {
 			return err
 		}

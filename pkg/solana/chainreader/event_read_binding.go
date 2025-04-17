@@ -67,26 +67,19 @@ func newEventReadBinding(
 }
 
 func (b *eventReadBinding) Bind(ctx context.Context, address solana.PublicKey) error {
-	if b.isBound() {
-		// we are changing contract address reference, so we need to unregister old filter if it exists
-		if err := b.Unregister(ctx); err != nil {
-			return err
-		}
-	}
-
-	// filter isn't required here because the event can also be polled for by the contractBinding common filter.
-	if b.filter != nil {
-		b.filter.SetName(fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString()))
-		b.filter.SetAddress(address)
-	}
-
 	b.setBinding(address)
 
-	if b.registered() {
-		return b.Register(ctx)
+	if b.filter == nil {
+		return nil
 	}
 
-	return nil
+	b.filter.SetAddress(address)
+
+	if !b.filter.Dirty() {
+		return nil
+	}
+
+	return b.update(ctx)
 }
 
 func (b *eventReadBinding) Unbind(ctx context.Context) error {
@@ -94,32 +87,59 @@ func (b *eventReadBinding) Unbind(ctx context.Context) error {
 		return nil
 	}
 
-	if b.filter != nil {
-		b.filter.SetAddress(solana.PublicKey{})
-		b.filter.SetName("")
+	if b.filter == nil {
+		return nil
+	}
+
+	if err := b.Unregister(ctx); err != nil {
+		return err
 	}
 
 	b.unsetBinding()
 
-	return b.Unregister(ctx)
+	return nil
 }
 
 func (b *eventReadBinding) Register(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.registerCalled = true
+
 	if b.filter == nil {
 		return nil
 	}
-
-	b.registerCalled = true
 
 	// can't be true before filters params are set so there is no race with a bad filter outcome
 	if !b.bound {
 		return nil
 	}
 
+	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	b.filter.SetName(newName)
+
 	return b.filter.Register(ctx, b.reader)
+}
+
+func (b *eventReadBinding) update(ctx context.Context) error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if b.filter == nil {
+		return nil
+	}
+
+	if !b.bound {
+		return nil
+	}
+
+	if !b.registerCalled {
+		return nil
+	}
+
+	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+
+	return b.filter.Update(ctx, b.reader, newName)
 }
 
 func (b *eventReadBinding) Unregister(ctx context.Context) error {
@@ -441,13 +461,6 @@ func (b *eventReadBinding) unsetBinding() {
 
 	b.key = solana.PublicKey{}
 	b.bound = false
-}
-
-func (b *eventReadBinding) registered() bool {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	return b.registerCalled
 }
 
 func (b *eventReadBinding) wrapDecoderForValuer(log *logpoller.Log) func(context.Context, any) error {

@@ -284,6 +284,8 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 	return nil
 }
 
+// removeFilterFromIndexes removes the filter from all indexes
+// WARNING: not thread safe, should only be called while fl.filtersMutex is locked
 func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)

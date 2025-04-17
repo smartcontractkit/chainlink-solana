@@ -16,16 +16,42 @@ type syncedFilter struct {
 	mu         sync.RWMutex
 	addressSet bool
 	filter     logpoller.Filter
+
+	dirty bool
 }
 
 func newSyncedFilter() *syncedFilter {
 	return &syncedFilter{}
 }
 
-func (r *syncedFilter) Register(ctx context.Context, registrar filterRegistrar) error {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, updatedName string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
+	if !r.dirty {
+		return nil
+	}
+
+	oldName := r.filter.Name
+	r.filter.Name = updatedName
+
+	if err := r.register(ctx, registrar); err != nil {
+		return err
+	}
+
+	// filter updated successfully, it's not dirty anymore
+	r.dirty = false
+
+	return r.unregister(ctx, registrar, oldName)
+}
+
+func (r *syncedFilter) Register(ctx context.Context, registrar filterRegistrar) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.register(ctx, registrar)
+}
+
+func (r *syncedFilter) register(ctx context.Context, registrar filterRegistrar) error {
 	if !registrar.HasFilter(ctx, r.filter.Name) {
 		if err := registrar.RegisterFilter(ctx, r.filter); err != nil {
 			return FilterError{
@@ -43,11 +69,25 @@ func (r *syncedFilter) Unregister(ctx context.Context, registrar filterRegistrar
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if !registrar.HasFilter(ctx, r.filter.Name) {
+	err := r.unregister(ctx, registrar, r.filter.Name)
+	if err != nil {
+		return err
+	}
+
+	r.setAddress(solana.PublicKey{})
+	r.setName("")
+
+	r.dirty = false
+
+	return nil
+}
+
+func (r *syncedFilter) unregister(ctx context.Context, registrar filterRegistrar, name string) error {
+	if !registrar.HasFilter(ctx, name) {
 		return nil
 	}
 
-	if err := registrar.UnregisterFilter(ctx, r.filter.Name); err != nil {
+	if err := registrar.UnregisterFilter(ctx, name); err != nil {
 		return FilterError{
 			Err:    fmt.Errorf("%w: %s", types.ErrInternal, err.Error()),
 			Action: "unregister",
@@ -69,6 +109,10 @@ func (r *syncedFilter) SetName(name string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.setName(name)
+}
+
+func (r *syncedFilter) setName(name string) {
 	r.filter.Name = name
 }
 
@@ -76,7 +120,18 @@ func (r *syncedFilter) SetAddress(address solana.PublicKey) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.setAddress(address)
+}
+
+func (r *syncedFilter) setAddress(address solana.PublicKey) {
 	r.addressSet = true
+
+	pkAddress := logpoller.PublicKey(address)
+	if r.filter.Address == pkAddress {
+		return
+	}
+
+	r.dirty = true
 	r.filter.Address = logpoller.PublicKey(address)
 }
 
@@ -85,6 +140,13 @@ func (r *syncedFilter) AddressSet() bool {
 	defer r.mu.RUnlock()
 
 	return r.addressSet
+}
+
+func (r *syncedFilter) Dirty() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.dirty
 }
 
 type FilterError struct {

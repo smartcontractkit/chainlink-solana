@@ -136,6 +136,9 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 }
 
 func setFromChain(c, f *Chain) {
+	if f.BlockTime != nil {
+		c.BlockTime = f.BlockTime
+	}
 	if f.BalancePollPeriod != nil {
 		c.BalancePollPeriod = f.BalancePollPeriod
 	}
@@ -193,6 +196,18 @@ func setFromChain(c, f *Chain) {
 	if f.BlockHistorySize != nil {
 		c.BlockHistorySize = f.BlockHistorySize
 	}
+	if f.LogPollerStartingLookback != nil {
+		c.LogPollerStartingLookback = f.LogPollerStartingLookback
+	}
+	if f.BlockHistoryBatchLoadSize != nil {
+		c.BlockHistoryBatchLoadSize = f.BlockHistoryBatchLoadSize
+	}
+	if f.ComputeUnitLimitDefault != nil {
+		c.ComputeUnitLimitDefault = f.ComputeUnitLimitDefault
+	}
+	if f.EstimateComputeUnitLimit != nil {
+		c.EstimateComputeUnitLimit = f.EstimateComputeUnitLimit
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -204,6 +219,10 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 
 	if len(c.Nodes) == 0 {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
+	}
+
+	if c.BlockTime() <= 0 {
+		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
 	}
 	return
 }
@@ -217,6 +236,10 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 var _ Config = &TOMLConfig{}
+
+func (c *TOMLConfig) BlockTime() time.Duration {
+	return c.Chain.BlockTime.Duration()
+}
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
 	return c.Chain.BalancePollPeriod.Duration()
@@ -300,12 +323,20 @@ func (c *TOMLConfig) BlockHistorySize() uint64 {
 	return *c.Chain.BlockHistorySize
 }
 
+func (c *TOMLConfig) BlockHistoryBatchLoadSize() uint64 {
+	return *c.Chain.BlockHistoryBatchLoadSize
+}
+
 func (c *TOMLConfig) ComputeUnitLimitDefault() uint32 {
 	return *c.Chain.ComputeUnitLimitDefault
 }
 
 func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 	return *c.Chain.EstimateComputeUnitLimit
+}
+
+func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
+	return c.Chain.LogPollerStartingLookback.Duration()
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {
