@@ -369,7 +369,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		lp.replayComplete(minSlot, to)
 	}
 
-  var err error
+	var err error
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
