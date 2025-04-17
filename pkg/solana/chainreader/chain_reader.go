@@ -523,7 +523,7 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 
 		// multi read defs don't have a generic name as they are accessed from the parent read which does have a generic name.
 		// generic name is used everywhere, so add a prefix to avoid potential collision with generic names of other reads.
-		genericName := fmt.Sprintf("multiread-%v-%v", readDefinition.ChainSpecificName, mr.ChainSpecificName)
+		genericName := fmt.Sprintf("multiread-%v-%v-%v", namespace, readDefinition.ChainSpecificName, mr.ChainSpecificName)
 		if err = s.addReadToCodec(s.parsed, namespace, genericName, idl, inputIDLDef, accountIDLDef, mr); err != nil {
 			return nil, fmt.Errorf("failed to add read to multi read %q: %w", mr.ChainSpecificName, err)
 		}
