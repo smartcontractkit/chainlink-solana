@@ -69,6 +69,7 @@ var _ ReaderWriter = (*Client)(nil)
 type Client struct {
 	url             string
 	rpc             *rpc.Client
+	chainID         string
 	skipPreflight   bool // to enable or disable preflight checks
 	commitment      rpc.CommitmentType
 	maxRetries      *uint
@@ -82,9 +83,15 @@ type Client struct {
 }
 
 // Return both the client and the underlying rpc client for testing
-func NewTestClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, *rpc.Client, error) {
+func NewTestClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, *rpc.Client, error) {
+	var chainID string
+	if cfg.ChainID != nil {
+		chainID = *cfg.ChainID
+	}
+
 	rpcClient := Client{
 		url:             endpoint,
+		chainID:         chainID,
 		skipPreflight:   cfg.SkipPreflight(),
 		commitment:      cfg.Commitment(),
 		maxRetries:      cfg.MaxRetries(),
@@ -97,21 +104,21 @@ func NewTestClient(endpoint string, cfg config.Config, requestTimeout time.Durat
 	return &rpcClient, rpcClient.rpc, nil
 }
 
-func NewClient(endpoint string, cfg config.Config, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
+func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
 	rpcClient, _, err := NewTestClient(endpoint, cfg, requestTimeout, log)
 	return rpcClient, err
 }
 
-func (c *Client) latency(name string) func() {
+func (c *Client) latency(name string) func(err error) {
 	start := time.Now()
-	return func() {
-		monitor.SetClientLatency(time.Since(start), name, c.url)
+	return func(err error) {
+		monitor.SetClientLatency(c.chainID, time.Since(start), name, c.url, err)
 	}
 }
 
-func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (uint64, error) {
+func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64, err error) {
 	done := c.latency("balance")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -130,9 +137,9 @@ func (c *Client) SlotHeight(ctx context.Context) (uint64, error) {
 	return c.SlotHeightWithCommitment(ctx, rpc.CommitmentProcessed) // get the latest slot height
 }
 
-func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (uint64, error) {
+func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.CommitmentType) (height uint64, err error) {
 	done := c.latency("slot_height")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -145,9 +152,9 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 	return v.(uint64), err
 }
 
-func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (sigs []*rpc.TransactionSignature, err error) {
 	done := c.latency("signatures_for_address")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -160,9 +167,9 @@ func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solan
 	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
 }
 
-func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*rpc.GetTransactionResult, error) {
+func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (tx *rpc.GetTransactionResult, err error) {
 	done := c.latency("transaction")
-	defer done()
+	defer func() { done(err) }()
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
@@ -175,9 +182,9 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (*
 	return v.(*rpc.GetTransactionResult), err
 }
 
-func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error) {
+func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (result *rpc.GetAccountInfoResult, err error) {
 	done := c.latency("account_info")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -187,7 +194,7 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 
 func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error) {
 	done := c.latency("multiple_account_info")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -197,7 +204,7 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 
 func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {
 	done := c.latency("first_available_block")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -206,7 +213,7 @@ func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err er
 
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
 	done := c.latency("blocks")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -223,9 +230,9 @@ func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint6
 	return v.(rpc.BlocksResult), err
 }
 
-func (c *Client) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error) {
+func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBlockhashResult, err error) {
 	done := c.latency("latest_blockhash")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -236,9 +243,9 @@ func (c *Client) LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashRe
 	return v.(*rpc.GetLatestBlockhashResult), err
 }
 
-func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
+func (c *Client) ChainID(ctx context.Context) (chainID mn.StringID, err error) {
 	done := c.latency("chain_id")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -253,9 +260,9 @@ func (c *Client) ChainID(ctx context.Context) (mn.StringID, error) {
 	return mn.StringID(v.(solana.Hash).String()), nil
 }
 
-func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, error) {
+func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (fee uint64, err error) {
 	done := c.latency("fee_for_message")
-	defer done()
+	defer func() { done(err) }()
 
 	// msg is base58 encoded data
 
@@ -273,9 +280,9 @@ func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (uint64, erro
 }
 
 // https://docs.solana.com/developing/clients/jsonrpc-api#getsignaturestatuses
-func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error) {
+func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature) (statuses []*rpc.SignatureStatusesResult, err error) {
 	done := c.latency("signature_statuses")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -294,9 +301,9 @@ func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature)
 
 // https://docs.solana.com/developing/clients/jsonrpc-api#simulatetransaction
 // opts - (optional) use `nil` to use defaults
-func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResult, error) {
+func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *rpc.SimulateTransactionOpts) (result *rpc.SimulateTransactionResult, err error) {
 	done := c.latency("simulate_tx")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
@@ -320,9 +327,9 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 	return res.Value, nil
 }
 
-func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (sig solana.Signature, err error) {
 	done := c.latency("send_tx")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
@@ -336,7 +343,7 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (solana.Sig
 	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
 }
 
-func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
+func (c *Client) GetLatestBlock(ctx context.Context) (result *rpc.GetBlockResult, err error) {
 	// get latest confirmed slot
 	slot, err := c.SlotHeightWithCommitment(ctx, c.commitment)
 	if err != nil {
@@ -345,14 +352,14 @@ func (c *Client) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error
 
 	// get block based on slot
 	done := c.latency("latest_block")
-	defer done()
+	defer func() { done(err) }()
 	return c.GetBlock(ctx, slot)
 }
 
 // GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
-func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
+func (c *Client) GetLatestBlockHeight(ctx context.Context) (height uint64, err error) {
 	done := c.latency("latest_block_height")
-	defer done()
+	defer func() { done(err) }()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 
@@ -362,18 +369,18 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (uint64, error) {
 	return v.(uint64), err
 }
 
-func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (result *rpc.GetBlockResult, err error) {
 	// get block based on slot with custom options set
 	done := c.latency("get_block_with_opts")
-	defer done()
+	defer func() { done(err) }()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	return c.rpc.GetBlockWithOpts(ctx, slot, opts)
 }
 
-func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult, error) {
+func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBlockResult, err error) {
 	done := c.latency("get_block")
-	defer done()
+	defer func() { done(err) }()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 	// Adding slot to the key so concurrent calls to GetBlock for different slots are not merged. Without including the slot,
@@ -389,9 +396,9 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (*rpc.GetBlockResult
 	return v.(*rpc.GetBlockResult), err
 }
 
-func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (*rpc.BlocksResult, error) {
+func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (result *rpc.BlocksResult, err error) {
 	done := c.latency("get_blocks_with_limit")
-	defer done()
+	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
