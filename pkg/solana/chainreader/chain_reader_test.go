@@ -592,6 +592,83 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 }
 
+func TestSolanaChainReaderService_DatabaseBloat(t *testing.T) {
+	// For every service start, new filters are created from the provided config. This can result in database bloat
+	// over long periods of time and add unnecessary load to LogPoller. This test attempts to quantify and limit bloat
+	// caused by restarts.
+
+	ctx := t.Context()
+	lggr := logger.Nop()
+	mAccts := new(mockedMultipleAccountGetter)
+	mEvts := mocks.NewEventsReader(t)
+	pubKey1 := solana.NewWallet().PublicKey()
+	pubKey2 := solana.NewWallet().PublicKey()
+	bindCallCount := 5
+	restartCount := 10
+
+	boolType := codec.IdlType{}
+	require.NoError(t, boolType.UnmarshalJSON([]byte("\"bool\"")))
+
+	cfg := config.ContractReader{
+		Namespaces: map[string]config.ChainContractReader{
+			"myChainReader": {
+				IDL: codec.IDL{
+					Accounts: []codec.IdlTypeDef{{Name: "myAccount",
+						Type: codec.IdlTypeDefTy{
+							Kind:   codec.IdlTypeDefTyKindStruct,
+							Fields: &[]codec.IdlField{}}}},
+					Events: []codec.IdlEvent{
+						{Name: "myEvent", Fields: []codec.IdlEventField{{Name: "a", Type: boolType}}},
+					},
+				},
+				Reads: map[string]config.ReadDefinition{
+					"myRead": {
+						ChainSpecificName: "myEvent",
+						ReadType:          config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							IndexedField0: &config.IndexedField{
+								OffChainPath: "A.B",
+								OnChainPath:  "A.B",
+							},
+							PollingFilter: &config.PollingFilter{},
+						}}}}},
+		AddressShareGroups: nil,
+	}
+
+	mEvts.EXPECT().Start(mock.Anything).Return(nil).Maybe()
+	mEvts.EXPECT().Ready().Return(nil).Maybe()
+	mEvts.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false).Maybe()
+
+	filters := []string{}
+
+	mEvts.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Run(func(_ context.Context, filter logpoller.Filter) {
+		filters = append(filters, filter.Name)
+	}).Return(nil).Maybe()
+
+	for range restartCount {
+		svc, err := chainreader.NewContractReaderService(
+			lggr,
+			mAccts,
+			cfg, mEvts,
+		)
+
+		require.NoError(t, err)
+		require.NoError(t, svc.Start(ctx))
+
+		// calling bind multiple times here simulates multiple uses of the contract reader service where bind might be
+		// called before GetLatestValue or QueryKey
+		for range bindCallCount {
+			require.NoError(t, svc.Bind(ctx, []types.BoundContract{{Address: pubKey1.String(), Name: "myChainReader"}}))
+			require.NoError(t, svc.Bind(ctx, []types.BoundContract{{Address: pubKey2.String(), Name: "myChainReader"}}))
+		}
+
+		require.NoError(t, svc.Close())
+	}
+
+	// TODO: implement cleanup routine to reduce database bloat
+	assert.Len(t, filters, restartCount*2, "registered filter count should match the total restarts multiplied by bound contracts")
+}
+
 func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
 	t.Helper()
 
