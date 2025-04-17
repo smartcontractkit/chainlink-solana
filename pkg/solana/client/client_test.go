@@ -13,15 +13,16 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-framework/metrics"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
@@ -407,15 +408,39 @@ func TestClientLatency(t *testing.T) {
 	n := t.Name() + uuid.NewString()
 	f := func() {
 		done := c.latency(n)
-		defer done()
+		defer done(nil)
 		time.Sleep(time.Duration(v) * time.Millisecond)
 	}
 	f()
-	g, err := monitor.GetClientLatency(n, c.url)
-	require.NoError(t, err)
-	val := testutil.ToFloat64(g)
 
-	// check within expected range
-	assert.GreaterOrEqual(t, val, float64(v))
-	assert.LessOrEqual(t, val, float64(v)*1.05)
+	labels := prometheus.Labels{
+		"chainFamily": metrics.Solana,
+		"chainID":     c.chainID,
+		"rpcUrl":      c.url,
+		"isSendOnly":  "false",
+		"success":     "true",
+		"rpcCallName": n,
+	}
+
+	metric, err := metrics.RPCCallLatency.GetMetricWith(labels)
+	require.NoError(t, err)
+	hist, ok := metric.(prometheus.Histogram)
+	require.True(t, ok)
+
+	// Collect histogram metric
+	ch := make(chan prometheus.Metric, 1)
+	hist.Collect(ch)
+	m := <-ch
+	dto := &io_prometheus_client.Metric{}
+	err = m.Write(dto)
+	require.NoError(t, err)
+
+	count := dto.GetHistogram().GetSampleCount()
+	sum := dto.GetHistogram().GetSampleSum()
+	avg := sum / float64(count)
+
+	// Check within expected range
+	expected := float64((time.Duration(v) * time.Millisecond).Nanoseconds())
+	assert.GreaterOrEqual(t, avg, expected)
+	assert.LessOrEqual(t, avg, expected*1.05)
 }
