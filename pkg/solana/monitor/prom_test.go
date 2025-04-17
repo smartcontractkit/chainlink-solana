@@ -6,6 +6,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-framework/metrics"
 )
 
 func TestPromSolBalance(t *testing.T) {
@@ -16,6 +18,6 @@ func TestPromSolBalance(t *testing.T) {
 	monitor.updateProm(key, balance)
 
 	// happy path test
-	promBalance := testutil.ToFloat64(promSolanaBalance.WithLabelValues(key.String(), monitor.chainID, "solana", "SOL"))
+	promBalance := testutil.ToFloat64(metrics.NodeBalance.WithLabelValues(key.String(), monitor.chainID, metrics.Solana))
 	assert.Equal(t, float64(balance)/float64(solana.LAMPORTS_PER_SOL), promBalance)
 }
