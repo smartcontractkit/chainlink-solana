@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	tc "github.com/testcontainers/testcontainers-go"
+	tclog "github.com/testcontainers/testcontainers-go/log"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/slices"
 
@@ -80,7 +81,7 @@ func (s *Solana) WithTestLogger(t *testing.T) *Solana {
 }
 
 func (s *Solana) StartContainer() error {
-	l := tc.Logger
+	l := tclog.Default()
 	if s.t != nil {
 		l = logging.CustomT{
 			T: s.t,
