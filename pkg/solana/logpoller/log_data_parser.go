@@ -56,31 +56,31 @@ func prefixBuilder(depth int) string {
 func ParseProgramLogs(logs []string) []ProgramOutput {
 	var depth int
 	programs := []string{}
-
 	instLogs := []ProgramOutput{}
-	lastLogIdx := -1
+
+	output := &ProgramOutput{}
 
 	for _, log := range logs {
 		if strings.HasPrefix(log, PROGRAM_LOG) {
-			if lastLogIdx < 0 {
+			if output == nil {
 				continue
 			}
 			logData := log[len(PROGRAM_LOG):]
 
 			// this is a general log
-			instLogs[lastLogIdx].Logs = append(instLogs[lastLogIdx].Logs, ProgramLog{
+			output.Logs = append(output.Logs, ProgramLog{
 				Prefix: prefixBuilder(depth),
 				Text:   logData,
 			})
 		} else if strings.HasPrefix(log, PROGRAM_DATA) {
-			if lastLogIdx < 0 {
+			if output == nil {
 				continue
 			}
 
 			logData := log[len(PROGRAM_DATA):]
 
-			txLogIdx := uint(len(instLogs[lastLogIdx].Events))
-			instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
+			txLogIdx := uint(len(output.Events))
+			output.Events = append(output.Events, ProgramEvent{
 				Program: programs[len(programs)-1],
 				Data:    logData,
 				BlockData: BlockData{
@@ -88,11 +88,11 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 				},
 			})
 		} else if strings.HasPrefix(log, "Log truncated") {
-			if lastLogIdx < 0 {
+			if output == nil {
 				continue
 			}
 
-			instLogs[lastLogIdx].Truncated = true
+			output.Truncated = true
 		} else {
 			matches := invokeMatcher.FindStringSubmatch(log)
 
@@ -101,8 +101,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 					instLogs = append(instLogs, ProgramOutput{
 						Program: matches[1],
 					})
-
-					lastLogIdx = len(instLogs) - 1
+					output = &instLogs[len(instLogs)-1]
 				}
 
 				depth++
@@ -111,11 +110,11 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 				depth--
 				programs = programs[:len(programs)-1]
 			} else if strings.Contains(log, "failed") {
-				if lastLogIdx < 0 {
+				if output == nil {
 					continue
 				}
 
-				instLogs[lastLogIdx].Failed = true
+				output.Failed = true
 
 				idx := strings.Index(log, ": ") + 2
 
@@ -124,24 +123,24 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 					depth++
 				}
 
-				instLogs[lastLogIdx].ErrorText = log[idx:]
+				output.ErrorText = log[idx:]
 
 				depth--
 				programs = programs[:len(programs)-1]
 			} else {
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{})
-					lastLogIdx = len(instLogs) - 1
+					output = &instLogs[len(instLogs)-1]
 				}
 
-				if lastLogIdx < 0 {
+				if output == nil {
 					continue
 				}
 
 				matches := consumedMatcher.FindStringSubmatch(log)
 				if len(matches) == 3 && depth == 1 {
 					if val, err := strconv.Atoi(matches[1]); err == nil {
-						instLogs[lastLogIdx].ComputeUnits = uint(val) //nolint:gosec
+						output.ComputeUnits = uint(val) //nolint:gosec
 					}
 				}
 			}
