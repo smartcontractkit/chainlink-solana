@@ -17,14 +17,14 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250417161444-6af45cb2bf9e
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250416205944-615547d91280
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417132850-8f68f1d0afea
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418171616-8578d7338b82
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417172504-66752a5dffb7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418082728-c667695601ab
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418082728-c667695601ab
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418082728-c667695601ab
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418172326-61fda64b3da2
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418172326-61fda64b3da2
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418172326-61fda64b3da2
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
@@ -352,7 +352,7 @@ require (
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250417193003-28f91982c2f6 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250408161305-721208f43882 // indirect
-	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250417095045-3582edc61c12 // indirect
+	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250418172157-c803ef4416e0 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250416142349-44f812078171 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0 // indirect
