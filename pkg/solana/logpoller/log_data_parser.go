@@ -54,7 +54,6 @@ func prefixBuilder(depth int) string {
 }
 
 func ParseProgramLogs(logs []string) []ProgramOutput {
-	var depth int
 	programs := []string{}
 	instLogs := []ProgramOutput{}
 
@@ -67,6 +66,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 			}
 			logData := log[len(PROGRAM_LOG):]
 
+			depth := len(programs)
 			// this is a general log
 			output.Logs = append(output.Logs, ProgramLog{
 				Prefix: prefixBuilder(depth),
@@ -97,6 +97,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 			matches := invokeMatcher.FindStringSubmatch(log)
 
 			if len(matches) > 0 {
+				depth := len(programs)
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{
 						Program: matches[1],
@@ -104,10 +105,8 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 					output = &instLogs[len(instLogs)-1]
 				}
 
-				depth++
 				programs = append(programs, matches[1])
 			} else if strings.Contains(log, "success") {
-				depth--
 				programs = programs[:len(programs)-1]
 			} else if strings.Contains(log, "failed") {
 				if output == nil {
@@ -119,15 +118,11 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 				idx := strings.Index(log, ": ") + 2
 
 				// failed to verify log of previous program so reset depth and print full log
-				if strings.HasPrefix(log, "failed") {
-					depth++
-				}
-
 				output.ErrorText = log[idx:]
 
-				depth--
 				programs = programs[:len(programs)-1]
 			} else {
+				depth := len(programs)
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{})
 					output = &instLogs[len(instLogs)-1]
@@ -139,7 +134,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 
 				matches := consumedMatcher.FindStringSubmatch(log)
 				// we only care about toplevel compute units cost
-				if len(matches) == 3 && depth == 1 {
+				if len(matches) == 3 && len(programs) == 1 {
 					if val, err := strconv.Atoi(matches[1]); err == nil {
 						output.ComputeUnits = uint(val) //nolint:gosec
 					}
