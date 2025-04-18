@@ -16,14 +16,11 @@ pub const MAX_REPORT_SIGNERS: usize = 17;
 
 pub const SIGNATURE_LEN: usize = 65;
 
-pub type EthAddress = [u8; 20];
-
 pub const FORWARDER_METADATA_LENGTH: usize = 45;
 pub const METADATA_LENGTH: usize = 109;
-
 #[program]
 pub mod keystone_forwarder {
-    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed, system_instruction};
+    use anchor_lang::{solana_program::{instruction::Instruction, program::invoke_signed, system_instruction}, Discriminator};
 
     use super::*;
 
@@ -57,12 +54,13 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    pub fn init_oracles_config(ctx: Context<InitOraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<EthAddress>) -> Result<()> {
+    pub fn init_oracles_config(ctx: Context<InitOraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config;
+
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
 
-    pub fn update_oracles_config(ctx: Context<UpdateOraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<EthAddress>) -> Result<()> {
+    pub fn update_oracles_config(ctx: Context<UpdateOraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config;
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -73,11 +71,11 @@ pub mod keystone_forwarder {
 
     // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(ctx: Context<'_, '_, '_, 'info, Report<'info>>, data: Vec<u8>) -> Result<()> {
-        let len_signatures = data[1] as usize;
-        require!(len_signatures <= MAX_REPORT_SIGNERS, ForwarderError::MaxSignersLimit);
+        let num_signatures = data[1] as usize;
+        require!(num_signatures <= MAX_REPORT_SIGNERS, ForwarderError::MaxSignersLimit);
 
-        // first 1 is bump, second is length of signatures
-        let min_data_size = 1 + 1 + len_signatures*SIGNATURE_LEN + REPORT_CONTEXT_LEN;
+        // first u8 stores bump, second u8 stores the number of signatures
+        let min_data_size = 1 + 1 + num_signatures*SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
         require!(data.len() > min_data_size.into(), ForwarderError::InvalidReport);
         
@@ -86,21 +84,21 @@ pub mod keystone_forwarder {
         let f = oracles_config.f;
         require!(f != 0, ForwarderError::InvalidConfig);
 
-        require!(len_signatures >= (f+1).into(), ForwarderError::InvalidSignatureCount);
+        require!(num_signatures >= (f+1).into(), ForwarderError::InvalidSignatureCount);
 
         // bump is calculated off-chain by the write target when computing the pda
         let execution_state_bump = data[0];
 
         // extract signatures
         let data = &data[2..];
-        let total_signature_len: usize = SIGNATURE_LEN * len_signatures;
+        let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
 
         let signatures: &[u8] = &data[..total_signature_len];
         // raw_report | report context
         let data = &data[total_signature_len..];
         let hashed_report = hash::hash(&data).to_bytes();
 
-        verify_signatures(&hashed_report, signatures, oracles_config, total_signature_len)?;
+        verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
         let raw_report_end = data.len() - REPORT_CONTEXT_LEN;
@@ -111,8 +109,7 @@ pub mod keystone_forwarder {
         let execution_state = &ctx.accounts.execution_state;
 
         if execution_state.data_is_empty() {
-            // includes anchor discriminator 
-            let space = ExecutionState::INIT_SPACE; 
+            let space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE; 
 
             let rent = Rent::get()?.minimum_balance(space);
 
@@ -198,15 +195,15 @@ pub mod keystone_forwarder {
 
         // update execution state
         let mut dst = execution_state.try_borrow_mut_data()?;
-
         let execution_state = ExecutionState {
             transmitter: ctx.accounts.transmitter.key(),
             transmission_id: transmission_id,
             success: true
         };
-        execution_state.serialize(&mut &mut dst[..])?;
+        dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&ExecutionState::discriminator());
+        execution_state.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
 
-        // let report_context = &data[data.len()-96..];
+        // let report_context = &data[data.len()-REPORT_CONTEXT_LEN..];
         Ok(())
     }
 
@@ -217,40 +214,40 @@ fn verify_signatures(
     hashed_report: &[u8; 32],
     signatures: &[u8],
     oracles_config: &Account<OraclesConfig>,
-    total_signatures_len: usize
+    num_signers: usize
 ) -> Result<()> {
      // ensure MAX_SIGNERS fit in the bits of uniques
      let mut uniques: u32 = 0;
      assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_REPORT_SIGNERS as u32); 
 
-     for sig in signatures.chunks(SIGNATURE_LEN.into()) {
+     for sig in signatures.chunks(SIGNATURE_LEN.into())  {
          // sig is [R || S || V] format where V is 0 or 1
          let v = sig[64];
 
          let signer = secp256k1_recover(hashed_report, v, &sig[..64])
              .map_err(|_| ForwarderError::InvalidSignature)?;
 
-         let signer_eth_address: EthAddress = keccak::hash(&signer.0).to_bytes()[12..32]
+         let signer_eth_address: [u8; 20] = keccak::hash(&signer.0).to_bytes()[12..32]
          .try_into()
          .map_err(|_| ForwarderError::UnauthorizedSigner)?;
 
          let index = oracles_config
-             .signer_addresses.binary_search_by(|addr| signer_eth_address.cmp(addr))
+             .signer_addresses.binary_search_by(|addr| addr.cmp(&signer_eth_address) )
              .map_err(|_| ForwarderError::UnauthorizedSigner)?;
 
          uniques |= 1 << index;
      };
 
-     require!(uniques.count_ones() as usize == total_signatures_len, ForwarderError::DuplicateSignatures);
+     require!(uniques.count_ones() as usize == num_signers, ForwarderError::DuplicateSignatures);
 
      Ok(())
 }
 
 
-fn set_oracles_config(oracles_config: &mut Account<OraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<EthAddress>) -> Result<()> {
+fn set_oracles_config(oracles_config: &mut Account<OraclesConfig>, don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>) -> Result<()> {
     require!(signer_addresses.len() <= MAX_REPORT_SIGNERS.into(), ForwarderError::MaxSignersLimit);
 
-    let mut prev_signer: EthAddress = [0u8; 20];
+    let mut prev_signer = [0u8; 20];
 
     for &curr_signer in signer_addresses.iter() {
         // will also fail if there is a duplicate signer
@@ -269,16 +266,15 @@ fn set_oracles_config(oracles_config: &mut Account<OraclesConfig>, don_id: u32, 
 #[account]
 #[derive(Default)]
 pub struct ForwarderState {
-    version: u8,
-    authority_nonce: u8, // bump
-    owner: Pubkey,
-    proposed_owner: Pubkey,
+    pub version: u8,
+    pub authority_nonce: u8, // bump
+    pub owner: Pubkey,
+    pub proposed_owner: Pubkey,
 }
-
 
 impl ForwarderState {
     // version + authority_nonce + owner + proposed_owner + vec prefix for config vec
-    pub const SPACE: usize = 1 + 1 + 4 + 4 + 32;
+    pub const SPACE: usize = 1 + 1 + 32 + 32;
 }
 
 #[derive(Accounts)]
@@ -316,18 +312,17 @@ pub struct AcceptOwnership<'info> {
 
 // combination of solidity's OracleSet and the configId mapping
 #[account]
-#[derive(Default)]
 pub struct OraclesConfig {
     config_id: u64,
     f: u8,
-    signer_addresses: Vec<EthAddress>, // maybe think about doing ECDSA over ed25519?
+    signer_addresses: Vec<[u8; 20]>, 
 } 
 
 impl OraclesConfig {
     pub const INIT_SPACE: usize = 8 + 1 + 4;
 
     pub fn space_with_signers(num_signers: usize) -> usize {
-        Self::INIT_SPACE + num_signers*20
+        Self::INIT_SPACE + (num_signers*20)
     }
 }
 
@@ -336,7 +331,7 @@ fn get_config_id(don_id: u32, config_version: u32) -> u64 {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, signer_addresses: Vec<EthAddress>)]
+#[instruction(don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>)]
 pub struct InitOraclesConfig<'info> {
 
     pub state: Account<'info, ForwarderState>,
@@ -346,7 +341,7 @@ pub struct InitOraclesConfig<'info> {
         payer = owner,
         seeds = [b"config", state.key().as_ref(), &get_config_id(don_id, config_version).to_be_bytes()],
         bump,
-        space = OraclesConfig::space_with_signers(signer_addresses.len())
+        space = ANCHOR_DISCRIMINATOR + OraclesConfig::space_with_signers(signer_addresses.len())
     )]
     oracles_config: Account<'info, OraclesConfig>,
 
@@ -357,7 +352,7 @@ pub struct InitOraclesConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, signer_addresses: Vec<Pubkey>)]
+#[instruction(don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>)]
 pub struct UpdateOraclesConfig<'info> {
 
     pub state: Account<'info, ForwarderState>,
@@ -397,16 +392,16 @@ pub struct CloseOraclesConfig<'info> {
 }
 
 // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
-fn extract_raw_report(data: &[u8]) -> Vec<u8> {
+fn extract_raw_report(data: &[u8]) -> &[u8] {
     let _execution_state_bump = data[0];
-    let len = data[1] as usize;
+    let num_signatures = data[1] as usize;
     let data = &data[2..];
-    let _signatures = &data[..65*len];
-    let data = &data[65*len..];
-    let _report_context = &data[data.len()-96..];
-    let raw_report = &data[..data.len()-96];
+    let _signatures = &data[..num_signatures*SIGNATURE_LEN];
+    let data = &data[num_signatures*SIGNATURE_LEN..];
+    let _report_context = &data[data.len()-REPORT_CONTEXT_LEN..];
+    let raw_report = &data[..data.len()-REPORT_CONTEXT_LEN];
 
-    return raw_report.to_vec()
+    return raw_report
 }
 
 
@@ -443,7 +438,7 @@ pub struct Report<'info> {
 
     #[account(
         mut,
-        seeds = [b"config", state.key().as_ref(), &extract_config_id(&extract_raw_report(&data))],
+        seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
     oracles_config: Account<'info, OraclesConfig>,
@@ -461,7 +456,7 @@ pub struct Report<'info> {
         mut, 
         seeds = [
             b"execution_state", 
-            &extract_transmission_id(&extract_raw_report(&data), receiver_program.key)
+            &extract_transmission_id(extract_raw_report(&data), receiver_program.key)
         ], 
         bump = data[0]
     )]

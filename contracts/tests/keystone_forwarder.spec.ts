@@ -1,0 +1,454 @@
+import * as anchor from "@coral-xyz/anchor";
+import { Program, BN } from "@coral-xyz/anchor";
+import { KeystoneForwarder } from "../target/types/keystone_forwarder";
+import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { keccak256 } from "ethereum-cryptography/keccak";
+import { assert } from "chai";
+import { randomBytes, createHash } from "crypto";
+import * as secp256k1 from "secp256k1";
+import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
+import { DummyReceiver } from "../target/types/dummy_receiver";
+
+function signMessage(message: Buffer, secretKey: Buffer) {
+  const { signature, recid: recovery } = secp256k1.ecdsaSign(message, secretKey);
+  return {
+    signature: Buffer.from(signature),
+    recovery // useful for pubkey recovery
+  };
+}
+
+let generateEthKeypair = () => {
+  let secretKey = randomBytes(32);
+  let publicKey = secp256k1.publicKeyCreate(secretKey, false).slice(1);
+  let ethereumAddress = getEthereumAddress(Buffer.from(publicKey));
+  return {
+    secretKey,
+    publicKey,
+    ethereumAddress
+  }
+}
+
+let getEthereumAddress = (publicKey: Buffer) => {
+  return keccak256(publicKey).slice(12);
+};
+
+describe("keystone_storage", function() {
+  // Configure the client to use the local cluster.
+  const provider = anchor.AnchorProvider.env()
+  anchor.setProvider(provider);
+
+  const program = anchor.workspace.KeystoneForwarder as Program<KeystoneForwarder>;
+
+  const receiverProgram = anchor.workspace.DummyReceiver as Program<DummyReceiver>;
+  const latestReportState = Keypair.generate();
+
+  const NUM_SIGNERS = 8;
+
+  before(async function() {
+    await receiverProgram.methods.initialize()
+      .accounts({
+        reportState: latestReportState.publicKey,
+        signer: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([latestReportState])
+      .rpc();
+  })
+
+  // forwarder state data account
+  const forwarderState = Keypair.generate();
+
+  let defaultOraclesConfigStorage: anchor.web3.PublicKey;
+  const defaultSigners = Array.from({ length: NUM_SIGNERS }, () => generateEthKeypair());
+  defaultSigners.sort((a, b) => {
+    return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
+  })
+
+
+  it("Is initialized!", async () => {
+
+    await program.methods.initialize().accounts({
+      state: forwarderState.publicKey,
+      owner:  provider.wallet.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .signers([forwarderState])
+    .rpc();
+
+    const actualState = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.isTrue(actualState.owner.equals(provider.wallet.publicKey), 'owner set');
+    assert.isTrue(actualState.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
+    assert.equal(actualState.version, 1, 'version 1');
+  });
+
+  it("Transfer ownership and back", async () => {
+
+    const proposedOwner = Keypair.generate();
+
+    // current owner initiates transfer to proposed owner
+    await program.methods.transferOwnership(proposedOwner.publicKey).accounts({
+      state: forwarderState.publicKey,
+      currentOwner:  provider.wallet.publicKey,
+    })
+    .rpc();
+
+    const actualState1 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.isTrue(actualState1.owner.equals(provider.wallet.publicKey), 'owner should be same');
+    assert.isTrue(actualState1.proposedOwner.equals(proposedOwner.publicKey), 'proposed owner set');
+
+    // proposed owner accepts
+    await program.methods.acceptOwnership().accounts({
+      state: forwarderState.publicKey,
+      proposedOwner: proposedOwner.publicKey
+    })
+    .signers([proposedOwner])
+    .rpc();
+
+    const actualState2 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.isTrue(actualState2.owner.equals(proposedOwner.publicKey), 'owner set correctly');
+    assert.isTrue(actualState2.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
+
+    // proposed owner transfer back
+     // current owner initiates transfer to proposed owner
+     await program.methods.transferOwnership(provider.wallet.publicKey).accounts({
+      state: forwarderState.publicKey,
+      currentOwner:  proposedOwner.publicKey,
+    })
+    .signers([proposedOwner])
+    .rpc();
+
+    const actualState3 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.isTrue(actualState3.owner.equals(proposedOwner.publicKey), 'owner should be same');
+    assert.isTrue(actualState3.proposedOwner.equals(provider.wallet.publicKey), 'proposed owner set');
+
+    // proposed owner accepts
+    await program.methods.acceptOwnership().accounts({
+      state: forwarderState.publicKey,
+      proposedOwner: provider.wallet.publicKey
+    })
+    .rpc();
+
+    const actualState4 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.isTrue(actualState4.owner.equals(provider.wallet.publicKey), 'owner set correctly');
+    assert.isTrue(actualState4.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
+  });
+
+
+  it("Initialize New Oracles Config, Update",  async () => {
+    const donId = 7;
+    const configVersion = 3;
+    const configId: bigint = (7n << 32n) | 3n; // 64 bytes
+
+    const configIdBytes = Buffer.alloc(8);
+    configIdBytes.writeBigUInt64BE(configId);
+
+    const seeds = [
+      Buffer.from(anchor.utils.bytes.utf8.encode("config")),
+      forwarderState.publicKey.toBuffer(),
+      configIdBytes
+    ];
+
+    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
+    defaultOraclesConfigStorage = oraclesConfigStorage;
+
+    const signers = defaultSigners;
+
+    // all 3 work... arrays of number[], Uint8Array, or Buffer
+    // const signerEthAddresses = signers.map(s => Array.from(s.ethereumAddress).map(x => new BN(x)));
+    // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
+    const signerEthAddresses = signers.map(s => (s.ethereumAddress ))
+
+    await program.methods.initOraclesConfig(
+      new BN(7), 
+      new BN(3), 
+      new BN(1), 
+      signerEthAddresses as any
+    )
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: oraclesConfigStorage,
+        owner: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId
+      })
+      .rpc();
+    
+      const actualConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+
+      assert.equal(configId, actualConfig.configId, 'config ids should equal');
+      assert.equal(1, actualConfig.f, 'f should equal');
+      assert.isTrue(actualConfig.signerAddresses.every((addr, i) => (Buffer.from(addr).equals(signerEthAddresses[i]) )));
+
+
+    const updatedSigners  = Array.from({ length: 15 }, () => generateEthKeypair());
+    updatedSigners.sort((a, b) => {
+      return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
+    })
+
+  // const signerEthAddresses = signers.map(s => Array.from(s.ethereumAddress).map(x => new BN(x)));
+
+  // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
+
+  const updatedSignerEthAddresses = signers.map(s => ( s.ethereumAddress ))
+
+  await program.methods.updateOraclesConfig(
+    new BN(7), 
+    new BN(3), 
+    new BN(1), 
+    updatedSignerEthAddresses as any
+  )
+    .accounts({
+      state: forwarderState.publicKey,
+      oraclesConfig: oraclesConfigStorage,
+      owner: provider.wallet.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId
+    })
+    .rpc();
+
+    const actualUpdatedConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+
+    assert.equal(configId, actualConfig.configId, 'config ids should equal');
+    assert.equal(1, actualConfig.f, 'f should equal');
+    assert.isTrue(actualUpdatedConfig.signerAddresses.every((addr, i) => (Buffer.from(addr).equals(updatedSignerEthAddresses[i]) )));
+  });
+
+  it("Close oracle config", async () => {
+
+    const donId = 9;
+    const configVersion = 2;
+    const configId: bigint = (9n << 32n) | 2n;
+
+    const configIdBytes = Buffer.alloc(8);
+    configIdBytes.writeBigUInt64BE(configId);
+
+    const seeds = [
+      Buffer.from(anchor.utils.bytes.utf8.encode("config")),
+      forwarderState.publicKey.toBuffer(),
+      configIdBytes
+    ];
+
+    const [oraclesConfigStorage, bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
+
+    const signers  = Array.from({ length: 2 }, () => generateEthKeypair());
+    signers.sort((a, b) => {
+      return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
+    })
+
+    const signerEthAddresses = signers.map(s => ( s.ethereumAddress ))
+
+    await program.methods.initOraclesConfig(
+      new BN(9), 
+      new BN(2), 
+      new BN(1), 
+      signerEthAddresses as any
+    )
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: oraclesConfigStorage,
+        owner: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId
+      })
+      .rpc();
+
+      const actualConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+
+      assert.equal(configId, actualConfig.configId, 'config ids should equal');
+
+      await program.methods.closeOraclesConfig(
+        new BN(9), 
+        new BN(2),
+      )
+        .accounts({
+          state: forwarderState.publicKey,
+          oraclesConfig: oraclesConfigStorage,
+          owner: provider.wallet.publicKey,
+        })
+        .rpc();
+
+        try {
+          await program.account.oraclesConfig.fetch(oraclesConfigStorage)
+        } catch (err) {
+          if (!err.message.includes("Account does not exist")) {
+            assert.fail("Account should not exist anymore")
+          }
+        }  
+  })
+
+  it("Report", async () => {
+    // let receiver = Keypair.generate();
+    const receiver = receiverProgram.programId;
+
+
+    let workflowExecutionId = 20;
+    let reportId = 11;
+
+    const workflowExecutionIdBytes = Buffer.alloc(32);
+    workflowExecutionIdBytes.writeUint8(workflowExecutionId, 31); // write at last byte for BigEndian
+
+    const reportIdBytes = Buffer.alloc(2);
+    reportIdBytes.writeUint16BE(reportId);
+
+    const transmissionIdBytes = createHash("sha256").update(Buffer.concat([
+      receiver.toBuffer(), 
+      workflowExecutionIdBytes,
+      reportIdBytes
+    ])).digest();
+   
+
+    const [forwarderAuthorityStorage, forwarderAuthorityBump] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+        forwarderState.publicKey.toBuffer(),
+      ], 
+      program.programId
+    );
+
+    const actualState = await program.account.forwarderState.fetch(forwarderState.publicKey)
+
+    assert.equal(actualState.authorityNonce, forwarderAuthorityBump, 'forwarder authority PDA bumps should be equal');
+
+    const [executionStateStorage, executionStateBump] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("execution_state")),
+        transmissionIdBytes,
+      ],
+      program.programId
+    );
+
+     // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+
+     const executionStateBumpBytes = Buffer.alloc(1);
+     executionStateBumpBytes.writeUint8(executionStateBump);
+
+     const lenSignatureBytes = Buffer.alloc(1);
+     lenSignatureBytes.writeUint8(defaultSigners.length);
+
+     // metadata length + actual report payload length
+     const rawReportBytes = Buffer.alloc(109 + 1);
+
+      // version                offset   0, size  1  
+      // workflow_execution_id  offset   1, size 32
+      // timestamp              offset  33, size  4
+      // don_id                 offset  37, size  4
+      // don_config_version     offset  41, size  4
+      // workflow_cid           offset  45, size 32
+      // workflow_name          offset  77, size 10
+      // workflow_owner         offset  87, size 20
+      // report_id              offset 107, size  2     
+  
+
+      const version = 1;
+      const timestamp = 5;
+      const donId = 7;
+      const configVersion = 3;
+      const workflowCid = 2;
+      const workflowName = 10;
+      const workflowOwner = 11;
+
+
+      rawReportBytes.writeUint8(version, 0);
+      rawReportBytes.writeUint8(workflowExecutionId, 32); // write at last byte for BigEndian
+      rawReportBytes.writeUint8(timestamp, 36);
+      rawReportBytes.writeUint8(donId, 40);
+      rawReportBytes.writeUint8(configVersion, 44);
+      rawReportBytes.writeUint8(workflowCid, 76);
+      rawReportBytes.writeUint8(workflowName, 86);
+      rawReportBytes.writeUint8(workflowOwner, 106);
+      rawReportBytes.writeUint8(reportId, 108);
+
+      // payload
+      rawReportBytes.writeUint8(255, 109);
+
+      // just keep this zero-ed since we don't use it outside of the hash
+      const reportContextBytes = Buffer.alloc(96);
+
+      const msgHashToSign = createHash("sha256")
+        .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+        .digest();
+
+      const signaturesInfo = defaultSigners.map(s => (signMessage(msgHashToSign, s.secretKey)));
+
+      const signaturesBytes = signaturesInfo.map(s => {
+        const recoveryIdBytes = Buffer.alloc(1);
+        recoveryIdBytes.writeUint8(s.recovery);
+        return Buffer.concat([s.signature, recoveryIdBytes]);
+      })
+
+      // they need to be packed as one buffer array
+      const signaturesBytesPacked = Buffer.concat(signaturesBytes);
+
+       // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+      //  1 + 1 + (15*65) + 110 + 96
+      const dataBytes = Buffer.concat([
+        executionStateBumpBytes,
+        lenSignatureBytes,
+        signaturesBytesPacked,
+        rawReportBytes,
+        reportContextBytes
+      ]);
+
+    const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+      units: 1_400_000,
+    });
+
+    const ix = await program.methods
+    .report(dataBytes)
+    .accounts({
+      state: forwarderState.publicKey,
+      oraclesConfig: defaultOraclesConfigStorage,
+      transmitter: provider.wallet.publicKey,
+      forwarderAuthority: forwarderAuthorityStorage,
+      executionState: executionStateStorage,
+      receiverProgram: receiver,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .remainingAccounts([{
+      pubkey: latestReportState.publicKey,
+      isSigner: false,
+      isWritable: true
+    }])
+    .instruction();
+
+    const tx = new Transaction()
+    .add(computeLimitIx)
+    .add(ix);
+
+    await provider.sendAndConfirm(tx);
+
+
+    const actualExecutionState = await program.account.executionState.fetch(executionStateStorage);
+
+    assert.equal(true, actualExecutionState.success, "execution should succeed");
+    assert.isTrue(provider.wallet.publicKey.equals(actualExecutionState.transmitter), 'expected transmitter');
+    assert.deepEqual(Array.from(transmissionIdBytes), actualExecutionState.transmissionId, 'expected transmissionid');
+
+    const { metadata: actualMetadata, report: actualReport } = await receiverProgram.account.latestReport.fetch(latestReportState.publicKey);
+    assert.deepEqual(Buffer.from([255]), actualReport, 'reports match');
+    assert.deepEqual(rawReportBytes.slice(45, 109), actualMetadata, 'metadatas match');
+
+    // duplicated execution should fail 
+    
+    try {
+      await provider.sendAndConfirm(tx);
+    } catch (err) {
+      if (!err.message.includes("ExecutionAlreadySucceded")) {
+        assert.fail("Executing twice should fail")
+      } 
+    }  
+
+  })
+
+
+  
+
+
+
+
+
+
+
+});

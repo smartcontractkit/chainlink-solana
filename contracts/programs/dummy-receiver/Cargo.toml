@@ -1,12 +1,12 @@
 [package]
-name = "keystone-forwarder"
+name = "dummy-receiver"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "keystone_forwarder"
+name = "dummy_receiver"
 
 [features]
 no-entrypoint = []
@@ -17,6 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
-# disables frozen-abi
-# solana-program = { version = "1.17.25", default-features = false }
-solana-program = { version = "1.17.25" }
+keystone-forwarder = { version = "0.1.0", path = "../keystone-forwarder", default-features = false, features = ["cpi"] }
