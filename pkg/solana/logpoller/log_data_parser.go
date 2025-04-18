@@ -8,11 +8,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
+const PROGRAM_LOG = "Program log: "
+const PROGRAM_DATA = "Program data: "
+
 var (
 	invokeMatcher   = regexp.MustCompile(`Program (\w*) invoke \[(\d)\]`)
 	consumedMatcher = regexp.MustCompile(`Program \w* consumed (\d*) (.*)`)
-	logMatcher      = regexp.MustCompile(`Program log: (.*)`)
-	dataMatcher     = regexp.MustCompile(`Program data: (.*)`)
 )
 
 type BlockData struct {
@@ -60,35 +61,32 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 	lastLogIdx := -1
 
 	for _, log := range logs {
-		if strings.HasPrefix(log, "Program log:") {
-			logDataMatches := logMatcher.FindStringSubmatch(log)
-
-			if len(logDataMatches) <= 1 || lastLogIdx < 0 {
+		if strings.HasPrefix(log, PROGRAM_LOG) {
+			if lastLogIdx < 0 {
 				continue
 			}
+			logData := log[len(PROGRAM_LOG):]
 
 			// this is a general log
 			instLogs[lastLogIdx].Logs = append(instLogs[lastLogIdx].Logs, ProgramLog{
 				Prefix: prefixBuilder(depth),
-				Text:   logDataMatches[1],
+				Text:   logData,
 			})
-		} else if strings.HasPrefix(log, "Program data:") {
+		} else if strings.HasPrefix(log, PROGRAM_DATA) {
 			if lastLogIdx < 0 {
 				continue
 			}
 
-			dataMatches := dataMatcher.FindStringSubmatch(log)
+			logData := log[len(PROGRAM_DATA):]
 
-			if len(dataMatches) > 1 {
-				txLogIdx := uint(len(instLogs[lastLogIdx].Events))
-				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
-					Program: programs[len(programs)-1],
-					Data:    dataMatches[1],
-					BlockData: BlockData{
-						TransactionLogIndex: txLogIdx,
-					},
-				})
-			}
+			txLogIdx := uint(len(instLogs[lastLogIdx].Events))
+			instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
+				Program: programs[len(programs)-1],
+				Data:    logData,
+				BlockData: BlockData{
+					TransactionLogIndex: txLogIdx,
+				},
+			})
 		} else if strings.HasPrefix(log, "Log truncated") {
 			if lastLogIdx < 0 {
 				continue
