@@ -17,14 +17,14 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250417161444-6af45cb2bf9e
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250417183726-347f43d97832
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417172504-66752a5dffb7
-	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250416205944-615547d91280
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417132850-8f68f1d0afea
+	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250417193400-638cd1850e89
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250417193400-638cd1850e89
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250417193400-638cd1850e89
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418082728-c667695601ab
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418082728-c667695601ab
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418082728-c667695601ab
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
@@ -340,7 +340,7 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
-	github.com/shirou/gopsutil/v4 v4.25.2 // indirect
+	github.com/shirou/gopsutil/v4 v4.25.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slack-go/slack v0.15.0 // indirect
