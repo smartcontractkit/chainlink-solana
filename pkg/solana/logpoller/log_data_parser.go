@@ -12,8 +12,8 @@ const PROGRAM_LOG = "Program log: "
 const PROGRAM_DATA = "Program data: "
 
 var (
-	invokeMatcher   = regexp.MustCompile(`Program (\w*) invoke \[(\d)\]`)
-	consumedMatcher = regexp.MustCompile(`Program \w* consumed (\d*) (.*)`)
+	invokeMatcher   = regexp.MustCompile(`^Program (\w*) invoke \[(\d)\]`)
+	consumedMatcher = regexp.MustCompile(`^Program \w* consumed (\d*) (.*)`)
 )
 
 type BlockData struct {
@@ -138,6 +138,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 				}
 
 				matches := consumedMatcher.FindStringSubmatch(log)
+				// we only care about toplevel compute units cost
 				if len(matches) == 3 && depth == 1 {
 					if val, err := strconv.Atoi(matches[1]); err == nil {
 						output.ComputeUnits = uint(val) //nolint:gosec
