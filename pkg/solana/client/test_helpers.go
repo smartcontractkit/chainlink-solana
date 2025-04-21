@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os/exec"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -80,13 +79,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-var fundMx sync.Mutex
-
 // fund accounts have rate limit
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
-	t.Helper()
-	fundMx.Lock()
-	defer fundMx.Unlock()
 	for i := range keys {
 		account := keys[i].String()
 		_, err := exec.Command("solana", "airdrop", "100",
