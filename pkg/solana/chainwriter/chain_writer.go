@@ -64,6 +64,7 @@ type MethodConfig struct {
 	// Location in the args where the debug ID is stored
 	DebugIDLocation           string `json:"debugIDLocation,omitempty"`
 	ArgsTransform             string `json:"argsTransform,omitempty"`
+	// Overhead added to calculated compute units in the args transform
 	ComputeUnitLimitOverheard uint32 `json:"computeUnitLimitOverheard,omitempty"`
 }
 
