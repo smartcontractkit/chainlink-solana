@@ -42,7 +42,8 @@ describe("keystone_storage", function() {
   const receiverProgram = anchor.workspace.DummyReceiver as Program<DummyReceiver>;
   const latestReportState = Keypair.generate();
 
-  const NUM_SIGNERS = 8;
+  // if N <= 16, then f = 5 so we need f + 1 (6) signers for BFT
+  const NUM_SIGNERS = 6;
 
   before(async function() {
     await receiverProgram.methods.initialize()
@@ -441,14 +442,5 @@ describe("keystone_storage", function() {
     }  
 
   })
-
-
-  
-
-
-
-
-
-
 
 });
