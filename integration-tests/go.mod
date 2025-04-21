@@ -24,7 +24,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418172326-61fda64b3da2
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418172326-61fda64b3da2
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418172326-61fda64b3da2
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418214607-b715d575b344
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
