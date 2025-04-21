@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"os/exec"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/cometbft/cometbft/libs/sync"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
