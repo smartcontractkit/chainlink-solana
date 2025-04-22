@@ -31,10 +31,10 @@ const (
 )
 
 type worker struct {
-	Name  string
-	Queue chan *worker
-	Retry chan Job
-	Lggr  logger.Logger
+	Name       string
+	Queue      chan *worker
+	FailedJobs chan failedJob
+	Lggr       logger.Logger
 }
 
 func (w *worker) Do(ctx context.Context, job Job) {
@@ -57,7 +57,7 @@ func (w *worker) Do(ctx context.Context, job Job) {
 			return
 		}
 		w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
-		w.Retry <- job
+		w.FailedJobs <- failedJob{Job: job, Err: err}
 		return
 	}
 
@@ -84,9 +84,9 @@ type Group struct {
 	queueClosed  atomic.Bool
 
 	// retry queue
-	chRetry  chan Job
-	mu       sync.RWMutex
-	retryMap map[string]retryableJob
+	failedJobs chan failedJob
+	mu         sync.RWMutex
+	retryMap   map[string]retryableJob
 }
 
 func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
@@ -99,7 +99,7 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 		input:         make(chan Job, 1),
 		chInputNotify: make(chan struct{}, 1),
 		chStopInputs:  make(chan struct{}),
-		chRetry:       make(chan Job, 1),
+		failedJobs:    make(chan failedJob, 1),
 		retryMap:      make(map[string]retryableJob),
 	}
 
@@ -111,10 +111,10 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 
 	for idx := range workers {
 		g.workers <- &worker{
-			Name:  fmt.Sprintf("worker-%d", idx+1),
-			Queue: g.workers,
-			Retry: g.chRetry,
-			Lggr:  g.lggr,
+			Name:       fmt.Sprintf("worker-%d", idx+1),
+			Queue:      g.workers,
+			FailedJobs: g.failedJobs,
+			Lggr:       g.lggr,
 		}
 	}
 
@@ -202,30 +202,32 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case job := <-g.chRetry:
+		case failedAttempt := <-g.failedJobs:
 			var retry retryableJob
 
-			switch typedJob := job.(type) {
+			switch typedJob := failedAttempt.Job.(type) {
 			case retryableJob:
 				retry = typedJob
 				retry.count++
-
-				if retry.count > g.maxRetryCount {
-					g.lggr.Criticalf("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
-				}
+				retry.errs = append(retry.errs, failedAttempt.Err)
 
 				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
-				g.lggr.Errorf("retrying job in %dms", wait/time.Millisecond)
+				if retry.count > g.maxRetryCount {
+					g.lggr.Criticalf("job %s failed %d times in a row, next retry in %s. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, retry.count, wait, errors.Join(retry.errs...))
+				} else {
+					g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
+				}
 
 				retry.when = time.Now().Add(wait)
 			default:
 				wait := calculateExponentialBackoff(0)
 
-				g.lggr.Errorf("retrying job %s in %s", job, wait)
+				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
 				retry = retryableJob{
 					name: createRandomString(12),
-					job:  job,
+					job:  failedAttempt.Job,
+					errs: []error{failedAttempt.Err},
 					when: time.Now().Add(wait),
 				}
 			}
