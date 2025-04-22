@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# Generate a new set of keys to use for testing. Primarily used for e2e testing on CI
+# Generate a new set of keys to use for testing. Primarily used for e2e testing on CI 
+# assumes that test program ids and keypairs have been generated via solana-keygen and placed in the 
+# associated network folder
 
 set -euxo pipefail
 source "${BASH_SOURCE%/*}/lib.sh"
