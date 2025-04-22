@@ -19,7 +19,7 @@ store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "id.json"
 
 [scripts]
