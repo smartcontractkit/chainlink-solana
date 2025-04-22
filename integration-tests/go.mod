@@ -17,14 +17,14 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250417161444-6af45cb2bf9e
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250411163110-21a13ceb3ac4
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250416205944-615547d91280
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417132850-8f68f1d0afea
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250421201900-888b361327e8
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250417172504-66752a5dffb7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418082728-c667695601ab
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418082728-c667695601ab
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418082728-c667695601ab
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250418172326-61fda64b3da2
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250418172326-61fda64b3da2
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250418214607-b715d575b344
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
@@ -135,6 +135,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.1.0 // indirect
+	github.com/creack/pty v1.1.21 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
@@ -348,11 +349,11 @@ require (
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250325191518-036bb568a69d // indirect
 	github.com/smartcontractkit/chainlink-deployments-framework v0.0.3 // indirect
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250416143528-61465bca61a6 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250421201955-d1559c194030 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250408161305-721208f43882 // indirect
-	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250325121830-cfa9bf24c4f5 // indirect
-	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250416142349-44f812078171 // indirect
+	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250421203809-e0f5602c126c // indirect
+	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250416211832-0a38c3b5b341 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250402142713-6529d36f91f3 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0 // indirect
