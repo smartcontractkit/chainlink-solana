@@ -23,7 +23,7 @@ echo $OCR2_PROGRAM_ID > ./contracts/artifacts/$network/ocr_2-keypair.pub
 
 # solana-keygen new -o ./contracts/artifacts/$network/keystone_forwarder-keypair.json
 KEYSTONE_FORWARDER_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/keystone_forwarder-keypair.json)
-echo $KEYSTONE_FORWARDER_PROGRAM_ID > ./contracts/artifacts/$network/keystone_forwarder-keypair..pub
+echo $KEYSTONE_FORWARDER_PROGRAM_ID > ./contracts/artifacts/$network/keystone_forwarder-keypair.pub
 
 # solana-keygen new -o ./contracts/artifacts/$network/dummy_receiver-keypair.json
 DUMMY_RECEIVER_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/dummy_receiver-keypair.json)
