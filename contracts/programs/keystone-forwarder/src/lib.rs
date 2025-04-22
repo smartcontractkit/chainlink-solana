@@ -69,7 +69,7 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(ctx: Context<'_, '_, '_, 'info, Report<'info>>, data: Vec<u8>) -> Result<()> {
         let num_signatures = data[1] as usize;
         require!(num_signatures <= MAX_REPORT_SIGNERS, ForwarderError::MaxSignersLimit);
@@ -203,7 +203,6 @@ pub mod keystone_forwarder {
         dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&ExecutionState::discriminator());
         execution_state.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
 
-        // let report_context = &data[data.len()-REPORT_CONTEXT_LEN..];
         Ok(())
     }
 
@@ -391,7 +390,7 @@ pub struct CloseOraclesConfig<'info> {
     pub owner: Signer<'info>,  // must be the same owner as the one in the state account
 }
 
-// data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+// data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 fn extract_raw_report(data: &[u8]) -> &[u8] {
     let _execution_state_bump = data[0];
     let num_signatures = data[1] as usize;
@@ -483,17 +482,19 @@ pub struct ExecutionState {
 
 //
 // Receiver contract will implement this in Anchor (or equivalent in pure Rust)
-// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
+// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> 
 // with the following declared accounts
-#[derive(Accounts)]
-pub struct OnReport<'info> {
-    #[account(owner = ID)]
-    pub state: Account<'info, ForwarderState>,
+// 
+// #[derive(Accounts)]
+// pub struct OnReport<'info> {
+//     #[account(owner = FORWARDER_ID)]
+//     pub state: Account<'info, ForwarderState>,
 
-    /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
-    pub forwarder_authority: Signer<'info>,
+//     /// CHECK: This is a PDA
+//     /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
+//     /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+//     pub forwarder_authority: Signer<'info>,
 
-    // remaining accounts passed in as well
-}
+//     // remaining accounts passed in as well
+// }
 

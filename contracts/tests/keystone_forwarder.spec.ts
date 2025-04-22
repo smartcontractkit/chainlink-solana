@@ -1,13 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
-import { ComputeBudgetProgram, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { AddressLookupTableProgram, ComputeBudgetProgram, Keypair, PublicKey, sendAndConfirmTransaction, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
 import { DummyReceiver } from "../target/types/dummy_receiver";
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function signMessage(message: Buffer, secretKey: Buffer) {
   const { signature, recid: recovery } = secp256k1.ecdsaSign(message, secretKey);
@@ -190,10 +192,6 @@ describe("keystone_storage", function() {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
     })
 
-  // const signerEthAddresses = signers.map(s => Array.from(s.ethereumAddress).map(x => new BN(x)));
-
-  // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
-
   const updatedSignerEthAddresses = signers.map(s => ( s.ethereumAddress ))
 
   await program.methods.updateOraclesConfig(
@@ -219,9 +217,9 @@ describe("keystone_storage", function() {
 
   it("Close oracle config", async () => {
 
-    const donId = 9;
-    const configVersion = 2;
-    const configId: bigint = (9n << 32n) | 2n;
+    const donId = 9n;
+    const configVersion = 2n;
+    const configId: bigint = (donId << 32n) | configVersion;
 
     const configIdBytes = Buffer.alloc(8);
     configIdBytes.writeBigUInt64BE(configId);
@@ -232,7 +230,7 @@ describe("keystone_storage", function() {
       configIdBytes
     ];
 
-    const [oraclesConfigStorage, bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
+    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
 
     const signers  = Array.from({ length: 2 }, () => generateEthKeypair());
     signers.sort((a, b) => {
@@ -280,9 +278,8 @@ describe("keystone_storage", function() {
   })
 
   it("Report", async () => {
-    // let receiver = Keypair.generate();
+    // use dummy receiver from setup
     const receiver = receiverProgram.programId;
-
 
     let workflowExecutionId = 20;
     let reportId = 11;
@@ -320,7 +317,7 @@ describe("keystone_storage", function() {
       program.programId
     );
 
-     // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+     // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 
      const executionStateBumpBytes = Buffer.alloc(1);
      executionStateBumpBytes.writeUint8(executionStateBump);
@@ -382,7 +379,7 @@ describe("keystone_storage", function() {
       // they need to be packed as one buffer array
       const signaturesBytesPacked = Buffer.concat(signaturesBytes);
 
-       // data =  bump | len_signatures (N) | signatures (N*65) | raw_report (M) | report_context (96)
+       // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
       //  1 + 1 + (15*65) + 110 + 96
       const dataBytes = Buffer.concat([
         executionStateBumpBytes,
@@ -391,6 +388,8 @@ describe("keystone_storage", function() {
         rawReportBytes,
         reportContextBytes
       ]);
+    
+
 
     const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
       units: 1_400_000,
@@ -414,12 +413,78 @@ describe("keystone_storage", function() {
     }])
     .instruction();
 
-    const tx = new Transaction()
-    .add(computeLimitIx)
-    .add(ix);
+    const slot = await provider.connection.getSlot();
+    const [lookupTableInst, lookupTableAddress] = AddressLookupTableProgram.createLookupTable({
+      authority: provider.wallet.publicKey,
+      payer: provider.wallet.publicKey,
+      recentSlot: slot - 1,
+    });
+
+    // for chainlink usage, the ALT does include the receiver (bc that is known and static to us)
+    // PLUS any data accounts we use in the receiver (bc that is known and static to us)
+    // for external usage, the external user can provide another ALT should they wish
+    const extendInstruction = AddressLookupTableProgram.extendLookupTable({
+      payer: provider.wallet.publicKey,
+      authority: provider.wallet.publicKey,
+      lookupTable: lookupTableAddress,
+      addresses: [
+        forwarderState.publicKey,
+        defaultOraclesConfigStorage,
+        forwarderAuthorityStorage, 
+        receiver,
+        anchor.web3.SystemProgram.programId,
+        latestReportState.publicKey
+      ],
+    });
+
+      // Create the transaction message
+    const message = new TransactionMessage({
+      payerKey: provider.wallet.publicKey, // Account paying for the transaction
+      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      instructions: [lookupTableInst, extendInstruction], // Instructions to be included in the transaction
+    }).compileToV0Message();
+
+    const lookUpTx = new VersionedTransaction(message);
+
+    await provider.wallet.signTransaction(lookUpTx);
+    await provider.sendAndConfirm(lookUpTx);
+
+    const lookupTableAccount = (
+      await provider.connection.getAddressLookupTable(lookupTableAddress)
+    ).value;
+
+    
+    assert.isTrue(lookupTableAccount.key.equals(lookupTableAddress), 'lookup addresses equal');
+    assert.equal(lookupTableAccount.state.addresses.length, 6, '6 addresses in lookup table');
+
+    const [lookupState, lookupConfig, lookupAuthority, lookupReceiver, lookupSystemP, lookupReceiverReport] = lookupTableAccount.state.addresses
+
+    assert.isTrue(lookupState.equals(forwarderState.publicKey), 'forwarder state in lookup table');
+    assert.isTrue(lookupConfig.equals(defaultOraclesConfigStorage), 'forwarder state in lookup table');
+    assert.isTrue(lookupAuthority.equals(forwarderAuthorityStorage), 'forwarder state in lookup table');
+    assert.isTrue(lookupReceiver.equals(receiver), 'forwarder state in lookup table');
+    assert.isTrue(lookupSystemP.equals(anchor.web3.SystemProgram.programId), 'forwarder state in lookup table');
+    assert.isTrue(lookupReceiverReport.equals(latestReportState.publicKey), 'receiver report state in lookup table');
+
+    // create transaction
+
+    const reportMessage = new TransactionMessage({
+      payerKey: provider.wallet.publicKey, // Account paying for the transaction
+      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      instructions: [computeLimitIx, ix], // Instructions to be included in the transaction
+    }).compileToV0Message([lookupTableAccount]);
+
+    const tx = new VersionedTransaction(reportMessage);
+
+    const signedTx = await provider.wallet.signTransaction(tx)
+
+    const txSerial = signedTx.serialize();
+    console.log('the size of the tx', txSerial.length);
+
+    // delay in order to activate lookup table
+    await sleep(3000);
 
     await provider.sendAndConfirm(tx);
-
 
     const actualExecutionState = await program.account.executionState.fetch(executionStateStorage);
 
@@ -431,13 +496,20 @@ describe("keystone_storage", function() {
     assert.deepEqual(Buffer.from([255]), actualReport, 'reports match');
     assert.deepEqual(rawReportBytes.slice(45, 109), actualMetadata, 'metadatas match');
 
-    // duplicated execution should fail 
-    
+    const sameReportMessage = new TransactionMessage({
+      payerKey: provider.wallet.publicKey, // Account paying for the transaction
+      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      instructions: [computeLimitIx, ix], // Instructions to be included in the transaction
+    }).compileToV0Message([lookupTableAccount]);
+
+    const sameTx = new VersionedTransaction(sameReportMessage);
+
     try {
-      await provider.sendAndConfirm(tx);
+      await provider.sendAndConfirm(sameTx);
+      assert.fail(`Executing twice should fail with ExecutionAlreadySucceded revert`);
     } catch (err) {
       if (!err.message.includes("ExecutionAlreadySucceded")) {
-        assert.fail("Executing twice should fail")
+        assert.fail(`Unexpected error: ${err.message}`)
       } 
     }  
 

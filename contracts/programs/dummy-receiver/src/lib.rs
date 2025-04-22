@@ -13,12 +13,14 @@ pub mod dummy_receiver {
     }
 
     pub fn on_report<'info>(ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
+        // verify forwarder authority signer
         let (expected_pda, expected_bump) = Pubkey::find_program_address(
             &[b"forwarder", ctx.accounts.state.key().as_ref()],
             &FORWARDER_ID,
         );
         require!(expected_pda == ctx.accounts.forwarder_authority.key() && expected_bump == ctx.accounts.state.authority_nonce, AuthError::Unauthorized);
 
+        // in a production setting you'd also want to verify the metadata too...
       
         let account_info = &ctx.remaining_accounts[0];
         let mut latest_report: Account<'info, LatestReport> = Account::try_from(account_info)?;
@@ -66,8 +68,9 @@ pub struct OnReport<'info> {
     pub state: Account<'info, ForwarderState>,
 
     /// CHECK: This is a PDA
-    /// todo: unable to compute PDA with other program id in anchor, must do check in on_report
-    // #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    /// Anchor is unable to compute PDA with other program id so you 
+    /// must do inline check within on_report
+    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
     pub forwarder_authority: Signer<'info>,
 
     // remaining accounts passed in as well
