@@ -252,6 +252,7 @@ func (j *retryJob) Run(ctx context.Context) error {
 }
 
 func newTestGroup(workers uint64) *worker.Group {
-	cfg := config.TOMLConfig{Chain: config.Chain{LogPollerWorkerCount: &workers}}
-	return worker.NewGroup(logger.Sugared(logger.Nop()), &cfg)
+	cfg := config.NewDefault()
+	cfg.Chain.LogPollerWorkerCount = &workers
+	return worker.NewGroup(logger.Sugared(logger.Nop()), cfg)
 }
