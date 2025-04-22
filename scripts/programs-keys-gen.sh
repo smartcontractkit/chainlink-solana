@@ -29,7 +29,6 @@ echo $KEYSTONE_FORWARDER_PROGRAM_ID > ./contracts/artifacts/$network/keystone_fo
 DUMMY_RECEIVER_PROGRAM_ID=$(solana-keygen pubkey ./contracts/artifacts/$network/dummy_receiver-keypair.json)
 echo $DUMMY_RECEIVER_PROGRAM_ID > ./contracts/artifacts/$network/dummy_receiver-keypair.pub
 
-
 mkdir -p ./contracts/target/deploy
 cp ./contracts/artifacts/$network/*.json ./contracts/target/deploy
 
