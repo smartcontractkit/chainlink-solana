@@ -43,7 +43,7 @@ var defaultConfigSet = Chain{
 	// log poller
 	LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
 	LogPollerMaxRetries:       ptr(uint8(18)), // max number of retries for log poller
-	LogPollerLargeQueueNotify: ptr(2000),      // queue depth at which the worker group will log a warning
+	LogPollerLargeQueueNotify: ptr(200),       // queue depth at which the worker group will log a warning
 	LogPollerWorkerCount:      ptr(uint64(8)), // default number of workers for log poller
 }
 
