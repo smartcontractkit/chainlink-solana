@@ -62,7 +62,7 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 		})
 	}
 
-	state.DeployCluster(utils.ContractsDir)
+	state.DeployCluster(t, utils.ContractsDir)
 	state.DeployContracts(utils.ContractsDir, subDir)
 	if state.Common.Env.WillUseRemoteRunner() {
 		return state, nil
