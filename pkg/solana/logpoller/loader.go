@@ -75,7 +75,7 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []P
 		slotsToFetchMu.Unlock()
 	}
 	for i, address := range addresses {
-		slotsForAddressJobs[i] = newGetSlotsForAddress(c.client, c.workers, storeSlot, address, fromSlot, toSlot)
+		slotsForAddressJobs[i] = newGetSlotsForAddress(c.lggr, c.client, c.workers, storeSlot, address, fromSlot, toSlot)
 		err := c.workers.Do(ctx, slotsForAddressJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not shedule job to fetch slots for address: %w", err)
