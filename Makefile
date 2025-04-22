@@ -45,6 +45,7 @@ ifeq ($(OSFLAG),$(OSX))
 	asdf install
 	go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 endif
+
 ifeq ($(OSFLAG),$(LINUX))
 ifneq ($(CI),true)
 	# install nix
