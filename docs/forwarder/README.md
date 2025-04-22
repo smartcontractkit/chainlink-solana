@@ -129,7 +129,7 @@ The anchor tests simulate the transaction so we can get a good idea of the amoun
 
 We can use ALTs (address lookup tables) to free up more transaction space. ALTs are enabled in V0 transactions. They allow a user to store account addresses on-chain, and pass in the ALT account and a list of byte indexes to refer to a program. So instead of passing 32 bytes for each account, you'd pass in a 1 byte index on top of specifying one or more ALT addresses. 
 
-We use ALTs (address lookup tables) for the following accounts for a hypothetical data feeds use case:
+We use ALTs (address lookup tables) for the following accounts for a hypothetical data feeds use case (see test usage [here](../../contracts/tests/keystone_forwarder.spec.ts#L430) and result [here](../../contracts/tests/keystone_forwarder.spec.ts#L482)):
 * forwarder state
 * oracles config pda,
 * forwarder authority pda, 
@@ -137,27 +137,26 @@ We use ALTs (address lookup tables) for the following accounts for a hypothetica
 * system program
 * receiver data account state which stores some arbitrary data (part of ctx.remaining_accounts)
 
-
 This uses 902 bytes, so we have 1232 - 902 = 330 bytes left over for the payload. 
 
-This 330 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, but they cancel out in the end.
+This 330 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 332 bytes with a clean slate.
 
 In an internal data feeds use case we can assume that the receiver program is static and that the data accounts we are writing to per price asset are also static. However, a realistic use case would definitely have extra data accounts passed into ctx.remaining_accounts. 
 
 So for internal data feeds use case:
 ```
-max_payload_size = 330 - (ctx.remaining_accounts.len())
+max_payload_size = 332 - (ctx.remaining_accounts.len())
 ```
 
 For an external use-case, for an arbitrary receiver, the user will need to pass in another ALT (Solana can support passing 4 ALTs per transaction) on top of the internal ALT we always pass in. So we lose 32 bytes. Assuming the user also puts the receiver program and extra data accounts in their personal ALT:
 ```
-max_payload_size = 330 - 32 = 298 - (ctx.remaining_accounts.len())
+max_payload_size = 332 - 32 = 300 - (ctx.remaining_accounts.len())
 ```
 
 If they don't pass in another ALT:
 
 ```
-max_payload_size = 330 - 32 - 32*(ctx.remaining_accounts.len()) = 298 - 32*(ctx.remaining_accounts.len()) 
+max_payload_size = 332 - 32 - 32*(ctx.remaining_accounts.len()) = 300 - 32*(ctx.remaining_accounts.len()) 
 ```
 (the first 32 bytes is deducted for the receiver account address)
 
