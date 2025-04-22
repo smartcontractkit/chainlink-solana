@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	tc "github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
