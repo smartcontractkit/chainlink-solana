@@ -766,7 +766,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	poolKeys = append(poolKeys, chainwriter.CreateTestPubKeys(t, 6)...)
 	tokenAdminRegistryAddr := poolKeys[1]
 
-	staticCUOverheard := uint32(150_000)
+	staticCUOverhead := uint32(150_000)
 
 	// simplified CCIP Config - does not contain full account list
 	ccipCWConfig := chainwriter.ChainWriterConfig{
@@ -785,7 +785,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						},
 						ChainSpecificName:         "execute",
 						ArgsTransform:             "CCIPExecute",
-						ComputeUnitLimitOverheard: staticCUOverheard,
+						ComputeUnitLimitOverhead: staticCUOverhead,
 						LookupTables: chainwriter.LookupTables{
 							DerivedLookupTables: []chainwriter.DerivedLookupTable{
 								{
@@ -918,7 +918,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			opt2(txConfig)
 
 			require.Equal(t, false, txConfig.EstimateComputeUnitLimit)
-			require.Equal(t, staticCUOverheard+700, txConfig.ComputeUnitLimit)
+			require.Equal(t, staticCUOverhead+700, txConfig.ComputeUnitLimit)
 		}).Once()
 
 		// stripped back report just for purposes of example

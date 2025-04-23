@@ -65,7 +65,7 @@ type MethodConfig struct {
 	DebugIDLocation string `json:"debugIDLocation,omitempty"`
 	ArgsTransform   string `json:"argsTransform,omitempty"`
 	// Overhead added to calculated compute units in the args transform
-	ComputeUnitLimitOverheard uint32 `json:"computeUnitLimitOverheard,omitempty"`
+	ComputeUnitLimitOverhead uint32 `json:"ComputeUnitLimitOverhead,omitempty"`
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
@@ -321,7 +321,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
 		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
-		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverheard)
+		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverhead)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}

@@ -167,13 +167,13 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 	return poolAccounts, nil
 }
 
-func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overheard uint32) (uint32, error) {
+func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
 	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
 	if !ok {
 		return 0, fmt.Errorf("computeUnits not found in ExtraData")
 	}
 
-	computeUnits := overheard + cu
+	computeUnits := overhead + cu
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
 		destGasAmount, ok := execData["destGasAmount"].(uint32)
