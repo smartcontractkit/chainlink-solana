@@ -82,15 +82,15 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 
 	// First insert 10 logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[:10]))
-	assert.Equal(t, float64(10), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainID)))
+	assert.Equal(t, float64(10), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
 
 	// Insert 5 more logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[10:15]))
-	assert.Equal(t, float64(15), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainID)))
+	assert.Equal(t, float64(15), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
 
 	// Insert 5 more logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[15:]))
-	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainID)))
+	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
 }
 
 func generateRandomLogs(t *testing.T, filterID int64, count int) []Log {

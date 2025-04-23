@@ -79,6 +79,23 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
+func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string) error {
+	t.Helper()
+
+	for i := range keys {
+		account := keys[i].String()
+		_, err := exec.Command("solana", "airdrop", "100",
+			account,
+			"--url", url,
+		).Output()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
 

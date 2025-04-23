@@ -220,6 +220,10 @@ func (r *Relayer) NewAutomationProvider(ctx context.Context, rargs relaytypes.Re
 	return nil, errors.New("automation is not supported for solana")
 }
 
+func (r *Relayer) NewEVMChain(ctx context.Context) (relaytypes.EVMChain, error) {
+	return nil, errors.New("new evm chain is not supported for solana")
+}
+
 var _ relaytypes.ConfigProvider = &configProvider{}
 
 type configProvider struct {
