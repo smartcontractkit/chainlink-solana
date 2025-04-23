@@ -64,6 +64,10 @@ func (r *Relayer) Name() string {
 	return r.lggr.Name()
 }
 
+func (r *Relayer) AsEVMRelayer() (relaytypes.EVMRelayer, error) {
+	return nil, errors.New("unimplemented")
+}
+
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(ctx context.Context) error {
 	return r.StartOnce("SolanaRelayer", func() error {
