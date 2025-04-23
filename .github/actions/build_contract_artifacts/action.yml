@@ -24,11 +24,11 @@ runs:
         ref: ${{ inputs.ref }}
     
     - name: Get ProjectSerum Version
-      uses: ./github/actions/projectserum_version
+      uses: ./.github/actions/projectserum_version
       id: get-version
       
     - name: Build Wrapped Anchor Image
-      uses: ./github/actions/build-wrapped-anchor-image
+      uses: ./.github/actions/build-wrapped-anchor-image
       with:
         runner-os: ${{ inputs.runner-os }}
 
