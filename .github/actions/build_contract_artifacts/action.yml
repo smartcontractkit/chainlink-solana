@@ -10,6 +10,9 @@ inputs:
   image-version:
     required: false
     description: docker image version/tag to use for build
+  runner-os:
+    description: the operating system 
+    required: true
 
 runs:
   using: composite
@@ -19,29 +22,45 @@ runs:
       with:
         repository: smartcontractkit/chainlink-solana
         ref: ${{ inputs.ref }}
+    
+    - name: Get ProjectSerum Version
+      uses: ./.github/actions/projectserum_version
+      id: get-version
+      
+    - name: Build Wrapped Anchor Image
+      uses: ./.github/actions/build-wrapped-anchor-image
+      with:
+        runner-os: ${{ inputs.runner-os }}
 
-    # temporary docker run to build artifacts
-    - name: Docker Builder
-      if: ${{ inputs.image != '' && inputs.image-version != '' }}
-      env:
-        image: ${{ inputs.image }}
-        image_version: ${{ inputs.image-version }}
+    - name: cache docker build image
+      id: cache-image
+      uses: actions/cache@v4
+      with:
+        path: contracts/docker-build.tar
+        key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+    
+    - name: load cached image
+      shell: bash
+      run: |
+        docker load --input contracts/docker-build.tar
+    
+    - name: Build Artifacts
       shell: bash
       run: |
         # start container
-        docker run -d -v $(pwd):/repo --name build-container "${image}":"${image_version}" tail -f /dev/null
+        docker run -d -v $(pwd):/repo --name build-container chainlink-solana:build tail -f /dev/null
         # generate go bindings
         docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
         # check go bindings
         git diff --stat --exit-code
         # build with keys
         docker exec build-container bash -c "\
-          export RUSTUP_HOME=\"/root/.rustup\" &&\
-          cd /repo &&\
-          ./scripts/programs-keys-gen.sh &&\
-          cd ./contracts &&\
-          anchor build &&\
-          chown -R $(id -u):$(id -g) /repo"
+        export RUSTUP_HOME=\"/root/.rustup\" &&\
+        cd /repo &&\
+        ./scripts/programs-keys-gen.sh &&\
+        cd ./contracts &&\
+        anchor build &&\
+        chown -R $(id -u):$(id -g) /repo"
         # clean up the container
         docker stop build-container
         docker rm build-container
