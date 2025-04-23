@@ -22,7 +22,15 @@ jobs:
         id: psversion
         uses: ./.github/actions/projectserum_version
 
-  build_wrapped_anchor_image:
+  build_wrapped_anchor_image:  
+    - name: build contract test image
+      runs-on: ubuntu-latest
+      steps:
+        - name: build image
+          uses: ./.github/actions/build-wrapped-anchor-image
+          with:
+            runner-os: ${{ inputs.runner-os }}
+
     name: build contract test image
     runs-on: ubuntu-latest
     needs: [get_projectserum_version]
