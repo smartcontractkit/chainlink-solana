@@ -23,6 +23,7 @@ runs:
 
     - name: build & save image
       if: steps.cache-image.outputs.cache-hit != 'true'
+      shell: bash
       run: |
         cd contracts
         docker buildx build . -t chainlink-solana:build --build-arg ANCHOR_CLI=${{ steps.get-version.outputs.projectserum_version }}
