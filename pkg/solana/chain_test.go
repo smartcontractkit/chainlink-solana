@@ -282,7 +282,8 @@ func TestChain_Transact(t *testing.T) {
 	receiver, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	amount := big.NewInt(100_000_000_000 - 5_000) // total balance - tx fee
-	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+	err = client.FundTestAccountsWithError(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+	require.NoError(t, err)
 
 	// configuration
 	cfg := solcfg.NewDefault()
