@@ -52,6 +52,7 @@ runs:
         # generate go bindings
         docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
         # check go bindings
+        git diff
         git diff --stat --exit-code
         # build with keys
         docker exec build-container bash -c "\
