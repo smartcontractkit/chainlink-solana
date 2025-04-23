@@ -29,7 +29,7 @@ jobs:
       - name: build image
         uses: ./.github/actions/build-wrapped-anchor-image
         with:
-          runner-os: ${{ inputs.runner-os }}
+          runner-os: ${{ runner.os }}
 
   rust_run_anchor_tests:
     name: Rust Run Anchor Tests
