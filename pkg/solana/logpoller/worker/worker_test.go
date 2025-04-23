@@ -125,7 +125,6 @@ func TestWorkerGroup_CriticalErrorOnFailingJob(t *testing.T) {
 		},
 	}
 
-	errors.Join()
 	err := group.Do(t.Context(), failingJob)
 	require.NoError(t, err)
 
