@@ -3,7 +3,7 @@
     "@chainlink/solana-sdk": "link:../ts",
     "@coral-xyz/anchor": "^0.29.0",
     "@solana/spl-token": "0.3.5",
-    "@solana/web3.js": "^1.50.1 <=1.92.3",
+    "@solana/web3.js": ">=1.50.1 <1.92.4",
     "@types/chai": "^4.2.22",
     "@types/mocha": "^10.0.0",
     "@types/node": "^14.14.37",
@@ -22,5 +22,6 @@
   "scripts": {
     "format": "pnpm prettier --write .",
     "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/*.ts"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
