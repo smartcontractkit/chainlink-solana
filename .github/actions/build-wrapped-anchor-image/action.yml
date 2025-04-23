@@ -16,10 +16,10 @@ runs:
 
     - name: cache docker build image
       id: cache-image
-        uses: actions/cache@v4
-        with:
-          path: contracts/docker-build.tar
-          key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+      uses: actions/cache@v4
+      with:
+        path: contracts/docker-build.tar
+        key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
 
     - name: build & save image
       if: steps.cache-image.outputs.cache-hit != 'true'
