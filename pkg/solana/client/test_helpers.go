@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"os/exec"
-	"strconv"
 	"testing"
 	"time"
 
@@ -28,13 +27,11 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	t.Helper()
 
 	port := utils.MustRandomPort(t)
-	portInt, _ := strconv.Atoi(port)
 	wsPort := utils.MustRandomPort(t)
-	wsPortInt, _ := strconv.Atoi(wsPort)
 
 	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(wsPortInt)
+	wsURL := "ws://127.0.0.1:" + wsPort
 
 	args := append([]string{
 		"--reset",
