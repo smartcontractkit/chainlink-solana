@@ -37,7 +37,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+        key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
     
     - name: load cached image
       run: |
