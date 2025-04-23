@@ -93,6 +93,8 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
+	cfg.SetDefaults() // Use defaults for unset configs
+
 	chainID := *cfg.ChainID
 	switch chainID {
 	case "devnet":
@@ -289,6 +291,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.MultiNodeClient]
 
 		for i, nodeInfo := range cfg.ListNodes() {
+			err := nodeInfo.ValidateConfig()
+			if err != nil {
+				return nil, err
+			}
 			rpcClient, err := client.NewMultiNodeClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
 				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
@@ -302,7 +308,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
 					mnCfg, mnCfg, lggr, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-					i, mn.StringID(id), 0, rpcClient, chainFamily)
+					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
 		}
