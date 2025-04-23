@@ -783,8 +783,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 								Fields: map[string]string{"RawExecutionReport": "Report"},
 							},
 						},
-						ChainSpecificName:         "execute",
-						ArgsTransform:             "CCIPExecute",
+						ChainSpecificName:        "execute",
+						ArgsTransform:            "CCIPExecute",
 						ComputeUnitLimitOverhead: staticCUOverhead,
 						LookupTables: chainwriter.LookupTables{
 							DerivedLookupTables: []chainwriter.DerivedLookupTable{
