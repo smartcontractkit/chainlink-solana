@@ -33,7 +33,7 @@ go install github.com/gagliardetto/anchor-go@v0.2.3
 
 # initial build
 cd "${CONTRACTS}"
-yarn install --frozen-lockfile
+pnpm install --frozen-lockfile
 anchor build
 
 # generate contract artifacts
