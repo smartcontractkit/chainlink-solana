@@ -2,7 +2,7 @@
   "dependencies": {
     "@chainlink/solana-sdk": "link:../ts",
     "@coral-xyz/anchor": "^0.29.0",
-    "@solana/spl-token": "^0.3.5",
+    "@solana/spl-token": "0.3.5",
     "@solana/web3.js": "^1.50.1 <=1.92.3",
     "@types/chai": "^4.2.22",
     "@types/mocha": "^10.0.0",
