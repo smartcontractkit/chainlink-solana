@@ -2,6 +2,8 @@ package client
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"testing"
@@ -91,6 +93,10 @@ func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string
 			"--url", url,
 		).Output()
 		if err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
+			}
 			return err
 		}
 	}
@@ -100,13 +106,6 @@ func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-
-	for i := range keys {
-		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
-			account,
-			"--url", url,
-		).Output()
-		require.NoError(t, err)
-	}
+	err := FundTestAccountsWithError(t, keys, url)
+	require.NoError(t, err)
 }
