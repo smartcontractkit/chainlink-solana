@@ -21,7 +21,7 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 6
+	DefaultMaxRetryCount = 6 // start logging crit after 12m48s
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
 	DefaultNotifyRetryDepth = 200
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
@@ -293,6 +293,7 @@ func (g *Group) processQueue(ctx context.Context) {
 		// the length check above should protect from that, but just in case
 		// this error also breaks the loop
 		if err != nil {
+			g.lggr.Criticalw("Assumption Violation: non-empty queue returned error from Pop", "err", err)
 			break
 		}
 
