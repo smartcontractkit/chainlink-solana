@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"os/exec"
+	"strconv"
 	"testing"
 	"time"
 
@@ -27,11 +28,11 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	t.Helper()
 
 	port := utils.MustRandomPort(t)
-	wsPort := utils.MustRandomPort(t)
+	portInt, _ := strconv.Atoi(port)
 
 	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + wsPort
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
