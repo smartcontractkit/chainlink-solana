@@ -8,8 +8,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-const PROGRAM_LOG = "Program log: "
-const PROGRAM_DATA = "Program data: "
+const programLog = "Program log: "
+const programData = "Program data: "
 
 var (
 	invokeMatcher   = regexp.MustCompile(`^Program (\w*) invoke \[(\d)\]`)
@@ -57,14 +57,23 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 	programs := []string{}
 	instLogs := []ProgramOutput{}
 
+	// split ': ', use first part
+	// split ' '
+	// match 0 = Program or skip
+	// match 1 is program id
+	// match 2 = consumed => match 3 is units, 4 is of, 5 is total
+	// match 2 = invoke
+	// match 2 = success
+	// match 2 = failed, second part is reason
+
 	output := &ProgramOutput{}
 
 	for _, log := range logs {
-		if strings.HasPrefix(log, PROGRAM_LOG) {
+		if strings.HasPrefix(log, programLog) {
 			if output == nil {
 				continue
 			}
-			logData := log[len(PROGRAM_LOG):]
+			logData := log[len(programLog):]
 
 			depth := len(programs)
 			// this is a general log
@@ -72,12 +81,12 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 				Prefix: prefixBuilder(depth),
 				Text:   logData,
 			})
-		} else if strings.HasPrefix(log, PROGRAM_DATA) {
+		} else if strings.HasPrefix(log, programData) {
 			if output == nil {
 				continue
 			}
 
-			logData := log[len(PROGRAM_DATA):]
+			logData := log[len(programData):]
 
 			txLogIdx := uint(len(output.Events))
 			output.Events = append(output.Events, ProgramEvent{
