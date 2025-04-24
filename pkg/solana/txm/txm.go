@@ -429,7 +429,7 @@ func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWr
 			defer wg.Done()
 
 			// to process successful first
-			sortedSigs, sortedRes, err := txmutils.SortSignaturesAndResults(sigsBatch[i], statuses)
+			sortedSigs, sortedRes, err := txmutils.SortSignaturesAndResults(sigsBatch[index], statuses)
 			if err != nil {
 				txm.lggr.Errorw("sorting error", "error", err)
 				return

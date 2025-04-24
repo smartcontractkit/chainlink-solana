@@ -21,11 +21,9 @@ import (
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
-// TODO: replace with exact value after CCIP testing is completed.
-const StaticCuOverhead uint32 = 150000
 const MandatoryExecuteAccounts = 12
 
-func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
+func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string, uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -47,14 +45,14 @@ type commonTokenTransferAccounts struct {
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string, computeUnitLimitOverhead uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	computeUnits, err := calculateComputeUnitLimit(argsTransformed)
+	computeUnits, err := calculateComputeUnitLimit(argsTransformed, computeUnitLimitOverhead)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to calculate compute unit limit: %w", err)
 	}
@@ -109,7 +107,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -169,13 +167,13 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 	return poolAccounts, nil
 }
 
-func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs) (uint32, error) {
+func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
 	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
 	if !ok {
 		return 0, fmt.Errorf("computeUnits not found in ExtraData")
 	}
 
-	computeUnits := StaticCuOverhead + cu
+	computeUnits := overhead + cu
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
 		destGasAmount, ok := execData["destGasAmount"].(uint32)
