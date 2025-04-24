@@ -113,6 +113,7 @@ func (p *blocksSorter) readNextReadyBlock() *Block {
 	if !ok {
 		return nil
 	}
+	delete(p.readyBlocks, slotNumber)
 
 	p.queue.Remove(element)
 	return &block

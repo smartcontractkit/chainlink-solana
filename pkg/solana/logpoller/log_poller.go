@@ -354,16 +354,22 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		}
 	}
 
-	err := lp.processBlocksRange(ctx, addresses, minSlot, to)
-	if err != nil {
-		return err
+	if minSlot < to {
+		err := lp.processBlocksRange(ctx, addresses, minSlot, to)
+		if err != nil {
+			return err
+		}
+
+		lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
+	} else {
+		lp.lggr.Infow("Starting block for filters backfill is greater than the latest processed block - marking filters as backfilled and starting global processing", "filters", len(filters), "from", minSlot, "to", to)
 	}
 
-	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
 	if isReplay {
 		lp.replayComplete(minSlot, to)
 	}
 
+	var err error
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
