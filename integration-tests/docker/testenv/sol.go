@@ -62,7 +62,6 @@ func NewSolana(networks []string, devnetImage string, publicKey string, opts ...
 		EnvComponent: test_env.EnvComponent{
 			ContainerName: fmt.Sprintf("%s-%s", "solana", uuid.NewString()[0:8]),
 			Networks:      networks,
-			LogLevel:      "debug",
 		},
 		l:         log.Logger,
 		Image:     devnetImage,
@@ -197,7 +196,7 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 				},
 			},
 		},
-		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator --log -r --mint=" + s.PublicKey + " " + inactiveFeatures.CLIString()},
+		Entrypoint: []string{"sh", "-c", "mkdir -p /root/.config/solana/cli && solana-test-validator -r --mint=" + s.PublicKey + " " + inactiveFeatures.CLIString()},
 	}, nil
 }
 
