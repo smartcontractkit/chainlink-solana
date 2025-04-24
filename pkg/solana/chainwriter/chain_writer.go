@@ -309,10 +309,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
-	// Filter the lookup table addresses based on which accounts are actually used
-	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
-
 	options := []txmutils.SetTxConfig{}
 	// Transform args if necessary
 	if methodConfig.ArgsTransform != "" {
@@ -326,6 +322,10 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
 	}
+
+	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
+	// Filter the lookup table addresses based on which accounts are actually used
+	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
 	// Prepare transaction
 	programID, err := solana.PublicKeyFromBase58(toAddress)
