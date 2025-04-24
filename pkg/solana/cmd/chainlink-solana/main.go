@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
@@ -79,5 +81,13 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 
 	c.SubService(ra)
 
-	return ra, nil
+	return &relayerAdapter{ra}, nil
+}
+
+type relayerAdapter struct {
+	types.Relayer
+}
+
+func (r *relayerAdapter) AsEVMRelayer() (loop.EVMRelayer, error) {
+	return nil, errors.New("unimplemented")
 }
