@@ -64,6 +64,10 @@ func (r *Relayer) Name() string {
 	return r.lggr.Name()
 }
 
+func (r *Relayer) AsEVMRelayer() (relaytypes.EVMRelayer, error) {
+	return nil, errors.New("unimplemented")
+}
+
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(ctx context.Context) error {
 	return r.StartOnce("SolanaRelayer", func() error {
@@ -218,10 +222,6 @@ func (r *Relayer) NewFunctionsProvider(ctx context.Context, rargs relaytypes.Rel
 
 func (r *Relayer) NewAutomationProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.AutomationProvider, error) {
 	return nil, errors.New("automation is not supported for solana")
-}
-
-func (r *Relayer) NewEVMChain(ctx context.Context) (relaytypes.EVMChain, error) {
-	return nil, errors.New("new evm chain is not supported for solana")
 }
 
 var _ relaytypes.ConfigProvider = &configProvider{}
