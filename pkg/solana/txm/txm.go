@@ -783,6 +783,8 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if cfg.DependencyTxID != "" {
 		go func(msg pendingTx, depID string) {
+			ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
+			defer cancel()
 			status, err := txm.waitForTxStatus(ctx, depID, commontypes.Finalized)
 			if err != nil {
 				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
