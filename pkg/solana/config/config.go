@@ -184,6 +184,7 @@ type Node struct {
 	Name     *string
 	URL      *config.URL
 	SendOnly bool
+	Order    *int32
 }
 
 func (n *Node) ValidateConfig() (err error) {
@@ -196,6 +197,12 @@ func (n *Node) ValidateConfig() (err error) {
 		err = errors.Join(err, config.ErrMissing{Name: "URL", Msg: "required for all nodes"})
 	} else if n.URL.String() == "" {
 		err = errors.Join(err, config.ErrEmpty{Name: "URL", Msg: "required for all nodes"})
+	}
+	if n.Order != nil && (*n.Order < 1 || *n.Order > 100) {
+		err = errors.Join(err, config.ErrInvalid{Name: "Order", Value: *n.Order, Msg: "must be between 1 and 100"})
+	} else if n.Order == nil {
+		z := int32(100)
+		n.Order = &z
 	}
 	return err
 }
