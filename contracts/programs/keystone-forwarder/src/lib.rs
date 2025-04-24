@@ -106,7 +106,7 @@ pub mod keystone_forwarder {
         let min_data_size = 1 + 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
         require!(
-            data.len() > min_data_size.into(),
+            data.len() > min_data_size,
             ForwarderError::InvalidReport
         );
 
@@ -130,7 +130,7 @@ pub mod keystone_forwarder {
         let signatures: &[u8] = &data[..total_signature_len];
         // raw_report | report context
         let data = &data[total_signature_len..];
-        let hashed_report = hash::hash(&data).to_bytes();
+        let hashed_report = hash::hash(data).to_bytes();
 
         verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
 
@@ -167,7 +167,7 @@ pub mod keystone_forwarder {
                     execution_state.to_account_info(),
                     ctx.accounts.system_program.to_account_info(),
                 ],
-                &[&seeds[..]],
+                &[seeds],
             )?;
         } else {
             // revert if execution succeded already
@@ -234,7 +234,7 @@ pub mod keystone_forwarder {
         let mut dst = execution_state.try_borrow_mut_data()?;
         let execution_state = ExecutionState {
             transmitter: ctx.accounts.transmitter.key(),
-            transmission_id: transmission_id,
+            transmission_id,
             success: true,
         };
         dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&ExecutionState::discriminator());
@@ -255,7 +255,7 @@ fn verify_signatures(
     let mut uniques: u32 = 0;
     assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_REPORT_SIGNERS as u32);
 
-    for sig in signatures.chunks(SIGNATURE_LEN.into()) {
+    for sig in signatures.chunks(SIGNATURE_LEN) {
         // sig is [R || S || V] format where V is 0 or 1
         let v = sig[64];
 
@@ -290,7 +290,7 @@ fn set_oracles_config(
     signer_addresses: Vec<[u8; 20]>,
 ) -> Result<()> {
     require!(
-        signer_addresses.len() <= MAX_REPORT_SIGNERS.into(),
+        signer_addresses.len() <= MAX_REPORT_SIGNERS,
         ForwarderError::MaxSignersLimit
     );
 
@@ -446,9 +446,9 @@ fn extract_raw_report(data: &[u8]) -> &[u8] {
     let _signatures = &data[..num_signatures * SIGNATURE_LEN];
     let data = &data[num_signatures * SIGNATURE_LEN..];
     let _report_context = &data[data.len() - REPORT_CONTEXT_LEN..];
-    let raw_report = &data[..data.len() - REPORT_CONTEXT_LEN];
-
-    return raw_report;
+    
+    // raw report
+    &data[..data.len() - REPORT_CONTEXT_LEN]
 }
 
 // version                offset   0, size  1
