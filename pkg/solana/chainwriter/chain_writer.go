@@ -309,10 +309,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
-	// Filter the lookup table addresses based on which accounts are actually used
-	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
-
 	options := []txmutils.SetTxConfig{}
 	// Transform args if necessary
 	if methodConfig.ArgsTransform != "" {
@@ -326,6 +322,10 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
 	}
+
+	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
+	// Filter the lookup table addresses based on which accounts are actually used
+	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
 	// Prepare transaction
 	programID, err := solana.PublicKeyFromBase58(toAddress)
@@ -362,7 +362,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		options = append(options, txmutils.SetDependencyTxID(ataUUID))
 	}
 
-	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method)
+	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", transactionID)
 
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
@@ -374,7 +374,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	s.lggr.Debugw("Fetching transaction status", "transactionID", transactionID)
+	s.lggr.Debugw("Fetching transaction status", "tx", transactionID)
 	return s.txm.GetTransactionStatus(ctx, transactionID)
 }
 
@@ -384,8 +384,9 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 		return nil, fmt.Errorf("gas estimator not available")
 	}
 
-	s.lggr.Debug("Fetching fee components")
 	fee := s.ge.BaseComputeUnitPrice()
+	s.lggr.Debugw("Fetched fee components", "executionFee", fee, "dataAvailabilityFee", 0)
+
 	return &types.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: big.NewInt(0), // required field so return 0 instead of nil

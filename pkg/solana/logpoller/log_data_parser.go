@@ -8,11 +8,12 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
+const programLog = "Program log: "
+const programData = "Program data: "
+
 var (
-	invokeMatcher   = regexp.MustCompile(`Program (\w*) invoke \[(\d)\]`)
-	consumedMatcher = regexp.MustCompile(`Program \w* consumed (\d*) (.*)`)
-	logMatcher      = regexp.MustCompile(`Program log: (.*)`)
-	dataMatcher     = regexp.MustCompile(`Program data: (.*)`)
+	invokeMatcher   = regexp.MustCompile(`^Program (\w*) invoke \[(\d)\]`)
+	consumedMatcher = regexp.MustCompile(`^Program \w* consumed (\d*) (.*)`)
 )
 
 type BlockData struct {
@@ -53,97 +54,98 @@ func prefixBuilder(depth int) string {
 }
 
 func ParseProgramLogs(logs []string) []ProgramOutput {
-	var depth int
 	programs := []string{}
-
 	instLogs := []ProgramOutput{}
-	lastLogIdx := -1
+
+	// split ': ', use first part
+	// split ' '
+	// match 0 = Program or skip
+	// match 1 is program id
+	// match 2 = consumed => match 3 is units, 4 is of, 5 is total
+	// match 2 = invoke
+	// match 2 = success
+	// match 2 = failed, second part is reason
+
+	output := &ProgramOutput{}
 
 	for _, log := range logs {
-		if strings.HasPrefix(log, "Program log:") {
-			logDataMatches := logMatcher.FindStringSubmatch(log)
-
-			if len(logDataMatches) <= 1 || lastLogIdx < 0 {
+		if strings.HasPrefix(log, programLog) {
+			if output == nil {
 				continue
 			}
+			logData := log[len(programLog):]
 
+			depth := len(programs)
 			// this is a general log
-			instLogs[lastLogIdx].Logs = append(instLogs[lastLogIdx].Logs, ProgramLog{
+			output.Logs = append(output.Logs, ProgramLog{
 				Prefix: prefixBuilder(depth),
-				Text:   logDataMatches[1],
+				Text:   logData,
 			})
-		} else if strings.HasPrefix(log, "Program data:") {
-			if lastLogIdx < 0 {
+		} else if strings.HasPrefix(log, programData) {
+			if output == nil {
 				continue
 			}
 
-			dataMatches := dataMatcher.FindStringSubmatch(log)
+			logData := log[len(programData):]
 
-			if len(dataMatches) > 1 {
-				txLogIdx := uint(len(instLogs[lastLogIdx].Events))
-				instLogs[lastLogIdx].Events = append(instLogs[lastLogIdx].Events, ProgramEvent{
-					Program: programs[len(programs)-1],
-					Data:    dataMatches[1],
-					BlockData: BlockData{
-						TransactionLogIndex: txLogIdx,
-					},
-				})
-			}
+			txLogIdx := uint(len(output.Events))
+			output.Events = append(output.Events, ProgramEvent{
+				Program: programs[len(programs)-1],
+				Data:    logData,
+				BlockData: BlockData{
+					TransactionLogIndex: txLogIdx,
+				},
+			})
 		} else if strings.HasPrefix(log, "Log truncated") {
-			if lastLogIdx < 0 {
+			if output == nil {
 				continue
 			}
 
-			instLogs[lastLogIdx].Truncated = true
+			output.Truncated = true
 		} else {
 			matches := invokeMatcher.FindStringSubmatch(log)
 
 			if len(matches) > 0 {
+				depth := len(programs)
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{
 						Program: matches[1],
 					})
-
-					lastLogIdx = len(instLogs) - 1
+					output = &instLogs[len(instLogs)-1]
 				}
 
-				depth++
 				programs = append(programs, matches[1])
 			} else if strings.Contains(log, "success") {
-				depth--
 				programs = programs[:len(programs)-1]
 			} else if strings.Contains(log, "failed") {
-				if lastLogIdx < 0 {
+				if output == nil {
 					continue
 				}
 
-				instLogs[lastLogIdx].Failed = true
+				output.Failed = true
 
 				idx := strings.Index(log, ": ") + 2
 
 				// failed to verify log of previous program so reset depth and print full log
-				if strings.HasPrefix(log, "failed") {
-					depth++
-				}
+				output.ErrorText = log[idx:]
 
-				instLogs[lastLogIdx].ErrorText = log[idx:]
-
-				depth--
 				programs = programs[:len(programs)-1]
 			} else {
+				depth := len(programs)
 				if depth == 0 {
 					instLogs = append(instLogs, ProgramOutput{})
-					lastLogIdx = len(instLogs) - 1
+					output = &instLogs[len(instLogs)-1]
 				}
 
-				if lastLogIdx < 0 {
+				if output == nil {
 					continue
 				}
 
 				matches := consumedMatcher.FindStringSubmatch(log)
-				if len(matches) == 3 && depth == 1 {
+				// we only care about toplevel compute units cost
+				if len(matches) == 3 && len(programs) == 1 {
 					if val, err := strconv.Atoi(matches[1]); err == nil {
-						instLogs[lastLogIdx].ComputeUnits = uint(val) //nolint:gosec
+						output.ComputeUnits = uint(val) //nolint:gosec
 					}
 				}
 			}

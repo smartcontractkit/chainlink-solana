@@ -317,7 +317,7 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 		return lookbackSlot, nil
 	}
-	lp.lggr.Infof("last processed slot %d is older than lookback window, skipping ahead to slot %d", lastProcessed, lookbackSlot)
+	lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead to slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
 	return lastProcessed, nil
 }

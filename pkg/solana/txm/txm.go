@@ -151,7 +151,7 @@ func (txm *Txm) run() {
 			// process tx (pass tx copy)
 			tx, id, sig, err := txm.sendWithRetry(ctx, msg)
 			if err != nil {
-				txm.lggr.Errorw("failed to send transaction", "error", err)
+				txm.lggr.Errorw("failed to send transaction", "id", id, "error", err)
 				txm.client.Reset() // clear client if tx fails immediately (potentially bad RPC)
 				continue           // skip remainining
 			}
@@ -783,9 +783,11 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if cfg.DependencyTxID != "" {
 		go func(msg pendingTx, depID string) {
+			ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
+			defer cancel()
 			status, err := txm.waitForTxStatus(ctx, depID, commontypes.Finalized)
 			if err != nil {
-				txm.lggr.Errorw("dependency transaction did not reach desired state", "dependencyTxID", depID, "error", err)
+				txm.lggr.Errorw("dependency transaction did not reach desired state", "id", msg.id, "dependencyTx", depID, "error", err)
 				errorStatus := txmutils.Errored
 				if status == commontypes.Fatal {
 					errorStatus = txmutils.FatallyErrored
@@ -798,7 +800,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 			}
 			select {
 			case txm.chSend <- msg:
-				txm.lggr.Debugw("enqueued tx after dependency complete", "txID", msg.id, "dependencyTxID", depID)
+				txm.lggr.Debugw("enqueued tx after dependency complete", "id", msg.id, "dependencyTxID", depID)
 			default:
 				txm.lggr.Errorw("failed to enqueue tx after dependency", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
 			}
@@ -837,7 +839,7 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desir
 			default:
 				if status >= desiredStatus {
 					// if status is equal to or greater than desired status, return
-					txm.lggr.Debugw("transaction reached state", "status", status, "transactionID", transactionID)
+					txm.lggr.Debugw("transaction reached state", "status", status, "id", transactionID)
 					return status, nil
 				}
 				// otherwise keep polling
