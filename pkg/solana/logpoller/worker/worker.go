@@ -50,18 +50,18 @@ func (w *worker) Do(ctx context.Context, job Job) {
 	}
 
 	start := time.Now()
-	w.Lggr.Debugf("Starting job %s", job.String())
+	w.Lggr.Debugw("Starting job", "id", job.String())
 	if err := job.Run(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
-			w.Lggr.Debugf("job %s was canceled", job.String())
+			w.Lggr.Debugw("job was canceled", "id", job.String())
 			return
 		}
-		w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
+		w.Lggr.Errorw("job failed with error; retrying", "job", job, "error", err)
 		w.Retry <- job
 		return
 	}
 
-	w.Lggr.Debugf("Finished job %s in %s", job.String(), time.Since(start))
+	w.Lggr.Debugw("Finished job", "job", job.String(), "duration", time.Since(start))
 }
 
 type Group struct {
