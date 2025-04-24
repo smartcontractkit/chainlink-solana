@@ -385,7 +385,7 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 	}
 
 	fee := s.ge.BaseComputeUnitPrice()
-	s.lggr.Debugf("Fetched fee components", "executionFee", fee, "dataAvailabilityFee", 0)
+	s.lggr.Debugw("Fetched fee components", "executionFee", fee, "dataAvailabilityFee", 0)
 
 	return &types.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),
