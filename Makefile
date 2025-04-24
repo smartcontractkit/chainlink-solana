@@ -1,4 +1,5 @@
 BIN_DIR = bin
+
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
 export PROJECT_SERUM_VERSION ?=v0.29.0

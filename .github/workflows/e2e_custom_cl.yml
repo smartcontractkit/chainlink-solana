@@ -101,6 +101,7 @@ jobs:
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
+          runner-os: ${{ runner.os }}
           image: backpackapp/build
           image-version: ${{ needs.get_projectserum_version.outputs.projectserum_version }}
 

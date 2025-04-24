@@ -99,7 +99,7 @@ func (c *Cache[R]) Poll() {
 			start := time.Now()
 			err := c.Fetch(ctx)
 			if err != nil {
-				c.lggr.Errorf("error in Poll.fetch %s", err)
+				c.lggr.Errorw("error in Poll.fetch", "err", err)
 			}
 			// Note negative duration will be immediately ready
 			tick = time.After(utils.WithJitter(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
