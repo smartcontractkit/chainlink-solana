@@ -100,7 +100,7 @@ func (bhe *blockHistoryEstimator) BaseComputeUnitPrice() uint64 {
 	}
 
 	if price < bhe.cfg.ComputeUnitPriceMin() {
-		bhe.lgr.Warnw("BlockHistoryEstimator: estimation below minimum consider lowering ComputeUnitPriceMin", "min", bhe.cfg.ComputeUnitPriceMin(), "calculated", price)
+		bhe.lgr.Debugw("BlockHistoryEstimator: estimation below minimum consider lowering ComputeUnitPriceMin", "min", bhe.cfg.ComputeUnitPriceMin(), "calculated", price)
 		return bhe.cfg.ComputeUnitPriceMin()
 	}
 

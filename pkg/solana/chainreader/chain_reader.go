@@ -391,11 +391,11 @@ func (s *ContractReaderService) Unbind(ctx context.Context, bindings []types.Bou
 func (s *ContractReaderService) CreateContractType(readIdentifier string, forEncoding bool) (any, error) {
 	values, ok := s.lookup.getContractForReadIdentifiers(readIdentifier)
 	if !ok {
-		return nil, fmt.Errorf("%w: no contract for read identifier", types.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: no contract for read identifier: %q", types.ErrInvalidConfig, readIdentifier)
 	}
 
 	if len(values.reads) == 0 {
-		return nil, fmt.Errorf("%w: no reads defined for read identifier", types.ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: no reads defined for read identifier: %q", types.ErrInvalidConfig, readIdentifier)
 	}
 
 	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
