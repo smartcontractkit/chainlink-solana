@@ -1,7 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
-import { AddressLookupTableProgram, ComputeBudgetProgram, Keypair, PublicKey, sendAndConfirmTransaction, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+import {
+  AddressLookupTableProgram,
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+  Transaction,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
 import { randomBytes, createHash } from "crypto";
@@ -9,13 +18,16 @@ import * as secp256k1 from "secp256k1";
 import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function signMessage(message: Buffer, secretKey: Buffer) {
-  const { signature, recid: recovery } = secp256k1.ecdsaSign(message, secretKey);
+  const { signature, recid: recovery } = secp256k1.ecdsaSign(
+    message,
+    secretKey
+  );
   return {
     signature: Buffer.from(signature),
-    recovery // useful for pubkey recovery
+    recovery, // useful for pubkey recovery
   };
 }
 
@@ -26,29 +38,32 @@ let generateEthKeypair = () => {
   return {
     secretKey,
     publicKey,
-    ethereumAddress
-  }
-}
+    ethereumAddress,
+  };
+};
 
 let getEthereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12);
 };
 
-describe("keystone_storage", function() {
+describe("keystone_storage", function () {
   // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env()
+  const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.KeystoneForwarder as Program<KeystoneForwarder>;
+  const program = anchor.workspace
+    .KeystoneForwarder as Program<KeystoneForwarder>;
 
-  const receiverProgram = anchor.workspace.DummyReceiver as Program<DummyReceiver>;
+  const receiverProgram = anchor.workspace
+    .DummyReceiver as Program<DummyReceiver>;
   const latestReportState = Keypair.generate();
 
   // if N <= 16, then f = 5 so we need f + 1 (6) signers for BFT
   const NUM_SIGNERS = 6;
 
-  before(async function() {
-    await receiverProgram.methods.initialize()
+  before(async function () {
+    await receiverProgram.methods
+      .initialize()
       .accounts({
         reportState: latestReportState.publicKey,
         signer: provider.wallet.publicKey,
@@ -56,93 +71,141 @@ describe("keystone_storage", function() {
       })
       .signers([latestReportState])
       .rpc();
-  })
+  });
 
   // forwarder state data account
   const forwarderState = Keypair.generate();
 
   let defaultOraclesConfigStorage: anchor.web3.PublicKey;
-  const defaultSigners = Array.from({ length: NUM_SIGNERS }, () => generateEthKeypair());
+  const defaultSigners = Array.from({ length: NUM_SIGNERS }, () =>
+    generateEthKeypair()
+  );
   defaultSigners.sort((a, b) => {
-    return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
-  })
-
+    return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
+  });
 
   it("Is initialized!", async () => {
+    await program.methods
+      .initialize()
+      .accounts({
+        state: forwarderState.publicKey,
+        owner: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([forwarderState])
+      .rpc();
 
-    await program.methods.initialize().accounts({
-      state: forwarderState.publicKey,
-      owner:  provider.wallet.publicKey,
-      systemProgram: anchor.web3.SystemProgram.programId,
-    })
-    .signers([forwarderState])
-    .rpc();
+    const actualState = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
+    );
 
-    const actualState = await program.account.forwarderState.fetch(forwarderState.publicKey)
-
-    assert.isTrue(actualState.owner.equals(provider.wallet.publicKey), 'owner set');
-    assert.isTrue(actualState.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
-    assert.equal(actualState.version, 1, 'version 1');
+    assert.isTrue(
+      actualState.owner.equals(provider.wallet.publicKey),
+      "owner set"
+    );
+    assert.isTrue(
+      actualState.proposedOwner.equals(PublicKey.default),
+      "proposed owner is 0"
+    );
+    assert.equal(actualState.version, 1, "version 1");
   });
 
   it("Transfer ownership and back", async () => {
-
     const proposedOwner = Keypair.generate();
 
     // current owner initiates transfer to proposed owner
-    await program.methods.transferOwnership(proposedOwner.publicKey).accounts({
-      state: forwarderState.publicKey,
-      currentOwner:  provider.wallet.publicKey,
-    })
-    .rpc();
+    await program.methods
+      .transferOwnership(proposedOwner.publicKey)
+      .accounts({
+        state: forwarderState.publicKey,
+        currentOwner: provider.wallet.publicKey,
+      })
+      .rpc();
 
-    const actualState1 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+    const actualState1 = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
+    );
 
-    assert.isTrue(actualState1.owner.equals(provider.wallet.publicKey), 'owner should be same');
-    assert.isTrue(actualState1.proposedOwner.equals(proposedOwner.publicKey), 'proposed owner set');
+    assert.isTrue(
+      actualState1.owner.equals(provider.wallet.publicKey),
+      "owner should be same"
+    );
+    assert.isTrue(
+      actualState1.proposedOwner.equals(proposedOwner.publicKey),
+      "proposed owner set"
+    );
 
     // proposed owner accepts
-    await program.methods.acceptOwnership().accounts({
-      state: forwarderState.publicKey,
-      proposedOwner: proposedOwner.publicKey
-    })
-    .signers([proposedOwner])
-    .rpc();
+    await program.methods
+      .acceptOwnership()
+      .accounts({
+        state: forwarderState.publicKey,
+        proposedOwner: proposedOwner.publicKey,
+      })
+      .signers([proposedOwner])
+      .rpc();
 
-    const actualState2 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+    const actualState2 = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
+    );
 
-    assert.isTrue(actualState2.owner.equals(proposedOwner.publicKey), 'owner set correctly');
-    assert.isTrue(actualState2.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
+    assert.isTrue(
+      actualState2.owner.equals(proposedOwner.publicKey),
+      "owner set correctly"
+    );
+    assert.isTrue(
+      actualState2.proposedOwner.equals(PublicKey.default),
+      "proposed owner is 0"
+    );
 
     // proposed owner transfer back
-     // current owner initiates transfer to proposed owner
-     await program.methods.transferOwnership(provider.wallet.publicKey).accounts({
-      state: forwarderState.publicKey,
-      currentOwner:  proposedOwner.publicKey,
-    })
-    .signers([proposedOwner])
-    .rpc();
+    // current owner initiates transfer to proposed owner
+    await program.methods
+      .transferOwnership(provider.wallet.publicKey)
+      .accounts({
+        state: forwarderState.publicKey,
+        currentOwner: proposedOwner.publicKey,
+      })
+      .signers([proposedOwner])
+      .rpc();
 
-    const actualState3 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+    const actualState3 = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
+    );
 
-    assert.isTrue(actualState3.owner.equals(proposedOwner.publicKey), 'owner should be same');
-    assert.isTrue(actualState3.proposedOwner.equals(provider.wallet.publicKey), 'proposed owner set');
+    assert.isTrue(
+      actualState3.owner.equals(proposedOwner.publicKey),
+      "owner should be same"
+    );
+    assert.isTrue(
+      actualState3.proposedOwner.equals(provider.wallet.publicKey),
+      "proposed owner set"
+    );
 
     // proposed owner accepts
-    await program.methods.acceptOwnership().accounts({
-      state: forwarderState.publicKey,
-      proposedOwner: provider.wallet.publicKey
-    })
-    .rpc();
+    await program.methods
+      .acceptOwnership()
+      .accounts({
+        state: forwarderState.publicKey,
+        proposedOwner: provider.wallet.publicKey,
+      })
+      .rpc();
 
-    const actualState4 = await program.account.forwarderState.fetch(forwarderState.publicKey)
+    const actualState4 = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
+    );
 
-    assert.isTrue(actualState4.owner.equals(provider.wallet.publicKey), 'owner set correctly');
-    assert.isTrue(actualState4.proposedOwner.equals(PublicKey.default), 'proposed owner is 0');
+    assert.isTrue(
+      actualState4.owner.equals(provider.wallet.publicKey),
+      "owner set correctly"
+    );
+    assert.isTrue(
+      actualState4.proposedOwner.equals(PublicKey.default),
+      "proposed owner is 0"
+    );
   });
 
-
-  it("Initialize New Oracles Config, Update",  async () => {
+  it("Initialize New Oracles Config, Update", async () => {
     const donId = 7;
     const configVersion = 3;
     const configId: bigint = (7n << 32n) | 3n; // 64 bytes
@@ -153,10 +216,13 @@ describe("keystone_storage", function() {
     const seeds = [
       Buffer.from(anchor.utils.bytes.utf8.encode("config")),
       forwarderState.publicKey.toBuffer(),
-      configIdBytes
+      configIdBytes,
     ];
 
-    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
+    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(
+      seeds,
+      program.programId
+    );
     defaultOraclesConfigStorage = oraclesConfigStorage;
 
     const signers = defaultSigners;
@@ -164,59 +230,73 @@ describe("keystone_storage", function() {
     // all 3 work... arrays of number[], Uint8Array, or Buffer
     // const signerEthAddresses = signers.map(s => Array.from(s.ethereumAddress).map(x => new BN(x)));
     // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
-    const signerEthAddresses = signers.map(s => (s.ethereumAddress ))
+    const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
-    await program.methods.initOraclesConfig(
-      new BN(7), 
-      new BN(3), 
-      new BN(1), 
-      signerEthAddresses as any
-    )
+    await program.methods
+      .initOraclesConfig(
+        new BN(7),
+        new BN(3),
+        new BN(1),
+        signerEthAddresses as any
+      )
       .accounts({
         state: forwarderState.publicKey,
         oraclesConfig: oraclesConfigStorage,
         owner: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
-    
-      const actualConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
 
-      assert.equal(configId, actualConfig.configId, 'config ids should equal');
-      assert.equal(1, actualConfig.f, 'f should equal');
-      assert.isTrue(actualConfig.signerAddresses.every((addr, i) => (Buffer.from(addr).equals(signerEthAddresses[i]) )));
+    const actualConfig = await program.account.oraclesConfig.fetch(
+      oraclesConfigStorage
+    );
 
+    assert.equal(configId, actualConfig.configId, "config ids should equal");
+    assert.equal(1, actualConfig.f, "f should equal");
+    assert.isTrue(
+      actualConfig.signerAddresses.every((addr, i) =>
+        Buffer.from(addr).equals(signerEthAddresses[i])
+      )
+    );
 
-    const updatedSigners  = Array.from({ length: 15 }, () => generateEthKeypair());
+    const updatedSigners = Array.from({ length: 15 }, () =>
+      generateEthKeypair()
+    );
     updatedSigners.sort((a, b) => {
-      return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
-    })
+      return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
+    });
 
-  const updatedSignerEthAddresses = signers.map(s => ( s.ethereumAddress ))
+    const updatedSignerEthAddresses = signers.map((s) => s.ethereumAddress);
 
-  await program.methods.updateOraclesConfig(
-    new BN(7), 
-    new BN(3), 
-    new BN(1), 
-    updatedSignerEthAddresses as any
-  )
-    .accounts({
-      state: forwarderState.publicKey,
-      oraclesConfig: oraclesConfigStorage,
-      owner: provider.wallet.publicKey,
-      systemProgram: anchor.web3.SystemProgram.programId
-    })
-    .rpc();
+    await program.methods
+      .updateOraclesConfig(
+        new BN(7),
+        new BN(3),
+        new BN(1),
+        updatedSignerEthAddresses as any
+      )
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: oraclesConfigStorage,
+        owner: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
 
-    const actualUpdatedConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+    const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
+      oraclesConfigStorage
+    );
 
-    assert.equal(configId, actualConfig.configId, 'config ids should equal');
-    assert.equal(1, actualConfig.f, 'f should equal');
-    assert.isTrue(actualUpdatedConfig.signerAddresses.every((addr, i) => (Buffer.from(addr).equals(updatedSignerEthAddresses[i]) )));
+    assert.equal(configId, actualConfig.configId, "config ids should equal");
+    assert.equal(1, actualConfig.f, "f should equal");
+    assert.isTrue(
+      actualUpdatedConfig.signerAddresses.every((addr, i) =>
+        Buffer.from(addr).equals(updatedSignerEthAddresses[i])
+      )
+    );
   });
 
   it("Close oracle config", async () => {
-
     const donId = 9n;
     const configVersion = 2n;
     const configId: bigint = (donId << 32n) | configVersion;
@@ -227,55 +307,59 @@ describe("keystone_storage", function() {
     const seeds = [
       Buffer.from(anchor.utils.bytes.utf8.encode("config")),
       forwarderState.publicKey.toBuffer(),
-      configIdBytes
+      configIdBytes,
     ];
 
-    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(seeds, program.programId);
+    const [oraclesConfigStorage, _bump] = PublicKey.findProgramAddressSync(
+      seeds,
+      program.programId
+    );
 
-    const signers  = Array.from({ length: 2 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 2 }, () => generateEthKeypair());
     signers.sort((a, b) => {
-      return Buffer.compare(a.ethereumAddress, b.ethereumAddress)
-    })
+      return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
+    });
 
-    const signerEthAddresses = signers.map(s => ( s.ethereumAddress ))
+    const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
-    await program.methods.initOraclesConfig(
-      new BN(9), 
-      new BN(2), 
-      new BN(1), 
-      signerEthAddresses as any
-    )
+    await program.methods
+      .initOraclesConfig(
+        new BN(9),
+        new BN(2),
+        new BN(1),
+        signerEthAddresses as any
+      )
       .accounts({
         state: forwarderState.publicKey,
         oraclesConfig: oraclesConfigStorage,
         owner: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
-      const actualConfig = await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+    const actualConfig = await program.account.oraclesConfig.fetch(
+      oraclesConfigStorage
+    );
 
-      assert.equal(configId, actualConfig.configId, 'config ids should equal');
+    assert.equal(configId, actualConfig.configId, "config ids should equal");
 
-      await program.methods.closeOraclesConfig(
-        new BN(9), 
-        new BN(2),
-      )
-        .accounts({
-          state: forwarderState.publicKey,
-          oraclesConfig: oraclesConfigStorage,
-          owner: provider.wallet.publicKey,
-        })
-        .rpc();
+    await program.methods
+      .closeOraclesConfig(new BN(9), new BN(2))
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: oraclesConfigStorage,
+        owner: provider.wallet.publicKey,
+      })
+      .rpc();
 
-        try {
-          await program.account.oraclesConfig.fetch(oraclesConfigStorage)
-        } catch (err) {
-          if (!err.message.includes("Account does not exist")) {
-            assert.fail("Account should not exist anymore")
-          }
-        }  
-  })
+    try {
+      await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+    } catch (err) {
+      if (!err.message.includes("Account does not exist")) {
+        assert.fail("Account should not exist anymore");
+      }
+    }
+  });
 
   it("Report", async () => {
     // use dummy receiver from setup
@@ -290,135 +374,147 @@ describe("keystone_storage", function() {
     const reportIdBytes = Buffer.alloc(2);
     reportIdBytes.writeUint16BE(reportId);
 
-    const transmissionIdBytes = createHash("sha256").update(Buffer.concat([
-      receiver.toBuffer(), 
-      workflowExecutionIdBytes,
-      reportIdBytes
-    ])).digest();
-   
+    const transmissionIdBytes = createHash("sha256")
+      .update(
+        Buffer.concat([
+          receiver.toBuffer(),
+          workflowExecutionIdBytes,
+          reportIdBytes,
+        ])
+      )
+      .digest();
 
-    const [forwarderAuthorityStorage, forwarderAuthorityBump] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-        forwarderState.publicKey.toBuffer(),
-      ], 
-      program.programId
+    const [forwarderAuthorityStorage, forwarderAuthorityBump] =
+      PublicKey.findProgramAddressSync(
+        [
+          Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+          forwarderState.publicKey.toBuffer(),
+        ],
+        program.programId
+      );
+
+    const actualState = await program.account.forwarderState.fetch(
+      forwarderState.publicKey
     );
 
-    const actualState = await program.account.forwarderState.fetch(forwarderState.publicKey)
-
-    assert.equal(actualState.authorityNonce, forwarderAuthorityBump, 'forwarder authority PDA bumps should be equal');
-
-    const [executionStateStorage, executionStateBump] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("execution_state")),
-        transmissionIdBytes,
-      ],
-      program.programId
+    assert.equal(
+      actualState.authorityNonce,
+      forwarderAuthorityBump,
+      "forwarder authority PDA bumps should be equal"
     );
 
-     // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    const [executionStateStorage, executionStateBump] =
+      PublicKey.findProgramAddressSync(
+        [
+          Buffer.from(anchor.utils.bytes.utf8.encode("execution_state")),
+          transmissionIdBytes,
+        ],
+        program.programId
+      );
 
-     const executionStateBumpBytes = Buffer.alloc(1);
-     executionStateBumpBytes.writeUint8(executionStateBump);
+    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 
-     const lenSignatureBytes = Buffer.alloc(1);
-     lenSignatureBytes.writeUint8(defaultSigners.length);
+    const executionStateBumpBytes = Buffer.alloc(1);
+    executionStateBumpBytes.writeUint8(executionStateBump);
 
-     // metadata length + actual report payload length
-     const rawReportBytes = Buffer.alloc(109 + 1);
+    const lenSignatureBytes = Buffer.alloc(1);
+    lenSignatureBytes.writeUint8(defaultSigners.length);
 
-      // version                offset   0, size  1  
-      // workflow_execution_id  offset   1, size 32
-      // timestamp              offset  33, size  4
-      // don_id                 offset  37, size  4
-      // don_config_version     offset  41, size  4
-      // workflow_cid           offset  45, size 32
-      // workflow_name          offset  77, size 10
-      // workflow_owner         offset  87, size 20
-      // report_id              offset 107, size  2     
-  
+    // metadata length + actual report payload length
+    const rawReportBytes = Buffer.alloc(109 + 1);
 
-      const version = 1;
-      const timestamp = 5;
-      const donId = 7;
-      const configVersion = 3;
-      const workflowCid = 2;
-      const workflowName = 10;
-      const workflowOwner = 11;
+    // version                offset   0, size  1
+    // workflow_execution_id  offset   1, size 32
+    // timestamp              offset  33, size  4
+    // don_id                 offset  37, size  4
+    // don_config_version     offset  41, size  4
+    // workflow_cid           offset  45, size 32
+    // workflow_name          offset  77, size 10
+    // workflow_owner         offset  87, size 20
+    // report_id              offset 107, size  2
 
+    const version = 1;
+    const timestamp = 5;
+    const donId = 7;
+    const configVersion = 3;
+    const workflowCid = 2;
+    const workflowName = 10;
+    const workflowOwner = 11;
 
-      rawReportBytes.writeUint8(version, 0);
-      rawReportBytes.writeUint8(workflowExecutionId, 32); // write at last byte for BigEndian
-      rawReportBytes.writeUint8(timestamp, 36);
-      rawReportBytes.writeUint8(donId, 40);
-      rawReportBytes.writeUint8(configVersion, 44);
-      rawReportBytes.writeUint8(workflowCid, 76);
-      rawReportBytes.writeUint8(workflowName, 86);
-      rawReportBytes.writeUint8(workflowOwner, 106);
-      rawReportBytes.writeUint8(reportId, 108);
+    rawReportBytes.writeUint8(version, 0);
+    rawReportBytes.writeUint8(workflowExecutionId, 32); // write at last byte for BigEndian
+    rawReportBytes.writeUint8(timestamp, 36);
+    rawReportBytes.writeUint8(donId, 40);
+    rawReportBytes.writeUint8(configVersion, 44);
+    rawReportBytes.writeUint8(workflowCid, 76);
+    rawReportBytes.writeUint8(workflowName, 86);
+    rawReportBytes.writeUint8(workflowOwner, 106);
+    rawReportBytes.writeUint8(reportId, 108);
 
-      // payload
-      rawReportBytes.writeUint8(255, 109);
+    // payload
+    rawReportBytes.writeUint8(255, 109);
 
-      // just keep this zero-ed since we don't use it outside of the hash
-      const reportContextBytes = Buffer.alloc(96);
+    // just keep this zero-ed since we don't use it outside of the hash
+    const reportContextBytes = Buffer.alloc(96);
 
-      const msgHashToSign = createHash("sha256")
-        .update(Buffer.concat([rawReportBytes, reportContextBytes]))
-        .digest();
+    const msgHashToSign = createHash("sha256")
+      .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+      .digest();
 
-      const signaturesInfo = defaultSigners.map(s => (signMessage(msgHashToSign, s.secretKey)));
+    const signaturesInfo = defaultSigners.map((s) =>
+      signMessage(msgHashToSign, s.secretKey)
+    );
 
-      const signaturesBytes = signaturesInfo.map(s => {
-        const recoveryIdBytes = Buffer.alloc(1);
-        recoveryIdBytes.writeUint8(s.recovery);
-        return Buffer.concat([s.signature, recoveryIdBytes]);
-      })
+    const signaturesBytes = signaturesInfo.map((s) => {
+      const recoveryIdBytes = Buffer.alloc(1);
+      recoveryIdBytes.writeUint8(s.recovery);
+      return Buffer.concat([s.signature, recoveryIdBytes]);
+    });
 
-      // they need to be packed as one buffer array
-      const signaturesBytesPacked = Buffer.concat(signaturesBytes);
+    // they need to be packed as one buffer array
+    const signaturesBytesPacked = Buffer.concat(signaturesBytes);
 
-       // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
-      //  1 + 1 + (15*65) + 110 + 96
-      const dataBytes = Buffer.concat([
-        executionStateBumpBytes,
-        lenSignatureBytes,
-        signaturesBytesPacked,
-        rawReportBytes,
-        reportContextBytes
-      ]);
-    
-
+    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    //  1 + 1 + (15*65) + 110 + 96
+    const dataBytes = Buffer.concat([
+      executionStateBumpBytes,
+      lenSignatureBytes,
+      signaturesBytesPacked,
+      rawReportBytes,
+      reportContextBytes,
+    ]);
 
     const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
       units: 1_400_000,
     });
 
     const ix = await program.methods
-    .report(dataBytes)
-    .accounts({
-      state: forwarderState.publicKey,
-      oraclesConfig: defaultOraclesConfigStorage,
-      transmitter: provider.wallet.publicKey,
-      forwarderAuthority: forwarderAuthorityStorage,
-      executionState: executionStateStorage,
-      receiverProgram: receiver,
-      systemProgram: anchor.web3.SystemProgram.programId,
-    })
-    .remainingAccounts([{
-      pubkey: latestReportState.publicKey,
-      isSigner: false,
-      isWritable: true
-    }])
-    .instruction();
+      .report(dataBytes)
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: defaultOraclesConfigStorage,
+        transmitter: provider.wallet.publicKey,
+        forwarderAuthority: forwarderAuthorityStorage,
+        executionState: executionStateStorage,
+        receiverProgram: receiver,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .remainingAccounts([
+        {
+          pubkey: latestReportState.publicKey,
+          isSigner: false,
+          isWritable: true,
+        },
+      ])
+      .instruction();
 
     const slot = await provider.connection.getSlot();
-    const [lookupTableInst, lookupTableAddress] = AddressLookupTableProgram.createLookupTable({
-      authority: provider.wallet.publicKey,
-      payer: provider.wallet.publicKey,
-      recentSlot: slot - 1,
-    });
+    const [lookupTableInst, lookupTableAddress] =
+      AddressLookupTableProgram.createLookupTable({
+        authority: provider.wallet.publicKey,
+        payer: provider.wallet.publicKey,
+        recentSlot: slot - 1,
+      });
 
     // for chainlink usage, the ALT does include the receiver (bc that is known and static to us)
     // PLUS any data accounts we use in the receiver (bc that is known and static to us)
@@ -430,17 +526,18 @@ describe("keystone_storage", function() {
       addresses: [
         forwarderState.publicKey,
         defaultOraclesConfigStorage,
-        forwarderAuthorityStorage, 
+        forwarderAuthorityStorage,
         receiver,
         anchor.web3.SystemProgram.programId,
-        latestReportState.publicKey
+        latestReportState.publicKey,
       ],
     });
 
-      // Create the transaction message
+    // Create the transaction message
     const message = new TransactionMessage({
       payerKey: provider.wallet.publicKey, // Account paying for the transaction
-      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash, // Latest blockhash
       instructions: [lookupTableInst, extendInstruction], // Instructions to be included in the transaction
     }).compileToV0Message();
 
@@ -453,52 +550,105 @@ describe("keystone_storage", function() {
       await provider.connection.getAddressLookupTable(lookupTableAddress)
     ).value;
 
-    
-    assert.isTrue(lookupTableAccount.key.equals(lookupTableAddress), 'lookup addresses equal');
-    assert.equal(lookupTableAccount.state.addresses.length, 6, '6 addresses in lookup table');
+    assert.isTrue(
+      lookupTableAccount.key.equals(lookupTableAddress),
+      "lookup addresses equal"
+    );
+    assert.equal(
+      lookupTableAccount.state.addresses.length,
+      6,
+      "6 addresses in lookup table"
+    );
 
-    const [lookupState, lookupConfig, lookupAuthority, lookupReceiver, lookupSystemP, lookupReceiverReport] = lookupTableAccount.state.addresses
+    const [
+      lookupState,
+      lookupConfig,
+      lookupAuthority,
+      lookupReceiver,
+      lookupSystemP,
+      lookupReceiverReport,
+    ] = lookupTableAccount.state.addresses;
 
-    assert.isTrue(lookupState.equals(forwarderState.publicKey), 'forwarder state in lookup table');
-    assert.isTrue(lookupConfig.equals(defaultOraclesConfigStorage), 'forwarder state in lookup table');
-    assert.isTrue(lookupAuthority.equals(forwarderAuthorityStorage), 'forwarder state in lookup table');
-    assert.isTrue(lookupReceiver.equals(receiver), 'forwarder state in lookup table');
-    assert.isTrue(lookupSystemP.equals(anchor.web3.SystemProgram.programId), 'forwarder state in lookup table');
-    assert.isTrue(lookupReceiverReport.equals(latestReportState.publicKey), 'receiver report state in lookup table');
+    assert.isTrue(
+      lookupState.equals(forwarderState.publicKey),
+      "forwarder state in lookup table"
+    );
+    assert.isTrue(
+      lookupConfig.equals(defaultOraclesConfigStorage),
+      "forwarder state in lookup table"
+    );
+    assert.isTrue(
+      lookupAuthority.equals(forwarderAuthorityStorage),
+      "forwarder state in lookup table"
+    );
+    assert.isTrue(
+      lookupReceiver.equals(receiver),
+      "forwarder state in lookup table"
+    );
+    assert.isTrue(
+      lookupSystemP.equals(anchor.web3.SystemProgram.programId),
+      "forwarder state in lookup table"
+    );
+    assert.isTrue(
+      lookupReceiverReport.equals(latestReportState.publicKey),
+      "receiver report state in lookup table"
+    );
 
     // create transaction
 
     const reportMessage = new TransactionMessage({
       payerKey: provider.wallet.publicKey, // Account paying for the transaction
-      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash, // Latest blockhash
       instructions: [computeLimitIx, ix], // Instructions to be included in the transaction
     }).compileToV0Message([lookupTableAccount]);
 
     const tx = new VersionedTransaction(reportMessage);
 
-    const signedTx = await provider.wallet.signTransaction(tx)
+    const signedTx = await provider.wallet.signTransaction(tx);
 
     const txSerial = signedTx.serialize();
-    console.log('the size of the tx', txSerial.length);
+    console.log("the size of the tx", txSerial.length);
 
     // delay in order to activate lookup table
     await sleep(3000);
 
     await provider.sendAndConfirm(tx);
 
-    const actualExecutionState = await program.account.executionState.fetch(executionStateStorage);
+    const actualExecutionState = await program.account.executionState.fetch(
+      executionStateStorage
+    );
 
-    assert.equal(true, actualExecutionState.success, "execution should succeed");
-    assert.isTrue(provider.wallet.publicKey.equals(actualExecutionState.transmitter), 'expected transmitter');
-    assert.deepEqual(Array.from(transmissionIdBytes), actualExecutionState.transmissionId, 'expected transmissionid');
+    assert.equal(
+      true,
+      actualExecutionState.success,
+      "execution should succeed"
+    );
+    assert.isTrue(
+      provider.wallet.publicKey.equals(actualExecutionState.transmitter),
+      "expected transmitter"
+    );
+    assert.deepEqual(
+      Array.from(transmissionIdBytes),
+      actualExecutionState.transmissionId,
+      "expected transmissionid"
+    );
 
-    const { metadata: actualMetadata, report: actualReport } = await receiverProgram.account.latestReport.fetch(latestReportState.publicKey);
-    assert.deepEqual(Buffer.from([255]), actualReport, 'reports match');
-    assert.deepEqual(rawReportBytes.slice(45, 109), actualMetadata, 'metadatas match');
+    const { metadata: actualMetadata, report: actualReport } =
+      await receiverProgram.account.latestReport.fetch(
+        latestReportState.publicKey
+      );
+    assert.deepEqual(Buffer.from([255]), actualReport, "reports match");
+    assert.deepEqual(
+      rawReportBytes.slice(45, 109),
+      actualMetadata,
+      "metadatas match"
+    );
 
     const sameReportMessage = new TransactionMessage({
       payerKey: provider.wallet.publicKey, // Account paying for the transaction
-      recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash, // Latest blockhash
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash, // Latest blockhash
       instructions: [computeLimitIx, ix], // Instructions to be included in the transaction
     }).compileToV0Message([lookupTableAccount]);
 
@@ -506,13 +656,13 @@ describe("keystone_storage", function() {
 
     try {
       await provider.sendAndConfirm(sameTx);
-      assert.fail(`Executing twice should fail with ExecutionAlreadySucceded revert`);
+      assert.fail(
+        `Executing twice should fail with ExecutionAlreadySucceded revert`
+      );
     } catch (err) {
       if (!err.message.includes("ExecutionAlreadySucceded")) {
-        assert.fail(`Unexpected error: ${err.message}`)
-      } 
-    }  
-
-  })
-
+        assert.fail(`Unexpected error: ${err.message}`);
+      }
+    }
+  });
 });
