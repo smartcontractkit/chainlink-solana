@@ -105,10 +105,7 @@ pub mod keystone_forwarder {
         // first u8 stores bump, second u8 stores the number of signatures
         let min_data_size = 1 + 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
-        require!(
-            data.len() > min_data_size,
-            ForwarderError::InvalidReport
-        );
+        require!(data.len() > min_data_size, ForwarderError::InvalidReport);
 
         // get config
         let oracles_config = &ctx.accounts.oracles_config;
@@ -446,7 +443,7 @@ fn extract_raw_report(data: &[u8]) -> &[u8] {
     let _signatures = &data[..num_signatures * SIGNATURE_LEN];
     let data = &data[num_signatures * SIGNATURE_LEN..];
     let _report_context = &data[data.len() - REPORT_CONTEXT_LEN..];
-    
+
     // raw report
     &data[..data.len() - REPORT_CONTEXT_LEN]
 }
