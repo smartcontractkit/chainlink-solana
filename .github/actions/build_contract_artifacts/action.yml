@@ -24,21 +24,28 @@ runs:
         ref: ${{ inputs.ref }}
     
     - name: Get ProjectSerum Version
-      uses: ./.github/actions/projectserum_version
+      shell: bash
       id: get-version
-      
-    - name: Build Wrapped Anchor Image
-      uses: ./.github/actions/build-wrapped-anchor-image
-      with:
-        runner-os: ${{ inputs.runner-os }}
-
+      run: |
+        PSVERSION=$(make projectserum_version)
+        echo "projectserum_version=${PSVERSION}" >> $GITHUB_OUTPUT
+    
     - name: cache docker build image
       id: cache-image
       uses: actions/cache@v4
       with:
         path: contracts/docker-build.tar
         key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
-    
+
+    - name: build & save image
+      if: steps.cache-image.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        cd contracts
+        docker buildx build . -t chainlink-solana:build --build-arg ANCHOR_CLI=${{ steps.get-version.outputs.projectserum_version }}
+        docker save chainlink-solana > docker-build.tar
+        cd ../
+
     - name: load cached image
       shell: bash
       run: |
