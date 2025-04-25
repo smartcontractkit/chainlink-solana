@@ -7,7 +7,7 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
 
 # global ownership
-* @smartcontractkit/bix-build
+* @smartcontractkit/bix-build @smartcontractkit/bix-framework
 
 # offchain code ownership
 /pkg/solana @smartcontractkit/bix-framework @smartcontractkit/bix-build
