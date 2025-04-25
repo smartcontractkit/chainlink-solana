@@ -64,7 +64,8 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		err := job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 		tests.RequireLogMessage(t, observed, "RPC signaled that transaction history is not available. "+
-			"Ensure that all instances of RPCs are configured to support transaction history and extended metadata storage.")
+			"Ensure that all instances of RPCs are configured to support transaction history "+
+			"(--enable-rpc-transaction-history) and extended metadata storage (-enable-extended-tx-metadata-storage).")
 	})
 	requireJobIsDone := func(t *testing.T, done <-chan struct{}, msg string) {
 		select {

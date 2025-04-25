@@ -81,7 +81,8 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 	if err != nil {
 		if strings.Contains(err.Error(), historyErrorMsg) {
 			f.lggr.Criticalw("RPC signaled that transaction history is not available. "+
-				"Ensure that all instances of RPCs are configured to support transaction history and extended metadata storage.",
+				"Ensure that all instances of RPCs are configured to support transaction history "+
+				"(--enable-rpc-transaction-history) and extended metadata storage (-enable-extended-tx-metadata-storage).",
 				"err", err)
 		}
 		return false, fmt.Errorf("failed getting signatures for address: %w", err)
