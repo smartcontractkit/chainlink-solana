@@ -55,7 +55,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	t.Cleanup(func() {
 		assert.NoError(t, cmd.Process.Kill())
 		if err2 := cmd.Wait(); assert.Error(t, err2) {
-			if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
+			if t.Failed() || !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
 				t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
 			}
 		}
