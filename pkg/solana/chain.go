@@ -93,8 +93,6 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
-	cfg.SetDefaults() // Use defaults for unset configs
-
 	chainID := *cfg.ChainID
 	switch chainID {
 	case "devnet":
