@@ -366,12 +366,12 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	}
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name:  ptr("devnet"),
-			URL:   config.MustParseURL(mockServer.URL + "/1"),
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/1"),
 		},
 		{
-			Name:  ptr("devnet"),
-			URL:   config.MustParseURL(mockServer.URL + "/2"),
+			Name: ptr("devnet"),
+			URL:  config.MustParseURL(mockServer.URL + "/2"),
 		},
 	}
 
