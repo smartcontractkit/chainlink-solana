@@ -3,9 +3,12 @@ package logpoller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
@@ -21,16 +24,18 @@ type getSlotsForAddressJob struct {
 	from, to  uint64
 
 	client RPCClient
+	lggr   logger.SugaredLogger
 
 	storeSlot func(slot uint64)
 	done      chan struct{}
 	workers   WorkerGroup
 }
 
-func newGetSlotsForAddress(client RPCClient, workers WorkerGroup, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
 		address:   address,
 		client:    client,
+		lggr:      lggr,
 		from:      from,
 		to:        to,
 		storeSlot: storeSlot,
@@ -59,6 +64,8 @@ func (f *getSlotsForAddressJob) Run(ctx context.Context) error {
 	return nil
 }
 
+const historyErrorMsg = "history is not available from this node"
+
 // run - returns true, nil - if job was fully done, and we have not created a child job
 func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 	opts := rpc.GetSignaturesForAddressOpts{
@@ -72,6 +79,12 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 
 	sigs, err := f.client.GetSignaturesForAddressWithOpts(ctx, f.address.ToSolana(), &opts)
 	if err != nil {
+		if strings.Contains(err.Error(), historyErrorMsg) {
+			f.lggr.Criticalw("RPC signaled that transaction history is not available. "+
+				"Ensure that all instances of RPCs are configured to support transaction history "+
+				"(--enable-rpc-transaction-history) and extended metadata storage (-enable-extended-tx-metadata-storage).",
+				"err", err)
+		}
 		return false, fmt.Errorf("failed getting signatures for address: %w", err)
 	}
 

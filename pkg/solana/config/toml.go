@@ -107,6 +107,9 @@ func setFromNode(n, f *Node) {
 	if f.URL != nil {
 		n.URL = f.URL
 	}
+	if f.Order != nil {
+		n.Order = f.Order
+	}
 	n.SendOnly = f.SendOnly
 }
 

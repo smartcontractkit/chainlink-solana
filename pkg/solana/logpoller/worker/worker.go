@@ -21,7 +21,7 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 6
+	DefaultMaxRetryCount = 6 // start logging crit after 12m48s
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
 	DefaultNotifyRetryDepth = 200
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
@@ -31,10 +31,10 @@ const (
 )
 
 type worker struct {
-	Name  string
-	Queue chan *worker
-	Retry chan Job
-	Lggr  logger.Logger
+	Name       string
+	Queue      chan *worker
+	FailedJobs chan failedJob
+	Lggr       logger.Logger
 }
 
 func (w *worker) Do(ctx context.Context, job Job) {
@@ -50,18 +50,18 @@ func (w *worker) Do(ctx context.Context, job Job) {
 	}
 
 	start := time.Now()
-	w.Lggr.Debugf("Starting job %s", job.String())
+	w.Lggr.Debugw("Starting job", "id", job.String())
 	if err := job.Run(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
-			w.Lggr.Debugf("job %s was canceled", job.String())
+			w.Lggr.Debugw("job was canceled", "id", job.String())
 			return
 		}
-		w.Lggr.Errorf("job %s failed with error; retrying: %s", job, err)
-		w.Retry <- job
+		w.Lggr.Errorw("job failed with error; retrying", "job", job, "error", err)
+		w.FailedJobs <- failedJob{Job: job, Err: err}
 		return
 	}
 
-	w.Lggr.Debugf("Finished job %s in %s", job.String(), time.Since(start))
+	w.Lggr.Debugw("Finished job", "job", job.String(), "duration", time.Since(start))
 }
 
 type Group struct {
@@ -84,9 +84,9 @@ type Group struct {
 	queueClosed  atomic.Bool
 
 	// retry queue
-	chRetry  chan Job
-	mu       sync.RWMutex
-	retryMap map[string]retryableJob
+	failedJobs chan failedJob
+	mu         sync.RWMutex
+	retryMap   map[string]retryableJob
 }
 
 func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
@@ -99,7 +99,7 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 		input:         make(chan Job, 1),
 		chInputNotify: make(chan struct{}, 1),
 		chStopInputs:  make(chan struct{}),
-		chRetry:       make(chan Job, 1),
+		failedJobs:    make(chan failedJob, 1),
 		retryMap:      make(map[string]retryableJob),
 	}
 
@@ -111,10 +111,10 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 
 	for idx := range workers {
 		g.workers <- &worker{
-			Name:  fmt.Sprintf("worker-%d", idx+1),
-			Queue: g.workers,
-			Retry: g.chRetry,
-			Lggr:  g.lggr,
+			Name:       fmt.Sprintf("worker-%d", idx+1),
+			Queue:      g.workers,
+			FailedJobs: g.failedJobs,
+			Lggr:       g.lggr,
 		}
 	}
 
@@ -202,30 +202,32 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case job := <-g.chRetry:
+		case failedAttempt := <-g.failedJobs:
 			var retry retryableJob
 
-			switch typedJob := job.(type) {
+			switch typedJob := failedAttempt.Job.(type) {
 			case retryableJob:
 				retry = typedJob
 				retry.count++
-
-				if retry.count > g.maxRetryCount {
-					g.lggr.Criticalf("job %s exceeded max retries %d/%d", job, retry.count, g.maxRetryCount)
-				}
+				retry.errs = append(retry.errs, failedAttempt.Err)
 
 				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
-				g.lggr.Errorf("retrying job in %dms", wait/time.Millisecond)
+				if retry.count > g.maxRetryCount {
+					g.lggr.Criticalf("job %s failed %d times in a row, next retry in %s. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, retry.count, wait, errors.Join(retry.errs...))
+				} else {
+					g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
+				}
 
 				retry.when = time.Now().Add(wait)
 			default:
 				wait := calculateExponentialBackoff(0)
 
-				g.lggr.Errorf("retrying job %s in %s", job, wait)
+				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
 				retry = retryableJob{
 					name: createRandomString(12),
-					job:  job,
+					job:  failedAttempt.Job,
+					errs: []error{failedAttempt.Err},
 					when: time.Now().Add(wait),
 				}
 			}
@@ -293,6 +295,7 @@ func (g *Group) processQueue(ctx context.Context) {
 		// the length check above should protect from that, but just in case
 		// this error also breaks the loop
 		if err != nil {
+			g.lggr.Criticalw("Assumption Violation: non-empty queue returned error from Pop", "err", err)
 			break
 		}
 

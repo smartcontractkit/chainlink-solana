@@ -84,6 +84,10 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	require.NoError(t, err)
 	userMessagingAccounts := chainwriter.CreateTestPubKeys(t, 3) // arbitrary number of user accounts
 
+	staticCUOverhead := uint32(150_000)
+	userCU := uint32(500)
+	destGasAmount := uint32(500)
+
 	args := ccipsolana.SVMExecCallArgs{
 		Info: ccipocr3.ExecuteReportInfo{
 			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
@@ -103,13 +107,13 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		},
 		ExtraData: ccipsolana.ExtraDataDecoded{
 			ExtraArgsDecoded: map[string]any{
-				"computeUnits":            uint32(500),
+				"computeUnits":            userCU,
 				"accounts":                userMessagingAccounts,
 				"accountIsWritableBitmap": uint64(1),
 				"tokenReceiver":           tokenReceiver,
 			},
 			DestExecDataDecoded: []map[string]any{
-				{"destGasAmount": uint32(500)},
+				{"destGasAmount": destGasAmount},
 			},
 		},
 	}
@@ -128,9 +132,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
 		}
 
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, tableMap, offrampAddress.String())
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, tableMap, offrampAddress.String(), staticCUOverhead)
 		require.NoError(t, err)
-		verifyTxOpts(t, options, true)
+		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
 		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
@@ -214,9 +218,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
 		}
 
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingLogicReceiverArgs, accounts, tableMap, offrampAddress.String())
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingLogicReceiverArgs, accounts, tableMap, offrampAddress.String(), staticCUOverhead)
 		require.NoError(t, err)
-		verifyTxOpts(t, options, true)
+		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
 		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
@@ -257,9 +261,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			},
 		}
 		t.Run("CCIPExecute ArgsTransform ignores missing pool lookup table error", func(t *testing.T) {
-			transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, messagingOnlyArgs, accounts, nil, offrampAddress.String())
+			transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, messagingOnlyArgs, accounts, nil, offrampAddress.String(), staticCUOverhead)
 			require.NoError(t, err)
-			verifyTxOpts(t, options, true)
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
 			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 			require.True(t, ok)
@@ -269,9 +273,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts))
 		})
 		t.Run("CCIPExecute ArgsTransform ignores missing token receiver error", func(t *testing.T) {
-			transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, messagingOnlyArgs, accounts, tableMap, offrampAddress.String())
+			transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, messagingOnlyArgs, accounts, tableMap, offrampAddress.String(), staticCUOverhead)
 			require.NoError(t, err)
-			verifyTxOpts(t, options, true)
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
 			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 			require.True(t, ok)
@@ -319,7 +323,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
 		}
 
-		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingTokenReceiverArgs, accounts, tableMap, offrampAddress.String())
+		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingTokenReceiverArgs, accounts, tableMap, offrampAddress.String(), 0)
 		require.Error(t, err)
 	})
 
@@ -352,9 +356,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
 		}
 
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingBothReceiverArgs, accounts, tableMap, offrampAddress.String())
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, missingBothReceiverArgs, accounts, tableMap, offrampAddress.String(), staticCUOverhead)
 		require.NoError(t, err)
-		verifyTxOpts(t, options, true)
+		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.NotNil(t, typedArgs.TokenIndexes)
@@ -370,7 +374,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		for _, acc := range mandatoryAccounts {
 			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
 		}
-		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String(), 0)
 		require.ErrorContains(t, err, "failed to find PoolLookupTable in table map")
 	})
 
@@ -401,10 +405,10 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				},
 			},
 		}
-		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		transformedArgs, newAccounts, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String(), staticCUOverhead)
 		require.NoError(t, err)
 
-		verifyTxOpts(t, options, true)
+		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 		_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
 		require.Len(t, newAccounts, len(accounts))
@@ -422,7 +426,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			Report:        []uint8{},
 			Info:          ccipocr3.ExecuteReportInfo{},
 		}
-		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String())
+		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String(), 0)
 		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
 	})
 }
@@ -438,6 +442,7 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 
 	key1 := utils.GetRandomPubKey(t)
 	key2 := utils.GetRandomPubKey(t)
+	staticCUOverhead := uint32(150_000)
 	t.Run("CCIPCommit ArgsTransform does not affect accounts if token prices exist", func(t *testing.T) {
 		args := struct {
 			Info ccipocr3.CommitReportInfo
@@ -451,8 +456,8 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
-		verifyTxOpts(t, options, false)
+		_, newAccounts, options, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "", staticCUOverhead)
+		verifyTxOpts(t, options, false, staticCUOverhead, 0, 0)
 		require.NoError(t, err)
 		require.Len(t, newAccounts, len(accounts))
 	})
@@ -463,28 +468,27 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 			Info: ccipocr3.CommitReportInfo{},
 		}
 		accounts := []*solana.AccountMeta{{PublicKey: key1}, {PublicKey: key2}}
-		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "")
+		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, accounts, nil, "", 0)
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 1)
 	})
 }
 
-func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool) {
-	// TODO: re-enable when the SanitizeFailure issue is fixed
-	// expectedLen := 1
-	// if exec {
-	// 	expectedLen = 2
-	// }
-	// require.Len(t, options, expectedLen)
+func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overhead, userCU, destGasAmount uint32) {
+	expectedLen := 1
+	if exec {
+		expectedLen = 2
+	}
+	require.Len(t, options, expectedLen)
 
-	// txConfig := &txmutils.TxConfig{}
-	// options[0](txConfig)
-	// require.Equal(t, !exec, txConfig.EstimateComputeUnitLimit)
+	txConfig := &txmutils.TxConfig{}
+	options[0](txConfig)
+	require.Equal(t, !exec, txConfig.EstimateComputeUnitLimit)
 
-	// if exec {
-	// 	options[1](txConfig)
-	// 	require.Equal(t, chainwriter.StaticCuOverhead+1000, txConfig.ComputeUnitLimit)
-	// }
+	if exec {
+		options[1](txConfig)
+		require.Equal(t, overhead+userCU+destGasAmount, txConfig.ComputeUnitLimit)
+	}
 }
 
 func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminRegistryAddr solana.PublicKey) {

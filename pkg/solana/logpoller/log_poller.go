@@ -229,6 +229,8 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			log.ExpiresAt = &expiresAt
 		}
 
+		lp.lggr.Infof("found matching event %v", log)
+
 		logs = append(logs, log)
 	}
 	if len(logs) == 0 {
@@ -314,10 +316,10 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 		return 0, err
 	}
 	if lookbackSlot > lastProcessed {
-		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 		return lookbackSlot, nil
 	}
-	lp.lggr.Infof("last processed slot %d is older than lookback window, skipping ahead to slot %d", lastProcessed, lookbackSlot)
+	lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
 	return lastProcessed, nil
 }
@@ -354,16 +356,22 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 		}
 	}
 
-	err := lp.processBlocksRange(ctx, addresses, minSlot, to)
-	if err != nil {
-		return err
+	if minSlot < to {
+		err := lp.processBlocksRange(ctx, addresses, minSlot, to)
+		if err != nil {
+			return err
+		}
+
+		lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
+	} else {
+		lp.lggr.Infow("Starting block for filters backfill is greater than the latest processed block - marking filters as backfilled and starting global processing", "filters", len(filters), "from", minSlot, "to", to)
 	}
 
-	lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
 	if isReplay {
 		lp.replayComplete(minSlot, to)
 	}
 
+	var err error
 	for _, filter := range filters {
 		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
 		if filterErr != nil {
@@ -396,6 +404,7 @@ consumedAllBlocks:
 
 			batch := []Block{block}
 			batch = appendBuffered(blocks, blocksChBuffer, batch)
+			lp.lggr.Infof("processing batch of %d blocks: [slots %d-%d]", len(batch), batch[0].SlotNumber, batch[len(batch)-1].SlotNumber)
 			err = lp.processBlocks(ctx, batch)
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)
