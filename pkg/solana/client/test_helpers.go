@@ -109,7 +109,7 @@ func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string
 		if attempts <= 0 {
 			return fmt.Errorf("failed to fund solana accounts")
 		}
-		time.Sleep(500*time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
 	}
 
