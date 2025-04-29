@@ -64,7 +64,7 @@ func (r *Relayer) Name() string {
 	return r.lggr.Name()
 }
 
-func (r *Relayer) AsEVMRelayer() (relaytypes.EVMRelayer, error) {
+func (r *Relayer) EVM() (relaytypes.EVMService, error) {
 	return nil, errors.New("unimplemented")
 }
 
