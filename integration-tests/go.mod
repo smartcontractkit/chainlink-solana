@@ -15,16 +15,16 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250429152735-e25c8362c8a2
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250429172937-8d7717f45f95
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250425163923-16aa375957b7
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250429205337-7ee5f91ed065
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250429172328-c28f433fc7ce
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250429214959-baa3b4c6812d
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250429174829-49dbae83be6a
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250429174829-49dbae83be6a
-	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250429174829-49dbae83be6a
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250430102235-e0d8a6199fe9
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250430102235-e0d8a6199fe9
+	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430102235-e0d8a6199fe9
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
