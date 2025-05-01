@@ -1211,10 +1211,10 @@ github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-202504081613
 github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250408161305-721208f43882/go.mod h1:NVoJQoPYr6BorpaXTusoIH1IYTySCmanQ8Q1yv3mNh4=
 github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250428160515-094b39db9145 h1:u0+92PO+sWTClEzyZ7cJwMuA1zJ0sQRp3IR4ili+UCw=
 github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250428160515-094b39db9145/go.mod h1:apM9rdhKDAFRiwQl94sGaQbXT/q1+Ji8Pt9BrLE6WHQ=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250428160515-094b39db9145 h1:uDu4opLkHttr8BnLYt1qxwf+qiowFspwIa8US9anIeQ=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250428160515-094b39db9145/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250428160515-094b39db9145 h1:/4iICuAiAzlSZzZ7e4h3GVbdXIg0+2Bop3g7wuNu/80=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250428160515-094b39db9145/go.mod h1:4+ql4aCuHaTigkVbYUKEZ7uThseEngmeRLiFbVrZVtc=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250501141303-e13c3bbc8666 h1:W+Og7fQhYHvzRws5VdeSQACslvRsOlleuyTsoGMyv4s=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250501141303-e13c3bbc8666/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250501141303-e13c3bbc8666 h1:A0lGFiYxWMgdF2s+U4ouxCuJTnp5RAB0fAFLKNi6QPA=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250501141303-e13c3bbc8666/go.mod h1:4+ql4aCuHaTigkVbYUKEZ7uThseEngmeRLiFbVrZVtc=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0 h1:hfMRj2ny6oNHd8w1rhJHdoX3YkoWJtCkBK6wTlCE4+c=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.9.0/go.mod h1:/dVVLXrsp+V0AbcYGJo3XMzKg3CkELsweA/TTopCsKE=
 github.com/smartcontractkit/chainlink-protos/orchestrator v0.5.0 h1:xRgu/kMkxcY4LeDKMBhaXU4khgya7v2wyb4Sa5Nzb+Y=
