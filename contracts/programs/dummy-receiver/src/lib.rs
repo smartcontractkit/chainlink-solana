@@ -4,6 +4,9 @@ use keystone_forwarder::ID as FORWARDER_ID;
 
 declare_id!("5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L");
 
+// THIS IS UN-AUDITED CODE USED FOR TESTING PURPOSES ONLY
+// DO NOT USE THIS CODE IN PRODUCTION.
+
 #[program]
 pub mod dummy_receiver {
     use super::*;
@@ -30,13 +33,19 @@ pub mod dummy_receiver {
 
         // in a production setting you'd also want to verify the metadata too...
 
-        let account_info = &ctx.remaining_accounts[0];
-        let mut latest_report: Account<'info, LatestReport> = Account::try_from(account_info)?;
-        latest_report.metadata = metadata;
-        latest_report.report = report;
+        ctx.accounts.report_state.report = report;
+        ctx.accounts.report_state.metadata = metadata;
 
-        // includes anchor discriminator by default
-        latest_report.try_serialize(&mut &mut account_info.data.borrow_mut()[..])?;
+        // note: alternative account implementation could pass as ctx.remaining_accounts
+        // however that requires more work
+
+        // let account_info = &ctx.remaining_accounts[0];
+        // let mut latest_report: Account<'info, LatestReport> = Account::try_from(account_info)?;
+        // latest_report.metadata = metadata;
+        // latest_report.report = report;
+
+        // // includes anchor discriminator by default
+        // latest_report.try_serialize(&mut &mut account_info.data.borrow_mut()[..])?;
 
         Ok(())
     }
@@ -81,4 +90,7 @@ pub struct OnReport<'info> {
     /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
     pub forwarder_authority: Signer<'info>,
     // remaining accounts passed in as well
+
+    #[account(mut)]
+    pub report_state: Account<'info, LatestReport>,
 }
