@@ -23,23 +23,13 @@ pub mod dummy_receiver {
     ) -> Result<()> {
 
         // verify 
-        // 1. forwarder authority signer is authorized by this program
-        // 2. forwarder authority signer belongs to (is a PDA derived from) forwarder state
-
-        // 1
-        require!(
-            ctx.accounts.forwarder_authority.key() == ctx.accounts.report_state.forwarder_authority,
-            AuthError::Unauthorized
-        );
+        // 1. forwarder authority signer belongs to (is a PDA derived from) forwarder state (done in the anchor constraint!)
+        // 2. forwarder authority signer is authorized by this program 
+        // 3. report metadata (not done in this dummy example)
 
         // 2
-        let (expected_pda, expected_bump) = Pubkey::find_program_address(
-            &[b"forwarder", ctx.accounts.state.key().as_ref()],
-            &FORWARDER_ID,
-        );
         require!(
-            expected_pda == ctx.accounts.forwarder_authority.key()
-                && expected_bump == ctx.accounts.state.authority_nonce,
+            ctx.accounts.forwarder_authority.key() == ctx.accounts.report_state.forwarder_authority,
             AuthError::Unauthorized
         );
 
@@ -91,6 +81,7 @@ pub struct Initialize<'info> {
 
     /// CHECK: this is the expected signer of "on_report"
     #[account()]
+    // #[account(address = report_state.key() @ AuthError::Unauthorized)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
@@ -101,13 +92,12 @@ pub struct OnReport<'info> {
     #[account(owner = FORWARDER_ID)]
     pub state: Account<'info, ForwarderState>,
 
-    /// CHECK: This is a PDA
-    /// Anchor is unable to compute PDA with other program id so you
-    /// must do inline check within on_report
-    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    // note the forwarder authority is a PDA signer
+    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = FORWARDER_ID)]
     pub forwarder_authority: Signer<'info>,
-    // remaining accounts passed in as well
 
     #[account(mut)]
     pub report_state: Account<'info, LatestReport>,
+
+    // remaining accounts may be passed in
 }
