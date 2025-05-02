@@ -11,7 +11,8 @@ declare_id!("5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L");
 pub mod dummy_receiver {
     use super::*;
 
-    pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.report_state.forwarder_authority = ctx.accounts.forwarder_authority.key();
         Ok(())
     }
 
@@ -20,7 +21,18 @@ pub mod dummy_receiver {
         metadata: Vec<u8>,
         report: Vec<u8>,
     ) -> Result<()> {
-        // verify forwarder authority signer
+
+        // verify 
+        // 1. forwarder authority signer is authorized by this program
+        // 2. forwarder authority signer belongs to (is a PDA derived from) forwarder state
+
+        // 1
+        require!(
+            ctx.accounts.forwarder_authority.key() == ctx.accounts.report_state.forwarder_authority,
+            AuthError::Unauthorized
+        );
+
+        // 2
         let (expected_pda, expected_bump) = Pubkey::find_program_address(
             &[b"forwarder", ctx.accounts.state.key().as_ref()],
             &FORWARDER_ID,
@@ -62,6 +74,7 @@ pub enum AuthError {
 pub struct LatestReport {
     pub metadata: Vec<u8>,
     pub report: Vec<u8>,
+    pub forwarder_authority: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -69,12 +82,16 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8 + 4 + 4 + 65 // 64 (metadata) + 1 (report)
+        space = 8 + 4 + 4 + 65 + 32 // [64 (metadata) + 1 (report)] = 65
     )]
     pub report_state: Account<'info, LatestReport>,
 
     #[account(mut)]
     pub signer: Signer<'info>,
+
+    /// CHECK: this is the expected signer of "on_report"
+    #[account()]
+    pub forwarder_authority: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }

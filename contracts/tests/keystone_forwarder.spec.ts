@@ -61,18 +61,6 @@ describe("keystone_storage", function () {
   // if N <= 16, then f = 5 so we need f + 1 (6) signers for BFT
   const NUM_SIGNERS = 6;
 
-  before(async function () {
-    await receiverProgram.methods
-      .initialize()
-      .accounts({
-        reportState: latestReportState.publicKey,
-        signer: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .signers([latestReportState])
-      .rpc();
-  });
-
   // forwarder state data account
   const forwarderState = Keypair.generate();
 
@@ -362,6 +350,7 @@ describe("keystone_storage", function () {
   });
 
   it("Report", async () => {
+
     // use dummy receiver from setup
     const receiver = receiverProgram.programId;
 
@@ -402,6 +391,21 @@ describe("keystone_storage", function () {
       forwarderAuthorityBump,
       "forwarder authority PDA bumps should be equal"
     );
+
+    // begin initializing the receiver program
+
+    await receiverProgram.methods
+    .initialize()
+    .accounts({
+      reportState: latestReportState.publicKey,
+      signer: provider.wallet.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+      forwarderAuthority: forwarderAuthorityStorage
+    })
+    .signers([latestReportState])
+    .rpc();
+
+    // finish initializing the receiver program
 
     const [executionStateStorage, executionStateBump] =
       PublicKey.findProgramAddressSync(
