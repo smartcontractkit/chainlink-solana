@@ -8,7 +8,7 @@ use anchor_lang::error_code;
 // [0:100]   Global errors
 // [100:N]   Function errors
 
-// this "AuthError" is separated from the "McmError" for error type generation from "anchor-go" tool
+// this "AuthError" is separated from the "ForwarderError" for error type generation from "anchor-go" tool
 // Known issue: only the first error_code block is included in idl.errors field, and go bindings for this first errors not generated.
 // anchor-go generates types for error from the second error_code block onwards.
 // This might be a bug in anchor-go, should be revisited once program functionality is stable.
@@ -48,4 +48,7 @@ pub enum ForwarderError {
 
     #[msg("Execution already succeded")]
     ExecutionAlreadySucceded,
+
+    #[msg("Invalid Execution PDA")]
+    InvalidExecutionPDA,
 }

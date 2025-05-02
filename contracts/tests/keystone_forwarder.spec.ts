@@ -412,10 +412,7 @@ describe("keystone_storage", function () {
         program.programId
       );
 
-    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
-
-    const executionStateBumpBytes = Buffer.alloc(1);
-    executionStateBumpBytes.writeUint8(executionStateBump);
+    // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 
     const lenSignatureBytes = Buffer.alloc(1);
     lenSignatureBytes.writeUint8(defaultSigners.length);
@@ -474,10 +471,9 @@ describe("keystone_storage", function () {
     // they need to be packed as one buffer array
     const signaturesBytesPacked = Buffer.concat(signaturesBytes);
 
-    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
-    //  1 + 1 + (15*65) + 110 + 96
+    // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    //  1 + (15*65) + 110 + 96
     const dataBytes = Buffer.concat([
-      executionStateBumpBytes,
       lenSignatureBytes,
       signaturesBytesPacked,
       rawReportBytes,

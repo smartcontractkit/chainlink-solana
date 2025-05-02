@@ -91,19 +91,18 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    // data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
-        let num_signatures = data[1] as usize;
+        let num_signatures = data[0] as usize;
         require!(
             num_signatures <= MAX_REPORT_SIGNERS,
             ForwarderError::MaxSignersLimit
         );
 
-        // first u8 stores bump, second u8 stores the number of signatures
-        let min_data_size = 1 + 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
+        let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
         require!(data.len() > min_data_size, ForwarderError::InvalidReport);
 
@@ -117,11 +116,8 @@ pub mod keystone_forwarder {
             ForwarderError::InvalidSignatureCount
         );
 
-        // bump is calculated off-chain by the write target when computing the pda
-        let execution_state_bump = data[0];
-
         // extract signatures
-        let data = &data[2..];
+        let data = &data[1..];
         let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
 
         let signatures: &[u8] = &data[..total_signature_len];
@@ -138,7 +134,15 @@ pub mod keystone_forwarder {
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
 
+        // verify the execution state PDA
+        let (expected_pda, pda_bump) = Pubkey::find_program_address(
+            &[b"execution_state", &transmission_id],
+            &crate::ID,
+        );
+
         let execution_state = &ctx.accounts.execution_state;
+
+        require!(execution_state.key == &expected_pda, ForwarderError::InvalidExecutionPDA);
 
         if execution_state.data_is_empty() {
             let space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE;
@@ -148,7 +152,7 @@ pub mod keystone_forwarder {
             let seeds: &[&[u8]] = &[
                 b"execution_state",
                 &transmission_id,
-                &[execution_state_bump],
+                &[pda_bump],
             ];
 
             invoke_signed(
@@ -435,11 +439,10 @@ pub struct CloseOraclesConfig<'info> {
     pub owner: Signer<'info>, // must be the same owner as the one in the state account
 }
 
-// data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+// data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 fn extract_raw_report(data: &[u8]) -> &[u8] {
-    let _execution_state_bump = data[0];
-    let num_signatures = data[1] as usize;
-    let data = &data[2..];
+    let num_signatures = data[0] as usize;
+    let data = &data[1..];
     let _signatures = &data[..num_signatures * SIGNATURE_LEN];
     let data = &data[num_signatures * SIGNATURE_LEN..];
     let _report_context = &data[data.len() - REPORT_CONTEXT_LEN..];
@@ -498,7 +501,7 @@ pub struct Report<'info> {
             b"execution_state", 
             &extract_transmission_id(extract_raw_report(&data), receiver_program.key)
         ],
-        bump = data[0]
+        bump
     )]
     pub execution_state: UncheckedAccount<'info>,
 
