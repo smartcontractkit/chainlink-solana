@@ -411,10 +411,10 @@ github.com/smartcontractkit/chainlink-common v0.7.1-0.20250429205337-7ee5f91ed06
 github.com/smartcontractkit/chainlink-common v0.7.1-0.20250429205337-7ee5f91ed065/go.mod h1:vHs/mPpAztdKJtzRKLnmLinmpS78fBh9sAuyKqQrQ+I=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7 h1:9wh1G+WbXwPVqf0cfSRSgwIcaXTQgvYezylEAfwmrbw=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7/go.mod h1:yaDOAZF6MNB+NGYpxGCUc+owIdKrjvFW0JODdTcQ3V0=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250501141303-e13c3bbc8666 h1:W+Og7fQhYHvzRws5VdeSQACslvRsOlleuyTsoGMyv4s=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250501141303-e13c3bbc8666/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250501141303-e13c3bbc8666 h1:A0lGFiYxWMgdF2s+U4ouxCuJTnp5RAB0fAFLKNi6QPA=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250501141303-e13c3bbc8666/go.mod h1:4+ql4aCuHaTigkVbYUKEZ7uThseEngmeRLiFbVrZVtc=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250502185459-289048da2b15 h1:EoinNbk2RF7oTA/03R4Cet5h28Ne4vNUVQ8ilK/svME=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250502185459-289048da2b15/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250502185459-289048da2b15 h1:/elQD8gxgUza8E1beaCuCmOgEesvZc4jA/5oYcT/BV4=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250502185459-289048da2b15/go.mod h1:zYqPBBRUXUQ/L+aD4Q7phnYsfVeC5rDBXtPt1VYwtws=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0 h1:yGD0bRNoIQ9vOILzlYg4AiGKMKpJNqi7eIMpW7QIO9Y=
