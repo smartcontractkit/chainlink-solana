@@ -259,7 +259,7 @@ func (m *MultiNodeClient) acquireQueryCtx(parentCtx context.Context, timeout tim
 	return
 }
 
-func (m *MultiNodeClient) PingClientVersion(ctx context.Context) (string, error) {
+func (m *MultiNodeClient) ClientVersion(ctx context.Context) (string, error) {
 	version, err := m.rpc.GetVersion(ctx)
 	if err != nil {
 		return "", fmt.Errorf("ping failed: %v", err)
