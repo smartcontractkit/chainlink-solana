@@ -23,7 +23,7 @@ pub enum AuthError {
 #[error_code]
 pub enum ForwarderError {
     #[msg("Signers exceed max limit")]
-    MaxSignersLimit,
+    ExcessSigners,
 
     #[msg("Signer addresses must strictly increase")]
     SignersNotSortedInIncreasingOrder,
@@ -51,4 +51,10 @@ pub enum ForwarderError {
 
     #[msg("Invalid Execution PDA")]
     InvalidExecutionPDA,
+
+    #[msg("Fault tolerance must be positive")]
+    FaultToleranceMustBePositive,
+
+    #[msg("Insufficient Signers")]
+    InsufficientSigners
 }

@@ -303,7 +303,7 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    const signers = Array.from({ length: 2 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 4 }, () => generateEthKeypair());
     signers.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
@@ -411,6 +411,7 @@ describe("keystone_storage", function () {
       PublicKey.findProgramAddressSync(
         [
           Buffer.from(anchor.utils.bytes.utf8.encode("execution_state")),
+          forwarderState.publicKey.toBuffer(),
           transmissionIdBytes,
         ],
         program.programId

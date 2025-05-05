@@ -12,7 +12,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
 pub const REPORT_CONTEXT_LEN: usize = 96;
 
-pub const MAX_REPORT_SIGNERS: usize = 17;
+pub const MAX_ORACLES: usize = 17;
 
 pub const SIGNATURE_LEN: usize = 65;
 
@@ -98,8 +98,8 @@ pub mod keystone_forwarder {
     ) -> Result<()> {
         let num_signatures = data[0] as usize;
         require!(
-            num_signatures <= MAX_REPORT_SIGNERS,
-            ForwarderError::MaxSignersLimit
+            num_signatures <= MAX_ORACLES,
+            ForwarderError::ExcessSigners
         );
 
         let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
@@ -134,52 +134,11 @@ pub mod keystone_forwarder {
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
 
-        // verify the execution state PDA
-        let (expected_pda, pda_bump) = Pubkey::find_program_address(
-            &[b"execution_state", &transmission_id],
-            &crate::ID,
-        );
-
-        let execution_state = &ctx.accounts.execution_state;
-
-        require!(execution_state.key == &expected_pda, ForwarderError::InvalidExecutionPDA);
-
-        if execution_state.data_is_empty() {
-            let space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE;
-
-            let rent = Rent::get()?.minimum_balance(space);
-
-            let seeds: &[&[u8]] = &[
-                b"execution_state",
-                &transmission_id,
-                &[pda_bump],
-            ];
-
-            invoke_signed(
-                &system_instruction::create_account(
-                    ctx.accounts.transmitter.key,
-                    execution_state.key,
-                    rent,
-                    space as u64,
-                    ctx.program_id,
-                ),
-                &[
-                    ctx.accounts.transmitter.to_account_info(),
-                    execution_state.to_account_info(),
-                    ctx.accounts.system_program.to_account_info(),
-                ],
-                &[seeds],
-            )?;
-        } else {
-            // revert if execution succeded already
-
-            let execution_state_info = execution_state.to_account_info(); // or just AccountInfo
-            let state =
-                ExecutionState::try_deserialize(&mut &execution_state_info.data.borrow()[..])?;
-
-            require!(!state.success, ForwarderError::ExecutionAlreadySucceded)
-        }
-
+        
+        let execution_state = &mut ctx.accounts.execution_state;
+        
+        require!(!execution_state.success, ForwarderError::ExecutionAlreadySucceded);
+        
         // forward to the receiver program
         let forwarder_authority_pda = ctx.accounts.forwarder_authority.clone();
 
@@ -229,17 +188,13 @@ pub mod keystone_forwarder {
             &[ctx.accounts.state.authority_nonce],
         ];
 
-        let _ = invoke_signed(&ix, &account_infos, &[signers_seeds]);
+        invoke_signed(&ix, &account_infos, &[signers_seeds])?;
 
         // update execution state
-        let mut dst = execution_state.try_borrow_mut_data()?;
-        let execution_state = ExecutionState {
-            transmitter: ctx.accounts.transmitter.key(),
-            transmission_id,
-            success: true,
-        };
-        dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&ExecutionState::discriminator());
-        execution_state.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
+
+        execution_state.transmitter = ctx.accounts.transmitter.key();
+        execution_state.transmission_id = transmission_id;
+        execution_state.success = true;
 
         Ok(())
     }
@@ -254,7 +209,7 @@ fn verify_signatures(
 ) -> Result<()> {
     // ensure MAX_SIGNERS fit in the bits of uniques
     let mut uniques: u32 = 0;
-    assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_REPORT_SIGNERS as u32);
+    assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_ORACLES as u32);
 
     for sig in signatures.chunks(SIGNATURE_LEN) {
         // sig is [R || S || V] format where V is 0 or 1
@@ -290,10 +245,12 @@ fn set_oracles_config(
     f: u8,
     signer_addresses: Vec<[u8; 20]>,
 ) -> Result<()> {
+    require!(f > 0, ForwarderError::FaultToleranceMustBePositive);
     require!(
-        signer_addresses.len() <= MAX_REPORT_SIGNERS,
-        ForwarderError::MaxSignersLimit
+        signer_addresses.len() <= MAX_ORACLES,
+        ForwarderError::ExcessSigners
     );
+    require!(signer_addresses.len() > (3*f).into(), ForwarderError::InsufficientSigners);
 
     let mut prev_signer = [0u8; 20];
 
@@ -307,7 +264,7 @@ fn set_oracles_config(
         prev_signer = curr_signer;
     }
 
-    oracles_config.config_id = ((don_id as u64) << 32) | (config_version as u64);
+    oracles_config.config_id = get_config_id(don_id, config_version);
     oracles_config.f = f;
     oracles_config.signer_addresses = signer_addresses;
 
@@ -494,16 +451,18 @@ pub struct Report<'info> {
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
-    /// CHECK: existing account will be updated OR new account will be initialized
     #[account(
-        mut,
+        init_if_needed,
+        payer = transmitter,
+        space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [
             b"execution_state", 
+            state.key().as_ref(),
             &extract_transmission_id(extract_raw_report(&data), receiver_program.key)
         ],
         bump
     )]
-    pub execution_state: UncheckedAccount<'info>,
+    pub execution_state: Account<'info, ExecutionState>,
 
     #[account(executable)]
     /// CHECK: We don't use Program<> here since it can be any program, "executable" is enough
