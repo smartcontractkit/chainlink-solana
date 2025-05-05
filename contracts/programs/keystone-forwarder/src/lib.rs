@@ -12,6 +12,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
 pub const REPORT_CONTEXT_LEN: usize = 96;
 
+// our don size is directly limited by the transaction size during on_report's signature verification
 pub const MAX_ORACLES: usize = 17;
 
 pub const SIGNATURE_LEN: usize = 65;
@@ -29,7 +30,7 @@ pub mod keystone_forwarder {
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         // store forwarder PDA bump for later
-        let (_authority_pubkey, authority_nonce) = Pubkey::find_program_address(
+        let (_, authority_nonce) = Pubkey::find_program_address(
             &[b"forwarder", ctx.accounts.state.key().as_ref()],
             &crate::ID,
         );
@@ -272,17 +273,12 @@ fn set_oracles_config(
 }
 
 #[account]
-#[derive(Default)]
+#[derive(Default, InitSpace)]
 pub struct ForwarderState {
     pub version: u8,
     pub authority_nonce: u8, // bump
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-}
-
-impl ForwarderState {
-    // version + authority_nonce + owner + proposed_owner + vec prefix for config vec
-    pub const SPACE: usize = 1 + 1 + 32 + 32;
 }
 
 #[derive(Accounts)]
@@ -291,7 +287,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + ForwarderState::SPACE
+        space = ANCHOR_DISCRIMINATOR + ForwarderState::INIT_SPACE
     )]
     pub state: Account<'info, ForwarderState>,
     #[account(mut)]
