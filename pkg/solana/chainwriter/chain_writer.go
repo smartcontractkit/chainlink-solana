@@ -362,7 +362,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		options = append(options, txmutils.SetDependencyTxID(ataUUID))
 	}
 
-	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", transactionID)
+	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {

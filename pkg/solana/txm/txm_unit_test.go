@@ -173,12 +173,12 @@ func TestTxm_ProcessError(t *testing.T) {
 			},
 		}
 		// returns no failure if BlockhashNotFound encountered during simulation
-		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true)
+		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true, "")
 		require.Equal(t, solanatxm.NoFailure, errType)
 		require.Equal(t, txmutils.NotFound, txState) // default enum value
 
 		// returns error if BlockhashNotFound encountered during normal processing
-		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false)
+		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false, "")
 		require.Equal(t, solanatxm.TxFailRevert, errType)
 		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
@@ -190,12 +190,12 @@ func TestTxm_ProcessError(t *testing.T) {
 			},
 		}
 		// returns no failure if AlreadyProcessed encountered during simulation
-		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true)
+		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true, "")
 		require.Equal(t, solanatxm.NoFailure, errType)
 		require.Equal(t, txmutils.NotFound, txState) // default enum value
 
 		// returns error if AlreadyProcessed encountered during normal processing
-		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false)
+		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false, "")
 		require.Equal(t, solanatxm.TxFailRevert, errType)
 		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
@@ -216,12 +216,12 @@ func TestTxm_ProcessError(t *testing.T) {
 					},
 				}
 				// returns fatal error if InstructionError encountered during simulation
-				txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true)
+				txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true, "")
 				require.Equal(t, solanatxm.TxFailSimRevert, errType)
 				require.Equal(t, txmutils.FatallyErrored, txState) // default enum value
 
 				// returns fatal error if InstructionError encountered during normal processing
-				txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false)
+				txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false, "")
 				require.Equal(t, solanatxm.TxFailRevert, errType)
 				require.Equal(t, txmutils.FatallyErrored, txState) // default enum value
 			})
@@ -235,12 +235,12 @@ func TestTxm_ProcessError(t *testing.T) {
 			},
 		}
 		// returns fatal error if InstructionError encountered during simulation
-		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true)
+		txState, errType := txm.ProcessError(ctx, solana.Signature{}, err, true, "")
 		require.Equal(t, solanatxm.TxFailSimOther, errType)
 		require.Equal(t, txmutils.Errored, txState) // default enum value
 
 		// returns fatal error if InstructionError encountered during normal processing
-		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false)
+		txState, errType = txm.ProcessError(ctx, solana.Signature{}, err, false, "")
 		require.Equal(t, solanatxm.TxFailRevert, errType)
 		require.Equal(t, txmutils.Errored, txState) // default enum value
 	})
