@@ -259,13 +259,13 @@ func (m *MultiNodeClient) acquireQueryCtx(parentCtx context.Context, timeout tim
 	return
 }
 
-func (m *MultiNodeClient) Ping(ctx context.Context) error {
+func (m *MultiNodeClient) ClientVersion(ctx context.Context) (string, error) {
 	version, err := m.rpc.GetVersion(ctx)
 	if err != nil {
-		return fmt.Errorf("ping failed: %v", err)
+		return "", fmt.Errorf("ping failed: %v", err)
 	}
 	m.log.Debugf("ping client version: %s", version.SolanaCore)
-	return err
+	return version.SolanaCore, nil
 }
 
 func (m *MultiNodeClient) IsSyncing(ctx context.Context) (bool, error) {

@@ -27,9 +27,10 @@ func initializeMultiNodeClient(t *testing.T) *MultiNodeClient {
 	return c
 }
 
-func TestMultiNodeClient_Ping(t *testing.T) {
+func TestMultiNodeClient_ClientVersion(t *testing.T) {
 	c := initializeMultiNodeClient(t)
-	require.NoError(t, c.Ping(t.Context()))
+	_, err := c.ClientVersion(t.Context())
+	require.NoError(t, err)
 }
 
 func TestMultiNodeClient_LatestBlock(t *testing.T) {
