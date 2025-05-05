@@ -1016,7 +1016,7 @@ func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr
 		logValues := []interface{}{
 			"signature", sig,
 			"error", resErr,
-			"txID", txID,
+			"transactionID", txID,
 		}
 		txm.lggr.Infow(errStr, logValues...)
 		// return TxFailRevert on any error if when processing error during confirmation
