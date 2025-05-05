@@ -27,23 +27,24 @@ pub struct Report<'info> {
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
-    /// CHECK: existing account will be updated OR new account will be initialized
     #[account(
-        mut, 
+        init_if_needed,
+        payer = transmitter,
+        space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [
             b"execution_state", 
+            state.key().as_ref(),
             &extract_transmission_id(extract_raw_report(&data), receiver_program.key)
-        ], 
-        bump = data[0]
+        ],
+        bump
     )]
-    pub execution_state: UncheckedAccount<'info>,
+    pub execution_state: Account<'info, ExecutionState>,
 
     #[account(executable)]
     /// CHECK: We don't use Program<> here since it can be any program, "executable" is enough
     pub receiver_program: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
-
     // remaining accounts passed to receiver
 }
 ```
@@ -86,10 +87,8 @@ If everything looks good, it'll begin constructing the CPI instruction. The repo
 The report function takes a raw data buffer `Vec<u8>` with a custom encoding format to save space
 
 ```
-data =  bump (1) | len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 ```
-
-`bump` is the execution state bump, which needs to be passed into the instruction in order to dynamically create the PDA account if necessary.
 
 The `report_context` is extra information about the report that is included before signing the entire report blob.
 
@@ -137,26 +136,26 @@ We use ALTs (address lookup tables) for the following accounts for a hypothetica
 * system program
 * receiver data account state which stores some arbitrary data (part of ctx.remaining_accounts)
 
-This uses 902 bytes, so we have 1232 - 902 = 330 bytes left over for the payload. 
+This uses 901 bytes, so we have 1232 - 901 = 331 bytes left over for the payload. 
 
-This 330 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 332 bytes with a clean slate.
+This 331 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 333 bytes with a clean slate.
 
 In an internal data feeds use case we can assume that the receiver program is static and that the data accounts we are writing to per price asset are also static. However, a realistic use case would definitely have extra data accounts passed into ctx.remaining_accounts. 
 
 So for internal data feeds use case:
 ```
-max_payload_size = 332 - (ctx.remaining_accounts.len())
+max_payload_size = 333 - (ctx.remaining_accounts.len())
 ```
 
 For an external use-case, for an arbitrary receiver, the user will need to pass in another ALT (Solana can support passing 4 ALTs per transaction) on top of the internal ALT we always pass in. So we lose 32 bytes. Assuming the user also puts the receiver program and extra data accounts in their personal ALT:
 ```
-max_payload_size = 332 - 32 = 300 - (ctx.remaining_accounts.len())
+max_payload_size = 333 - 32 = 301 - (ctx.remaining_accounts.len())
 ```
 
 If they don't pass in another ALT:
 
 ```
-max_payload_size = 332 - 32 - 32*(ctx.remaining_accounts.len()) = 300 - 32*(ctx.remaining_accounts.len()) 
+max_payload_size = 333 - 32 - 32*(ctx.remaining_accounts.len()) = 301 - 32*(ctx.remaining_accounts.len()) 
 ```
 (the first 32 bytes is deducted for the receiver account address)
 
