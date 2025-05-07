@@ -21,10 +21,9 @@ pub mod dummy_receiver {
         metadata: Vec<u8>,
         report: Vec<u8>,
     ) -> Result<()> {
-
-        // verify 
+        // verify
         // 1. forwarder authority signer belongs to (is a PDA derived from) forwarder state (done in the anchor constraint!)
-        // 2. forwarder authority signer is authorized by this program 
+        // 2. forwarder authority signer is authorized by this program
         // 3. report metadata (not done in this dummy example)
 
         // 2
@@ -98,6 +97,5 @@ pub struct OnReport<'info> {
 
     #[account(mut)]
     pub report_state: Account<'info, LatestReport>,
-
     // remaining accounts may be passed in
 }

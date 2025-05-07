@@ -1,7 +1,7 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::hash;
 
-use crate::common::{SIGNATURE_LEN, REPORT_CONTEXT_LEN};
+use crate::common::{REPORT_CONTEXT_LEN, SIGNATURE_LEN};
 
 pub fn get_config_id(don_id: u32, config_version: u32) -> u64 {
     ((don_id as u64) << 32) | (config_version as u64)

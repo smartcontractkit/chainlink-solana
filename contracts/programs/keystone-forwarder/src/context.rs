@@ -1,8 +1,8 @@
-use anchor_lang::prelude::*;
 use crate::common::ANCHOR_DISCRIMINATOR;
-use crate::state::{ForwarderState, ExecutionState, OraclesConfig};
 use crate::error::AuthError;
-use crate::utils::{get_config_id, extract_config_id, extract_raw_report, extract_transmission_id};
+use crate::state::{ExecutionState, ForwarderState, OraclesConfig};
+use crate::utils::{extract_config_id, extract_raw_report, extract_transmission_id, get_config_id};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

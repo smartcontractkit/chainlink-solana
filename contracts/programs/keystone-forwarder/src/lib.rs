@@ -1,15 +1,18 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
 
+use common::{
+    FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, REPORT_CONTEXT_LEN, SIGNATURE_LEN,
+    STATE_VERSION,
+};
 use context::*;
-pub use state::{ForwarderState, ExecutionState, OraclesConfig};
-use utils::{get_config_id, extract_transmission_id};
-use common::{STATE_VERSION, REPORT_CONTEXT_LEN, MAX_ORACLES, SIGNATURE_LEN, FORWARDER_METADATA_LENGTH, METADATA_LENGTH};
 pub use error::*;
+pub use state::{ExecutionState, ForwarderState, OraclesConfig};
+use utils::{extract_transmission_id, get_config_id};
 
-mod error;
-mod context;
 mod common;
+mod context;
+mod error;
 mod state;
 mod utils;
 
@@ -122,11 +125,13 @@ pub mod keystone_forwarder {
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
 
-        
         let execution_state = &mut ctx.accounts.execution_state;
-        
-        require!(!execution_state.success, ForwarderError::ExecutionAlreadySucceded);
-        
+
+        require!(
+            !execution_state.success,
+            ForwarderError::ExecutionAlreadySucceded
+        );
+
         // forward to the receiver program
         let forwarder_authority_pda = ctx.accounts.forwarder_authority.clone();
 
@@ -238,7 +243,10 @@ fn set_oracles_config(
         signer_addresses.len() <= MAX_ORACLES,
         ForwarderError::ExcessSigners
     );
-    require!(signer_addresses.len() > (3*f).into(), ForwarderError::InsufficientSigners);
+    require!(
+        signer_addresses.len() > (3 * f).into(),
+        ForwarderError::InsufficientSigners
+    );
 
     let mut prev_signer = [0u8; 20];
 

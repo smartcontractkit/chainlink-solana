@@ -59,27 +59,25 @@ describe("keystone_storage", function () {
   const latestReportState = Keypair.generate();
 
   // in BFT algorithm with N nodes, the maximum # of faulty nodes you can stomach is f where
-  // f = floor(N / 3) 
-  // 
+  // f = floor(N / 3)
+  //
   // conversely, if you decide to support f faulty nodes, then
-  // the DON size you can need to ensure BFT is N >= 3*f + 1, 
+  // the DON size you can need to ensure BFT is N >= 3*f + 1,
   // where we choose N = 3*f + 1 for convinience.
 
-  // with an f chosen, we need at elast f + 1 signatures to verify in the "report", 
+  // with an f chosen, we need at elast f + 1 signatures to verify in the "report",
 
   // if f + 1 = 6 , then N >= 16
   // if f + 1 = 7, then N >= 19
 
   const N = 16;
-  const f = Math.floor(N/3);
+  const f = Math.floor(N / 3);
 
   // forwarder state data account
   const forwarderState = Keypair.generate();
 
   let defaultOraclesConfigStorage: anchor.web3.PublicKey;
-  const defaultSigners = Array.from({ length: N }, () =>
-    generateEthKeypair()
-  );
+  const defaultSigners = Array.from({ length: N }, () => generateEthKeypair());
   defaultSigners.sort((a, b) => {
     return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
   });
@@ -232,7 +230,7 @@ describe("keystone_storage", function () {
     // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
-    const initialEthAddresses =  signerEthAddresses.slice(0, 4)
+    const initialEthAddresses = signerEthAddresses.slice(0, 4);
 
     // f = 1, N = 4 initially
     await program.methods
@@ -263,7 +261,7 @@ describe("keystone_storage", function () {
       )
     );
 
-    // update to new f 
+    // update to new f
     await program.methods
       .updateOraclesConfig(
         new BN(7),
@@ -283,7 +281,11 @@ describe("keystone_storage", function () {
       oraclesConfigStorage
     );
 
-    assert.equal(configId, actualUpdatedConfig.configId, "config ids should equal");
+    assert.equal(
+      configId,
+      actualUpdatedConfig.configId,
+      "config ids should equal"
+    );
     assert.equal(f, actualUpdatedConfig.f, "f should equal");
     assert.isTrue(
       actualUpdatedConfig.signerAddresses.every((addr, i) =>
@@ -319,19 +321,19 @@ describe("keystone_storage", function () {
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
     const ix = await program.methods
-    .initOraclesConfig(
-      new BN(9),
-      new BN(2),
-      new BN(1),
-      signerEthAddresses as any
-    )
-    .accounts({
-      state: forwarderState.publicKey,
-      oraclesConfig: oraclesConfigStorage,
-      owner: provider.wallet.publicKey,
-      systemProgram: anchor.web3.SystemProgram.programId,
-    })
-    .instruction()
+      .initOraclesConfig(
+        new BN(9),
+        new BN(2),
+        new BN(1),
+        signerEthAddresses as any
+      )
+      .accounts({
+        state: forwarderState.publicKey,
+        oraclesConfig: oraclesConfigStorage,
+        owner: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
 
     const message = new TransactionMessage({
       payerKey: provider.wallet.publicKey, // Account paying for the transaction
@@ -349,8 +351,6 @@ describe("keystone_storage", function () {
     // console.log(`tx size w/ 17 nodes ${serializedTx.length}`);
 
     await provider.sendAndConfirm(signedTx);
-
-
 
     const actualConfig = await program.account.oraclesConfig.fetch(
       oraclesConfigStorage
@@ -421,15 +421,15 @@ describe("keystone_storage", function () {
     // begin initializing the receiver program
 
     await receiverProgram.methods
-    .initialize()
-    .accounts({
-      reportState: latestReportState.publicKey,
-      signer: provider.wallet.publicKey,
-      systemProgram: anchor.web3.SystemProgram.programId,
-      forwarderAuthority: forwarderAuthorityStorage
-    })
-    .signers([latestReportState])
-    .rpc();
+      .initialize()
+      .accounts({
+        reportState: latestReportState.publicKey,
+        signer: provider.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        forwarderAuthority: forwarderAuthorityStorage,
+      })
+      .signers([latestReportState])
+      .rpc();
 
     // finish initializing the receiver program
 
@@ -446,7 +446,7 @@ describe("keystone_storage", function () {
     // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 
     // signers for the report only need to be f + 1
-    const signers = defaultSigners.slice(0, f+1);
+    const signers = defaultSigners.slice(0, f + 1);
 
     const lenSignatureBytes = Buffer.alloc(1);
     lenSignatureBytes.writeUint8(signers.length);

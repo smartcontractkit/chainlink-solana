@@ -56,5 +56,5 @@ pub enum ForwarderError {
     FaultToleranceMustBePositive,
 
     #[msg("Insufficient Signers")]
-    InsufficientSigners
+    InsufficientSigners,
 }
