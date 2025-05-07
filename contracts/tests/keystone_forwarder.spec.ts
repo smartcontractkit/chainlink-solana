@@ -58,14 +58,26 @@ describe("keystone_storage", function () {
     .DummyReceiver as Program<DummyReceiver>;
   const latestReportState = Keypair.generate();
 
-  // if N <= 16, then f = 5 so we need f + 1 (6) signers for BFT
-  const NUM_SIGNERS = 6;
+  // in BFT algorithm with N nodes, the maximum # of faulty nodes you can stomach is f where
+  // f = floor(N / 3) 
+  // 
+  // conversely, if you decide to support f faulty nodes, then
+  // the DON size you can need to ensure BFT is N >= 3*f + 1, 
+  // where we choose N = 3*f + 1 for convinience.
+
+  // with an f chosen, we need at elast f + 1 signatures to verify in the "report", 
+
+  // if f + 1 = 6 , then N >= 16
+  // if f + 1 = 7, then N >= 19
+
+  const N = 16;
+  const f = Math.floor(N/3);
 
   // forwarder state data account
   const forwarderState = Keypair.generate();
 
   let defaultOraclesConfigStorage: anchor.web3.PublicKey;
-  const defaultSigners = Array.from({ length: NUM_SIGNERS }, () =>
+  const defaultSigners = Array.from({ length: N }, () =>
     generateEthKeypair()
   );
   defaultSigners.sort((a, b) => {
@@ -220,12 +232,15 @@ describe("keystone_storage", function () {
     // const signerEthAddresses = signers.map(s => ( new Uint8Array(s.ethereumAddress) ))
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
+    const initialEthAddresses =  signerEthAddresses.slice(0, 4)
+
+    // f = 1, N = 4 initially
     await program.methods
       .initOraclesConfig(
         new BN(7),
         new BN(3),
         new BN(1),
-        signerEthAddresses as any
+        initialEthAddresses as any
       )
       .accounts({
         state: forwarderState.publicKey,
@@ -241,27 +256,20 @@ describe("keystone_storage", function () {
 
     assert.equal(configId, actualConfig.configId, "config ids should equal");
     assert.equal(1, actualConfig.f, "f should equal");
+    assert.equal(actualConfig.signerAddresses.length, 4, "4 signer addresses");
     assert.isTrue(
       actualConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(signerEthAddresses[i])
+        Buffer.from(addr).equals(initialEthAddresses[i])
       )
     );
 
-    const updatedSigners = Array.from({ length: 15 }, () =>
-      generateEthKeypair()
-    );
-    updatedSigners.sort((a, b) => {
-      return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
-    });
-
-    const updatedSignerEthAddresses = signers.map((s) => s.ethereumAddress);
-
+    // update to new f 
     await program.methods
       .updateOraclesConfig(
         new BN(7),
         new BN(3),
-        new BN(1),
-        updatedSignerEthAddresses as any
+        new BN(f),
+        signerEthAddresses as any
       )
       .accounts({
         state: forwarderState.publicKey,
@@ -275,11 +283,11 @@ describe("keystone_storage", function () {
       oraclesConfigStorage
     );
 
-    assert.equal(configId, actualConfig.configId, "config ids should equal");
-    assert.equal(1, actualConfig.f, "f should equal");
+    assert.equal(configId, actualUpdatedConfig.configId, "config ids should equal");
+    assert.equal(f, actualUpdatedConfig.f, "f should equal");
     assert.isTrue(
       actualUpdatedConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(updatedSignerEthAddresses[i])
+        Buffer.from(addr).equals(signerEthAddresses[i])
       )
     );
   });
@@ -303,27 +311,46 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    const signers = Array.from({ length: 4 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 17 }, () => generateEthKeypair());
     signers.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
 
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
-    await program.methods
-      .initOraclesConfig(
-        new BN(9),
-        new BN(2),
-        new BN(1),
-        signerEthAddresses as any
-      )
-      .accounts({
-        state: forwarderState.publicKey,
-        oraclesConfig: oraclesConfigStorage,
-        owner: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
+    const ix = await program.methods
+    .initOraclesConfig(
+      new BN(9),
+      new BN(2),
+      new BN(1),
+      signerEthAddresses as any
+    )
+    .accounts({
+      state: forwarderState.publicKey,
+      oraclesConfig: oraclesConfigStorage,
+      owner: provider.wallet.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .instruction()
+
+    const message = new TransactionMessage({
+      payerKey: provider.wallet.publicKey, // Account paying for the transaction
+      recentBlockhash: (await provider.connection.getLatestBlockhash())
+        .blockhash, // Latest blockhash
+      instructions: [ix], // Instructions to be included in the transaction
+    }).compileToV0Message();
+
+    const tx = new VersionedTransaction(message);
+
+    const signedTx = await provider.wallet.signTransaction(tx);
+
+    const serializedTx = signedTx.serialize();
+
+    // console.log(`tx size w/ 17 nodes ${serializedTx.length}`);
+
+    await provider.sendAndConfirm(signedTx);
+
+
 
     const actualConfig = await program.account.oraclesConfig.fetch(
       oraclesConfigStorage
@@ -350,7 +377,6 @@ describe("keystone_storage", function () {
   });
 
   it("Report", async () => {
-
     // use dummy receiver from setup
     const receiver = receiverProgram.programId;
 
@@ -419,8 +445,11 @@ describe("keystone_storage", function () {
 
     // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 
+    // signers for the report only need to be f + 1
+    const signers = defaultSigners.slice(0, f+1);
+
     const lenSignatureBytes = Buffer.alloc(1);
-    lenSignatureBytes.writeUint8(defaultSigners.length);
+    lenSignatureBytes.writeUint8(signers.length);
 
     // metadata length + actual report payload length
     const rawReportBytes = Buffer.alloc(109 + 1);
@@ -463,7 +492,7 @@ describe("keystone_storage", function () {
       .update(Buffer.concat([rawReportBytes, reportContextBytes]))
       .digest();
 
-    const signaturesInfo = defaultSigners.map((s) =>
+    const signaturesInfo = signers.map((s) =>
       signMessage(msgHashToSign, s.secretKey)
     );
 
@@ -609,7 +638,7 @@ describe("keystone_storage", function () {
     const signedTx = await provider.wallet.signTransaction(tx);
 
     const txSerial = signedTx.serialize();
-    console.log("the size of the tx", txSerial.length);
+    console.log(`"report" tx size w/ ${f + 1} signers`, txSerial.length);
 
     // delay in order to activate lookup table
     await sleep(3000);
