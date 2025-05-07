@@ -90,11 +90,6 @@ pub mod keystone_forwarder {
         data: Vec<u8>,
     ) -> Result<()> {
         let num_signatures = data[0] as usize;
-        require!(
-            num_signatures <= MAX_ORACLES,
-            ForwarderError::ExcessSigners
-        );
-
         let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
         require!(data.len() > min_data_size, ForwarderError::InvalidReport);
