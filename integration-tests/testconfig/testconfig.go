@@ -3,13 +3,12 @@ package testconfig
 import (
 	"embed"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
-
-	"errors"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -435,7 +434,7 @@ func (c *Common) Validate() error {
 		}
 
 	default:
-		return fmt.Errorf("network must be either 'localnet' or 'devnet'")
+		return fmt.Errorf("network must be either 'localnet' or 'devnet', but got %s", *c.Network)
 	}
 
 	if c.InsideK8s == nil {

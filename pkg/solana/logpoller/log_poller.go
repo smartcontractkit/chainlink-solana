@@ -229,6 +229,8 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			log.ExpiresAt = &expiresAt
 		}
 
+		lp.lggr.Infof("found matching event %v", log)
+
 		logs = append(logs, log)
 	}
 	if len(logs) == 0 {
@@ -314,10 +316,10 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 		return 0, err
 	}
 	if lookbackSlot > lastProcessed {
-		lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 		return lookbackSlot, nil
 	}
-	lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead to slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+	lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
 	return lastProcessed, nil
 }
@@ -402,6 +404,7 @@ consumedAllBlocks:
 
 			batch := []Block{block}
 			batch = appendBuffered(blocks, blocksChBuffer, batch)
+			lp.lggr.Infof("processing batch of %d blocks: [slots %d-%d]", len(batch), batch[0].SlotNumber, batch[len(batch)-1].SlotNumber)
 			err = lp.processBlocks(ctx, batch)
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)

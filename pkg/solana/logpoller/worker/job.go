@@ -18,6 +18,7 @@ type retryableJob struct {
 	count uint8
 	when  time.Time
 	job   Job
+	errs  []error
 }
 
 func (j retryableJob) String() string {
@@ -26,4 +27,9 @@ func (j retryableJob) String() string {
 
 func (j retryableJob) Run(ctx context.Context) error {
 	return j.job.Run(ctx)
+}
+
+type failedJob struct {
+	Job Job
+	Err error
 }

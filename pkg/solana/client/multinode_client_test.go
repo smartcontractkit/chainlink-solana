@@ -6,18 +6,15 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 func initializeMultiNodeClient(t *testing.T) *MultiNodeClient {
 	url := SetupLocalSolNode(t)
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	pubKey := privKey.PublicKey()
-	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -30,9 +27,10 @@ func initializeMultiNodeClient(t *testing.T) *MultiNodeClient {
 	return c
 }
 
-func TestMultiNodeClient_Ping(t *testing.T) {
+func TestMultiNodeClient_ClientVersion(t *testing.T) {
 	c := initializeMultiNodeClient(t)
-	require.NoError(t, c.Ping(t.Context()))
+	_, err := c.ClientVersion(t.Context())
+	require.NoError(t, err)
 }
 
 func TestMultiNodeClient_LatestBlock(t *testing.T) {

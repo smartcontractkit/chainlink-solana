@@ -88,6 +88,28 @@ func NewExtendLookupTableInstruction(
 }
 
 func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rpc.Client) {
+	fundAccounts(t, accounts, solanaGoClient, waitAndRetryOpts{
+		RemainingAttempts: 5,
+		Timeout:           30 * time.Second,
+		Timestep:          500 * time.Millisecond,
+	})
+}
+
+type waitAndRetryOpts struct {
+	RemainingAttempts uint
+	Timeout           time.Duration
+	Timestep          time.Duration
+}
+
+func (o waitAndRetryOpts) WithDecreasedAttempts() waitAndRetryOpts {
+	return waitAndRetryOpts{
+		RemainingAttempts: o.RemainingAttempts - 1,
+		Timeout:           o.Timeout,
+		Timestep:          o.Timestep,
+	}
+}
+
+func fundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rpc.Client, opts waitAndRetryOpts) {
 	ctx := t.Context()
 	sigs := []solana.Signature{}
 	for _, v := range accounts {
@@ -97,27 +119,34 @@ func FundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rp
 	}
 
 	// wait for confirmation so later transactions don't fail
-	remaining := len(sigs)
-	count := 0
-	for remaining > 0 {
-		count++
+	remaining := accounts
+	initTime := time.Now()
+	for elapsed := time.Since(initTime); elapsed < opts.Timeout; elapsed = time.Since(initTime) {
+		time.Sleep(opts.Timestep)
+
 		statusRes, sigErr := solanaGoClient.GetSignatureStatuses(ctx, true, sigs...)
 		require.NoError(t, sigErr)
 		require.NotNil(t, statusRes)
 		require.NotNil(t, statusRes.Value)
 
-		unconfirmedTxCount := 0
-		for _, res := range statusRes.Value {
+		accountsWithNonFinalizedFunding := []solana.PrivateKey{}
+		for i, res := range statusRes.Value {
 			if res == nil || res.ConfirmationStatus == rpc.ConfirmationStatusProcessed || res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed {
-				unconfirmedTxCount++
+				accountsWithNonFinalizedFunding = append(accountsWithNonFinalizedFunding, accounts[i])
 			}
 		}
-		remaining = unconfirmedTxCount
+		remaining = accountsWithNonFinalizedFunding
 
-		time.Sleep(500 * time.Millisecond)
-		if count > 60 {
-			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
+		if len(remaining) == 0 {
+			return // all done!
 		}
+	}
+
+	decreasedOpts := opts.WithDecreasedAttempts()
+	if decreasedOpts.RemainingAttempts == 0 {
+		require.NoError(t, fmt.Errorf("[%s]: unable to find transactions after all attempts", t.Name()))
+	} else {
+		fundAccounts(t, remaining, solanaGoClient, decreasedOpts) // recursive call with only remaining & with fewer attempts
 	}
 }
 

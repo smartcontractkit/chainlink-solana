@@ -54,7 +54,7 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 				})
 			}
 
-			state.DeployCluster(utils.ContractsDir)
+			state.DeployCluster(t, utils.ContractsDir)
 
 			if state.Common.Env.WillUseRemoteRunner() {
 				return

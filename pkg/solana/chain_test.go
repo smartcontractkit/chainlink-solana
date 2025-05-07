@@ -282,8 +282,7 @@ func TestChain_Transact(t *testing.T) {
 	receiver, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	amount := big.NewInt(100_000_000_000 - 5_000) // total balance - tx fee
-	err = client.FundTestAccountsWithError(t, solana.PublicKeySlice{sender.PublicKey()}, url)
-	require.NoError(t, err)
+	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
 
 	// configuration
 	cfg := solcfg.NewDefault()
@@ -343,11 +342,14 @@ func TestChain_Transact(t *testing.T) {
 }
 
 func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
+	triedSelectingMismatchNode := false
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out := fmt.Sprintf(TestSolanaGenesisHashTemplate, client.MainnetGenesisHash) // mainnet genesis hash
 		if !strings.Contains(r.URL.Path, "/mismatch") {
 			// devnet gensis hash
 			out = fmt.Sprintf(TestSolanaGenesisHashTemplate, client.DevnetGenesisHash)
+		} else {
+			triedSelectingMismatchNode = true
 		}
 		_, err := w.Write([]byte(out))
 		require.NoError(t, err)
@@ -366,12 +368,19 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	}
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("devnet"),
-			URL:  config.MustParseURL(mockServer.URL + "/1"),
+			Name:  ptr("devnet"),
+			URL:   config.MustParseURL(mockServer.URL + "/1"),
+			Order: ptr(int32(2)),
 		},
 		{
-			Name: ptr("devnet"),
-			URL:  config.MustParseURL(mockServer.URL + "/2"),
+			Name:  ptr("devnet"),
+			URL:   config.MustParseURL(mockServer.URL + "/2"),
+			Order: ptr(int32(2)),
+		},
+		{
+			Name:  ptr("devnet"),
+			URL:   config.MustParseURL(mockServer.URL + "/mismatch"),
+			Order: ptr(int32(1)), // Try to select bad node first with priority selection mode
 		},
 	}
 
@@ -391,6 +400,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	id, err := selectedClient.ChainID(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, client.DevnetGenesisHash, id.String())
+	require.True(t, triedSelectingMismatchNode)
 }
 
 func TestChain_MultiNode_TransactionSender(t *testing.T) {

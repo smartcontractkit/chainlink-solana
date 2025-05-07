@@ -104,7 +104,7 @@ type ContractsState struct {
 	OCRVault      string `json:"ocr_vault"`
 }
 
-func (m *OCRv2TestState) DeployCluster(contractsDir string) {
+func (m *OCRv2TestState) DeployCluster(t *testing.T, contractsDir string) {
 	if *m.Config.TestConfig.Common.InsideK8s {
 		m.DeployEnv(contractsDir)
 
@@ -127,7 +127,7 @@ func (m *OCRv2TestState) DeployCluster(contractsDir string) {
 	} else {
 		env, err := test_env.NewTestEnv()
 		require.NoError(m.Config.T, err)
-		sol := testenvsol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey)
+		sol := testenvsol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey).WithTestLogger(t)
 		err = sol.StartContainer()
 		require.NoError(m.Config.T, err)
 

@@ -1,4 +1,4 @@
-package worker_test
+package worker
 
 import (
 	"context"
@@ -6,21 +6,21 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
 func TestWorkerGroup(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
+	group := NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -55,7 +55,7 @@ func TestWorkerGroup(t *testing.T) {
 
 func TestWorkerGroup_Retry(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
+	group := NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 	t.Cleanup(func() {
@@ -107,9 +107,33 @@ func TestWorkerGroup_Retry(t *testing.T) {
 	})
 }
 
+func TestWorkerGroup_CriticalErrorOnFailingJob(t *testing.T) {
+	ctx := t.Context()
+	lggr, observed := logger.TestObservedSugared(t, zapcore.DPanicLevel)
+	group := NewGroup(1, lggr)
+	group.maxRetryCount = 2
+	require.NoError(t, group.Start(ctx))
+	t.Cleanup(func() {
+		require.NoError(t, group.Close())
+	})
+
+	var counter atomic.Int64
+	failingJob := testJob{
+		job: func(ctx context.Context) error {
+			attempt := counter.Add(1)
+			return fmt.Errorf("RPC error %d", attempt)
+		},
+	}
+
+	err := group.Do(t.Context(), failingJob)
+	require.NoError(t, err)
+
+	tests.AssertLogEventually(t, observed, "job testJob failed 3 times in a row, next retry in 800ms. Resolution most likely requires manual intervention. Errors: RPC error 1\nRPC error 2\nRPC error 3")
+}
+
 func TestWorkerGroup_Close(t *testing.T) {
 	ctx := t.Context()
-	group := worker.NewGroup(5, logger.Sugared(logger.Nop()))
+	group := NewGroup(5, logger.Sugared(logger.Nop()))
 
 	require.NoError(t, group.Start(ctx))
 
@@ -176,7 +200,7 @@ func TestWorkerGroup_Close(t *testing.T) {
 func TestWorkerGroup_DoContext(t *testing.T) {
 	t.Run("will not add to queue", func(t *testing.T) {
 		ctx := t.Context()
-		group := worker.NewGroup(2, logger.Sugared(logger.Nop()))
+		group := NewGroup(2, logger.Sugared(logger.Nop()))
 		job := testJob{job: func(ctx context.Context) error { return nil }}
 
 		require.NoError(t, group.Start(ctx))
@@ -187,13 +211,13 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 			// calling cancel before calling Do should result in an error
 			cancel()
 
-			require.ErrorIs(t, group.Do(ctxB, job), worker.ErrContextCancelled)
+			require.ErrorIs(t, group.Do(ctxB, job), ErrContextCancelled)
 		})
 
 		t.Run("if queue closed", func(t *testing.T) {
 			require.NoError(t, group.Close())
 
-			require.ErrorIs(t, group.Do(ctx, job), worker.ErrProcessStopped)
+			require.ErrorIs(t, group.Do(ctx, job), ErrProcessStopped)
 		})
 	})
 }
@@ -201,7 +225,7 @@ func TestWorkerGroup_DoContext(t *testing.T) {
 func BenchmarkWorkerGroup(b *testing.B) {
 	ctx := b.Context()
 
-	group := worker.NewGroup(100, logger.Sugared(logger.Nop()))
+	group := NewGroup(100, logger.Sugared(logger.Nop()))
 	job := testJob{job: func(ctx context.Context) error { return nil }}
 
 	require.NoError(b, group.Start(ctx))

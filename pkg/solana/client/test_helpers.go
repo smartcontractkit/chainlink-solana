@@ -2,6 +2,8 @@ package client
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"testing"
@@ -32,13 +34,15 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 
 	faucetPort := utils.MustRandomPort(t)
 	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1)
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
 		"--rpc-port", port,
 		"--faucet-port", faucetPort,
 		"--ledger", t.TempDir(),
+		// Configurations to make the local cluster faster
+		"--ticks-per-slot", "8", // value in mainnet: 64
 	}, flags...)
 
 	cmd := exec.Command("solana-test-validator", args...)
@@ -51,7 +55,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	t.Cleanup(func() {
 		assert.NoError(t, cmd.Process.Kill())
 		if err2 := cmd.Wait(); assert.Error(t, err2) {
-			if !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
+			if t.Failed() || !assert.Contains(t, err2.Error(), "signal: killed", cmd.ProcessState.String()) {
 				t.Logf("solana-test-validator\n stdout: %s\n stderr: %s", stdOut.String(), stdErr.String())
 			}
 		}
@@ -79,18 +83,34 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string) error {
+func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
 	t.Helper()
 
-	for i := range keys {
+	var errKeys []solana.PublicKey
+	for i, key := range keys {
 		account := keys[i].String()
 		_, err := exec.Command("solana", "airdrop", "100",
 			account,
 			"--url", url,
 		).Output()
 		if err != nil {
-			return err
+			if attempts <= 0 {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
+				}
+				return err
+			}
+			errKeys = append(errKeys, key)
 		}
+	}
+	// call FundTestAccountsWithRetry recursively with keys that errored, decrement attempts to cap the number of retries
+	if len(errKeys) > 0 {
+		if attempts <= 0 {
+			return fmt.Errorf("failed to fund solana accounts")
+		}
+		time.Sleep(500 * time.Millisecond)
+		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
 	}
 
 	return nil
@@ -98,13 +118,6 @@ func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-
-	for i := range keys {
-		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
-			account,
-			"--url", url,
-		).Output()
-		require.NoError(t, err)
-	}
+	err := FundTestAccountsWithRetry(t, keys, url, 5)
+	require.NoError(t, err)
 }
