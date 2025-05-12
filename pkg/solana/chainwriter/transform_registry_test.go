@@ -472,6 +472,17 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, newAccounts, 1)
 	})
+
+	t.Run("CCIPCommit ArgsTransform no-ops if accounts list is empty", func(t *testing.T) {
+		args := struct {
+			Info ccipocr3.CommitReportInfo
+		}{
+			Info: ccipocr3.CommitReportInfo{},
+		}
+		_, newAccounts, _, err := chainwriter.CCIPCommitAccountTransform(ctx, mc, args, nil, nil, "", 0)
+		require.NoError(t, err)
+		require.Len(t, newAccounts, 0)
+	})
 }
 
 func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overhead, userCU, destGasAmount uint32) {
