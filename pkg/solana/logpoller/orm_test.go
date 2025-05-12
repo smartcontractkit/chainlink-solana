@@ -465,14 +465,13 @@ func TestPruneLogsForFilter(t *testing.T) {
 }
 
 func sanitize(expected, actual *types.Log) {
-	// TODO: override ScanLocation with custom TimestamptzCodec?
-	// See: https://github.com/jackc/pgx/issues/2117
-	actual.CreatedAt = actual.CreatedAt.UTC().Round(0)
-	actual.BlockTimestamp = actual.BlockTimestamp.UTC().Round(0)
+	actual.CreatedAt = actual.CreatedAt.UTC().Truncate(time.Millisecond)
+	actual.BlockTimestamp = actual.BlockTimestamp.UTC().Truncate(time.Millisecond)
 
 	// fill in fields populated by db write itself
 	expected.ID = actual.ID
 	expected.CreatedAt = actual.CreatedAt
+	expected.BlockTimestamp = expected.BlockTimestamp.UTC().Truncate(time.Millisecond)
 
 	// These are not returned by FilteredLogs
 	actual.SequenceNum = expected.SequenceNum
