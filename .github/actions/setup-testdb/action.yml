@@ -1,0 +1,29 @@
+name: Setup Test DB
+description: Setup Chainlink Test DB with schema defined in chainlink repo
+inputs:
+  core-ref:
+    description: The chainlink ref which contains the schema we want to test against
+    default: 'develop'
+outputs:
+  cl-db-url:
+    description: The value to set CL_DATABASE_URL to while running tests
+    value: {{ runs.steps.setup-postgres.outputs.database-url }}
+ 
+runs:
+  using: composite
+  steps:
+    - name: Setup Postgres
+      id: setup-postgres
+      uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+      with:
+        tmpfs: 'true'
+    - name: Checkout chainlink
+      uses: actions/checkout@v4
+      with:
+        repository: smartcontractkit/chainlink
+        ref: ${{ inputs.core-ref || 'develop' }}
+        path: chainlink
+    - name: Prepare Test Schema
+      run: cd chainlink && go run ./core/store/cmd/preparetest
+      env:
+        CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}

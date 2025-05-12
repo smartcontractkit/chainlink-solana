@@ -119,6 +119,8 @@ jobs:
 
   relay_run_interface_tests:
     name: Relay Run Interface Tests
+    env:
+      DB_URL: 'postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable'
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
@@ -156,7 +158,39 @@ jobs:
       - name: Install Solana CLI
         run: ../scripts/install-solana-ci.sh
 
+      - name: Setup Postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/0.2.0
+        with:
+          tmpfs: 'true'
+
+      - name: Get core ref from PR body
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
+          # shellcheck disable=SC2086
+          core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
+          if [ -n "$core_ref" ]; then
+            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Checkout chainlink
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink
+          ref: ${{ env.CUSTOM_CORE_REF || 'develop' }}
+          path: chainlink
+          fetch-depth: 0
+
+      - name: Setup DB
+        run: cd chainlink && go run ./core/store/cmd/preparetest
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+
       - name: Test Relay Interfaces
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
         run: |
           set -eoux pipefail
           # compile artifacts
