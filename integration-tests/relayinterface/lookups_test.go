@@ -318,10 +318,13 @@ func TestAccountLookups(t *testing.T) {
 			IsWritable: chainwriter.MetaBool{BitmapLocation: "Bitmap"},
 		}}
 
-		args := struct{Accounts []*solana.AccountMeta; Bitmap []byte}{
-				Accounts: accounts[:],
-				Bitmap: make([]byte, 3), // invalid bitmap length
-			}
+		args := struct {
+			Accounts []*solana.AccountMeta
+			Bitmap   []byte
+		}{
+			Accounts: accounts[:],
+			Bitmap:   make([]byte, 3), // invalid bitmap length
+		}
 
 		_, err := lookupConfig.AccountLookup.Resolve(args)
 		require.Error(t, err)
