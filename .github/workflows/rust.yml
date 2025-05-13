@@ -181,7 +181,6 @@ jobs:
           repository: smartcontractkit/chainlink
           ref: ${{ env.CUSTOM_CORE_REF || 'develop' }}
           path: chainlink
-          fetch-depth: 0
 
       - name: Setup DB
         run: cd chainlink && go run ./core/store/cmd/preparetest
