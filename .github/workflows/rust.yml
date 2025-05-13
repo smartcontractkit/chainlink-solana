@@ -183,7 +183,7 @@ jobs:
           path: chainlink
 
       - name: Setup DB
-        run: cd chainlink && go run ./core/store/cmd/preparetest
+        run: cd ../chainlink && go run ./core/store/cmd/preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
 
