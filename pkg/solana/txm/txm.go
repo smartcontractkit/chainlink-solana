@@ -78,6 +78,9 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 	if sendTx == nil {
 		// default sendTx using a single RPC
 		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
+			if tx == nil {
+				return solanaGo.Signature{}, fmt.Errorf("transaction is nil")
+			}
 			c, err := client.Get(ctx)
 			if err != nil {
 				return solanaGo.Signature{}, err
