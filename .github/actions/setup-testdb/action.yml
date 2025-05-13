@@ -8,7 +8,7 @@ outputs:
   cl-db-url:
     description: The value to set CL_DATABASE_URL to while running tests
     value: {{ runs.steps.setup-postgres.outputs.database-url }}
- 
+
 runs:
   using: composite
   steps:
