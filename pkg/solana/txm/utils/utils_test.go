@@ -44,17 +44,15 @@ func TestSortSignaturesAndResults(t *testing.T) {
 func TestStatusSortHelpers(t *testing.T) {
 	t.Parallel()
 
-	status := statuses{
-		sigs: make([]solana.Signature, 2),
-		res: []*rpc.SignatureStatusesResult{{ConfirmationStatus: rpc.ConfirmationStatusConfirmed}, {ConfirmationStatus: rpc.ConfirmationStatusFinalized}},
-	}
 	t.Run("successfully swaps statuses in list", func(t *testing.T) {
+		status := NewTestStatuses(t)
 		status.Swap(0, 1)
 		require.Equal(t, rpc.ConfirmationStatusFinalized, status.res[0].ConfirmationStatus)
 		require.Equal(t, rpc.ConfirmationStatusConfirmed, status.res[1].ConfirmationStatus)
 	})
 
 	t.Run("no-op if swap indexes are out-of-bounds", func(t *testing.T) {
+		status := NewTestStatuses(t)
 		status.Swap(1, 2) // j out of bounds
 		require.Equal(t, rpc.ConfirmationStatusConfirmed, status.res[0].ConfirmationStatus)
 		require.Equal(t, rpc.ConfirmationStatusFinalized, status.res[1].ConfirmationStatus)
@@ -69,11 +67,13 @@ func TestStatusSortHelpers(t *testing.T) {
 	})
 
 	t.Run("successfully compares statuses in list", func(t *testing.T) {
-		less := status.Less(0, 1) 
+		status := NewTestStatuses(t)
+		less := status.Less(0, 1)
 		require.False(t, less) // expect highest to lowest statuses and Finalized > Confirmed
 	})
 
 	t.Run("no-op if less indexes are out-of-bounds", func(t *testing.T) {
+		status := NewTestStatuses(t)
 		less := status.Less(1, 2) // j out of bounds
 		require.True(t, less)
 
@@ -139,4 +139,12 @@ func TestSetTxConfig(t *testing.T) {
 	assert.Equal(t, uint64(4), cfg.ComputeUnitPriceMin)
 	assert.Equal(t, uint64(5), cfg.ComputeUnitPriceMax)
 	assert.Equal(t, uint32(6), cfg.ComputeUnitLimit)
+}
+
+func NewTestStatuses(t *testing.T) statuses {
+	t.Helper()
+	return statuses{
+		sigs: make([]solana.Signature, 2),
+		res:  []*rpc.SignatureStatusesResult{{ConfirmationStatus: rpc.ConfirmationStatusConfirmed}, {ConfirmationStatus: rpc.ConfirmationStatusFinalized}},
+	}
 }
