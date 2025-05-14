@@ -189,6 +189,9 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 }
 
 func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
+	if length > 64 {
+		return []bool{}, fmt.Errorf("bitmap cannot have more than 64 flags. provided length: %d", length)
+	}
 	result := make([]bool, length)
 	if mb.BitmapLocation == "" {
 		for i := 0; i < length; i++ {
@@ -206,6 +209,11 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 		return []bool{}, fmt.Errorf("bitmap value is not a single value: %v, length: %d", bitmapVals, len(bitmapVals))
 	}
 
+	if len(bitmapVals[0]) != 8 {
+		return []bool{}, fmt.Errorf("bitmap value has insufficient bytes: %v, length: %d", bitmapVals[0], len(bitmapVals[0]))
+	}
+
+	// The bitmap is user defined and always uint64 size. The input cannot be further validated for correctness.
 	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
 	for i := 0; i < length; i++ {
 		result[i] = bitmapInt&(1<<i) > 0
