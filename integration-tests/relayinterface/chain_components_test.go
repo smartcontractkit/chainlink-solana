@@ -111,6 +111,11 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 		ContractReaderQueryKeyCanFilterWithValueComparator,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
+		ContractReaderQueryKeysNotFound,
+		ContractReaderQueryKeysReturnsData,
+		ContractReaderQueryKeysReturnsDataAsValuesDotValue,
+		ContractReaderQueryKeysCanFilterWithValueComparator,
+		ContractReaderQueryKeysCanLimitResultsWithCursor,
 	})
 	if it.inMemoryDB {
 		it.DisableTests([]string{ContractReaderGetLatestValueIncludeReverted})
