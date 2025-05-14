@@ -511,6 +511,38 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 		require.Equal(t, storedPubKey, entry[0])
 	})
 
+	t.Run("returns filtered map and ignores nil account meta and nil entry in lookup table", func(t *testing.T) {
+		accountLookupConfig := []chainwriter.Lookup{
+			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+				LookupTableName: "DerivedTable",
+				IncludeIndexes:  []int{0},
+			}},
+		}
+		// Fetch derived table map
+		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
+		require.NoError(t, err)
+
+		lookupAccounts := derivedTableMap["DerivedTable"][lookupTablePubkey.String()]
+		// add nil account meta
+		lookupAccounts = append(lookupAccounts, nil)
+		derivedTableMap["DerivedTable"][lookupTablePubkey.String()] = lookupAccounts
+
+		// Resolve account metas
+		accounts, err := chainwriter.GetAddresses(ctx, args, accountLookupConfig, derivedTableMap, mc)
+		require.NoError(t, err)
+
+		// add nil account meta
+		accounts = append(accounts, nil)
+
+		filteredLookupTableMap := cw.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
+		// Filter map should only contain the address for the DerivedTable lookup defined in the account lookup config
+		require.Len(t, filteredLookupTableMap, 1)
+		entry, exists := filteredLookupTableMap[lookupTablePubkey]
+		require.True(t, exists)
+		require.Len(t, entry, 3)
+		require.Equal(t, storedPubKey, entry[0])
+	})
+
 	t.Run("returns empty map if empty account lookup config provided", func(t *testing.T) {
 		accountLookupConfig := []chainwriter.Lookup{}
 

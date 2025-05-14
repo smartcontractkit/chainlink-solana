@@ -429,6 +429,32 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, nil, offrampAddress.String(), 0)
 		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
 	})
+
+	t.Run("CCIPExecute ArgsTransform ignores nil accounts in pool lookup table", func(t *testing.T) {
+		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
+		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
+		mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+		// Accounts list contains other accounts before token addresses
+		accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts)+len(userMessagingAccounts))
+		for _, acc := range mandatoryAccounts {
+			accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+		}
+
+		corruptTableMap := make(map[string]map[string][]*solana.AccountMeta)
+		corruptTableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
+		corruptLookupTablePubkey := utils.GetRandomPubKey(t)
+
+		poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys))
+		for _, poolKey := range poolKeys {
+			poolKeysMeta = append(poolKeysMeta, &solana.AccountMeta{PublicKey: poolKey})
+		}
+		// add nil account meta
+		poolKeysMeta = append(poolKeysMeta, nil)
+		corruptTableMap["PoolLookupTable"][corruptLookupTablePubkey.String()] = poolKeysMeta
+
+		_, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, accounts, corruptTableMap, offrampAddress.String(), staticCUOverhead)
+		require.NoError(t, err)
+	})
 }
 
 func Test_CCIPCommitAccountTransform(t *testing.T) {

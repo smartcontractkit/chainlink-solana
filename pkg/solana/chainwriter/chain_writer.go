@@ -189,7 +189,9 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	// Build a hash set of account public keys for fast lookup
 	usedAccounts := make(map[string]struct{})
 	for _, account := range accounts {
-		usedAccounts[account.PublicKey.String()] = struct{}{}
+		if account != nil {
+			usedAccounts[account.PublicKey.String()] = struct{}{}
+		}
 	}
 
 	// Filter derived lookup tables
@@ -204,6 +206,9 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 			foundUsedAddress := false
 			// Parse metas into public keys for filtered lookup table map
 			for _, meta := range metas {
+				if meta == nil {
+					continue
+				}
 				tableAddresses = append(tableAddresses, meta.PublicKey)
 				if _, exists := usedAccounts[meta.PublicKey.String()]; exists {
 					foundUsedAddress = true

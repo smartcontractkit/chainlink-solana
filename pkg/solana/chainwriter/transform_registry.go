@@ -159,6 +159,9 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 		}
 		// set IsWritable according to token admin registry's WritableIndexes
 		for i, meta := range table {
+			if meta == nil {
+				continue
+			}
 			writable := string(writableBits[i]) == "1"
 			meta.IsWritable = writable
 			poolAccounts = append(poolAccounts, meta)
