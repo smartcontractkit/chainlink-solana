@@ -52,7 +52,7 @@ jobs:
         run: go build -v ./pkg/...
       - name: Get core ref from PR body
         uses: ./.github/actions/get-core-ref
-      - name: Setup DB
+      - name: Setup Test DB
         id: setup-testdb
         uses: ./.github/actions/setup-testdb
       - name: Test

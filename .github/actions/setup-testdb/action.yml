@@ -17,6 +17,11 @@ runs:
       uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
       with:
         tmpfs: 'true'
+    # This is considered untrusted code from the POV of chainlink-solana, but this is safe as long as we:
+    # - Only call this from workflows with read-only git permissions set
+    # and
+    # - Unset all secrets passed to this action by workflows calling it, before running "go run ./core/store/cmd/preparetest"
+    # codeql-disable-next-line actions/untrusted-checkout
     - name: Checkout chainlink
       uses: actions/checkout@v4
       with:
@@ -24,6 +29,11 @@ runs:
         ref: ${{ inputs.core-ref || 'develop' }}
         path: chainlink
     - name: Prepare Test Schema
-      run: cd chainlink && go run ./core/store/cmd/preparetest
+      run: |
+        unset GRAFANA_INTERNAL_TENANT_ID
+        unset GRAFANA_INTERNAL_BASIC_AUTH
+        unset GRAFANA_INTERNAL_HOST
+        cd chainlink
+        go run ./core/store/cmd/preparetest
       env:
         CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}

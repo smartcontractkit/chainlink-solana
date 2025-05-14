@@ -119,6 +119,9 @@ jobs:
 
   relay_run_interface_tests:
     name: Relay Run Interface Tests
+    permissions:
+      contents: read
+      actions: read
     env:
       DB_URL: 'postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable'
     runs-on: ubuntu-latest-8cores-32GB
@@ -163,24 +166,17 @@ jobs:
         with:
           tmpfs: 'true'
 
-      - name: Get core ref from PR body
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
-          # shellcheck disable=SC2086
-          core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ -n "$core_ref" ]; then
-            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
-          fi
+      - name: Get Core Ref
+        id: get-core-ref
+        uses: ./.github/actions/get-core-ref
 
       - name: Checkout chainlink
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink
-          ref: ${{ env.CUSTOM_CORE_REF || 'develop' }}
+          ref: ${{ steps.get-core-ref.outputs.core-ref || 'develop' }}
           path: chainlink
+          persist-credentials: false
 
       - name: Setup DB
         run: cd ../chainlink && go run ./core/store/cmd/preparetest
