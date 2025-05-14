@@ -119,7 +119,7 @@ func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, 
 
 	transformedAccounts := accounts
 	// Remove the global state config from the end of the account list if neither token nor gas price updates are included
-	if len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
+	if len(accounts) > 0 && len(tokenPriceVals) == 0 && len(gasPriceVals) == 0 {
 		transformedAccounts = accounts[:len(accounts)-1]
 	}
 
