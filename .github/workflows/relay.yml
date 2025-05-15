@@ -9,6 +9,9 @@ on:
 jobs:
   relay_run_unit_tests:
     name: Relay Run Unit Tests
+    permissions:
+      contents: read
+      actions: read
     env:
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
     runs-on: ubuntu-latest-8cores-32GB
