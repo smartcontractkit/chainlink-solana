@@ -21,7 +21,7 @@ runs:
     # - Only call this from workflows with read-only git permissions set
     # and
     # - Unset all secrets passed to this action by workflows calling it, before running "go run ./core/store/cmd/preparetest"
-    # codeql-disable-next-line actions/untrusted-checkout
+    # codeql[actions/untrusted-checkout]: disable
     - name: Checkout chainlink
       uses: actions/checkout@v4
       with:
