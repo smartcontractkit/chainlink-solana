@@ -12,6 +12,7 @@ runs:
     - name: Extract core ref
       if: ${{ github.event_name == 'pull_request' }}
       id: extract
+      shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
