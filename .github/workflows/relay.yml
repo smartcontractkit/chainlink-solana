@@ -54,13 +54,16 @@ jobs:
       - name: Build
         run: go build -v ./pkg/...
       - name: Get core ref from PR body
+        id: get-ref
         uses: ./.github/actions/get-core-ref
       - name: Setup Test DB
         id: setup-testdb
         uses: ./.github/actions/setup-testdb
+        with:
+          core-ref: ${{ steps.get-ref.outputs.core-ref }}
       - name: Test
         with:
-          cl_ref: env.CUSTOM_CORE_REF
+          cl_ref: ${{ steps.get-ref.outputs.core-ref }}
         env:
           CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
         run: |
