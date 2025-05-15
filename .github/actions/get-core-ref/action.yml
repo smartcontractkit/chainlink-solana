@@ -1,13 +1,23 @@
 name: Get Core Refs from PR
 description: Extracts "core ref:" tag in PR to use as a custom ref, returns as output
+
 outputs:
-  core-ref: ${{ env.CUSTOM_CORE_REF }}
+  core-ref:
+    description: chainlink git ref from PR body
+    value: ${{ steps.extract.outputs.core_ref }}
+
 runs:
-  if: github.event_name == 'pull_request'
-  run: |
-    comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
+  using: composite
+  steps:
+  - name: Extract core ref
+    if: github.event_name == 'pull_request'
+    id: extract
+    env:
+      GH_TOKEN: ${{ github.token }}
+    run: |
+      comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
     # shellcheck disable=SC2086
-    core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-    if [ -n "$core_ref" ]; then
-      echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
-    fi
+      core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
+      if [ -n "$core_ref" ]; then
+        echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
+      fi
