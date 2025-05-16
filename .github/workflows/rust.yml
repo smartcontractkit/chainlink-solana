@@ -157,6 +157,8 @@ jobs:
         run: ../scripts/install-solana-ci.sh
 
       - name: Test Relay Interfaces
+        env:
+          GODEBUG: "http2client=0"
         run: |
           set -eoux pipefail
           # compile artifacts
