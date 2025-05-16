@@ -169,4 +169,4 @@ jobs:
             anchor build"
 
           cd ..
-          make test_relay_integration
+          GODEBUG=http2client=0 make test_relay_integration
