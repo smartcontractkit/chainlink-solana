@@ -755,6 +755,20 @@ type helper struct {
 	inMemoryDB         bool
 }
 
+func connectWSWithRetry(ctx context.Context, url string, maxWait time.Duration) (*ws.Client, error) {
+	deadline := time.Now().Add(maxWait)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		c, err := ws.Connect(ctx, url)
+		if err == nil {
+			return c, nil
+		}
+		lastErr = err
+		time.Sleep(300 * time.Millisecond)
+	}
+	return nil, lastErr
+}
+
 func (h *helper) Init(t *testing.T) {
 	t.Helper()
 
@@ -770,7 +784,7 @@ func (h *helper) Init(t *testing.T) {
 	h.sender = privateKey
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
-	h.wsClient, err = ws.Connect(t.Context(), h.wsURL)
+	h.wsClient, err = connectWSWithRetry(t.Context(), h.wsURL, 5*time.Second)
 	h.rpcClient = rpc.New(h.rpcURL)
 	lggr := logger.Test(t)
 
