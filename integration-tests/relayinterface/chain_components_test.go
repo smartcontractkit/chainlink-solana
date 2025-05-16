@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -58,6 +59,12 @@ const (
 	AnyContractNameWithSharedAddress2 = AnyContractName + "Shared2"
 	AnyContractNameWithSharedAddress3 = AnyContractName + "Shared3"
 )
+
+func init() {
+	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+		tr.ForceAttemptHTTP2 = false
+	}
+}
 
 var trueVal = true
 
