@@ -72,7 +72,6 @@ func TestChainComponents(t *testing.T) {
 	t.Parallel()
 
 	t.Run("RunChainComponentsSolanaTests", func(t *testing.T) {
-		t.Parallel()
 		helper := &helper{}
 		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
@@ -82,7 +81,6 @@ func TestChainComponents(t *testing.T) {
 	})
 
 	t.Run("RunChainComponentsInLoopSolanaTests", func(t *testing.T) {
-		t.Parallel()
 		helper := &helper{}
 		helper.Init(t)
 		it := &SolanaChainComponentsInterfaceTester[*testing.T]{Helper: helper, testContext: make(map[string]uint64), testContextMu: &sync.RWMutex{}, testIdx: &atomic.Uint64{}, inMemoryDB: helper.InMemoryDB()}
