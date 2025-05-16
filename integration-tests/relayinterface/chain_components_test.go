@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -755,18 +757,30 @@ type helper struct {
 	inMemoryDB         bool
 }
 
+// connectWSWithRetry waits until solana-test-validator’s PubSub socket is ready.
+// It retries the dial every 500 ms, up to maxWait.
 func connectWSWithRetry(ctx context.Context, url string, maxWait time.Duration) (*ws.Client, error) {
 	deadline := time.Now().Add(maxWait)
 	var lastErr error
-	for time.Now().Before(deadline) {
+
+	for time.Now().Before(deadline) && ctx.Err() == nil {
 		c, err := ws.Connect(ctx, url)
 		if err == nil {
 			return c, nil
 		}
-		lastErr = err
-		time.Sleep(300 * time.Millisecond)
+
+		// Retry while the validator is still warming up.
+		if strings.Contains(err.Error(), "malformed HTTP response") ||
+			errors.Is(err, context.DeadlineExceeded) ||
+			strings.Contains(err.Error(), "connection refused") {
+			lastErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		// Any other error is not transient ⇒ fail fast.
+		return nil, err
 	}
-	return nil, lastErr
+	return nil, fmt.Errorf("web-socket not ready after %s: %w", maxWait, lastErr)
 }
 
 func (h *helper) Init(t *testing.T) {
@@ -784,7 +798,7 @@ func (h *helper) Init(t *testing.T) {
 	h.sender = privateKey
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
-	h.wsClient, err = connectWSWithRetry(t.Context(), h.wsURL, 5*time.Second)
+	h.wsClient, err = connectWSWithRetry(t.Context(), h.wsURL, 20*time.Second)
 	h.rpcClient = rpc.New(h.rpcURL)
 	lggr := logger.Test(t)
 
