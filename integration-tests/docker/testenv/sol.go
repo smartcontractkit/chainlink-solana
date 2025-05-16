@@ -171,7 +171,7 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 			"SERVER_PORT": "1080",
 		},
 		Networks: s.Networks,
-		WaitingFor: tcwait.ForLog("Processed Slot: 1").
+		WaitingFor: tcwait.ForLog("Processed Slot:").
 			WithStartupTimeout(30 * time.Second).
 			WithPollInterval(100 * time.Millisecond),
 		HostConfigModifier: func(hostConfig *container.HostConfig) {

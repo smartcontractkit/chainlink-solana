@@ -83,22 +83,34 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string) error {
+func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
 	t.Helper()
 
-	for i := range keys {
+	var errKeys []solana.PublicKey
+	for i, key := range keys {
 		account := keys[i].String()
 		_, err := exec.Command("solana", "airdrop", "100",
 			account,
 			"--url", url,
 		).Output()
 		if err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
+			if attempts <= 0 {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
+				}
+				return err
 			}
-			return err
+			errKeys = append(errKeys, key)
 		}
+	}
+	// call FundTestAccountsWithRetry recursively with keys that errored, decrement attempts to cap the number of retries
+	if len(errKeys) > 0 {
+		if attempts <= 0 {
+			return fmt.Errorf("failed to fund solana accounts")
+		}
+		time.Sleep(500 * time.Millisecond)
+		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
 	}
 
 	return nil
@@ -106,6 +118,6 @@ func FundTestAccountsWithError(t *testing.T, keys []solana.PublicKey, url string
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	err := FundTestAccountsWithError(t, keys, url)
+	err := FundTestAccountsWithRetry(t, keys, url, 5)
 	require.NoError(t, err)
 }

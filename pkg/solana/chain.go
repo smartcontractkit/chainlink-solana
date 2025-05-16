@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-framework/metrics"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -280,13 +281,18 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 	// txm will default to sending transactions using a single RPC client if sendTx is nil
 	var sendTx func(ctx context.Context, tx *solanago.Transaction) (solanago.Signature, error)
 
-	if cfg.MultiNode.Enabled() {
-		chainFamily := "solana"
+	chainFamily := "solana"
 
+	if cfg.MultiNode.Enabled() {
 		mnCfg := &cfg.MultiNode
 
 		var nodes []mn.Node[mn.StringID, *client.MultiNodeClient]
 		var sendOnlyNodes []mn.SendOnlyNode[mn.StringID, *client.MultiNodeClient]
+
+		multiNodeMetrics, err := metrics.NewGenericMultiNodeMetrics(chainFamily, id)
+		if err != nil {
+			return nil, err
+		}
 
 		for i, nodeInfo := range cfg.ListNodes() {
 			err := nodeInfo.ValidateConfig()
@@ -301,11 +307,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 			if nodeInfo.SendOnly {
 				newSendOnly := mn.NewSendOnlyNode[mn.StringID, *client.MultiNodeClient](
-					lggr, *nodeInfo.URL.URL(), *nodeInfo.Name, mn.StringID(id), rpcClient)
+					lggr, multiNodeMetrics, *nodeInfo.URL.URL(), *nodeInfo.Name, mn.StringID(id), rpcClient)
 				sendOnlyNodes = append(sendOnlyNodes, newSendOnly)
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
-					mnCfg, mnCfg, lggr, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
+					mnCfg, mnCfg, lggr, multiNodeMetrics, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
 					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily)
 				nodes = append(nodes, newNode)
 			}
@@ -313,6 +319,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 		multiNode := mn.NewMultiNode[mn.StringID, *client.MultiNodeClient](
 			lggr,
+			multiNodeMetrics,
 			mnCfg.SelectionMode(),
 			mnCfg.LeaseDuration(),
 			nodes,
@@ -327,6 +334,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			mn.StringID(id),
 			chainFamily,
 			multiNode,
+			multiNodeMetrics,
 			func(err error) mn.SendTxReturnCode {
 				return client.ClassifySendError(nil, err)
 			},
@@ -349,7 +357,12 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		bc = utils.NewOnceLoader[monitor.BalanceClient](func(ctx context.Context) (monitor.BalanceClient, error) { return ch.multiNode.SelectRPC(ctx) })
 	}
 
-	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), logpoller.NewObservedORM(ch.ID(), ds, lggr), ch.multiClient, cfg)
+	orm, err := logpoller.NewObservedORM(ch.ID(), chainFamily, ds, lggr)
+	if err != nil {
+		return nil, err
+	}
+
+	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), orm, ch.multiClient, cfg)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil

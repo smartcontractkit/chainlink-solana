@@ -64,11 +64,22 @@ func (s statuses) Len() int {
 }
 
 func (s statuses) Swap(i, j int) {
+	// no-op if indexes are ever out of bounds
+	if i >= len(s.sigs) || j >= len(s.sigs) {
+		return
+	}
+	if i >= len(s.res) || j >= len(s.res) {
+		return
+	}
 	s.sigs[i], s.sigs[j] = s.sigs[j], s.sigs[i]
 	s.res[i], s.res[j] = s.res[j], s.res[i]
 }
 
 func (s statuses) Less(i, j int) bool {
+	// no-op if indexes are ever out of bounds
+	if i >= len(s.res) || j >= len(s.res) {
+		return true
+	}
 	return ConvertStatus(s.res[i]) > ConvertStatus(s.res[j]) // returns list with highest first
 }
 

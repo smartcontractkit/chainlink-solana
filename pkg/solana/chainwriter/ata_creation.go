@@ -81,7 +81,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				Commitment: rpc.CommitmentFinalized,
 			})
 			if err == nil {
-				logger.Infow("ATA already exists, skipping creation.", "location", lookup.Location)
+				logger.Debugw("ATA already exists, skipping creation.", "location", lookup.Location)
 				continue
 			}
 			if !strings.Contains(err.Error(), "not found") {
