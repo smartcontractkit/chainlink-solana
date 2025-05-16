@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -763,6 +764,10 @@ func (h *helper) Init(t *testing.T) {
 	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 	require.NoError(t, err)
 	h.sender = privateKey
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.ForceAttemptHTTP2 = false
+	http.DefaultTransport = tr
 
 	h.rpcURL, h.wsURL = utils.SetupTestValidatorWithAnchorPrograms(t, privateKey.PublicKey().String(), []string{"contract-reader-interface", "contract-reader-interface-secondary"})
 	h.wsClient, err = ws.Connect(t.Context(), h.wsURL)
