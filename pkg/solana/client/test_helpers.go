@@ -29,12 +29,12 @@ func SetupLocalSolNode(t *testing.T) string {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := freeport.GetOne(t)
-	portStr := strconv.Itoa(port)
+	port := freeport.GetN(t, 2)
+	portStr := strconv.Itoa(port[0])
 
 	faucetPort := freeport.GetOne(t)
 	url := "http://127.0.0.1:" + portStr
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port+1) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
