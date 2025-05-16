@@ -24,6 +24,7 @@ require (
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250502210357-2df484128afa
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250502210357-2df484128afa
+	github.com/smartcontractkit/freeport v0.1.0
 	github.com/smartcontractkit/libocr v0.0.0-20250408131511-c90716988ee0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
