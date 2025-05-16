@@ -1050,7 +1050,7 @@ func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr
 			return txmutils.Errored, errType
 		// transaction will encounter execution error/revert
 		case strings.Contains(errStr, "InstructionError"):
-			txm.lggr.Errorw("InstructionError", logValues...)
+			txm.lggr.Debugw("InstructionError", logValues...)
 			if !simulation {
 				txm.fetchTransactionLogs(ctx, sig)
 			}
