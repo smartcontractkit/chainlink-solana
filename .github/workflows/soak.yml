@@ -105,7 +105,7 @@ jobs:
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@fdaf56b1df7248d18e30ad09982d03ec67d6b71c # v2.3.29
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
+          test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2Soak/embedded -json $(args) ./soak 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
