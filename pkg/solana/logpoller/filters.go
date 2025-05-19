@@ -32,7 +32,7 @@ type filters struct {
 	filtersToDelete        map[int64]types.Filter
 	filtersMutex           sync.RWMutex
 	loadedFilters          atomic.Bool
-	knownPrograms          map[string]uint         // fast lookup to see if a base58-encoded ProgramID matches any registered filters
+	knownPrograms          map[string]uint               // fast lookup to see if a base58-encoded ProgramID matches any registered filters
 	knownDiscriminators    map[types.EventSignature]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
 	decoders               map[int64]types.Decoder

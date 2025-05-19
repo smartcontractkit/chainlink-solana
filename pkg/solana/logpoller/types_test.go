@@ -4,9 +4,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 func TestIndexedValue(t *testing.T) {

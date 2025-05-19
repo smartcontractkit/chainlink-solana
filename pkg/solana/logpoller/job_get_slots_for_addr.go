@@ -32,7 +32,7 @@ type getSlotsForAddressJob struct {
 	workers   WorkerGroup
 }
 
-func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address  types.PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address types.PublicKey, from, to uint64) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
 		address:   address,
 		client:    client,

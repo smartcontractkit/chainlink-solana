@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )

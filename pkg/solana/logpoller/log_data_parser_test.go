@@ -3,9 +3,10 @@ package logpoller
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 func TestLogDataParse_Error(t *testing.T) {

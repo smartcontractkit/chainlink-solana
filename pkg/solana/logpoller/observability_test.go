@@ -9,9 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	ioprometheusclient "github.com/prometheus/client_model/go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"

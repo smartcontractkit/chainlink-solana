@@ -108,7 +108,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			}, nil
 		})
 
-	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), [] types.PublicKey{types.PublicKey(address)}, 41, 44)
+	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), []types.PublicKey{types.PublicKey(address)}, 41, 44)
 	require.NoError(t, err)
 	defer cleanUp()
 	var events []types.ProgramEvent
