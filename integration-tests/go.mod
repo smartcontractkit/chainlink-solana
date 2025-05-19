@@ -17,14 +17,14 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250515091132-6c08936b29ab
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250515132731-ad40fab9b75e
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250515195530-e8d85e4dddc1
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250515194919-7fa923e88444
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250519142857-5d6808c6f91f
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250516012027-1a138fb900a1
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.0
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250515202803-66fa82211638
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250515202803-66fa82211638
-	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250515202803-66fa82211638
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250519144524-8a0f179b0473
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250519144524-8a0f179b0473
+	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250519144524-8a0f179b0473
 	github.com/smartcontractkit/libocr v0.0.0-20250513175559-61c382d6cee4
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
@@ -346,7 +346,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slack-go/slack v0.15.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.55 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.57 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250502091650-484cfa7ccddf // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049 // indirect
