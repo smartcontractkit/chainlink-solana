@@ -321,7 +321,7 @@ jobs:
       - name: Run Tests
         uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+          test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
@@ -405,7 +405,7 @@ jobs:
       - name: Run Upgrade Test
         uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 24h -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
+          test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 

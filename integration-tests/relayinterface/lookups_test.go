@@ -274,6 +274,61 @@ func TestAccountLookups(t *testing.T) {
 		_, err := lookupConfig.AccountLookup.Resolve(args)
 		require.Contains(t, err.Error(), "invalid value format at path")
 	})
+
+	t.Run("AccountLookup fails if lookup returns more than 64 values and uses bitmap", func(t *testing.T) {
+		accounts := [65]*solana.AccountMeta{}
+
+		for i := 0; i < 65; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  solanautils.GetRandomPubKey(t),
+				IsWritable: true,
+			}
+		}
+
+		lookupConfig := chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+			Name:       "TestAccount",
+			Location:   "Inner.Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{Value: true},
+			IsWritable: chainwriter.MetaBool{Value: true},
+		}}
+		args := TestAccountArgs{
+			Inner: InnerAccountArgs{
+				Accounts: accounts[:],
+			},
+		}
+		_, err := lookupConfig.AccountLookup.Resolve(args)
+		require.Error(t, err)
+	})
+
+	t.Run("AccountLookup fails if provided bitmap is not 8 bytes", func(t *testing.T) {
+		accounts := [3]*solana.AccountMeta{}
+
+		for i := 0; i < 3; i++ {
+			accounts[i] = &solana.AccountMeta{
+				PublicKey:  solanautils.GetRandomPubKey(t),
+				IsSigner:   (i)%2 == 0,
+				IsWritable: (i)%2 == 0,
+			}
+		}
+
+		lookupConfig := chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+			Name:       "TestAccount",
+			Location:   "Accounts.PublicKey",
+			IsSigner:   chainwriter.MetaBool{BitmapLocation: "Bitmap"},
+			IsWritable: chainwriter.MetaBool{BitmapLocation: "Bitmap"},
+		}}
+
+		args := struct {
+			Accounts []*solana.AccountMeta
+			Bitmap   []byte
+		}{
+			Accounts: accounts[:],
+			Bitmap:   make([]byte, 3), // invalid bitmap length
+		}
+
+		_, err := lookupConfig.AccountLookup.Resolve(args)
+		require.Error(t, err)
+	})
 }
 
 func TestPDALookups(t *testing.T) {

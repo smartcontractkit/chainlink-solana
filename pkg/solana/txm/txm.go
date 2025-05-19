@@ -78,6 +78,9 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 	if sendTx == nil {
 		// default sendTx using a single RPC
 		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
+			if tx == nil {
+				return solanaGo.Signature{}, errors.New("transaction is nil")
+			}
 			c, err := client.Get(ctx)
 			if err != nil {
 				return solanaGo.Signature{}, err
@@ -1047,7 +1050,7 @@ func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr
 			return txmutils.Errored, errType
 		// transaction will encounter execution error/revert
 		case strings.Contains(errStr, "InstructionError"):
-			txm.lggr.Errorw("InstructionError", logValues...)
+			txm.lggr.Debugw("InstructionError", logValues...)
 			if !simulation {
 				txm.fetchTransactionLogs(ctx, sig)
 			}
