@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,9 +39,9 @@ func TestIndexedValue(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.typeName, func(t *testing.T) {
-			iVal1, err := newIndexedValue(c.lower)
+			iVal1, err := types.NewIndexedValue(c.lower)
 			require.NoError(t, err)
-			iVal2, err := newIndexedValue(c.higher)
+			iVal2, err := types.NewIndexedValue(c.higher)
 			require.NoError(t, err)
 			assert.Less(t, iVal1, iVal2)
 		})

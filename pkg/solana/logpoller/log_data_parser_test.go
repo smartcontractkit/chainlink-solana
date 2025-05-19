@@ -3,6 +3,7 @@ package logpoller
 import (
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,14 +26,14 @@ func TestLogDataParse_Error(t *testing.T) {
 	require.Len(t, output, 2)
 
 	// first program has no logs, no events, no compute units and succeeded
-	assert.Equal(t, ProgramOutput{
+	assert.Equal(t, types.ProgramOutput{
 		Program: "ComputeBudget111111111111111111111111111111",
 	}, output[0])
 
 	// second program should have one log, no events, 6504 compute units and failed with error message
-	expected := ProgramOutput{
+	expected := types.ProgramOutput{
 		Program: "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ",
-		Logs: []ProgramLog{
+		Logs: []types.ProgramLog{
 			{
 				Prefix: ">",
 				Text:   "AnchorError thrown in programs/ocr2/src/lib.rs:639. Error Code: StaleReport. Error Number: 6003. Error Message: Stale report.",
@@ -65,14 +66,14 @@ func TestLogDataParse_SuccessBasic(t *testing.T) {
 	require.Len(t, output, 2)
 
 	// first program has no logs, no events, no compute units and succeeded
-	assert.Equal(t, ProgramOutput{
+	assert.Equal(t, types.ProgramOutput{
 		Program: "ComputeBudget111111111111111111111111111111",
 	}, output[0])
 
 	// second program should have one log, no events, 6504 compute units and failed with error message
-	expected := ProgramOutput{
+	expected := types.ProgramOutput{
 		Program: "SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE",
-		Logs: []ProgramLog{
+		Logs: []types.ProgramLog{
 			{Prefix: ">", Text: "Instruction: IdleToLoadingBay"},
 			{Prefix: ">", Text: "Current state: Idle(Idle { sector: [13, 37] })"},
 		},
@@ -169,14 +170,14 @@ func TestLogDataParse_SuccessComplex(t *testing.T) {
 
 	// first two programs have no logs, no events, no compute units and succeeded
 	for idx := range 1 {
-		assert.Equal(t, ProgramOutput{
+		assert.Equal(t, types.ProgramOutput{
 			Program: "ComputeBudget111111111111111111111111111111",
 		}, output[idx])
 	}
 
 	expectedSystemProgramIdxs := []int{2, 7, 9}
 	for _, idx := range expectedSystemProgramIdxs {
-		assert.Equal(t, ProgramOutput{
+		assert.Equal(t, types.ProgramOutput{
 			Program: "11111111111111111111111111111111",
 		}, output[idx])
 	}

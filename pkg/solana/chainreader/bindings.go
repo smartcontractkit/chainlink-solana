@@ -14,12 +14,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type filterRegistrar interface {
 	HasFilter(context.Context, string) bool
-	RegisterFilter(context.Context, logpoller.Filter) error
+	RegisterFilter(context.Context, logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 }
 

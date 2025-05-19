@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 var _ ORM = (*DSORM)(nil)
@@ -66,7 +67,7 @@ func (o *DSORM) HasFilter(ctx context.Context, name string) (bool, error) {
 //
 // Each address/event pair must have a unique job id, so it may be removed when the job is deleted.
 // Returns ID for updated or newly inserted filter.
-func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err error) {
+func (o *DSORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64, err error) {
 	args, err := newQueryArgs(o.chainID).
 		withField("name", filter.Name).
 		withRetention(filter.Retention).
@@ -111,9 +112,9 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err 
 }
 
 // GetFilterByID returns filter by ID
-func (o *DSORM) GetFilterByID(ctx context.Context, id int64) (Filter, error) {
+func (o *DSORM) GetFilterByID(ctx context.Context, id int64) (types.Filter, error) {
 	query := filtersQuery("WHERE id = $1")
-	var result Filter
+	var result types.Filter
 	err := o.ds.GetContext(ctx, &result, query, id)
 	return result, err
 }
@@ -136,7 +137,7 @@ func (o *DSORM) DeleteFilter(ctx context.Context, id int64) (err error) {
 	return err
 }
 
-func (o *DSORM) DeleteFilters(ctx context.Context, filters map[int64]Filter) error {
+func (o *DSORM) DeleteFilters(ctx context.Context, filters map[int64]types.Filter) error {
 	for _, filter := range filters {
 		err := o.DeleteFilter(ctx, filter.ID)
 		if err != nil {
@@ -147,15 +148,15 @@ func (o *DSORM) DeleteFilters(ctx context.Context, filters map[int64]Filter) err
 	return nil
 }
 
-func (o *DSORM) SelectFilters(ctx context.Context) ([]Filter, error) {
+func (o *DSORM) SelectFilters(ctx context.Context) ([]types.Filter, error) {
 	query := filtersQuery("WHERE chain_id = $1")
-	var filters []Filter
+	var filters []types.Filter
 	err := o.ds.SelectContext(ctx, &filters, query, o.chainID)
 	return filters, err
 }
 
 // InsertLogs is idempotent to support replays.
-func (o *DSORM) InsertLogs(ctx context.Context, logs []Log) error {
+func (o *DSORM) InsertLogs(ctx context.Context, logs []types.Log) error {
 	if err := o.validateLogs(logs); err != nil {
 		return err
 	}
@@ -164,7 +165,7 @@ func (o *DSORM) InsertLogs(ctx context.Context, logs []Log) error {
 	})
 }
 
-func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.DataSource) error {
+func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sqlutil.DataSource) error {
 	batchInsertSize := 4000
 	for i := 0; i < len(logs); i += batchInsertSize {
 		start, end := i, i+batchInsertSize
@@ -200,7 +201,7 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 	return nil
 }
 
-func (o *DSORM) validateLogs(logs []Log) error {
+func (o *DSORM) validateLogs(logs []types.Log) error {
 	for _, log := range logs {
 		if o.chainID != log.ChainID {
 			return fmt.Errorf("invalid chainID in log got %v want %v", log.ChainID, o.chainID)
@@ -210,7 +211,7 @@ func (o *DSORM) validateLogs(logs []Log) error {
 }
 
 // SelectLogs finds the logs in a given block range.
-func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address PublicKey, eventSig EventSignature) ([]Log, error) {
+func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address types.PublicKey, eventSig types.EventSignature) ([]types.Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withStartBlock(start).
 		withEndBlock(end).
@@ -227,7 +228,7 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address Public
 		AND block_number <= :end_block
 		ORDER BY block_number, log_index`)
 
-	var logs []Log
+	var logs []types.Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
 		return nil, err
@@ -240,7 +241,7 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address Public
 	return logs, nil
 }
 
-func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, _ string) ([]Log, error) {
+func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, _ string) ([]types.Log, error) {
 	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter, limitAndSort)
 	if err != nil {
 		return nil, err
@@ -256,7 +257,7 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 		return nil, err
 	}
 
-	var logs []Log
+	var logs []types.Log
 	if err = o.ds.SelectContext(ctx, &logs, query, sqlArgs...); err != nil {
 		return nil, err
 	}
@@ -270,7 +271,7 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 	}
 
 	seen := make(map[Key]struct{}, len(logs))
-	res := make([]Log, 0, len(logs))
+	res := make([]types.Log, 0, len(logs))
 	for _, log := range logs {
 		key := Key{log.BlockNumber, log.LogIndex}
 		if _, ok := seen[key]; ok {
@@ -306,7 +307,7 @@ func (o *DSORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error) {
 	return seqNums, nil
 }
 
-func (o *DSORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+func (o *DSORM) PruneLogsForFilter(ctx context.Context, filter types.Filter) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 

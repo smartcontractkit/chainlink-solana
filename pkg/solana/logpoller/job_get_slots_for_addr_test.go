@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
@@ -24,7 +25,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 	require.NoError(t, err)
 	rawAddr, err := solana.PublicKeyFromBase58("Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o")
 	require.NoError(t, err)
-	address := PublicKey(rawAddr)
+	address :=  types.PublicKey(rawAddr)
 	const from = uint64(10)
 	const to = uint64(20)
 	t.Run("String representation contains all details", func(t *testing.T) {

@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 func TestLogPollerFilters(t *testing.T) {
@@ -29,15 +30,15 @@ func TestLogPollerFilters(t *testing.T) {
 	require.NoError(t, err)
 	pubKey := privateKey.PublicKey()
 	t.Run("Ensure all fields are readable/writable", func(t *testing.T) {
-		filters := []Filter{
+		filters := []types.Filter{
 			{
 				Name:          "happy path",
-				Address:       PublicKey(pubKey),
+				Address:       types.PublicKey(pubKey),
 				EventName:     "event",
-				EventSig:      EventSignature{1, 2, 3},
+				EventSig:      types.EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubkeyPaths:   SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-				EventIdl: EventIdl{
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: types.EventIdl{
 					Event: codec.IdlEvent{
 						Name:   "MyEvent",
 						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
@@ -51,19 +52,19 @@ func TestLogPollerFilters(t *testing.T) {
 			},
 			{
 				Name:          "empty sub key paths",
-				Address:       PublicKey(pubKey),
+				Address:       types.PublicKey(pubKey),
 				EventName:     "event",
-				EventSig:      EventSignature{1, 2, 3},
+				EventSig:      types.EventSignature{1, 2, 3},
 				StartingBlock: 1,
-				SubkeyPaths:   SubKeyPaths([][]string{}),
+				SubkeyPaths:   types.SubKeyPaths([][]string{}),
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
 			{
 				Name:          "nil sub key paths",
-				Address:       PublicKey(pubKey),
+				Address:       types.PublicKey(pubKey),
 				EventName:     "event",
-				EventSig:      EventSignature{1, 2, 3},
+				EventSig:      types.EventSignature{1, 2, 3},
 				StartingBlock: 1,
 				SubkeyPaths:   nil,
 				Retention:     1000,
@@ -90,7 +91,7 @@ func TestLogPollerFilters(t *testing.T) {
 
 				dbFilters, err := orm.SelectFilters(ctx)
 				require.NoError(t, err)
-				i := slices.IndexFunc(dbFilters, func(f Filter) bool {
+				i := slices.IndexFunc(dbFilters, func(f types.Filter) bool {
 					return f.ID == id
 				})
 				require.NotEqual(t, -1, i, "Expected filter to be present in slice")
@@ -156,7 +157,7 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		log := newRandomLog(t, filterID, chainID, "My Event")
 
-		err = orm.InsertLogs(ctx, []Log{log})
+		err = orm.InsertLogs(ctx, []types.Log{log})
 		require.NoError(t, err)
 		logs, err := orm.SelectLogs(ctx, 0, log.BlockNumber, log.Address, log.EventSig)
 		require.NoError(t, err)
@@ -226,10 +227,10 @@ func TestLogPollerLogs(t *testing.T) {
 	require.NoError(t, err)
 	log := newRandomLog(t, filterID, chainID, "My Event")
 	log2 := newRandomLog(t, filterID2, chainID, "My Event")
-	err = orm.InsertLogs(ctx, []Log{log, log2})
+	err = orm.InsertLogs(ctx, []types.Log{log, log2})
 	require.NoError(t, err)
 	// insert of the same Log should not produce two instances
-	err = orm.InsertLogs(ctx, []Log{log})
+	err = orm.InsertLogs(ctx, []types.Log{log})
 	require.NoError(t, err)
 
 	dbLogs, err := orm.SelectLogs(ctx, 0, 1000000, log.Address, log.EventSig)
@@ -263,7 +264,7 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 		for _, block := range blocks {
 			log := newRandomLog(t, filterID, orm.chainID, "My Event")
 			log.BlockNumber = block
-			err = orm.InsertLogs(ctx, []Log{log})
+			err = orm.InsertLogs(ctx, []types.Log{log})
 			require.NoError(t, err)
 		}
 	}
@@ -280,8 +281,8 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 	require.Equal(t, int64(120), latestBlockChain2)
 }
 
-func newRandomFilter(t *testing.T) Filter {
-	return Filter{
+func newRandomFilter(t *testing.T) types.Filter {
+	return types.Filter{
 		Name:          uuid.NewString(),
 		Address:       newRandomPublicKey(t),
 		EventName:     "event",
@@ -303,18 +304,18 @@ func TestFilteredLogs(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		input    []Log
-		expected []Log
+		input    []types.Log
+		expected []types.Log
 	}{
 		{
 			name: "simple, no duplicates",
-			input: []Log{
+			input: []types.Log{
 				{BlockNumber: 1, LogIndex: 0},
 				{BlockNumber: 2, LogIndex: 1},
 				{BlockNumber: 2, LogIndex: 2},
 				{BlockNumber: 3, LogIndex: 0},
 			},
-			expected: []Log{
+			expected: []types.Log{
 				{BlockNumber: 3, LogIndex: 0},
 				{BlockNumber: 2, LogIndex: 2},
 				{BlockNumber: 2, LogIndex: 1},
@@ -323,12 +324,12 @@ func TestFilteredLogs(t *testing.T) {
 		},
 		{
 			name: "with duplicates",
-			input: []Log{
+			input: []types.Log{
 				{BlockNumber: 1, LogIndex: 0}, // dup
 				{BlockNumber: 2, LogIndex: 2}, // dup
 				{BlockNumber: 3, LogIndex: 2},
 			},
-			expected: []Log{
+			expected: []types.Log{
 				{BlockNumber: 3, LogIndex: 2},
 				{BlockNumber: 3, LogIndex: 0},
 				{BlockNumber: 2, LogIndex: 2},
@@ -388,7 +389,7 @@ func TestPruneLogsForFilter(t *testing.T) {
 
 	filter.ID = filterID
 
-	logs := make([]Log, 7)
+	logs := make([]types.Log, 7)
 
 	for i := range logs {
 		logs[i].FilterID = filterID
@@ -425,7 +426,7 @@ func TestPruneLogsForFilter(t *testing.T) {
 
 		assert.Equal(t, int64(2), deleted)
 
-		var actual []Log
+		var actual []types.Log
 		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
 		require.NoError(t, err)
 
@@ -438,7 +439,7 @@ func TestPruneLogsForFilter(t *testing.T) {
 
 	t.Run("Expired logs should be pruned", func(t *testing.T) {
 		filter.MaxLogsKept = 18
-		var initial []Log
+		var initial []types.Log
 		initial, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
 		require.NoError(t, err)
 
@@ -456,14 +457,14 @@ func TestPruneLogsForFilter(t *testing.T) {
 
 		assert.Equal(t, int64(1), deleted)
 
-		var actual []Log
+		var actual []types.Log
 		actual, err = orm.SelectLogs(ctx, 0, 10, filter.Address, filter.EventSig)
 		require.NoError(t, err)
 		assert.Len(t, actual, len(initial)+1)
 	})
 }
 
-func sanitize(expected, actual *Log) {
+func sanitize(expected, actual *types.Log) {
 	// TODO: override ScanLocation with custom TimestamptzCodec?
 	// See: https://github.com/jackc/pgx/issues/2117
 	actual.CreatedAt = actual.CreatedAt.UTC().Round(0)

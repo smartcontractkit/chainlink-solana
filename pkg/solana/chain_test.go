@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 )
 
@@ -273,7 +274,7 @@ func ptr[T any](t T) *T {
 
 func TestChain_Transact(t *testing.T) {
 	ctx := t.Context()
-	url := client.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
 	// transaction parameters
@@ -282,7 +283,7 @@ func TestChain_Transact(t *testing.T) {
 	receiver, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	amount := big.NewInt(100_000_000_000 - 5_000) // total balance - tx fee
-	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+	solanatesting.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
 
 	// configuration
 	cfg := solcfg.NewDefault()
@@ -405,7 +406,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	ctx := t.Context()
-	url := client.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	lgr := logger.Test(t)
 
 	// transaction parameters
@@ -413,7 +414,7 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	require.NoError(t, err)
 	receiver, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	client.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+	solanatesting.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
 
 	// configuration
 	cfg := solcfg.NewDefault()
@@ -522,7 +523,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	cfg.Nodes = []*solcfg.Node{
 		{
 			Name: ptr("primary"),
-			URL:  config.MustParseURL(client.SetupLocalSolNode(t)),
+			URL:  config.MustParseURL(solanatesting.SetupLocalSolNode(t)),
 		},
 	}
 
@@ -555,7 +556,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	}()
 
 	// fund keys
-	client.FundTestAccounts(t, []solana.PublicKey{pubKey}, cfg.Nodes[0].URL.String())
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, cfg.Nodes[0].URL.String())
 
 	// track initial balance
 	selectedClient, err := testChain.getClient(ctx)

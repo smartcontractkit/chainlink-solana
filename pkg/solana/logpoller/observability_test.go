@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	ioprometheusclient "github.com/prometheus/client_model/go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -95,8 +96,8 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
 }
 
-func generateRandomLogs(t *testing.T, filterID int64, count int) []Log {
-	logs := make([]Log, count)
+func generateRandomLogs(t *testing.T, filterID int64, count int) []types.Log {
+	logs := make([]types.Log, count)
 	for i := range logs {
 		logs[i] = newRandomLog(t, filterID, chainID, "My Event")
 	}

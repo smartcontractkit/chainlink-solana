@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 var (
@@ -60,7 +61,7 @@ func TestDSLParser(t *testing.T) {
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
-			NewEventSigFilter(NewEventSignatureFromName("TestEvent")),
+			NewEventSigFilter(types.NewEventSignatureFromName("TestEvent")),
 			subkey,
 			query.Confidence(primitives.Unconfirmed),
 		}
@@ -98,7 +99,7 @@ func TestDSLParser(t *testing.T) {
 		parser := &pgDSLParser{}
 		expressions := []query.Expression{
 			NewAddressFilter(pk),
-			NewEventSigFilter(NewEventSignatureFromName("TestEvent")),
+			NewEventSigFilter(types.NewEventSignatureFromName("TestEvent")),
 			subkey,
 		}
 		limiter := query.NewLimitAndSort(query.CountLimit(20))
@@ -235,10 +236,10 @@ func TestDSLParser(t *testing.T) {
 			" WHERE chain_id = :chain_id " +
 				"AND subkey_values[:subkey_index_0] > :subkey_value_0 AND subkey_values[:subkey_index_0] < :subkey_value_1 ORDER BY " + defaultSort)
 
-		var iValLower, iValUpper IndexedValue
-		iValLower, err = newIndexedValue(4)
+		var iValLower, iValUpper types.IndexedValue
+		iValLower, err = types.NewIndexedValue(4)
 		require.NoError(t, err)
-		iValUpper, err = newIndexedValue(7)
+		iValUpper, err = types.NewIndexedValue(7)
 		require.NoError(t, err)
 
 		expectedArgs := map[string]any{
@@ -297,7 +298,7 @@ func TestDSLParser(t *testing.T) {
 		t.Parallel()
 
 		parser := &pgDSLParser{}
-		sigFilter := NewEventSigFilter(NewEventSignatureFromName("TestEvent"))
+		sigFilter := NewEventSigFilter(types.NewEventSignatureFromName("TestEvent"))
 
 		limiter := query.LimitAndSort{}
 		expressions := []query.Expression{

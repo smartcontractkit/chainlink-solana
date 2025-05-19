@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-framework/metrics"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 // ObservedORM is a decorator layer for ORM used by LogPoller, responsible for pushing Prometheus metrics reporting duration and size of result set for the queries.
@@ -44,7 +45,7 @@ func NewObservedORM(chainID string, chainFamily string, ds sqlutil.DataSource, l
 	}, nil
 }
 
-func (o *ObservedORM) InsertLogs(ctx context.Context, logs []Log) error {
+func (o *ObservedORM) InsertLogs(ctx context.Context, logs []types.Log) error {
 	err := withObservedExec(o, "InsertLogs", metrics.Create, func() error {
 		return o.ORM.InsertLogs(ctx, logs)
 	})
@@ -52,20 +53,20 @@ func (o *ObservedORM) InsertLogs(ctx context.Context, logs []Log) error {
 	return err
 }
 
-func (o *ObservedORM) InsertFilter(ctx context.Context, filter Filter) (id int64, err error) {
+func (o *ObservedORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64, err error) {
 	return id, withObservedExec(o, "InsertFilter", metrics.Create, func() (err error) {
 		id, err = o.ORM.InsertFilter(ctx, filter)
 		return err
 	})
 }
 
-func (o *ObservedORM) SelectFilters(ctx context.Context) ([]Filter, error) {
-	return withObservedQuery(o, "SelectFilters", func() ([]Filter, error) {
+func (o *ObservedORM) SelectFilters(ctx context.Context) ([]types.Filter, error) {
+	return withObservedQuery(o, "SelectFilters", func() ([]types.Filter, error) {
 		return o.ORM.SelectFilters(ctx)
 	})
 }
 
-func (o *ObservedORM) DeleteFilters(ctx context.Context, filters map[int64]Filter) error {
+func (o *ObservedORM) DeleteFilters(ctx context.Context, filters map[int64]types.Filter) error {
 	return withObservedExec(o, "DeleteFilters", metrics.Del, func() error {
 		return o.ORM.DeleteFilters(ctx, filters)
 	})
@@ -89,8 +90,8 @@ func (o *ObservedORM) SelectSeqNums(ctx context.Context) (map[int64]int64, error
 	})
 }
 
-func (o *ObservedORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
-	return withObservedQueryAndResults(o, queryName, func() ([]Log, error) {
+func (o *ObservedORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error) {
+	return withObservedQueryAndResults(o, queryName, func() ([]types.Log, error) {
 		return o.ORM.FilteredLogs(ctx, filter, limitAndSort, queryName)
 	})
 }
@@ -101,7 +102,7 @@ func (o *ObservedORM) GetLatestBlock(ctx context.Context) (int64, error) {
 	})
 }
 
-func (o *ObservedORM) PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error) {
+func (o *ObservedORM) PruneLogsForFilter(ctx context.Context, filter types.Filter) (int64, error) {
 	return withObservedExecAndRowsAffected(o, "PruneLogsForFilter", metrics.Del, func() (int64, error) {
 		return o.ORM.PruneLogsForFilter(ctx, filter)
 	})
@@ -150,7 +151,7 @@ func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType
 	return rowsAffected, err
 }
 
-func trackInsertedLogs(o *ObservedORM, logs []Log, err error) {
+func trackInsertedLogs(o *ObservedORM, logs []types.Log, err error) {
 	if err != nil {
 		return
 	}

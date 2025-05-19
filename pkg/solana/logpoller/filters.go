@@ -18,23 +18,24 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type filters struct {
 	orm  ORM
 	lggr logger.SugaredLogger
 
-	filtersByID            map[int64]*Filter
+	filtersByID            map[int64]*types.Filter
 	filtersByName          map[string]int64
-	filtersByAddress       map[PublicKey]map[EventSignature]map[int64]struct{}
+	filtersByAddress       map[types.PublicKey]map[types.EventSignature]map[int64]struct{}
 	filtersToBackfill      map[int64]struct{}
-	filtersToDelete        map[int64]Filter
+	filtersToDelete        map[int64]types.Filter
 	filtersMutex           sync.RWMutex
 	loadedFilters          atomic.Bool
 	knownPrograms          map[string]uint         // fast lookup to see if a base58-encoded ProgramID matches any registered filters
-	knownDiscriminators    map[EventSignature]uint // fast lookup based on raw discriminator bytes as string
+	knownDiscriminators    map[types.EventSignature]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
-	decoders               map[int64]Decoder
+	decoders               map[int64]types.Decoder
 	discriminatorExtractor codec.DiscriminatorExtractor
 }
 
@@ -42,7 +43,7 @@ func newFilters(lggr logger.Logger, orm ORM) *filters {
 	return &filters{
 		orm:                    orm,
 		lggr:                   logger.Sugared(lggr),
-		decoders:               make(map[int64]Decoder),
+		decoders:               make(map[int64]types.Decoder),
 		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
 	}
 }
@@ -64,7 +65,7 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 
 	fl.filtersMutex.Lock()
 	filtersToDelete := fl.filtersToDelete
-	fl.filtersToDelete = make(map[int64]Filter)
+	fl.filtersToDelete = make(map[int64]types.Filter)
 	fl.filtersMutex.Unlock()
 
 	if len(filtersToDelete) == 0 {
@@ -83,9 +84,9 @@ func (fl *filters) PruneFilters(ctx context.Context) error {
 }
 
 // Returns a randomly shuffled snapshot of all currently registered filters
-func (fl *filters) shuffledFilters() iter.Seq[Filter] {
+func (fl *filters) shuffledFilters() iter.Seq[types.Filter] {
 	fl.filtersMutex.Lock()
-	filterSlice := make([]*Filter, 0, len(fl.filtersByID))
+	filterSlice := make([]*types.Filter, 0, len(fl.filtersByID))
 	for _, filter := range fl.filtersByID {
 		filterSlice = append(filterSlice, filter)
 	}
@@ -96,7 +97,7 @@ func (fl *filters) shuffledFilters() iter.Seq[Filter] {
 		filterSlice[i], filterSlice[j] = filterSlice[j], filterSlice[i]
 	})
 
-	return func(yield func(Filter) bool) {
+	return func(yield func(types.Filter) bool) {
 		for _, filter := range filterSlice {
 			if !yield(*filter) {
 				return
@@ -144,7 +145,7 @@ func (fl *filters) HasFilter(ctx context.Context, name string) bool {
 // one of the fields defining resulting logs (Address, EventSig, EventIDL, SubKeyPaths) does not match original filter.
 // Otherwise, updates remaining fields and schedules backfill.
 // Warnings/debug information is keyed by filter name.
-func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
+func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) error {
 	if len(filter.Name) == 0 {
 		return errors.New("name is required")
 	}
@@ -204,7 +205,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter Filter) error {
 	return nil
 }
 
-func newDecoder(filter Filter) (Decoder, error) {
+func newDecoder(filter types.Filter) (types.Decoder, error) {
 	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
@@ -213,7 +214,7 @@ func newDecoder(filter Filter) (Decoder, error) {
 	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
-func (fl *filters) addToIndices(filter Filter, decoder Decoder) {
+func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {
 	fl.filtersByID[filter.ID] = &filter
 
 	if _, ok := fl.filtersByName[filter.Name]; ok {
@@ -225,7 +226,7 @@ func (fl *filters) addToIndices(filter Filter, decoder Decoder) {
 	fl.filtersByName[filter.Name] = filter.ID
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
 	if !ok {
-		filtersForAddress = make(map[EventSignature]map[int64]struct{})
+		filtersForAddress = make(map[types.EventSignature]map[int64]struct{})
 		fl.filtersByAddress[filter.Address] = filtersForAddress
 	}
 
@@ -286,7 +287,7 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 
 // removeFilterFromIndexes removes the filter from all indexes
 // WARNING: not thread safe, should only be called while fl.filtersMutex is locked
-func (fl *filters) removeFilterFromIndexes(filter Filter) {
+func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
@@ -334,7 +335,7 @@ func (fl *filters) removeFilterFromIndexes(filter Filter) {
 	}
 }
 
-func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]PublicKey, error) {
+func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]types.PublicKey, error) {
 	err := fl.LoadFilters(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load filters: %w", err)
@@ -343,8 +344,8 @@ func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]PublicKey, error
 	fl.filtersMutex.RLock()
 	defer fl.filtersMutex.RUnlock()
 
-	var result []PublicKey
-	set := map[PublicKey]struct{}{}
+	var result []types.PublicKey
+	set := map[types.PublicKey]struct{}{}
 	for _, filter := range fl.filtersByID {
 		if _, ok := set[filter.Address]; ok {
 			continue
@@ -359,12 +360,12 @@ func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]PublicKey, error
 
 // MatchingFilters - returns iterator to go through all matching filters.
 // Requires LoadFilters to be called at least once.
-func (fl *filters) matchingFilters(addr PublicKey, eventSignature EventSignature) iter.Seq[Filter] {
+func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.EventSignature) iter.Seq[types.Filter] {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to matchingFilters")
 		return nil
 	}
-	return func(yield func(Filter) bool) {
+	return func(yield func(types.Filter) bool) {
 		fl.filtersMutex.RLock()
 		defer fl.filtersMutex.RUnlock()
 		filters, ok := fl.filtersByAddress[addr]
@@ -388,7 +389,7 @@ func (fl *filters) matchingFilters(addr PublicKey, eventSignature EventSignature
 // MatchchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,
 // this will be called on every new event that happens on the blockchain, so it's important it returns immediately if it
 // doesn't match any registered filters.
-func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter] {
+func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter] {
 	// If this log message corresponds to an anchor event, then it must begin with an 8 byte discriminator,
 	// which will appear as the first 11 bytes of base64-encoded data. Standard base64 encoding RFC requires
 	// that any base64-encoded string must be padding with the = char to make its length a multiple of 4, so
@@ -420,19 +421,19 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[F
 		return nil
 	}
 
-	return fl.matchingFilters(PublicKey(addr), discriminator)
+	return fl.matchingFilters(types.PublicKey(addr), discriminator)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue
 // Requires LoadFilters to be called at least once.
-func (fl *filters) GetFiltersToBackfill() []Filter {
+func (fl *filters) GetFiltersToBackfill() []types.Filter {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to MatchingFilters")
 		return nil
 	}
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
-	result := make([]Filter, 0, len(fl.filtersToBackfill))
+	result := make([]types.Filter, 0, len(fl.filtersToBackfill))
 	for filterID := range fl.filtersToBackfill {
 		filter, ok := fl.filtersByID[filterID]
 		if !ok {
@@ -500,13 +501,13 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 		return nil
 	}
 	// reset filters' indexes to ensure we do not have partial data from the previous run
-	fl.filtersByID = make(map[int64]*Filter)
+	fl.filtersByID = make(map[int64]*types.Filter)
 	fl.filtersByName = make(map[string]int64)
-	fl.filtersByAddress = make(map[PublicKey]map[EventSignature]map[int64]struct{})
+	fl.filtersByAddress = make(map[types.PublicKey]map[types.EventSignature]map[int64]struct{})
 	fl.filtersToBackfill = make(map[int64]struct{})
-	fl.filtersToDelete = make(map[int64]Filter)
+	fl.filtersToDelete = make(map[int64]types.Filter)
 	fl.knownPrograms = make(map[string]uint)
-	fl.knownDiscriminators = make(map[EventSignature]uint)
+	fl.knownDiscriminators = make(map[types.EventSignature]uint)
 
 	filters, err := fl.orm.SelectFilters(ctx)
 	if err != nil {
@@ -520,7 +521,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 			continue
 		}
 
-		var decoder Decoder
+		var decoder types.Decoder
 		decoder, err = newDecoder(filter)
 		if err != nil {
 			return fmt.Errorf("failed to create decoder for filter %d: %w", filter.ID, err)

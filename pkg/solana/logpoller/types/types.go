@@ -1,4 +1,4 @@
-package logpoller
+package types
 
 import (
 	"context"
@@ -223,7 +223,7 @@ func (v IndexedValues) Value() (driver.Value, error) {
 	return byteArray.Value()
 }
 
-func newIndexedValue(typedVal any) (iVal IndexedValue, err error) {
+func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic recovered: %v while creating indexedValue for %T", r, typedVal)

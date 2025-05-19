@@ -17,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 var (
@@ -107,17 +108,17 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			}, nil
 		})
 
-	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), []logpoller.PublicKey{logpoller.PublicKey(address)}, 41, 44)
+	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), [] types.PublicKey{types.PublicKey(address)}, 41, 44)
 	require.NoError(t, err)
 	defer cleanUp()
-	var events []logpoller.ProgramEvent
+	var events []types.ProgramEvent
 	for event := range results {
 		events = append(events, event.Events...)
 	}
 
-	require.Equal(t, []logpoller.ProgramEvent{
+	require.Equal(t, []types.ProgramEvent{
 		{
-			BlockData: logpoller.BlockData{
+			BlockData: types.BlockData{
 				SlotNumber:          41,
 				BlockHeight:         40,
 				BlockTime:           timeStamp,
@@ -130,7 +131,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
 		},
 		{
-			BlockData: logpoller.BlockData{
+			BlockData: types.BlockData{
 				SlotNumber:          42,
 				BlockHeight:         41,
 				BlockTime:           timeStamp,
@@ -143,7 +144,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
 		},
 		{
-			BlockData: logpoller.BlockData{
+			BlockData: types.BlockData{
 				SlotNumber:          43,
 				BlockHeight:         42,
 				BlockTime:           timeStamp,
@@ -156,7 +157,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
 		},
 		{
-			BlockData: logpoller.BlockData{
+			BlockData: types.BlockData{
 				SlotNumber:          44,
 				BlockHeight:         43,
 				BlockTime:           timeStamp,

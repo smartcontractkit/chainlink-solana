@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 const blocksChBuffer = 16
@@ -17,23 +18,23 @@ type blocksSorter struct {
 	engine *services.Engine
 	lggr   logger.Logger
 
-	inBlocks         <-chan Block
+	inBlocks         <-chan types.Block
 	receivedNewBlock chan struct{}
 
-	outBlocks chan Block
+	outBlocks chan types.Block
 
 	mu          sync.Mutex
 	queue       *list.List
-	readyBlocks map[uint64]Block
+	readyBlocks map[uint64]types.Block
 }
 
 // newBlocksSorter - returns new instance of blocksSorter that writes blocks into output channel in order defined by expectedBlocks.
-func newBlocksSorter(inBlocks <-chan Block, lggr logger.Logger, expectedBlocks []uint64) (*blocksSorter, <-chan Block) {
+func newBlocksSorter(inBlocks <-chan types.Block, lggr logger.Logger, expectedBlocks []uint64) (*blocksSorter, <-chan types.Block) {
 	op := &blocksSorter{
 		queue:            list.New(),
-		readyBlocks:      make(map[uint64]Block),
+		readyBlocks:      make(map[uint64]types.Block),
 		inBlocks:         inBlocks,
-		outBlocks:        make(chan Block, blocksChBuffer),
+		outBlocks:        make(chan types.Block, blocksChBuffer),
 		receivedNewBlock: make(chan struct{}, 1),
 		lggr:             lggr,
 	}
@@ -100,7 +101,7 @@ func (p *blocksSorter) writeOrderedBlocks(ctx context.Context) {
 	}
 }
 
-func (p *blocksSorter) readNextReadyBlock() *Block {
+func (p *blocksSorter) readNextReadyBlock() *types.Block {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	element := p.queue.Front()

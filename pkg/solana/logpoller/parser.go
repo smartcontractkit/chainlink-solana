@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 const (
@@ -43,7 +44,7 @@ var (
 )
 
 type IndexedValueComparator struct {
-	Value    IndexedValue
+	Value    types.IndexedValue
 	Operator primitives.ComparisonOperator
 }
 
@@ -124,7 +125,7 @@ func (v *pgDSLParser) TxHash(prim primitives.TxHash) {
 	v.expression = fmt.Sprintf(
 		"%s = :%s",
 		txHashFieldName,
-		v.args.withIndexedField(txHashFieldName, PublicKey(txHash)),
+		v.args.withIndexedField(txHashFieldName, types.PublicKey(txHash)),
 	)
 }
 
@@ -406,12 +407,12 @@ func orderToString(dir query.SortDirection) (string, error) {
 }
 
 type addressFilter struct {
-	address PublicKey
+	address types.PublicKey
 }
 
 func NewAddressFilter(address solana.PublicKey) query.Expression {
 	return query.Expression{
-		Primitive: &addressFilter{address: PublicKey(address)},
+		Primitive: &addressFilter{address: types.PublicKey(address)},
 	}
 }
 
@@ -423,10 +424,10 @@ func (f *addressFilter) Accept(visitor primitives.Visitor) {
 }
 
 type eventSigFilter struct {
-	eventSig EventSignature
+	eventSig types.EventSignature
 }
 
-func NewEventSigFilter(sig EventSignature) query.Expression {
+func NewEventSigFilter(sig types.EventSignature) query.Expression {
 	return query.Expression{
 		Primitive: &eventSigFilter{eventSig: sig},
 	}
@@ -447,7 +448,7 @@ type eventBySubKeyFilter struct {
 func NewEventBySubKeyFilter(subKeyIndex uint64, valueComparers []primitives.ValueComparator) (query.Expression, error) {
 	var indexedValueComparators []IndexedValueComparator
 	for _, cmp := range valueComparers {
-		iVal, err := newIndexedValue(cmp.Value)
+		iVal, err := types.NewIndexedValue(cmp.Value)
 		if err != nil {
 			return query.Expression{}, err
 		}
@@ -473,7 +474,7 @@ func (f *eventBySubKeyFilter) Accept(visitor primitives.Visitor) {
 }
 
 // FormatContractReaderCursor is exported to ensure cursor structure remains consistent.
-func FormatContractReaderCursor(log Log) string {
+func FormatContractReaderCursor(log types.Log) string {
 	return fmt.Sprintf("%d-%d-%s", log.BlockNumber, log.LogIndex, log.TxHash.ToSolana().String())
 }
 
