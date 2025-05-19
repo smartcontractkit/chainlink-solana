@@ -280,7 +280,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 65; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  solanautils.GetRandomPubKey(t),
+				PublicKey:  GetRandomPubKey(t),
 				IsWritable: true,
 			}
 		}
@@ -305,7 +305,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  solanautils.GetRandomPubKey(t),
+				PublicKey:  GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
 				IsWritable: (i)%2 == 0,
 			}

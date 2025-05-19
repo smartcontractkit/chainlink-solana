@@ -432,7 +432,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	t.Run("CCIPExecute ArgsTransform ignores nil accounts in pool lookup table", func(t *testing.T) {
 		mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
 		mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
-		mandatoryAccounts := chainwriter.CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
+		mandatoryAccounts := CreateTestPubKeys(t, chainwriter.MandatoryExecuteAccounts)
 		// Accounts list contains other accounts before token addresses
 		accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts)+len(userMessagingAccounts))
 		for _, acc := range mandatoryAccounts {
@@ -441,7 +441,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		corruptTableMap := make(map[string]map[string][]*solana.AccountMeta)
 		corruptTableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
-		corruptLookupTablePubkey := utils.GetRandomPubKey(t)
+		corruptLookupTablePubkey := GetRandomPubKey(t)
 
 		poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys))
 		for _, poolKey := range poolKeys {
