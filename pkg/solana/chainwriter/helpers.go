@@ -1,7 +1,6 @@
 package chainwriter
 
 import (
-	"context"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/binary"
@@ -10,15 +9,10 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"testing"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type TestArgs struct {
@@ -187,35 +181,6 @@ func traversePath(data any, path []string) ([]any, error) {
 	}
 }
 
-func InitializeDataAccount(
-	ctx context.Context,
-	t *testing.T,
-	client *rpc.Client,
-	programID solana.PublicKey,
-	admin solana.PrivateKey,
-	lookupTable solana.PublicKey,
-) {
-	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("lookup")}, programID)
-	require.NoError(t, err)
-
-	discriminator := GetDiscriminator("initializelookuptable")
-
-	instructionData := append(discriminator[:], lookupTable.Bytes()...)
-
-	instruction := solana.NewInstruction(
-		programID,
-		solana.AccountMetaSlice{
-			solana.Meta(admin.PublicKey()).SIGNER().WRITE(),
-			solana.Meta(pda).WRITE(),
-			solana.Meta(solana.SystemProgramID),
-		},
-		instructionData,
-	)
-
-	// Send and confirm the transaction
-	utils.SendAndConfirm(ctx, t, client, []solana.Instruction{instruction}, admin, rpc.CommitmentFinalized)
-}
-
 func GetDiscriminator(instruction string) [8]byte {
 	fullHash := sha256.Sum256([]byte("global:" + ToSnakeCase(instruction)))
 	var discriminator [8]byte
@@ -227,12 +192,4 @@ func ToSnakeCase(s string) string {
 	s = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(s, "${1}_${2}")
 	s = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`).ReplaceAllString(s, "${1}_${2}")
 	return strings.ToLower(s)
-}
-
-func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
-	addresses := make([]solana.PublicKey, num)
-	for i := 0; i < num; i++ {
-		addresses[i] = utils.GetRandomPubKey(t)
-	}
-	return addresses
 }

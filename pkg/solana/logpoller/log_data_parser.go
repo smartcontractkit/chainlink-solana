@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 const programLog = "Program log: "
@@ -16,46 +16,13 @@ var (
 	consumedMatcher = regexp.MustCompile(`^Program \w* consumed (\d*) (.*)`)
 )
 
-type BlockData struct {
-	SlotNumber          uint64
-	BlockHeight         uint64
-	BlockHash           solana.Hash
-	BlockTime           solana.UnixTimeSeconds
-	TransactionHash     solana.Signature
-	TransactionIndex    int
-	TransactionLogIndex uint
-	Error               interface{}
-}
-
-type ProgramLog struct {
-	BlockData
-	Text   string
-	Prefix string
-}
-
-type ProgramEvent struct {
-	Program string
-	BlockData
-	Data string
-}
-
-type ProgramOutput struct {
-	Program      string
-	Logs         []ProgramLog
-	Events       []ProgramEvent
-	ComputeUnits uint
-	Truncated    bool
-	Failed       bool
-	ErrorText    string
-}
-
 func prefixBuilder(depth int) string {
 	return strings.Repeat(">", depth)
 }
 
-func ParseProgramLogs(logs []string) []ProgramOutput {
+func ParseProgramLogs(logs []string) []types.ProgramOutput {
 	programs := []string{}
-	instLogs := []ProgramOutput{}
+	instLogs := []types.ProgramOutput{}
 
 	// split ': ', use first part
 	// split ' '
@@ -66,7 +33,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 	// match 2 = success
 	// match 2 = failed, second part is reason
 
-	output := &ProgramOutput{}
+	output := &types.ProgramOutput{}
 
 	for _, log := range logs {
 		if strings.HasPrefix(log, programLog) {
@@ -77,7 +44,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 
 			depth := len(programs)
 			// this is a general log
-			output.Logs = append(output.Logs, ProgramLog{
+			output.Logs = append(output.Logs, types.ProgramLog{
 				Prefix: prefixBuilder(depth),
 				Text:   logData,
 			})
@@ -89,10 +56,10 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 			logData := log[len(programData):]
 
 			txLogIdx := uint(len(output.Events))
-			output.Events = append(output.Events, ProgramEvent{
+			output.Events = append(output.Events, types.ProgramEvent{
 				Program: programs[len(programs)-1],
 				Data:    logData,
-				BlockData: BlockData{
+				BlockData: types.BlockData{
 					TransactionLogIndex: txLogIdx,
 				},
 			})
@@ -108,7 +75,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 			if len(matches) > 0 {
 				depth := len(programs)
 				if depth == 0 {
-					instLogs = append(instLogs, ProgramOutput{
+					instLogs = append(instLogs, types.ProgramOutput{
 						Program: matches[1],
 					})
 					output = &instLogs[len(instLogs)-1]
@@ -133,7 +100,7 @@ func ParseProgramLogs(logs []string) []ProgramOutput {
 			} else {
 				depth := len(programs)
 				if depth == 0 {
-					instLogs = append(instLogs, ProgramOutput{})
+					instLogs = append(instLogs, types.ProgramOutput{})
 					output = &instLogs[len(instLogs)-1]
 				}
 

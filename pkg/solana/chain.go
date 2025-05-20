@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -40,9 +41,9 @@ type LogPoller interface {
 	Ready() error
 	Close() error
 	HasFilter(context.Context, string) bool
-	RegisterFilter(ctx context.Context, filter logpoller.Filter) error
+	RegisterFilter(ctx context.Context, filter logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
-	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
+	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
 	Replay(fromBlock int64)
 }
 

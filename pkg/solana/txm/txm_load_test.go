@@ -21,6 +21,7 @@ import (
 
 	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -33,7 +34,7 @@ func TestTxm_Integration(t *testing.T) {
 			t.Parallel() // run estimator tests in parallel
 
 			ctx := t.Context()
-			url := solanaClient.SetupLocalSolNode(t)
+			url := solanatesting.SetupLocalSolNode(t)
 
 			// setup key
 			key, err := solana.NewRandomPrivateKey()
@@ -49,7 +50,7 @@ func TestTxm_Integration(t *testing.T) {
 			pubKeyReceiver := privKeyReceiver.PublicKey()
 
 			// fund keys
-			solanaClient.FundTestAccounts(t, []solana.PublicKey{pubKey, loadTestKey.PublicKey()}, url)
+			solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey, loadTestKey.PublicKey()}, url)
 
 			// setup mock keystore
 			mkey := keyMocks.NewSimpleKeystore(t)

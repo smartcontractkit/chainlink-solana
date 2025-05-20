@@ -12,14 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
-
-type Block struct {
-	SlotNumber uint64
-	BlockHash  *solana.Hash
-	Events     []ProgramEvent
-}
 
 type RPCClient interface {
 	GetFirstAvailableBlock(ctx context.Context) (uint64, error)
@@ -64,7 +59,7 @@ func NewEncodedLogCollector(
 	return c
 }
 
-func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []PublicKey, fromSlot, toSlot uint64) ([]uint64, error) {
+func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) ([]uint64, error) {
 	// identify slots to fetch
 	slotsForAddressJobs := make([]*getSlotsForAddressJob, len(addresses))
 	slotsToFetch := make(map[uint64]struct{}, toSlot-fromSlot)
@@ -100,8 +95,8 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []P
 	return result, nil
 }
 
-func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan Block, error) {
-	blocks := make(chan Block)
+func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan types.Block, error) {
+	blocks := make(chan types.Block)
 	getBlockJobs := make([]*getBlockJob, len(slots))
 	for i, slot := range slots {
 		getBlockJobs[i] = newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot)
@@ -126,13 +121,13 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	return blocks, nil
 }
 
-func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresses []PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan Block, cleanUp func(), err error) {
+func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan types.Block, cleanUp func(), err error) {
 	slotsToFetch, err := c.getSlotsToFetch(ctx, addresses, fromSlot, toSlot)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("failed to identify slots to fetch: %w", err)
 	}
 
-	c.lggr.Debugw("Got all slots that need fetching for backfill operations", "addresses", PublicKeysToString(addresses), "fromSlot", fromSlot, "toSlot", toSlot, "slotsToFetch", slotsToFetch)
+	c.lggr.Debugw("Got all slots that need fetching for backfill operations", "addresses", types.PublicKeysToString(addresses), "fromSlot", fromSlot, "toSlot", toSlot, "slotsToFetch", slotsToFetch)
 
 	ctx, cancelJobs := context.WithCancel(ctx)
 	defer func() {

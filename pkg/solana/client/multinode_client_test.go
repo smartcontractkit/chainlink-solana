@@ -11,10 +11,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 )
 
 func initializeMultiNodeClient(t *testing.T) *MultiNodeClient {
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)

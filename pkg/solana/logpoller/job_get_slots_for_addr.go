@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/worker"
 )
 
@@ -19,7 +20,7 @@ var _ worker.Job = (*getSlotsForAddressJob)(nil)
 // calls storeSlot for each. If single request was not sufficient to identify all slots - schedules a new job. Channel
 // returned by Done() will be closed only when all jobs are done.
 type getSlotsForAddressJob struct {
-	address   PublicKey
+	address   types.PublicKey
 	beforeSig solana.Signature
 	from, to  uint64
 
@@ -31,7 +32,7 @@ type getSlotsForAddressJob struct {
 	workers   WorkerGroup
 }
 
-func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address types.PublicKey, from, to uint64) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
 		address:   address,
 		client:    client,

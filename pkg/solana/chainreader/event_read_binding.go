@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type eventReadBinding struct {
@@ -33,7 +34,7 @@ type eventReadBinding struct {
 
 	// static data
 	namespace, genericName string
-	eventSig               logpoller.EventSignature
+	eventSig               logpollertypes.EventSignature
 	indexedSubKeys         *indexedSubkeys
 	readDefinition         config.ReadDefinition
 
@@ -190,7 +191,7 @@ func (b *eventReadBinding) SetModifier(modifier commoncodec.Modifier) {
 	b.modifier = modifier
 }
 
-func (b *eventReadBinding) SetFilter(filter logpoller.Filter) {
+func (b *eventReadBinding) SetFilter(filter logpollertypes.Filter) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -395,7 +396,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 
 func (b *eventReadBinding) decodeLogsIntoSequences(
 	ctx context.Context,
-	logs []logpoller.Log,
+	logs []logpollertypes.Log,
 	into any,
 ) ([]types.Sequence, error) {
 	sequences := make([]types.Sequence, len(logs))
@@ -430,7 +431,7 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 	return sequences, nil
 }
 
-func (b *eventReadBinding) decodeLog(ctx context.Context, log *logpoller.Log, into any) error {
+func (b *eventReadBinding) decodeLog(ctx context.Context, log *logpollertypes.Log, into any) error {
 	itemType := codec.WrapItemType(false, b.namespace, b.genericName)
 
 	if err := b.codec.Decode(ctx, log.Data, into, itemType); err != nil {
@@ -463,7 +464,7 @@ func (b *eventReadBinding) unsetBinding() {
 	b.bound = false
 }
 
-func (b *eventReadBinding) wrapDecoderForValuer(log *logpoller.Log) func(context.Context, any) error {
+func (b *eventReadBinding) wrapDecoderForValuer(log *logpollertypes.Log) func(context.Context, any) error {
 	return func(ctx context.Context, returnVal any) error {
 		return b.decodeLog(ctx, log, returnVal)
 	}
