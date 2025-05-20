@@ -37,7 +37,7 @@ func TestTxDetailsSource(t *testing.T) {
 	cr.On("GetSignaturesForAddressWithOpts", mock.Anything, mock.Anything, mock.Anything).Return([]*rpc.TransactionSignature{}, nil).Once()
 	res, err := s.Fetch(t.Context())
 	require.NoError(t, err)
-	data := ParseTxDetails(t, res)
+	data := parseTxDetails(t, res)
 	assert.Equal(t, 0, len(data))
 
 	// nil GetTransaction response
@@ -47,7 +47,7 @@ func TestTxDetailsSource(t *testing.T) {
 	cr.On("GetTransaction", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
 	res, err = s.Fetch(t.Context())
 	require.NoError(t, err)
-	data = ParseTxDetails(t, res)
+	data = parseTxDetails(t, res)
 	assert.Equal(t, 0, len(data)) // ignores tx
 	assert.Equal(t, 1, logs.FilterLevelExact(zapcore.DebugLevel).FilterMessage("GetTransaction returned nil").Len())
 
@@ -63,7 +63,7 @@ func TestTxDetailsSource(t *testing.T) {
 	}, nil).Once()
 	res, err = s.Fetch(t.Context())
 	require.NoError(t, err)
-	data = ParseTxDetails(t, res)
+	data = parseTxDetails(t, res)
 	assert.Equal(t, 0, len(data)) // ignores tx
 	assert.Equal(t, 1, logs.FilterLevelExact(zapcore.DebugLevel).FilterMessage("tx not valid for tracking").Len())
 
@@ -76,7 +76,7 @@ func TestTxDetailsSource(t *testing.T) {
 	cr.On("GetTransaction", mock.Anything, mock.Anything, mock.Anything).Return(&rpcResponse, nil).Once()
 	res, err = s.Fetch(t.Context())
 	require.NoError(t, err)
-	data = ParseTxDetails(t, res)
+	data = parseTxDetails(t, res)
 	assert.Equal(t, 1, len(data))
 	assert.Nil(t, data[0].Err)
 	assert.NotEqual(t, solana.PublicKey{}, data[0].Sender)
@@ -85,9 +85,8 @@ func TestTxDetailsSource(t *testing.T) {
 	assert.NotZero(t, data[0].Slot)
 }
 
-func ParseTxDetails(t *testing.T, in interface{}) []types.TxDetails {
+func parseTxDetails(t *testing.T, in interface{}) []types.TxDetails {
 	t.Helper()
-
 	out, err := types.MakeTxDetails(in)
 	require.NoError(t, err)
 	return out
