@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/freeport"
 )
 
 func SetupLocalSolNode(t *testing.T) string {
@@ -29,17 +29,17 @@ func SetupLocalSolNode(t *testing.T) string {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := utils.MustRandomPort(t)
-	portInt, _ := strconv.Atoi(port)
+	port := freeport.GetN(t, 2)
+	portStr := strconv.Itoa(port[0])
 
-	faucetPort := utils.MustRandomPort(t)
-	url := "http://127.0.0.1:" + port
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(portInt+1) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
+	faucetPort := freeport.GetOne(t)
+	url := "http://127.0.0.1:" + portStr
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
-		"--rpc-port", port,
-		"--faucet-port", faucetPort,
+		"--rpc-port", portStr,
+		"--faucet-port", strconv.Itoa(faucetPort),
 		"--ledger", t.TempDir(),
 		// Configurations to make the local cluster faster
 		"--ticks-per-slot", "8", // value in mainnet: 64

@@ -189,7 +189,9 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 	// Build a hash set of account public keys for fast lookup
 	usedAccounts := make(map[string]struct{})
 	for _, account := range accounts {
-		usedAccounts[account.PublicKey.String()] = struct{}{}
+		if account != nil {
+			usedAccounts[account.PublicKey.String()] = struct{}{}
+		}
 	}
 
 	// Filter derived lookup tables
@@ -204,6 +206,9 @@ func (s *SolanaChainWriterService) FilterLookupTableAddresses(
 			foundUsedAddress := false
 			// Parse metas into public keys for filtered lookup table map
 			for _, meta := range metas {
+				if meta == nil {
+					continue
+				}
 				tableAddresses = append(tableAddresses, meta.PublicKey)
 				if _, exists := usedAccounts[meta.PublicKey.String()]; exists {
 					foundUsedAddress = true
@@ -355,6 +360,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		solana.TransactionPayer(feePayer),
 		solana.TransactionAddressTables(filteredLookupTableMap),
 	)
+
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
@@ -391,6 +397,10 @@ func (s *SolanaChainWriterService) GetFeeComponents(ctx context.Context) (*types
 		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: big.NewInt(0), // required field so return 0 instead of nil
 	}, nil
+}
+
+func (s *SolanaChainWriterService) GetEstimateFee(ctx context.Context, contract, method string, args any, toAddress string, meta *types.TxMeta, val *big.Int) (types.EstimateFee, error) {
+	return types.EstimateFee{}, errors.New("estimate fee is not implemented for solana")
 }
 
 func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args any, lookupTables LookupTables) (map[string]map[string][]*solana.AccountMeta, map[solana.PublicKey]solana.PublicKeySlice, error) {

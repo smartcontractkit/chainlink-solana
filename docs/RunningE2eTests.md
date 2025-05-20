@@ -32,7 +32,7 @@ By default all values are pulled either from `default.toml` or if we create an `
 
 ## Run tests
 
-`cd integration-tests/smoke && go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke -test.timeout 30m;`
+`cd integration-tests/smoke && go test -timeout 30m -count=1 -run TestSolanaOCRV2Smoke;`
 
 ### On demand soak test
 
@@ -54,4 +54,4 @@ If you want to kick off the test from local:
 - `export ENV_JOB_IMAGE: <internal_repo>/chainlink-solana-tests:<tag>`
 - Base64 the .toml config
 - Run `export BASE64_CONFIG_OVERRIDE="<config>"`
-- cd integration-tests/soak && go test -timeout 24h -count=1 -run TestSolanaOCRV2Soak -test.timeout 30m;
+- cd integration-tests/soak && go test -timeout 30m -count=1 -run TestSolanaOCRV2Soak;

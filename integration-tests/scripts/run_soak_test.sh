@@ -20,7 +20,7 @@ while IFS= read -r line; do
         terminated_by_script=true
         break
     fi
-done < <(sudo go test -timeout 24h -count=1 -run TestSolanaOCRV2Smoke/embedded -test.timeout 30m 2>&1)
+done < <(sudo go test -timeout 30m -count=1 -run TestSolanaOCRV2Smoke/embedded 2>&1)
 
 # Capture the PID of the background process
 READER_PID=$!

@@ -280,7 +280,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			Commitment: rpc.CommitmentFinalized,
 		})
 
-		if err != nil || accountInfo == nil || accountInfo.Value == nil {
+		if err != nil || accountInfo == nil || accountInfo.Value == nil || accountInfo.Value.Data == nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err))
 		}
 
