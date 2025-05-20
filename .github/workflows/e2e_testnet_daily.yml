@@ -98,7 +98,7 @@ jobs:
         with:
           should_checkout: true
           cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref }}
+          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
           push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
