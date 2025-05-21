@@ -83,6 +83,13 @@ describe("keystone_storage", function () {
   });
 
   it("Is initialized!", async () => {
+    // Check event is emitted
+    const listener = program.addEventListener("InitializeEmitEvent", (event, slot) => {
+      assert.isTrue(event.owner.equals(provider.wallet.publicKey), "Owner set")
+      assert.isNotNull(event.authorityNonce)
+      assert.isNotNull(event.authorityNonce)
+    });
+
     await program.methods
       .initialize()
       .accounts({
@@ -106,10 +113,28 @@ describe("keystone_storage", function () {
       "proposed owner is 0"
     );
     assert.equal(actualState.version, 1, "version 1");
+    await program.removeEventListener(listener);
   });
 
   it("Transfer ownership and back", async () => {
     const proposedOwner = Keypair.generate();
+
+    // transfer ownership event emitted
+    const transferOwnershipEventPromise = new Promise((resolve, reject) => {
+      const listener = program.addEventListener("TransferOwnershipEvent", (event, slot) => {
+        try {
+          assert.isTrue(
+            event.newOwner.equals(proposedOwner.publicKey),
+            "new owner key emitted"
+          );
+          resolve(event);
+        } catch (err) {
+          reject(err);
+        } finally {
+          program.removeEventListener(listener);
+        }
+      });
+    });
 
     // current owner initiates transfer to proposed owner
     await program.methods
@@ -132,6 +157,19 @@ describe("keystone_storage", function () {
       actualState1.proposedOwner.equals(proposedOwner.publicKey),
       "proposed owner set"
     );
+
+    const eventPromise = new Promise((resolve, reject) => {
+      const listener = program.addEventListener("AcceptOwnershipEvent", (event, slot) => {
+        try {
+          assert.isTrue(event.owner.equals(proposedOwner.publicKey), "accept owner key emitted");
+          resolve(event);
+        } catch (err) {
+          reject(err);
+        } finally {
+          program.removeEventListener(listener); // clean up
+        }
+      });
+    });
 
     // proposed owner accepts
     await program.methods
@@ -261,6 +299,23 @@ describe("keystone_storage", function () {
       )
     );
 
+    // Check event is emitted
+    const configSetEventPromise = new Promise((resolve, reject) => {
+      const listener = program.addEventListener("ConfigSetEvent", (event, slot) => {
+        try {
+          assert.isTrue(event.donId === 7, "don Id set");
+          assert.isTrue(event.f === f, "f is equal");
+          assert.isNotNull(event.signers, "signers not null");
+          assert.isTrue(event.configVersion === 3, "config version is 3");
+          resolve(event);
+        } catch (err) {
+          reject(err);
+        } finally {
+          program.removeEventListener(listener);
+        }
+      });
+    });
+
     // update to new f
     await program.methods
       .updateOraclesConfig(
@@ -350,7 +405,7 @@ describe("keystone_storage", function () {
 
     // console.log(`tx size w/ 17 nodes ${serializedTx.length}`);
 
-    await provider.sendAndConfirm(signedTx);
+     await provider.sendAndConfirm(signedTx);
 
     const actualConfig = await program.account.oraclesConfig.fetch(
       oraclesConfigStorage
@@ -516,6 +571,22 @@ describe("keystone_storage", function () {
 
     const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
       units: 1_400_000,
+    });
+
+    // Check event is emitted
+    const reportProcessedEventPromise = new Promise((resolve, reject) => {
+      const listener = program.addEventListener("ReportProcessedEvent", (event, slot) => {
+        try {
+          assert.isTrue(receiver.equals(event.receiver), "receiver pub key emitted");
+          assert.isTrue(event.result, "Successful report emitted");
+          assert.isNotNull(event.transmissionId, "Transmission Id present");
+          resolve(event);
+        } catch (err) {
+          reject(err);
+        } finally {
+          program.removeEventListener(listener);
+        }
+      })
     });
 
     const ix = await program.methods
@@ -694,5 +765,6 @@ describe("keystone_storage", function () {
         assert.fail(`Unexpected error: ${err.message}`);
       }
     }
+
   });
 });
