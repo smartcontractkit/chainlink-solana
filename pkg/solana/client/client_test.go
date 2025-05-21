@@ -23,15 +23,16 @@ import (
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 )
 
 func TestClient_Reader_Integration(t *testing.T) {
 	ctx := t.Context()
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
-	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -163,11 +164,11 @@ func TestClient_Reader_ChainID(t *testing.T) {
 }
 
 func TestClient_Writer_Integration(t *testing.T) {
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
-	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -264,11 +265,11 @@ func TestClient_Writer_Integration(t *testing.T) {
 }
 
 func TestClient_GetBlocks(t *testing.T) {
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
-	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -294,7 +295,7 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
@@ -319,11 +320,11 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	ctx := t.Context()
 	// set up environment
-	url := SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t)
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
-	FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	// create client
 	requestTimeout := 5 * time.Second

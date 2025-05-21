@@ -8,14 +8,14 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type syncedFilter struct {
 	// internal state properties
 	mu         sync.RWMutex
 	addressSet bool
-	filter     logpoller.Filter
+	filter     logpollertypes.Filter
 
 	dirty bool
 }
@@ -98,7 +98,7 @@ func (r *syncedFilter) unregister(ctx context.Context, registrar filterRegistrar
 	return nil
 }
 
-func (r *syncedFilter) SetFilter(filter logpoller.Filter) {
+func (r *syncedFilter) SetFilter(filter logpollertypes.Filter) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -126,13 +126,13 @@ func (r *syncedFilter) SetAddress(address solana.PublicKey) {
 func (r *syncedFilter) setAddress(address solana.PublicKey) {
 	r.addressSet = true
 
-	pkAddress := logpoller.PublicKey(address)
+	pkAddress := logpollertypes.PublicKey(address)
 	if r.filter.Address == pkAddress {
 		return
 	}
 
 	r.dirty = true
-	r.filter.Address = logpoller.PublicKey(address)
+	r.filter.Address = logpollertypes.PublicKey(address)
 }
 
 func (r *syncedFilter) AddressSet() bool {
@@ -152,7 +152,7 @@ func (r *syncedFilter) Dirty() bool {
 type FilterError struct {
 	Err    error
 	Action string
-	Filter logpoller.Filter
+	Filter logpollertypes.Filter
 }
 
 func (e FilterError) Error() string {

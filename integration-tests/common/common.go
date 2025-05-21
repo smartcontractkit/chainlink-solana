@@ -440,3 +440,14 @@ func (c *Common) Default(t *testing.T, namespacePrefix string) (*Common, error) 
 
 	return c, nil
 }
+
+func formatBuffer(buf []byte) string {
+	if len(buf) == 0 {
+		return ""
+	}
+	result := fmt.Sprintf("%d", buf[0])
+	for _, b := range buf[1:] {
+		result += fmt.Sprintf(",%d", b)
+	}
+	return result
+}

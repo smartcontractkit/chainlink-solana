@@ -27,7 +27,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
@@ -35,9 +35,9 @@ type EventsReader interface {
 	Start(ctx context.Context) error
 	Ready() error
 	HasFilter(context.Context, string) bool
-	RegisterFilter(context.Context, logpoller.Filter) error
+	RegisterFilter(context.Context, logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
-	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpoller.Log, error)
+	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
 }
 
 const ServiceName = "SolanaContractReader"
@@ -663,12 +663,12 @@ func toLPFilter(
 	conf config.PollingFilter,
 	subKeyPaths [][]string,
 	eventIdl codec.EventIDLTypes,
-) logpoller.Filter {
-	return logpoller.Filter{
+) logpollertypes.Filter {
+	return logpollertypes.Filter{
 		EventName:       name,
-		EventSig:        logpoller.NewEventSignatureFromName(name),
+		EventSig:        logpollertypes.NewEventSignatureFromName(name),
 		StartingBlock:   conf.GetStartingBlock(),
-		EventIdl:        logpoller.EventIdl(eventIdl),
+		EventIdl:        logpollertypes.EventIdl(eventIdl),
 		SubkeyPaths:     subKeyPaths,
 		Retention:       conf.GetRetention(),
 		MaxLogsKept:     conf.GetMaxLogsKept(),

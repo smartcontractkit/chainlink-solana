@@ -44,20 +44,17 @@ packages:
       WorkerGroup:
       filtersI:
         config:
-          inpackage: True
-          dir: "pkg/solana/logpoller"
+          dir: "pkg/solana/logpoller/mocks"
           filename: mock_filters.go
-          mockname: mockFilters
+          mockname: MockFilters
       logsLoader:
         config:
-          inpackage: True
-          dir: "pkg/solana/logpoller"
+          dir: "pkg/solana/logpoller/mocks"
           filename: mock_logs_loader.go
-          mockname: mockLogsLoader
+          mockname: MockLogsLoader
       ORM:
         config:
-          inpackage: True
-          dir: "pkg/solana/logpoller"
+          dir: "pkg/solana/logpoller/mocks"
           filename: mock_orm.go
           mockname: MockORM
   github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader:

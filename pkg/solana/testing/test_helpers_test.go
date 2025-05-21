@@ -1,4 +1,4 @@
-package client
+package testing
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -30,7 +31,7 @@ func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 	checkFunded := func(t *testing.T, url string) {
 		ctx := t.Context()
 		// create client
-		c, err := NewClient(url, cfg, requestTimeout, lggr)
+		c, err := client.NewClient(url, cfg, requestTimeout, lggr)
 		require.NoError(t, err)
 
 		// check init balance

@@ -29,6 +29,9 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollermocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
@@ -60,15 +63,15 @@ func TestEventLoader(t *testing.T) {
 	defer wsClient.Close()
 
 	require.NoError(t, err)
-	client.FundTestAccounts(t, []solana.PublicKey{privateKey.PublicKey()}, rpcURL)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{privateKey.PublicKey()}, rpcURL)
 
 	totalLogsToSend := 30
 	parser := &printParser{t: t}
 	sender := newLogSender(t, rpcClient, wsClient)
-	orm := logpoller.NewMockORM(t) // TODO: replace with real DB, when available
+	orm := logpollermocks.NewMockORM(t) // TODO: replace with real DB, when available
 	programPubKey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(t, err)
-	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpoller.Filter{{ID: 1, IsBackfilled: false, Address: logpoller.PublicKey(programPubKey)}}, nil).Once()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpollertypes.Filter{{ID: 1, IsBackfilled: false, Address: logpollertypes.PublicKey(programPubKey)}}, nil).Once()
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
@@ -135,7 +138,7 @@ func setupTestValidator(t *testing.T, upgradeAuthority string) (string, string) 
 		upgradeAuthority,
 	}
 
-	return client.SetupLocalSolNodeWithFlags(t, flags...)
+	return solanatesting.SetupLocalSolNodeWithFlags(t, flags...)
 }
 
 type testEvent struct {
@@ -150,7 +153,7 @@ type printParser struct {
 	values []uint64
 }
 
-func (p *printParser) ProcessBlocks(ctx context.Context, blocks []logpoller.Block) error {
+func (p *printParser) ProcessBlocks(ctx context.Context, blocks []logpollertypes.Block) error {
 	for _, b := range blocks {
 		err := p.process(b)
 		if err != nil {
@@ -161,7 +164,7 @@ func (p *printParser) ProcessBlocks(ctx context.Context, blocks []logpoller.Bloc
 	return nil
 }
 
-func (p *printParser) process(block logpoller.Block) error {
+func (p *printParser) process(block logpollertypes.Block) error {
 	p.t.Helper()
 
 	sum := sha256.Sum256([]byte("event:TestEvent"))

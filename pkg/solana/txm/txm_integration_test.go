@@ -19,23 +19,23 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
+	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 
-	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-
-	solanaClient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	solanaclient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 	t.Parallel()
-	url := solanaClient.SetupLocalSolNode(t) // live validator
+	url := solanatesting.SetupLocalSolNode(t) // live validator
 
 	type TestCase struct {
 		name                    string
@@ -116,7 +116,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Context, *solanaClient.Client, *Txm, solana.PublicKey, solana.PublicKey, *observer.ObservedLogs) {
+func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Context, *solanaclient.Client, *Txm, solana.PublicKey, solana.PublicKey, *observer.ObservedLogs) {
 	ctx := t.Context()
 
 	// Generate sender and receiver keys and fund sender account
@@ -126,7 +126,7 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 	receiverKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	receiverPubKey := receiverKey.PublicKey()
-	solanaClient.FundTestAccounts(t, []solana.PublicKey{senderPubKey}, url)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{senderPubKey}, url)
 
 	// Set up mock keystore with sender key
 	mkey := keyMocks.NewSimpleKeystore(t)
@@ -142,9 +142,9 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 
 	// Initialize the Solana client and TXM
 	lggr, obs := logger.TestObserved(t, zapcore.DebugLevel)
-	client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
+	client, err := solanaclient.NewClient(url, cfg, 2*time.Second, lggr)
 	require.NoError(t, err)
-	loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
+	loader := utils.NewStaticLoader[solanaclient.ReaderWriter](client)
 	txmInstance := NewTxm("localnet", loader, nil, cfg, mkey, lggr)
 	servicetest.Run(t, txmInstance)
 
@@ -152,7 +152,7 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 }
 
 // createTransaction is a helper function to create a transaction based on the test case.
-func createTransaction(ctx context.Context, t *testing.T, client *solanaClient.Client, senderPubKey, receiverPubKey solana.PublicKey, amount uint64, useValidBlockHash bool) (*solana.Transaction, uint64) {
+func createTransaction(ctx context.Context, t *testing.T, client *solanaclient.Client, senderPubKey, receiverPubKey solana.PublicKey, amount uint64, useValidBlockHash bool) (*solana.Transaction, uint64) {
 	var blockhash solana.Hash
 	var lastValidBlockHeight uint64
 
@@ -190,7 +190,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 	t.Run("no reorg", func(t *testing.T) {
 		// Setup live validator and test environment
 		t.Parallel()
-		url := solanaClient.SetupLocalSolNode(t)
+		url := solanatesting.SetupLocalSolNode(t)
 		ctx, client, txmInstance, senderPubKey, receiverPubKey, observer := setup(t, url, true)
 
 		// Record initial balance
@@ -273,7 +273,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 func TestTxm_Integration_DependencyTx(t *testing.T) {
 	t.Parallel()
 
-	url := solanaClient.SetupLocalSolNode(t) // live validator
+	url := solanatesting.SetupLocalSolNode(t) // live validator
 	const amount = 1 * solana.LAMPORTS_PER_SOL
 	ctx, client, txmInstance, senderPubKey, receiverPubKey, observer := setup(t, url, true)
 
@@ -402,4 +402,11 @@ func waitForStatus(t *testing.T, txmInstance *Txm, txID string, targetStatus typ
 		}
 		return status == targetStatus
 	}, waitFor, tick, "Transaction failed to eventually reach target status")
+}
+
+func GetRandomPubKey(t *testing.T) solana.PublicKey {
+	t.Helper()
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	return privKey.PublicKey()
 }

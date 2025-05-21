@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-framework/metrics"
@@ -95,8 +97,8 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
 }
 
-func generateRandomLogs(t *testing.T, filterID int64, count int) []Log {
-	logs := make([]Log, count)
+func generateRandomLogs(t *testing.T, filterID int64, count int) []types.Log {
+	logs := make([]types.Log, count)
 	for i := range logs {
 		logs[i] = newRandomLog(t, filterID, chainID, "My Event")
 	}

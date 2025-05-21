@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 // getBlockJob is a job that fetches a block with transactions, converts logs into ProgramEvents and writes them into blocks channel
@@ -19,13 +20,13 @@ type getBlockJob struct {
 	slotNumber       uint64
 	stopCh           services.StopRChan
 	client           RPCClient
-	blocks           chan Block
+	blocks           chan types.Block
 	done             chan struct{}
-	parseProgramLogs func(logs []string) []ProgramOutput
+	parseProgramLogs func(logs []string) []types.ProgramOutput
 	lggr             logger.SugaredLogger
 }
 
-func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
+func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
 	return &getBlockJob{
 		client:           client,
 		blocks:           blocks,
@@ -74,10 +75,10 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		}
 		if oldestAvailableSlot > j.slotNumber {
 			j.lggr.Warnf("slot %d is pruned away, as oldest available slot is %d. skipping this slot", j.slotNumber, oldestAvailableSlot)
-			result := Block{
+			result := types.Block{
 				SlotNumber: j.slotNumber,
 				BlockHash:  nil,
-				Events:     []ProgramEvent{},
+				Events:     []types.ProgramEvent{},
 			}
 			select {
 			case <-ctx.Done():
@@ -105,7 +106,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	}
 	detail.blockTime = *block.BlockTime
 
-	events := make([]ProgramEvent, 0, len(block.Transactions))
+	events := make([]types.ProgramEvent, 0, len(block.Transactions))
 	for idx, txWithMeta := range block.Transactions {
 		detail.trxIdx = idx
 		if txWithMeta.Transaction == nil {
@@ -130,7 +131,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 
 	j.lggr.Debugf("found %d events at slot %d", len(events), j.slotNumber)
 
-	result := Block{
+	result := types.Block{
 		SlotNumber: j.slotNumber,
 		BlockHash:  &block.Blockhash,
 		Events:     events,
@@ -145,9 +146,9 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	return nil
 }
 
-func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []ProgramEvent {
+func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []types.ProgramEvent {
 	var logIdx uint
-	events := make([]ProgramEvent, 0, len(messages))
+	events := make([]types.ProgramEvent, 0, len(messages))
 	for _, outputs := range j.parseProgramLogs(messages) {
 		for i, event := range outputs.Events {
 			event.SlotNumber = detail.slotNumber
