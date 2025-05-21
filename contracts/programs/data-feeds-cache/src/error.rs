@@ -51,5 +51,8 @@ pub enum DataCacheError {
     MaxWorkflowsExceeded,
 
     #[msg("addresses must strictly increase")]
-    AddressesMustStrictlyIncrease
+    AddressesMustStrictlyIncrease,
+
+    #[msg("out of bounds")]
+    OutOfBounds,
 }
