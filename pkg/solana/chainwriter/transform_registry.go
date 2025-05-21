@@ -107,7 +107,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
