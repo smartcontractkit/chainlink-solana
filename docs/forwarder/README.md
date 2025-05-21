@@ -118,6 +118,23 @@ pub struct OnReport<'info> {
 }
 ```
 
+The anatomy of the metadata and report sent to the receiver is as follows:
+
+```
+metadata = workflow_cid (32) | workflow_name (10) | workflow_owner (20) | report_id (2)
+
+// workflow_cid           offset  0, size 32
+// workflow_name          offset  32, size 10
+// workflow_owner         offset  42, size 20
+// report_id              offset  62, size  2
+```
+
+```
+report = (X bytes)
+```
+
+where the report byte array is borsh-serialized
+
 As noted above, it is crucial that the receiver program verify the forwarder authority is a PDA derived from the forwarder state account.
 
 ## transaction size

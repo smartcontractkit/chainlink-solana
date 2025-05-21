@@ -1,4 +1,8 @@
+
 use anchor_lang::prelude::*;
+use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
+use std::{io::Write, ops::DerefMut};
+use std::io::Cursor;
 
 declare_id!("3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa");
 
@@ -19,8 +23,7 @@ use anchor_lang::solana_program::hash;
 pub mod data_feeds_cache {
 
     use anchor_lang::{solana_program::{program::invoke_signed, system_instruction}, Discriminator};
-    use keystone_forwarder::AuthError;
-    use state::WorkflowMetadata;
+    use state::{ReceivedDecimalReport, WorkflowMetadata};
 
     use crate::{common::ANCHOR_DISCRIMINATOR, state::WritePermissionFlag};
 
@@ -45,41 +48,63 @@ pub mod data_feeds_cache {
     }
 
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
-        let state = ctx.accounts.state.load()?;
-        require!(ctx.accounts.owner.key == &state.owner, AuthError::Unauthorized);
+        let mut state = ctx.accounts.state.load_mut()?;
 
-
-        // set feed admin . make sure it's sorted and what not
+        match state.feed_admins.binary_search_by(|a| { a.cmp(&admin) }) {
+            Ok(i) => {
+                if !is_admin {
+                    state.feed_admins.remove(i);
+                }
+            }, 
+            Err(i) => {
+                if is_admin {
+                    state.feed_admins.insert(i, admin);
+                }
+            }
+        };
         Ok(())
     }
 
     pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
+        let state = &mut ctx.accounts.state.load_mut()?;
+        state.proposed_owner = proposed_owner;
 
         Ok(())
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        
-        Ok(())
-    }
+        let state = &mut ctx.accounts.state.load_mut()?;
 
-
-    pub fn init_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>) -> Result<()> {
-          // data_ids are sorted,
-        // len(data_ids) == len(legacy_feeds)
+        state.owner = state.proposed_owner;
+        state.proposed_owner = Pubkey::default();
 
         Ok(())
     }
 
-    pub fn set_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>, legacy_store: Pubkey) -> Result<()> {
-        // data_ids are sorted,
-        // len(data_ids) == len(legacy_feeds)
-        Ok(())
-    }
+    // todo: should i write out the entire logic for this? it should
+    // probably query the contract... and feed ids of each one as a precaution?
+    // pub fn init_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>) -> Result<()> {
+    //     // ensure data_ids are sorted,
 
-    pub fn close_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>) -> Result<()> {
-        Ok(())
-    }
+
+    //     for (i, data_id) in data_ids.iter().enumerate() {
+
+    //     }
+    //     // len(data_ids) == len(legacy_feeds)
+    //     let legacy_feeds_config = &mut ctx.accounts.legacy_feeds_config.load_init()?;
+    //     legacy_feeds_config.
+    //     Ok(())
+    // }
+
+    // pub fn set_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>, legacy_store: Pubkey) -> Result<()> {
+    //     // data_ids are sorted,
+    //     // len(data_ids) == len(legacy_feeds)
+    //     Ok(())
+    // }
+
+    // pub fn close_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>) -> Result<()> {
+    //     Ok(())
+    // }
 
 
     // in general, you always add before removing for making things
@@ -112,13 +137,18 @@ pub mod data_feeds_cache {
         let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
         let permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..];
 
+        let cache_state_key = ctx.accounts.state.key();
+
         for (i, curr_data_id) in data_ids.iter().enumerate() {
 
             require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
 
             // derive the PDA
             // get the existing config feed , see if it's empty or not
-            let (curr_feed_config, feed_config_bump) = Pubkey::find_program_address(&[b"feed_config", curr_data_id], &crate::ID);
+            let (curr_feed_config, feed_config_bump) = Pubkey::find_program_address(
+                &[b"feed_config", cache_state_key.as_ref(), curr_data_id], 
+                &crate::ID
+            );
 
             // the feed config accounts should be in order
             require!(feed_config_account_infos[i].key() == curr_feed_config, DataCacheError::AccountMismatch);
@@ -131,7 +161,7 @@ pub mod data_feeds_cache {
             } else {
                 let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE);
                 // initialize it
-                let seeds: &[&[u8]] = &[b"feed_config", curr_data_id, &[feed_config_bump]];
+                let seeds: &[&[u8]] = &[b"feed_config", cache_state_key.as_ref(), curr_data_id, &[feed_config_bump]];
 
                 invoke_signed(
                     &system_instruction::create_account(
@@ -149,14 +179,18 @@ pub mod data_feeds_cache {
                     &[seeds],
                 )?;
 
+                // avoid double borrow to write discriminator
+                {
+                    let mut dst = feed_config_account_infos[i].try_borrow_mut_data()?;
+                    dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&FeedConfig::discriminator());
+                }
+
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
             };
 
-            let mut feed_config = if feed_config_exists {
-                feed_config_loader.load_mut()?
-            } else {
-                feed_config_loader.load_init()?
-            };
+
+            // load_mut instead of load_mut because we write the discriminator above
+            let mut feed_config = feed_config_loader.load_mut()?;
 
             let mut stale_permission_flag_accounts: Vec<Pubkey> = Vec::new();
 
@@ -168,9 +202,15 @@ pub mod data_feeds_cache {
                 for (i, metadata) in feed_config.workflow_metadata.iter().enumerate() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
 
+                    let derived_report_hash = create_report_hash(
+                        curr_data_id, 
+                        &metadata.allowed_sender, 
+                        &metadata.allowed_workflow_owner, 
+                        &metadata.allowed_workflow_name
+                    );
                     // todo: should you store the nonce? or permission account in metadata? i don't think it is necessary
                     let (permission_flag, _) = Pubkey::find_program_address(
-                        &[b"permission", &create_report_hash(curr_data_id, &metadata.allowed_sender, &metadata.allowed_workflow_owner, &metadata.allowed_workflow_name)],
+                        &[b"permission_flag", cache_state_key.as_ref(), &derived_report_hash],
                         &crate::ID,
                     );
 
@@ -188,19 +228,19 @@ pub mod data_feeds_cache {
 
                 let report_hash = create_report_hash(curr_data_id, &metadata.allowed_sender, &metadata.allowed_workflow_owner, &metadata.allowed_workflow_name);
                 let (curr_permission_flag, bump) = Pubkey::find_program_address(
-                    &[b"permission_flag", &report_hash],
+                    &[b"permission_flag", ctx.accounts.state.key().as_ref(), &report_hash],
                     &crate::ID,
                 );
 
                 // ex: data_ids: [1, 2]
                 // workflow metdatas [5, 6, 7]
                 // ctx remaining accounts: 
-                // [1-feed-config]
-                // [2-feed-config] 
-                // [flag-1-5] [flag-1-6] [flag-1-7] 
-                // [flag-2-5] [flag-2-6] [flag-2-7]
+                // [1-feed-config]  |- feed_config_accounts
+                // [2-feed-config]  |
+                // [flag-1-5] [flag-1-6] [flag-1-7]  |- permission_flag_accounts
+                // [flag-2-5] [flag-2-6] [flag-2-7]  |
 
-                let permission_flag_account_info = &permission_flag_account_infos[data_ids.len() + i*workflow_metadatas.len() + j];
+                let permission_flag_account_info = &permission_flag_account_infos[i*workflow_metadatas.len() + j];
 
                 // check that it is in the remaining accounts
                 require!(&curr_permission_flag == permission_flag_account_info.key, DataCacheError::AccountMismatch);
@@ -209,7 +249,7 @@ pub mod data_feeds_cache {
                 if permission_flag_account_info.data_is_empty() {
                     let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR);
 
-                    let seeds: &[&[u8]] = &[b"permission_flag", &report_hash, &[bump]];
+                    let seeds: &[&[u8]] = &[b"permission_flag", cache_state_key.as_ref(), &report_hash, &[bump]];
 
                     invoke_signed(
                         &system_instruction::create_account(
@@ -289,7 +329,69 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    pub fn on_report(ctx: Context<OnReport>) -> Result<()> {
+    pub fn close_stale_permission_accounts<'info>(ctx: Context<'_, '_, 'info, 'info, CloseStalePermissionAccounts<'info>>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+        let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
+        let stale_permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..];
+       
+       let mut flag_idx = 0;
+       // for each of the data ids , read the account. should be in order.
+       for (i, curr_data_id) in data_ids.iter().enumerate() {
+            require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
+
+            // derive the PDA
+            // get the existing config feed , see if it's empty or not
+            let (curr_feed_config_key, _feed_config_bump) = Pubkey::find_program_address(
+                &[b"feed_config", ctx.accounts.state.key().as_ref(), curr_data_id], 
+                &crate::ID
+            );
+
+            // the feed config accounts should be in order
+            require!(feed_config_account_infos[i].key() == curr_feed_config_key, DataCacheError::AccountMismatch);
+
+            let loader = AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?;
+
+            let mut curr_feed_config = loader.load_mut()?;
+            // close stale accounts
+            for (i, stale_account_key) in curr_feed_config.stale_permission_accounts.iter().enumerate() {
+                let curr_stale_account_info = stale_permission_flag_account_infos[flag_idx].clone();
+                require!(stale_account_key == curr_stale_account_info.key, DataCacheError::AccountMismatch);
+                close_account(curr_stale_account_info, ctx.accounts.feed_admin.to_account_info())?;
+                flag_idx += 1;
+            }
+
+            curr_feed_config.stale_permission_accounts.clear();
+       }
+
+        Ok(())
+    }
+
+    // // todo: change report and metadata to &[u8]
+    // pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
+    //     // verify each of the report hashes for each of the reports
+    //     // first, solve if legacy_store and legacy_feed_config is
+
+    //     let (workflow_owner, workflow_name) = get_workflow_metadata(&metadata)?;
+
+    //     let decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
+
+    //     for (i, decimal_report) in decimal_reports.iter().enumerate() {
+    //         let ReceivedDecimalReport { data_id, answer, timestamp } = decimal_report;
+    //         let reportHash = create_report_hash(
+    //             data_id, 
+    //             &ctx.accounts.forwarder_authority.key(), 
+    //             workflow_owner, 
+    //             workflow_name
+    //         );
+
+
+    //     };
+
+
+
+    //     Ok(())
+    // }
+
+    pub fn test_option(ctx: Context<TestOption>) -> Result<()> {
 
         Ok(())
     }
@@ -304,9 +406,6 @@ pub mod data_feeds_cache {
     // pub fn get_feed_metadata(ctx: Context<GetFeedMetadata>, data_ids: Vec<[u8; 2]>, start_index: usize, max_count: usize) -> Result<()> {
     //     Ok(())
     // }
-
-
-
 
 
 }
@@ -330,4 +429,34 @@ fn get_decimals(data_id: &[u8; 16]) -> u8 {
     } else {
         0
     }
+}
+
+fn close_account(account: AccountInfo, destination: AccountInfo) -> Result<()> {
+    **destination.lamports.borrow_mut() = destination
+        .lamports()
+        .checked_add(account.lamports())
+        .unwrap();
+    **account.lamports.borrow_mut() = 0;
+
+    let mut data = account.try_borrow_mut_data()?;
+    for byte in data.deref_mut().iter_mut() {
+        *byte = 0;
+    }
+
+    let dst: &mut [u8] = &mut data;
+    let mut cursor = Cursor::new(dst);
+    cursor.write_all(&CLOSED_ACCOUNT_DISCRIMINATOR).unwrap();
+
+    Ok(())
+}
+
+// workflow_cid           offset  0, size 32
+// workflow_name          offset  32, size 10
+// workflow_owner         offset  42, size 20
+// report_id              offset  62, size  2
+fn get_workflow_metadata(metadata: &[u8]) -> Result<(&[u8], &[u8])> {
+    let workflow_name = metadata.get(32..42).ok_or(DataCacheError::OutOfBounds)?;
+    let workflow_owner = metadata.get(42..52).ok_or(DataCacheError::OutOfBounds)?;
+
+    Ok((workflow_name, workflow_owner))
 }

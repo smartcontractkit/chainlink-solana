@@ -20,7 +20,7 @@ pub struct CacheState {
     pub feed_admins: AdminList
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
 pub struct ReceivedDecimalReport {
     pub timestamp: u32,
     pub answer: u128,
