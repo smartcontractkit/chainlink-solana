@@ -119,6 +119,9 @@ jobs:
 
   relay_run_interface_tests:
     name: Relay Run Interface Tests
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
@@ -156,7 +159,23 @@ jobs:
       - name: Install Solana CLI
         run: ../scripts/install-solana-ci.sh
 
+      - name: Setup Postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+        with:
+          tmpfs: 'true'
+
+      - name: Get core ref
+        id: get-core-ref
+        uses: ./.github/actions/get-core-ref
+
+      - name: Setup Test DB
+        uses: ./.github/actions/setup-testdb
+        id: setup-testdb
+        with:
+          core-ref: ${{ steps.get-core-ref.outputs.core-ref }}
       - name: Test Relay Interfaces
+        env:
+          CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
         run: |
           set -eoux pipefail
           # compile artifacts

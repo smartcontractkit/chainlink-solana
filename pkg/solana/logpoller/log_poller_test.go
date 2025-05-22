@@ -25,22 +25,23 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type mockedLP struct {
-	ORM       *MockORM
+	ORM       *mocks.MockORM
 	Client    *mocks.RPCClient
-	Loader    *mockLogsLoader
-	Filters   *mockFilters
+	Loader    *mocks.MockLogsLoader
+	Filters   *mocks.MockFilters
 	LogPoller *Service
 }
 
 func newMockedLPwithConfig(t *testing.T, cfg config.Config) mockedLP {
 	result := mockedLP{
-		ORM:     NewMockORM(t),
+		ORM:     mocks.NewMockORM(t),
 		Client:  mocks.NewRPCClient(t),
-		Loader:  newMockLogsLoader(t),
-		Filters: newMockFilters(t),
+		Loader:  mocks.NewMockLogsLoader(t),
+		Filters: mocks.NewMockFilters(t),
 	}
 	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client, cfg)
 	result.LogPoller.loader = result.Loader
@@ -64,7 +65,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{{StartingBlock: 16}}).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{{StartingBlock: 16}}).Once()
 
 		expectedErr := errors.New("loaderFailed")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
@@ -75,15 +76,15 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]Filter{
-			{ID: 1, StartingBlock: 16, Address: PublicKey{1, 2, 3}},
-			{ID: 2, StartingBlock: 12, Address: PublicKey{1, 2, 3}},
-			{ID: 3, StartingBlock: 14, Address: PublicKey{3, 2, 1}},
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+			{ID: 1, StartingBlock: 16, Address: types.PublicKey{1, 2, 3}},
+			{ID: 2, StartingBlock: 12, Address: types.PublicKey{1, 2, 3}},
+			{ID: 3, StartingBlock: 14, Address: types.PublicKey{3, 2, 1}},
 		}).Once()
 		done := func() {}
-		blocks := make(chan Block)
+		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128)).Return(blocks, done, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128)).Return(blocks, done, nil).Once()
 		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, filterID int64) error {
 			switch filterID {
 			case 1:
@@ -122,7 +123,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
-		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
+		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
@@ -133,7 +134,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
-		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
+		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "last processed slot 128 is higher than highest RPC slot 16")
@@ -143,7 +144,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
-		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
+		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
@@ -155,9 +156,9 @@ func TestLogPoller_run(t *testing.T) {
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
-		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]PublicKey{{}}, nil).Once()
+		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
-		blocks := make(chan Block)
+		blocks := make(chan types.Block)
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
 		err := lp.LogPoller.run(t.Context())
@@ -296,7 +297,7 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 	t.Run("Can abort by cancelling context", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		lp := newMockedLP(t)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, []PublicKey, uint64, uint64) (<-chan Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, []types.PublicKey, uint64, uint64) (<-chan types.Block, func(), error) {
 			cancel()
 			return nil, funcWithCallExpectation(t), nil
 		}).Once()
@@ -305,9 +306,9 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		lp := newMockedLP(t)
-		blocks := make(chan Block, 2)
-		blocks <- Block{}
-		blocks <- Block{}
+		blocks := make(chan types.Block, 2)
+		blocks <- types.Block{}
+		blocks <- types.Block{}
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
 		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
@@ -320,14 +321,14 @@ func TestProcess(t *testing.T) {
 
 	addr := newRandomPublicKey(t)
 	eventName := "myEvent"
-	eventSig := NewEventSignatureFromName(eventName)
+	eventSig := types.NewEventSignatureFromName(eventName)
 	event := struct {
 		A int64
 		B string
 	}{55, "hello"}
-	subKeyValA, err := newIndexedValue(event.A)
+	subKeyValA, err := types.NewIndexedValue(event.A)
 	require.NoError(t, err)
-	subKeyValB, err := newIndexedValue(event.B)
+	subKeyValB, err := types.NewIndexedValue(event.B)
 	require.NoError(t, err)
 
 	filterID := rand.Int63()
@@ -341,15 +342,15 @@ func TestProcess(t *testing.T) {
 	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
 	require.NoError(t, err)
 	expectedLog.SequenceNum = 1
-	expectedLog.SubkeyValues = []IndexedValue{subKeyValA, subKeyValB}
+	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA, subKeyValB}
 
 	expectedLog.Data, err = bin.MarshalBorsh(&event)
 	require.NoError(t, err)
 
 	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
-	ev := ProgramEvent{
+	ev := types.ProgramEvent{
 		Program: addr.ToSolana().String(),
-		BlockData: BlockData{
+		BlockData: types.BlockData{
 			SlotNumber:          uint64(expectedLog.BlockNumber),
 			BlockHeight:         3,
 			BlockHash:           expectedLog.BlockHash.ToSolana(),
@@ -362,7 +363,7 @@ func TestProcess(t *testing.T) {
 		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
 
-	orm := NewMockORM(t)
+	orm := mocks.NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
 	lggr := logger.Sugared(logger.Test(t))
 	lp := New(lggr, orm, cl, config.NewDefault())
@@ -375,7 +376,7 @@ func TestProcess(t *testing.T) {
 	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
 	require.NoError(t, err)
 
-	idl := EventIdl{
+	idl := types.EventIdl{
 		Event: codec.IdlEvent{
 			Name: "myEvent",
 			Fields: []codec.IdlEventField{{
@@ -389,7 +390,7 @@ func TestProcess(t *testing.T) {
 		Types: []codec.IdlTypeDef{},
 	}
 
-	filter := Filter{
+	filter := types.Filter{
 		Name:        "test filter",
 		EventName:   eventName,
 		Address:     addr,
@@ -398,9 +399,9 @@ func TestProcess(t *testing.T) {
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().ChainID().Return(chainID).Maybe()
-	orm.EXPECT().SelectFilters(mock.Anything).Return([]Filter{filter}, nil).Once()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{filter}, nil).Once()
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
-	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) {
 		require.Equal(t, f, filter)
 		return filterID, nil
 	}).Once()
@@ -409,7 +410,7 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("accepts matching log", func(t *testing.T) {
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
 			log := logs[0]
 			assert.Equal(t, expectedLog, log)
@@ -421,14 +422,14 @@ func TestProcess(t *testing.T) {
 
 	t.Run("populates expiresAt field when retention is set", func(t *testing.T) {
 		filter.Retention = 30 * time.Minute
-		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) {
 			require.Equal(t, f, filter)
 			return filterID, nil
 		}).Once()
 		err = lp.RegisterFilter(ctx, filter)
 		require.NoError(t, err)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
 			log := logs[0]
 			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
@@ -451,7 +452,7 @@ func TestProcess(t *testing.T) {
 	})
 
 	filter.IncludeReverted = true
-	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f Filter) (int64, error) {
+	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) {
 		require.Equal(t, f, filter)
 		return filterID, nil
 	}).Once()
@@ -462,7 +463,7 @@ func TestProcess(t *testing.T) {
 		expectedLog.Error = new(string)
 		*expectedLog.Error = string(jsonErr)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
 			log := logs[0]
 			assert.Equal(t, expectedLog, log)
@@ -492,77 +493,77 @@ func Test_LogPoller_Replay(t *testing.T) {
 	fromBlock := int64(5)
 
 	lp := newMockedLP(t)
-	assertReplayInfo := func(requestBlock int64, status ReplayStatus) {
+	assertReplayInfo := func(requestBlock int64, status types.ReplayStatus) {
 		assert.Equal(t, requestBlock, lp.LogPoller.replay.requestBlock)
 		assert.Equal(t, status, lp.LogPoller.replay.status)
 	}
 
 	t.Run("ReplayInfo state initialized properly", func(t *testing.T) {
-		assertReplayInfo(0, ReplayStatusNoRequest)
+		assertReplayInfo(0, types.ReplayStatusNoRequest)
 	})
 
 	t.Run("ordinary replay request", func(t *testing.T) {
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock).Once()
 		lp.LogPoller.Replay(fromBlock)
-		assertReplayInfo(fromBlock, ReplayStatusRequested)
+		assertReplayInfo(fromBlock, types.ReplayStatusRequested)
 	})
 
 	t.Run("redundant replay request", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = fromBlock
-		lp.LogPoller.replay.status = ReplayStatusRequested
+		lp.LogPoller.replay.status = types.ReplayStatusRequested
 		lp.LogPoller.Replay(fromBlock + 10)
-		assertReplayInfo(fromBlock, ReplayStatusRequested)
+		assertReplayInfo(fromBlock, types.ReplayStatusRequested)
 	})
 
 	t.Run("replay request updated", func(t *testing.T) {
-		lp.LogPoller.replay.status = ReplayStatusNoRequest
+		lp.LogPoller.replay.status = types.ReplayStatusNoRequest
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
 		lp.LogPoller.Replay(fromBlock - 1)
-		assertReplayInfo(fromBlock-1, ReplayStatusRequested)
+		assertReplayInfo(fromBlock-1, types.ReplayStatusRequested)
 	})
 
 	t.Run("replay request updated while pending", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = fromBlock
-		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.LogPoller.replay.status = types.ReplayStatusPending
 		lp.Filters.EXPECT().UpdateStartingBlocks(fromBlock - 1).Once()
 		lp.LogPoller.Replay(fromBlock - 1)
-		assertReplayInfo(fromBlock-1, ReplayStatusPending)
+		assertReplayInfo(fromBlock-1, types.ReplayStatusPending)
 	})
 
 	t.Run("checkForReplayRequest should not enter pending state if there are no requests", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = 400
-		lp.LogPoller.replay.status = ReplayStatusComplete
+		lp.LogPoller.replay.status = types.ReplayStatusComplete
 		assert.False(t, lp.LogPoller.checkForReplayRequest())
-		assertReplayInfo(400, ReplayStatusComplete)
-		assert.Equal(t, ReplayStatusComplete, lp.LogPoller.ReplayStatus())
+		assertReplayInfo(400, types.ReplayStatusComplete)
+		assert.Equal(t, types.ReplayStatusComplete, lp.LogPoller.ReplayStatus())
 	})
 
 	t.Run("checkForReplayRequest should enter pending state if there is a new request", func(t *testing.T) {
-		lp.LogPoller.replay.status = ReplayStatusRequested
+		lp.LogPoller.replay.status = types.ReplayStatusRequested
 		lp.LogPoller.replay.requestBlock = 18
 		assert.True(t, lp.LogPoller.checkForReplayRequest())
-		assertReplayInfo(18, ReplayStatusPending)
-		assert.Equal(t, ReplayStatusPending, lp.LogPoller.ReplayStatus())
+		assertReplayInfo(18, types.ReplayStatusPending)
+		assert.Equal(t, types.ReplayStatusPending, lp.LogPoller.ReplayStatus())
 	})
 
 	t.Run("replayComplete enters ReplayComplete state", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = 10
-		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.LogPoller.replay.status = types.ReplayStatusPending
 		lp.LogPoller.replayComplete(8, 20)
-		assertReplayInfo(10, ReplayStatusComplete)
+		assertReplayInfo(10, types.ReplayStatusComplete)
 	})
 
 	t.Run("replayComplete stays in pending state if lower block request received", func(t *testing.T) {
 		lp.LogPoller.replay.requestBlock = 3
-		lp.LogPoller.replay.status = ReplayStatusPending
+		lp.LogPoller.replay.status = types.ReplayStatusPending
 		lp.LogPoller.replayComplete(8, 20)
-		assertReplayInfo(3, ReplayStatusRequested)
+		assertReplayInfo(3, types.ReplayStatusRequested)
 	})
 }
 
 func TestShuffledFilters(t *testing.T) {
 	fl := &filters{
-		filtersByID: map[int64]*Filter{
+		filtersByID: map[int64]*types.Filter{
 			0: {Name: "Filter A"},
 			1: {Name: "Filter B"},
 			2: {Name: "Filter C"},
@@ -585,15 +586,15 @@ func TestBackgroundWorkerRun(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	lggr := logger.TestSugared(t)
-	orm := NewMockORM(t)
+	orm := mocks.NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
 	lp := New(lggr, orm, cl, config.NewDefault())
 
-	filter1 := Filter{ID: 1, Name: "Filter A"}
-	filter2 := Filter{ID: 2, Name: "Filter B"}
-	filter3 := Filter{ID: 3, Name: "Filter C"}
+	filter1 := types.Filter{ID: 1, Name: "Filter A"}
+	filter2 := types.Filter{ID: 2, Name: "Filter B"}
+	filter3 := types.Filter{ID: 3, Name: "Filter C"}
 
-	filters := []Filter{
+	filters := []types.Filter{
 		filter1, filter2, filter3,
 	}
 
@@ -603,4 +604,42 @@ func TestBackgroundWorkerRun(t *testing.T) {
 
 	lp.backgroundWorkerRun(ctx)
 	orm.AssertNumberOfCalls(t, "PruneLogsForFilter", 3)
+}
+
+func newRandomPublicKey(t *testing.T) types.PublicKey {
+	t.Helper()
+	privateKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privateKey.PublicKey()
+	return types.PublicKey(pubKey)
+}
+
+func newRandomEventSignature(t *testing.T) types.EventSignature {
+	t.Helper()
+	pubKey := newRandomPublicKey(t)
+	return types.EventSignature(pubKey[:8])
+}
+
+func newRandomLog(t *testing.T, filterID int64, chainID string, eventName string) types.Log {
+	t.Helper()
+	privateKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privateKey.PublicKey()
+	data := []byte("solana is fun")
+	signature, err := privateKey.Sign(data)
+	require.NoError(t, err)
+	return types.Log{
+		FilterID:       filterID,
+		ChainID:        chainID,
+		LogIndex:       rand.Int63n(1000),
+		BlockHash:      types.Hash(pubKey),
+		BlockNumber:    rand.Int63n(1000000),
+		BlockTimestamp: time.Unix(1731590113, 0).UTC(),
+		Address:        types.PublicKey(pubKey),
+		EventSig:       types.NewEventSignatureFromName(eventName),
+		SubkeyValues:   []types.IndexedValue{{3, 2, 1}, {1}, {1, 2}, pubKey.Bytes()},
+		TxHash:         types.Signature(signature),
+		Data:           data,
+		SequenceNum:    rand.Int63n(500),
+	}
 }

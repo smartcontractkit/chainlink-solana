@@ -8,12 +8,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	ioprometheusclient "github.com/prometheus/client_model/go"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
 	"github.com/smartcontractkit/chainlink-framework/metrics"
 )
 
@@ -24,6 +27,7 @@ func TestShouldPublishDurationInCaseOfError(t *testing.T) {
 	ctx := t.Context()
 	orm := createObservedORM(t, "testChainID")
 	t.Cleanup(func() { resetMetrics(*orm) })
+
 	require.Equal(t, 0, testutil.CollectAndCount(orm.queryDuration))
 
 	// Cancel ctx to force error
@@ -57,6 +61,7 @@ func TestMetricsAreProperlyPopulatedWithLabels(t *testing.T) {
 
 func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
 	orm := createObservedORM(t, chainID)
+	t.Cleanup(func() { resetMetrics(*orm) })
 
 	_, err := withObservedQueryAndResults(orm, "errorQuery", func() ([]string, error) { return nil, fmt.Errorf("error") })
 	require.Error(t, err)
@@ -67,6 +72,8 @@ func TestNotPublishingDatasetSizeInCaseOfError(t *testing.T) {
 
 func TestMetricsAreProperlyPopulatedForWrites(t *testing.T) {
 	orm := createObservedORM(t, chainID)
+	t.Cleanup(func() { resetMetrics(*orm) })
+
 	require.NoError(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return nil }))
 	require.Error(t, withObservedExec(orm, "execQuery", metrics.Create, func() error { return fmt.Errorf("error") }))
 	require.Equal(t, 2, counterFromHistogramByLabels(t, orm.queryDuration, chainFamily, chainID, "execQuery", "create"))
@@ -77,6 +84,8 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 
 	ctx := t.Context()
 	orm := createObservedORM(t, chainID)
+	t.Cleanup(func() { resetMetrics(*orm) })
+
 	filterID, err := orm.InsertFilter(t.Context(), newRandomFilter(t))
 	require.NoError(t, err)
 
@@ -84,19 +93,20 @@ func TestCountersAreProperlyPopulatedForWrites(t *testing.T) {
 
 	// First insert 10 logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[:10]))
-	assert.Equal(t, float64(10), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
+	assert.Equal(t, float64(10), testutil.ToFloat64(metrics.PromLpLogsInserted.WithLabelValues(chainFamily, chainID)))
+	assert.Equal(t, float64(10), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainFamily, chainID)))
 
 	// Insert 5 more logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[10:15]))
-	assert.Equal(t, float64(15), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
+	assert.Equal(t, float64(15), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainFamily, chainID)))
 
 	// Insert 5 more logs
 	require.NoError(t, orm.InsertLogs(ctx, logs[15:]))
-	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues("solana", chainID)))
+	assert.Equal(t, float64(20), testutil.ToFloat64(orm.logsInserted.WithLabelValues(chainFamily, chainID)))
 }
 
-func generateRandomLogs(t *testing.T, filterID int64, count int) []Log {
-	logs := make([]Log, count)
+func generateRandomLogs(t *testing.T, filterID int64, count int) []types.Log {
+	logs := make([]types.Log, count)
 	for i := range logs {
 		logs[i] = newRandomLog(t, filterID, chainID, "My Event")
 	}

@@ -387,17 +387,6 @@ func (m *OCRv2TestState) SetChainlinkNodes() {
 	m.Clients.ChainlinkClient.ChainlinkNodes = chainlinkNodes
 }
 
-func formatBuffer(buf []byte) string {
-	if len(buf) == 0 {
-		return ""
-	}
-	result := fmt.Sprintf("%d", buf[0])
-	for _, b := range buf[1:] {
-		result += fmt.Sprintf(",%d", b)
-	}
-	return result
-}
-
 func GetLatestRound(transmissions []gauntlet.Transmission) gauntlet.Transmission {
 	highestRound := transmissions[0]
 	for _, t := range transmissions[1:] {

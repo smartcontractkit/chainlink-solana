@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 // queryArgs is a helper for building the arguments to a postgres query created by DSORM
@@ -66,7 +68,7 @@ func (q *queryArgs) withName(name string) *queryArgs {
 }
 
 // withAddress sets the Address field in queryArgs.
-func (q *queryArgs) withAddress(address PublicKey) *queryArgs {
+func (q *queryArgs) withAddress(address types.PublicKey) *queryArgs {
 	return q.withField("address", address)
 }
 
@@ -76,7 +78,7 @@ func (q *queryArgs) withEventName(eventName string) *queryArgs {
 }
 
 // withEventSig sets the EventSig field in queryArgs.
-func (q *queryArgs) withEventSig(eventSig EventSignature) *queryArgs {
+func (q *queryArgs) withEventSig(eventSig types.EventSignature) *queryArgs {
 	return q.withField("event_sig", eventSig)
 }
 
@@ -86,7 +88,7 @@ func (q *queryArgs) withStartingBlock(startingBlock int64) *queryArgs {
 }
 
 // withEventIDL sets the EventIDL field in queryArgs.
-func (q *queryArgs) withEventIDL(eventIdl EventIdl) *queryArgs {
+func (q *queryArgs) withEventIDL(eventIdl types.EventIdl) *queryArgs {
 	return q.withField("event_idl", eventIdl)
 }
 
@@ -105,7 +107,7 @@ func (q *queryArgs) withMaxLogsKept(maxLogsKept int64) *queryArgs {
 	return q.withField("max_logs_kept", maxLogsKept)
 }
 
-func newQueryArgsForEvent(chainID string, address PublicKey, eventSig EventSignature) *queryArgs {
+func newQueryArgsForEvent(chainID string, address types.PublicKey, eventSig types.EventSignature) *queryArgs {
 	return newQueryArgs(chainID).
 		withAddress(address).
 		withEventSig(eventSig)

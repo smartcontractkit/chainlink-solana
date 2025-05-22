@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 var (
@@ -29,34 +30,34 @@ var (
 type ORM interface {
 	ChainID() string
 	HasFilter(ctx context.Context, name string) (bool, error)
-	InsertFilter(ctx context.Context, filter Filter) (id int64, err error)
-	SelectFilters(ctx context.Context) ([]Filter, error)
-	DeleteFilters(ctx context.Context, filters map[int64]Filter) error
+	InsertFilter(ctx context.Context, filter types.Filter) (id int64, err error)
+	SelectFilters(ctx context.Context) ([]types.Filter, error)
+	DeleteFilters(ctx context.Context, filters map[int64]types.Filter) error
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
 	GetLatestBlock(ctx context.Context) (int64, error)
-	InsertLogs(context.Context, []Log) (err error)
+	InsertLogs(context.Context, []types.Log) (err error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
-	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
-	PruneLogsForFilter(ctx context.Context, filter Filter) (int64, error)
+	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error)
+	PruneLogsForFilter(ctx context.Context, filter types.Filter) (int64, error)
 }
 
 type logsLoader interface {
-	BackfillForAddresses(ctx context.Context, addresses []PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan Block, cleanUp func(), err error)
+	BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan types.Block, cleanUp func(), err error)
 }
 
 type filtersI interface {
 	HasFilter(ctx context.Context, name string) bool
-	RegisterFilter(ctx context.Context, filter Filter) error
+	RegisterFilter(ctx context.Context, filter types.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
 	PruneFilters(ctx context.Context) error
 	PruneLogs(ctx context.Context) error
-	GetDistinctAddresses(ctx context.Context) ([]PublicKey, error)
-	GetFiltersToBackfill() []Filter
+	GetDistinctAddresses(ctx context.Context) ([]types.PublicKey, error)
+	GetFiltersToBackfill() []types.Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	UpdateStartingBlocks(startingBlocks int64)
-	MatchingFiltersForEncodedEvent(event ProgramEvent) iter.Seq[Filter]
+	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
 }
@@ -64,13 +65,13 @@ type filtersI interface {
 type ReplayInfo struct {
 	mut          sync.RWMutex
 	requestBlock int64
-	status       ReplayStatus
+	status       types.ReplayStatus
 }
 
 // hasRequest returns true if a new request has been received (since the last request completed),
 // whether or not it is pending yet
 func (r *ReplayInfo) hasRequest() bool {
-	return r.status == ReplayStatusRequested || r.status == ReplayStatusPending
+	return r.status == types.ReplayStatusRequested || r.status == types.ReplayStatusPending
 }
 
 type Service struct {
@@ -84,7 +85,7 @@ type Service struct {
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
-	processBlocks     func(ctx context.Context, blocks []Block) error
+	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
 }
@@ -108,7 +109,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 		},
 	}.NewServiceEngine(lggr)
 	lp.lggr = lp.eng.SugaredLogger
-	lp.replay.status = ReplayStatusNoRequest
+	lp.replay.status = types.ReplayStatusNoRequest
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
@@ -116,7 +117,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 	return lp
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []Block) error) *Service {
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []types.Block) error) *Service {
 	lp := New(lggr, orm, client, cfg)
 	lp.processBlocks = processBlocks
 	return lp
@@ -143,7 +144,7 @@ func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
 }
 
 // Process - process stream of events coming from log ingester
-func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err error) {
+func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent) (err error) {
 	// This should never happen, since the log collector isn't started until after the filters
 	// get loaded. But just in case, return an error if they aren't so the collector knows to retry later.
 	if err = lp.filters.LoadFilters(ctx); err != nil {
@@ -157,7 +158,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 		return nil
 	}
 
-	var logs []Log
+	var logs []types.Log
 	for filter := range matchingFilters {
 		var revertErr *string
 		if blockData.Error != nil {
@@ -185,16 +186,16 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log := Log{
+		log := types.Log{
 			FilterID:       filter.ID,
 			ChainID:        lp.orm.ChainID(),
 			LogIndex:       logIndex,
-			BlockHash:      Hash(blockData.BlockHash),
+			BlockHash:      types.Hash(blockData.BlockHash),
 			BlockNumber:    int64(blockData.SlotNumber),
 			BlockTimestamp: blockData.BlockTime.Time().UTC(),
 			Address:        filter.Address,
 			EventSig:       filter.EventSig,
-			TxHash:         Signature(blockData.TransactionHash),
+			TxHash:         types.Signature(blockData.TransactionHash),
 			Error:          revertErr,
 		}
 
@@ -203,7 +204,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 			return err
 		}
 
-		log.SubkeyValues = make([]IndexedValue, len(filter.SubkeyPaths))
+		log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
 		for idx, path := range filter.SubkeyPaths {
 			if len(path) == 0 {
 				continue
@@ -214,7 +215,7 @@ func (lp *Service) Process(ctx context.Context, programEvent ProgramEvent) (err 
 				return decodeSubKeyErr
 			}
 
-			indexedVal, newIndexedValErr := newIndexedValue(subKeyVal)
+			indexedVal, newIndexedValErr := types.NewIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
 				return newIndexedValErr
 			}
@@ -248,7 +249,7 @@ func (lp *Service) HasFilter(ctx context.Context, name string) bool {
 }
 
 // RegisterFilter - refer to filters.RegisterFilter for details.
-func (lp *Service) RegisterFilter(ctx context.Context, filter Filter) error {
+func (lp *Service) RegisterFilter(ctx context.Context, filter types.Filter) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.RegisterFilter(ctx, filter)
@@ -279,8 +280,8 @@ func (lp *Service) Replay(fromBlock int64) {
 	}
 	lp.filters.UpdateStartingBlocks(fromBlock)
 	lp.replay.requestBlock = fromBlock
-	if lp.replay.status != ReplayStatusPending {
-		lp.replay.status = ReplayStatusRequested
+	if lp.replay.status != types.ReplayStatusPending {
+		lp.replay.status = types.ReplayStatusRequested
 	}
 }
 
@@ -290,7 +291,7 @@ func (lp *Service) Replay(fromBlock int64) {
 // Requested - a replay has been requested, but has not started yet
 // Pending - a replay is currently in progress
 // Complete - there was at least one replay executed since startup, but all have since completed
-func (lp *Service) ReplayStatus() ReplayStatus {
+func (lp *Service) ReplayStatus() types.ReplayStatus {
 	lp.replay.mut.RLock()
 	defer lp.replay.mut.RUnlock()
 	return lp.replay.status
@@ -335,15 +336,15 @@ func (lp *Service) checkForReplayRequest() bool {
 	}
 
 	lp.lggr.Infow("starting replay", "replayBlock", lp.replay.requestBlock)
-	lp.replay.status = ReplayStatusPending
+	lp.replay.status = types.ReplayStatusPending
 	return true
 }
 
-func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int64) error {
+func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, to int64) error {
 	isReplay := lp.checkForReplayRequest()
 
-	addressesSet := make(map[PublicKey]struct{})
-	addresses := make([]PublicKey, 0, len(filters))
+	addressesSet := make(map[types.PublicKey]struct{})
+	addresses := make([]types.PublicKey, 0, len(filters))
 	minSlot := to
 
 	for _, filter := range filters {
@@ -382,7 +383,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []Filter, to int
 	return err
 }
 
-func (lp *Service) processBlocksRange(ctx context.Context, addresses []PublicKey, from, to int64) error {
+func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
 	lp.lggr.Infow("Processing block range", "from", from, "to", to)
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
@@ -402,7 +403,7 @@ consumedAllBlocks:
 				break consumedAllBlocks
 			}
 
-			batch := []Block{block}
+			batch := []types.Block{block}
 			batch = appendBuffered(blocks, blocksChBuffer, batch)
 			lp.lggr.Infof("processing batch of %d blocks: [slots %d-%d]", len(batch), batch[0].SlotNumber, batch[len(batch)-1].SlotNumber)
 			err = lp.processBlocks(ctx, batch)
@@ -415,7 +416,7 @@ consumedAllBlocks:
 	return nil
 }
 
-func (lp *Service) processBlocksImpl(ctx context.Context, blocks []Block) error {
+func (lp *Service) processBlocksImpl(ctx context.Context, blocks []types.Block) error {
 	for _, block := range blocks {
 		for _, event := range block.Events {
 			err := lp.Process(ctx, event)
@@ -497,14 +498,14 @@ func (lp *Service) replayComplete(from, to int64) bool {
 
 	if lp.replay.requestBlock < from {
 		// received a new request with lower block number while replaying, we'll process that next time
-		lp.replay.status = ReplayStatusRequested
+		lp.replay.status = types.ReplayStatusRequested
 		return false
 	}
-	lp.replay.status = ReplayStatusComplete
+	lp.replay.status = types.ReplayStatusComplete
 	return true
 }
 
-func appendBuffered(ch <-chan Block, maxNum int, blocks []Block) []Block {
+func appendBuffered(ch <-chan types.Block, maxNum int, blocks []types.Block) []types.Block {
 	for {
 		select {
 		case block, ok := <-ch:
@@ -539,7 +540,7 @@ func (lp *Service) backgroundWorkerRun(ctx context.Context) {
 	}
 }
 
-func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
+func (lp *Service) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error) {
 	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
 }
 
