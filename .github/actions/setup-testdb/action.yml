@@ -1,0 +1,40 @@
+name: Setup Test DB
+description: Setup Chainlink Test DB with schema defined in chainlink repo
+inputs:
+  core-ref:
+    description: The chainlink ref which contains the schema we want to test against
+    default: 'develop'
+outputs:
+  cl-db-url:
+    description: The value to set CL_DATABASE_URL to while running tests
+    value: ${{ steps.setup-postgres.outputs.database-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Postgres
+      id: setup-postgres
+      uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+      with:
+        tmpfs: 'true'
+    # This is considered untrusted code from the POV of chainlink-solana, but this is safe as long as we:
+    # - Only call this from workflows with read-only git permissions set
+    # and
+    # - Unset all secrets passed to this action by workflows calling it, before running "go run ./core/store/cmd/preparetest"
+    # codeql[actions/untrusted-checkout]: disable
+    - name: Checkout chainlink
+      uses: actions/checkout@v4
+      with:
+        repository: smartcontractkit/chainlink
+        ref: ${{ inputs.core-ref || 'develop' }}
+        path: chainlink
+    - name: Prepare Test Schema
+      run: |
+        unset GRAFANA_INTERNAL_TENANT_ID
+        unset GRAFANA_INTERNAL_BASIC_AUTH
+        unset GRAFANA_INTERNAL_HOST
+        cd chainlink
+        go run ./core/store/cmd/preparetest
+      shell: bash
+      env:
+        CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}
