@@ -146,7 +146,12 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 		// HACK: workaround for RouterGetWrappedNative
 		if batchCall.ReadName == ccipconsts.MethodNameRouterGetWrappedNative {
-			*(results[idx].returnVal.(*[]byte)) = solana.WrappedSol.Bytes()
+			returnVal, ok := results[idx].returnVal.(*[]byte) 
+			if !ok {
+				results[idx].err = fmt.Errorf("returnVal is unexpected type: %T, expected %T", results[idx].returnVal, &[]byte{})
+				continue
+			}
+			*returnVal = solana.WrappedSol.Bytes()
 			continue
 		}
 
@@ -167,8 +172,16 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 		// HACK: workaround for OffRampLatestConfigDetails: we need to use an input param to filter an array in the return values, not for seeds
 		if batchCall.ReadName == ccipconsts.MethodNameOffRampLatestConfigDetails {
-			params := batchCall.Params.(map[string]any)
-			ocrPluginType := params["ocrPluginType"].(uint8)
+			params, ok := batchCall.Params.(map[string]any)
+			if !ok {
+				results[idx].err = fmt.Errorf("batch call params is unexpected type: %T, expected %T", batchCall.Params, map[string]any{})
+				continue
+			}
+			ocrPluginType, ok := params["ocrPluginType"].(uint8); 
+			if !ok {
+				results[idx].err = fmt.Errorf("ocrPluginType is unexpected type: %T, expected uint8", params["ocrPluginType"])
+				continue
+			}
 
 			output := map[string]any{}
 			err := asValueDotValue(
