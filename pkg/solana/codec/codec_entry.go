@@ -6,16 +6,14 @@ import (
 	"reflect"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
-	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type Entry interface {
 	Encode(value any, into []byte) ([]byte, error)
 	Decode(encoded []byte) (any, []byte, error)
-	GetCodecType() commonencodings.TypeCodec
+	GetCodecType() encodings.TypeCodec
 	GetType() reflect.Type
 	Modifier() codec.Modifier
 	Size(numItems int) (int, error)
@@ -27,7 +25,7 @@ type entry struct {
 	genericName       string
 	chainSpecificName string
 	reflectType       reflect.Type
-	typeCodec         commonencodings.TypeCodec
+	typeCodec         encodings.TypeCodec
 	mod               codec.Modifier
 	// includeDiscriminator during Encode adds a discriminator to the encoded bytes under an assumption that the provided value didn't have a discriminator.
 	// During Decode includeDiscriminator removes discriminator from bytes under an assumption that the provided struct doesn't need a discriminator.
@@ -40,7 +38,7 @@ type AccountIDLTypes struct {
 	Types   IdlTypeDefSlice
 }
 
-func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (Entry, error) {
 	_, accCodec, err := createCodecType(idlTypes.Account, createRefs(idlTypes.Types, builder), false)
 	if err != nil {
 		return nil, err
@@ -60,7 +58,7 @@ func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscr
 	), nil
 }
 
-func NewPDAEntry(offchainName string, pdaTypeDef PDATypeDef, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+func NewPDAEntry(offchainName string, pdaTypeDef PDATypeDef, mod codec.Modifier, builder encodings.Builder) (Entry, error) {
 	// PDA seeds do not have any dependencies in the IDL so the type def slice can be left empty for refs
 	_, accCodec, err := asStruct(pdaSeedsToIdlField(pdaTypeDef.Seeds), createRefs(IdlTypeDefSlice{}, builder), offchainName, false, false)
 	if err != nil {
@@ -81,7 +79,7 @@ type InstructionArgsIDLTypes struct {
 	Types       IdlTypeDefSlice
 }
 
-func NewInstructionArgsEntry(offChainName string, idlTypes InstructionArgsIDLTypes, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+func NewInstructionArgsEntry(offChainName string, idlTypes InstructionArgsIDLTypes, mod codec.Modifier, builder encodings.Builder) (Entry, error) {
 	_, instructionCodecArgs, err := asStruct(idlTypes.Instruction.Args, createRefs(idlTypes.Types, builder), idlTypes.Instruction.Name, false, true)
 	if err != nil {
 		return nil, err
@@ -102,7 +100,7 @@ type EventIDLTypes struct {
 	Types IdlTypeDefSlice
 }
 
-func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder commonencodings.Builder) (Entry, error) {
+func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (Entry, error) {
 	_, eventCodec, err := asStruct(eventFieldsToFields(idlTypes.Event.Fields), createRefs(idlTypes.Types, builder), idlTypes.Event.Name, false, false)
 	if err != nil {
 		return nil, err
@@ -124,7 +122,7 @@ func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscr
 
 func newEntry(
 	genericName, chainSpecificName string,
-	typeCodec commonencodings.TypeCodec,
+	typeCodec encodings.TypeCodec,
 	discriminator *Discriminator,
 	mod codec.Modifier,
 ) Entry {
@@ -144,10 +142,10 @@ func newEntry(
 	return e
 }
 
-func createRefs(idlTypes IdlTypeDefSlice, builder commonencodings.Builder) *codecRefs {
+func createRefs(idlTypes IdlTypeDefSlice, builder encodings.Builder) *codecRefs {
 	return &codecRefs{
 		builder:      builder,
-		codecs:       make(map[string]commonencodings.TypeCodec),
+		codecs:       make(map[string]encodings.TypeCodec),
 		typeDefs:     idlTypes,
 		dependencies: make(map[string][]string),
 	}
@@ -201,7 +199,7 @@ func (e *entry) Decode(encoded []byte) (any, []byte, error) {
 	return e.typeCodec.Decode(encoded)
 }
 
-func (e *entry) GetCodecType() commonencodings.TypeCodec {
+func (e *entry) GetCodecType() encodings.TypeCodec {
 	return e.typeCodec
 }
 
@@ -225,7 +223,7 @@ func EntryAsModifierRemoteCodec(entry Entry, itemType string) (commontypes.Remot
 	lenientFromTypeCodec := make(encodings.LenientCodecFromTypeCodec)
 	lenientFromTypeCodec[itemType] = entry
 
-	return commoncodec.NewModifierCodec(lenientFromTypeCodec, entry.Modifier(), DecoderHooks...)
+	return codec.NewModifierCodec(lenientFromTypeCodec, entry.Modifier(), DecoderHooks...)
 }
 
 func ensureModifier(mod codec.Modifier) codec.Modifier {
