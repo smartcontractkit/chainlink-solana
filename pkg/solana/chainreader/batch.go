@@ -146,7 +146,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 		// HACK: workaround for RouterGetWrappedNative
 		if batchCall.ReadName == ccipconsts.MethodNameRouterGetWrappedNative {
-			returnVal, ok := results[idx].returnVal.(*[]byte) 
+			returnVal, ok := results[idx].returnVal.(*[]byte)
 			if !ok {
 				results[idx].err = fmt.Errorf("returnVal is unexpected type: %T, expected %T", results[idx].returnVal, &[]byte{})
 				continue
@@ -177,7 +177,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 				results[idx].err = fmt.Errorf("batch call params is unexpected type: %T, expected %T", batchCall.Params, map[string]any{})
 				continue
 			}
-			ocrPluginType, ok := params["ocrPluginType"].(uint8); 
+			ocrPluginType, ok := params["ocrPluginType"].(uint8)
 			if !ok {
 				results[idx].err = fmt.Errorf("ocrPluginType is unexpected type: %T, expected uint8", params["ocrPluginType"])
 				continue
