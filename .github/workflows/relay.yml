@@ -9,6 +9,11 @@ on:
 jobs:
   relay_run_unit_tests:
     name: Relay Run Unit Tests
+    permissions:
+      contents: read
+      actions: read
+    env:
+      DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
     runs-on: ubuntu-latest-8cores-32GB
     steps:
       - name: Collect Metrics
@@ -48,11 +53,23 @@ jobs:
         run: go test -run=xxx ./... # check compilation across tests + relayer / monitoring go code without running
       - name: Build
         run: go build -v ./pkg/...
+      - name: Get core ref
+        id: get-ref
+        uses: ./.github/actions/get-core-ref
+      - name: Setup Test DB
+        id: setup-testdb
+        uses: ./.github/actions/setup-testdb
+        with:
+          core-ref: ${{ steps.get-ref.outputs.core-ref }}
       - name: Test
+        env:
+          CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
         run: |
           set -o pipefail
           go test ./pkg/... -json -tags integration -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
       - name: Test with the race detector enabled
+        env:
+          CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
         run: go test ./pkg/... -v -race -count=10 -timeout=15m -covermode=atomic -coverpkg=./... -coverprofile=race_coverage.txt
       - name: Upload Go test results
         if: always()
