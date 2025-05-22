@@ -138,7 +138,7 @@ func (lp *Service) start(_ context.Context) error {
 
 func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
 	if txIndex >= 0 && txIndex < math.MaxInt32 && txLogIndex < math.MaxUint32 {
-		return int64(txIndex<<32) | int64(txLogIndex), nil //nolint:gosec
+		return int64(txIndex<<32) | int64(txLogIndex), nil //nolint:gosec // safe: values validated prior to casting
 	}
 	return 0, fmt.Errorf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex)
 }
