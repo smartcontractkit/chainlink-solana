@@ -92,11 +92,21 @@ const randomDescription = () => {
   return description;
 }
 
-const randomFeedData = () => {
+const newFeeds = (n: number) => {
+  return Array.from({ length: n }).map(() => newFeed());
+}
+
+type Feed = {
+  dataId: Buffer,
+  description: Buffer
+}
+
+
+const newFeed = () => {
   return {
     dataId: randomBytes(16), 
     description: randomDescription()
-  }
+  };
 }; 
 
 const randomWorkflowMetadata = (allowedSender: PublicKey) => {
@@ -112,12 +122,15 @@ describe("data feeds cache", function () {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-
   const defaultConnection = getProvider().connection;
 
   let feedAdminA: Signer;
   let reportSender: Signer;
   let otherSigners: Array<Signer>;
+
+  let feedA: Feed;
+  let feedB: Feed;
+  let otherFeeds: Array<Feed>;
   
   const defaultCacheState = Keypair.generate();
 
@@ -125,10 +138,11 @@ describe("data feeds cache", function () {
 
   before(async () => {
     [feedAdminA, reportSender, ...otherSigners] = await newSigners(defaultConnection, 5);
+    [feedA, feedB, ...otherFeeds] = newFeeds(5);
   });
 
   const feedConfigPDA = (dataId: Buffer) => {
-    const [feedConfigAccount, _bump] = PublicKey.findProgramAddressSync(
+    const [pda, _bump] = PublicKey.findProgramAddressSync(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("feed_config")),
         defaultCacheState.publicKey.toBuffer(),
@@ -136,11 +150,11 @@ describe("data feeds cache", function () {
       ],
       program.programId
     );
-    return feedConfigAccount;
+    return pda;
   }
 
   const permissionFlagPDA = (reportHash: Buffer) => {
-    const [permissionFlagAccount, _bump] = PublicKey.findProgramAddressSync(
+    const [pda, _bump] = PublicKey.findProgramAddressSync(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode("permission_flag")),
         defaultCacheState.publicKey.toBuffer(),
@@ -148,7 +162,19 @@ describe("data feeds cache", function () {
       ],
       program.programId 
     );
-    return permissionFlagAccount
+    return pda
+  }
+
+  const decimalReportPDA = (dataId: Buffer) => {
+    const [pda, _bump] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("decimal_report")),
+        defaultCacheState.publicKey.toBuffer(),
+        dataId,
+      ],
+      program.programId 
+    );
+    return pda
   }
 
   it("Initialize Cache", async () => {
@@ -187,13 +213,71 @@ describe("data feeds cache", function () {
 
   });
 
+  // todo: add more tests -- 
+  // b. if you pass in the wrong length
+  // c. if feed admin is not authorized
+  // d. out of order data ids and out of order remaining accounts
+  it("Initialize data feed reports", async () => {
+
+    const feedAReportPDA = decimalReportPDA(feedA.dataId);
+    const feedBReportPDA = decimalReportPDA(feedB.dataId);
+
+    // test initialization
+    await program.methods
+      .initDecimalReports([feedA.dataId] as any)
+      .accounts({
+        feedAdmin: feedAdminA.provider.publicKey,
+        state: defaultCacheState.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId
+      })
+      .remainingAccounts([
+        {
+          pubkey: feedAReportPDA,
+          isSigner: false,
+          isWritable: true
+        }
+      ])
+      .signers([feedAdminA.keypair])
+      .rpc();
+
+      let feedAState = await program.account.decimalReport.fetch(feedAReportPDA);
+      assert.equal(feedAState.timestamp, 0, "timestamp 0");
+
+      // test initialization with existing feed as well
+      await program.methods
+      .initDecimalReports([feedA.dataId, feedB.dataId] as any)
+      .accounts({
+        feedAdmin: feedAdminA.provider.publicKey,
+        state: defaultCacheState.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId
+      })
+      .remainingAccounts([
+        {
+          pubkey: feedAReportPDA,
+          isSigner: false,
+          isWritable: true
+        },
+        {
+          pubkey: feedBReportPDA,
+          isSigner: false,
+          isWritable: true
+        }
+      ])
+      .signers([feedAdminA.keypair])
+      .rpc();
+
+      feedAState = await program.account.decimalReport.fetch(feedAReportPDA);
+      assert.equal(feedAState.timestamp, 0, "timestamp 0");
+
+      const feedBState = await program.account.decimalReport.fetch(feedBReportPDA);
+      assert.equal(feedBState.timestamp, 0, "timestamp 0");
+  });
+
   it("Set Feed Configs + Close Stale Accounts", async () => {
 
-    const assetA = randomFeedData()
+    const dataIds = [feedA.dataId];
 
-    const dataIds = [assetA.dataId];
-
-    const descriptions = [assetA.description];
+    const descriptions = [feedA.description];
 
     const workflowMetadatas = [randomWorkflowMetadata(reportSender.provider.publicKey)];
 
@@ -207,26 +291,7 @@ describe("data feeds cache", function () {
     // find the PDAs
 
     const feedConfigAccount1 = feedConfigPDA(dataIds[0]);
-
-    // const [feedConfigAccount, _feedConfigAccountBump] = PublicKey.findProgramAddressSync(
-    //   [
-    //     Buffer.from(anchor.utils.bytes.utf8.encode("feed_config")),
-    //     dataIds[0],
-    //   ],
-    //   program.programId
-    // );
-
     const permissionFlagAccount1 = permissionFlagPDA(reportHash);
-
-    // const [permissionFlagAccount, _permissionFlagAccountBump] = PublicKey.findProgramAddressSync(
-    //   [
-    //     Buffer.from(anchor.utils.bytes.utf8.encode("permission_flag")),
-    //     reportHash,
-    //   ],
-    //   program.programId 
-    // );
-
-    console.log('we reached the point')
 
     await program.methods
       .setDecimalFeedConfigs(
@@ -301,11 +366,9 @@ describe("data feeds cache", function () {
     // todo: should work with 0 accounts?
       // todo: one update and one new
 
-      const assetB = randomFeedData()
+      const dataIds2 = [feedA.dataId, feedB.dataId];
 
-      const dataIds2 = [assetA.dataId, assetB.dataId];
-
-      const descriptions2 = [randomDescription(), assetB.description]; // change assetA's description while we're at it!
+      const descriptions2 = [randomDescription(), feedB.description]; // change assetA's description while we're at it!
 
       const workflowMetadatas2 = Array.from({length: 3}).map(() => {
         return randomWorkflowMetadata(reportSender.provider.publicKey)
@@ -420,6 +483,13 @@ describe("data feeds cache", function () {
     assert.isRejected(program.account.writePermissionFlag.fetch(permissionFlagAccount1), /Account does not exist/);
 
   });
+
+  it("Updates reports", async () => {
+
+    // need to basically initialize the keystone forwarder
+
+
+  })
 
   
 

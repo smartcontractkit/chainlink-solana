@@ -28,6 +28,7 @@ pub struct ReceivedDecimalReport {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct DecimalReport {
     pub timestamp: u32,
     pub answer: u128,

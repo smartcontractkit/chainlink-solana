@@ -25,7 +25,7 @@ pub mod data_feeds_cache {
     use anchor_lang::{solana_program::{program::invoke_signed, system_instruction}, Discriminator};
     use state::{ReceivedDecimalReport, WorkflowMetadata};
 
-    use crate::{common::ANCHOR_DISCRIMINATOR, state::WritePermissionFlag};
+    use crate::{common::ANCHOR_DISCRIMINATOR, state::{DecimalReport, WritePermissionFlag}};
 
     use super::*;
 
@@ -77,6 +77,60 @@ pub mod data_feeds_cache {
 
         state.owner = state.proposed_owner;
         state.proposed_owner = Pubkey::default();
+
+        Ok(())
+    }
+
+    pub fn init_decimal_reports<'info>(ctx: Context<'_, '_, 'info, 'info, InitDecimalReports<'info>>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+         // check feed admin here 
+         let state = &mut ctx.accounts.state.load()?;
+         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
+
+        let state_key = ctx.accounts.state.key();
+
+        let data_ids_account_infos = ctx.remaining_accounts;
+
+        require!(data_ids.len() == data_ids_account_infos.len(), DataCacheError::ArrayLengthMismatch);
+
+        for (i, data_id) in data_ids.iter().enumerate() {
+
+            let curr_report_account_info = &data_ids_account_infos[i];
+
+            let (decimal_report, bump) = Pubkey::find_program_address(
+                &[b"decimal_report", state_key.as_ref(), data_id],
+                &crate::ID,
+            );
+
+            require!(&decimal_report == curr_report_account_info.key, DataCacheError::AccountMismatch);
+
+            if curr_report_account_info.data_is_empty() {
+                let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE);
+
+                let seeds: &[&[u8]] = &[b"decimal_report", state_key.as_ref(), data_id, &[bump]];
+
+                invoke_signed(
+                    &system_instruction::create_account(
+                        ctx.accounts.feed_admin.key,
+                        &decimal_report,
+                        rent,
+                        (ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE) as u64,
+                        ctx.program_id,
+                    ),
+                    &[
+                        ctx.accounts.feed_admin.to_account_info(),
+                        curr_report_account_info.clone(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    &[seeds],
+                )?;
+
+                let mut dst = curr_report_account_info.try_borrow_mut_data()?;
+                dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&DecimalReport::discriminator());
+            }
+
+            // todo: probably optional... just makes sure the account is the right type
+            DecimalReport::try_deserialize(&mut &curr_report_account_info.data.borrow()[..])?;
+        }
 
         Ok(())
     }
@@ -366,30 +420,74 @@ pub mod data_feeds_cache {
     }
 
     // // todo: change report and metadata to &[u8]
-    // pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
-    //     // verify each of the report hashes for each of the reports
-    //     // first, solve if legacy_store and legacy_feed_config is
+    pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
+        // todo: check if legacy_store and legacy_feed_config are both there
 
-    //     let (workflow_owner, workflow_name) = get_workflow_metadata(&metadata)?;
+        // first assume we don't have legacy_store or legacy_feed_config
 
-    //     let decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
+        let (workflow_owner, workflow_name) = get_workflow_metadata(&metadata)?;
 
-    //     for (i, decimal_report) in decimal_reports.iter().enumerate() {
-    //         let ReceivedDecimalReport { data_id, answer, timestamp } = decimal_report;
-    //         let reportHash = create_report_hash(
-    //             data_id, 
-    //             &ctx.accounts.forwarder_authority.key(), 
-    //             workflow_owner, 
-    //             workflow_name
-    //         );
+        let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
+
+        let report_account_infos = &ctx.remaining_accounts[..received_decimal_reports.len()];
+        // todo: adjust indexing if we have legacy store
+        let permission_flag_account_infos = &ctx.remaining_accounts[received_decimal_reports.len()..]; 
+
+        require!(
+            report_account_infos.len() == received_decimal_reports.len() &&
+            permission_flag_account_infos.len() == received_decimal_reports.len(), 
+            DataCacheError::ArrayLengthMismatch
+        );
+
+        for (i, received_decimal_report) in received_decimal_reports.iter().enumerate() {
+            let ReceivedDecimalReport { data_id, answer, timestamp } = received_decimal_report;
+
+            // 1. check that sender has permission to write
+
+                let report_hash = create_report_hash(
+                data_id, 
+                &ctx.accounts.forwarder_authority.key(), 
+                workflow_owner, 
+                workflow_name
+            );
+
+            let (curr_permission_flag, _) = Pubkey::find_program_address(
+                &[b"permission_flag", ctx.accounts.cache_state.key().as_ref(), &report_hash],
+                &crate::ID,
+            );
+
+            require!(&curr_permission_flag == permission_flag_account_infos[i].key, DataCacheError::AccountMismatch);
+            
+            // verifies the permission account exists
+            WritePermissionFlag::try_deserialize(
+                &mut &permission_flag_account_infos[i].data.borrow()[..]
+            ).map_err(|_| DataCacheError::InvalidUpdatePermission)?;
+
+            // 2. check report account is valid
+            let (curr_report, _) = Pubkey::find_program_address(
+                &[b"decimal_report", ctx.accounts.cache_state.key().as_ref(), data_id],
+                &crate::ID,
+            );
+
+            require!(&curr_report == report_account_infos[i].key, DataCacheError::AccountMismatch);
+
+            let mut dst = report_account_infos[i].try_borrow_mut_data()?;
+
+            let updated_report = DecimalReport{
+                answer: answer.clone(), 
+                timestamp: timestamp.clone()
+            };
+
+            updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
+
+            // todo: add event here
+
+        };
 
 
-    //     };
 
-
-
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     pub fn test_option(ctx: Context<TestOption>) -> Result<()> {
 
