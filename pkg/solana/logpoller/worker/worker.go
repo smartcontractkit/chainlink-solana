@@ -377,6 +377,7 @@ func createRandomString(length int) string {
 }
 
 func calculateExponentialBackoff(retries uint8) time.Duration {
+	retries = min(retries, 36) // 36 is the maximum amount of bit shifts before the duration (int64) overflows with a 100ms multiplier
 	// 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s
 	return time.Duration(2<<retries) * 100 * time.Millisecond
 }
