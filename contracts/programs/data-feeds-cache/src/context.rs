@@ -120,6 +120,29 @@ pub struct CloseLegacyFeedsConfig<'info> {
     pub legacy_feeds_config: AccountLoader<'info, LegacyFeedsConfig>,
 }
 
+#[derive(Accounts)]
+pub struct InitDecimalReports<'info> {
+
+    #[account(mut)]
+    pub feed_admin: Signer<'info>,
+
+    pub state: AccountLoader<'info, CacheState>,
+    
+    pub system_program: Program<'info, System>,
+
+    // N data report accounts
+    // #[account(
+    //     init,
+    //     seeds = [
+    //         b"decimal_report", 
+    //         cache_state.key().as_ref()
+    //         data_id,
+    //     ],
+    //     bump
+    // )]
+    // pub report: UncheckedAccount<'info>
+}
+
 // you may need to close old config accounts, init new ones
 // use realloc if possible
 #[derive(Accounts)]
@@ -220,8 +243,13 @@ pub struct TestOption<'info> {
 
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    // also verified inline (via the permission account)
-    #[account(owner = FORWARDER_ID)]
+    // #[account(owner = FORWARDER_ID)]
+    // checking the owner of the state is optional and not necessary 
+    // because the forwarder state is uniquely associated with the
+    // forwarder authority which is verified in the instruction
+    // warning: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control. you need to view the docs to determine
+    // what the actual deployed program id is.
     pub forwarder_state: Account<'info, ForwarderState>,
 
     #[account(seeds = [b"forwarder", forwarder_state.key().as_ref()], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
@@ -244,15 +272,16 @@ pub struct OnReport<'info> {
     // N                Y     - if it is in a report, don't write but log about feeds
     // Y                N     - ERROR state
     // Y                Y     - if it is in a report, writes to the legacy feed
-
+    
     // we can emit an event that says if it's writing or not
 
     #[account(
         seeds = [b"legacy_feeds_config", cache_state.key().as_ref()], // todo: add the current state
         bump
     )]
-    pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>
+    pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>,
 
+    pub system_program: Program<'info, System>,
 
     // remaining accounts (N data ids, M legacy feeds)
 
@@ -279,6 +308,10 @@ pub struct OnReport<'info> {
     //     bump
     // )]
     // pub permission_flag: UncheckedAccount<'info>
+
+    // included if and only if both legacy_store and legacy_feeds_config is included
+    // if only 1 or 0 or the legacy_store / legacy_feeds_config accounts are included
+    // this must not be included
 
     // M transmission feed accounts
     // pub legacy_feed: UncheckedAccount<'info>

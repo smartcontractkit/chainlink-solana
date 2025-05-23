@@ -55,4 +55,8 @@ pub enum DataCacheError {
 
     #[msg("out of bounds")]
     OutOfBounds,
+
+    #[msg("invalid update permission")]
+    InvalidUpdatePermission
+
 }
