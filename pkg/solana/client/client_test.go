@@ -266,10 +266,6 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 func TestClient_GetBlocks(t *testing.T) {
 	url := solanatesting.SetupLocalSolNode(t)
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	pubKey := privKey.PublicKey()
-	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)

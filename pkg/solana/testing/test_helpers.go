@@ -29,12 +29,12 @@ func SetupLocalSolNode(t *testing.T) string {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := freeport.GetN(t, 2)
-	portStr := strconv.Itoa(port[0])
+	ports := twoConsecutiveFreeports(t)
+	portStr := strconv.Itoa(ports[0])
 
 	faucetPort := freeport.GetOne(t)
 	url := "http://127.0.0.1:" + portStr
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
@@ -89,10 +89,7 @@ func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string
 	var errKeys []solana.PublicKey
 	for i, key := range keys {
 		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
-			account,
-			"--url", url,
-		).Output()
+		_, err := exec.Command("solana", "airdrop", "100", account, "--url", url).Output()
 		if err != nil {
 			if attempts <= 0 {
 				var exitErr *exec.ExitError
@@ -120,4 +117,29 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
 	err := FundTestAccountsWithRetry(t, keys, url, 5)
 	require.NoError(t, err)
+}
+
+func twoConsecutiveFreeports(t *testing.T) []int {
+	t.Helper()
+	ports := freeport.GetN(t, 2)
+	if ports[0] == ports[1] - 1 {
+		return ports
+	}
+	// track unused ports until consecutive ones are found or max retries is reached
+	// ports are not immediately returned to avoid re-fetching the same ones again
+	unusedPorts := []int{ports[0], ports[1]}
+	attempt := 0
+	maxRetries := 5
+	for attempt < maxRetries{
+		attempt++
+		ports := freeport.GetN(t, 2)
+		if ports[0] == ports[1] - 1 {
+			freeport.Return(unusedPorts)
+			return ports
+		}
+		unusedPorts = append(unusedPorts, ports...)
+	}
+	freeport.Return(unusedPorts)
+	require.Fail(t, "failed to fetch 2 consecutive ports")
+	return nil
 }
