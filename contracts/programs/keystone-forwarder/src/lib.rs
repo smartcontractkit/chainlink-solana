@@ -52,11 +52,11 @@ pub mod keystone_forwarder {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
-        let old_owner = state.owner;
+        let state_old_owner = state.owner;
         state.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransfer {
-            old_owner: old_owner,
+            old_owner: state_old_owner,
             new_owner: proposed_owner
         });
 
@@ -65,12 +65,12 @@ pub mod keystone_forwarder {
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state;
-        let old_owner = state.owner;
+        let state_old_owner = state.owner;
         state.owner = state.proposed_owner;
         state.proposed_owner = Pubkey::default();
 
         emit!(OwnershipAcceptance {
-            old_owner: old_owner,
+            old_owner: state_old_owner,
             new_owner: state.owner
         });
 
