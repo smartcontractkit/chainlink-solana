@@ -42,7 +42,7 @@ type TxManager interface {
 	GetTransactionStatus(ctx context.Context, transactionID string) (relaytypes.TransactionStatus, error)
 }
 
-var _ relaytypes.Relayer = &Relayer{} //nolint:staticcheck
+var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
 	services.StateMachine

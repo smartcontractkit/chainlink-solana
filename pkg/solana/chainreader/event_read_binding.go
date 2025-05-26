@@ -407,7 +407,7 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 			Head: types.Head{
 				Height:    fmt.Sprint(logs[idx].BlockNumber),
 				Hash:      solana.PublicKey(logs[idx].BlockHash).Bytes(),
-				Timestamp: uint64(logs[idx].BlockTimestamp.Unix()), //nolint:gosec
+				Timestamp: uint64(logs[idx].BlockTimestamp.Unix()), //nolint:gosec // BlockTimestamp can never be negative so it is safe to cast it to uint64
 			},
 		}
 

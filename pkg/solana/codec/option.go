@@ -5,10 +5,9 @@ import (
 	"reflect"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 )
 
-func NewOption(codec commonencodings.TypeCodec) encodings.TypeCodec {
+func NewOption(codec encodings.TypeCodec) encodings.TypeCodec {
 	return &option{
 		codec,
 	}

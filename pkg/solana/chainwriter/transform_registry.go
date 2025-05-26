@@ -107,7 +107,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -307,7 +307,7 @@ func appendTokenTransferAccounts(tokenAccountsRequired bool, accounts solana.Acc
 			return nil, nil, fmt.Errorf("failed to calculate pool chain config PDA: %w", err)
 		}
 		// Token indexes are relative to the remaining accounts which exclude mandatory accounts
-		tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec
+		tokenIndexes = append(tokenIndexes, uint8(len(accounts)-MandatoryExecuteAccounts)) //nolint:gosec // safe: limitations on solana transaction sizes and account limits ensures the token index will always fit within uint8
 		// Append all token accounts for transfer
 		accounts = append(accounts,
 			&solana.AccountMeta{PublicKey: commonTTAccounts.offrampPoolsSigner},
