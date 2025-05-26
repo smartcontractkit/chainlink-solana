@@ -112,7 +112,7 @@ func ParseProgramLogs(logs []string) []types.ProgramOutput {
 				// we only care about toplevel compute units cost
 				if len(matches) == 3 && len(programs) == 1 {
 					if val, err := strconv.Atoi(matches[1]); err == nil {
-						output.ComputeUnits = uint(val) //nolint:gosec
+						output.ComputeUnits = uint(val) //nolint:gosec // compute unit costs are always positive so it is safe to cast to uint
 					}
 				}
 			}

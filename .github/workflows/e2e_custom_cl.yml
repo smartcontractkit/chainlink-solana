@@ -200,15 +200,11 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Get core ref from PR body
-        if: github.event_name == 'pull_request'
-        run: |
-          comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
-          # shellcheck disable=SC2086
-          core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ -n "$core_ref" ]; then
-            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
-          fi
+      - name: Checkout the repo
+        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - name: Get core ref
+        id: get-core-ref
+        uses: ./.github/actions/get-core-ref
       - name: Check if image exists
         id: check-image
         uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
@@ -223,7 +219,7 @@ jobs:
         with:
           should_checkout: true
           cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ env.CUSTOM_CORE_REF || github.event.inputs.cl_branch_ref }}
+          cl_ref: ${{ steps.get-core-ref.outputs.core-ref || github.event.inputs.cl_branch_ref }}
           dep_solana_sha: ${{ github.event.pull_request.head.sha }}
           push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -287,15 +283,6 @@ jobs:
           this-job-name: E2E Custom Run Smoke Tests
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
-      - name: Get core ref from PR body
-        if: github.event_name == 'pull_request'
-        run: |
-          comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
-          # shellcheck disable=SC2086
-          core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ -n "$core_ref" ]; then
-            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
-          fi
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
@@ -370,15 +357,6 @@ jobs:
           this-job-name: E2E Program Upgrade Tests
           test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
         continue-on-error: true
-      - name: Get core ref from PR body
-        if: github.event_name == 'pull_request'
-        run: |
-          comment="$(gh pr view https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }} --json body -q '.body')"
-          # shellcheck disable=SC2086
-          core_ref="$(echo $comment | grep -oP 'core ref: \K\S+' || true)"
-          if [ -n "$core_ref" ]; then
-            echo "CUSTOM_CORE_REF=${core_ref}" >> "${GITHUB_ENV}"
-          fi
       - name: Checkout the repo
         uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
