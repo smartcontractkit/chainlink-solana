@@ -6,9 +6,7 @@ use common::{
     STATE_VERSION,
 };
 
-use events::{
-    ConfigSetEvent, ReportProcessedEvent, InitializeEmitEvent, TransferOwnershipEvent, AcceptOwnershipEvent
-};
+use events::{ConfigSet, InitializeEmit, OwnershipAcceptance, OwnershipTransfer, ReportProcessed};
 
 use context::*;
 pub use error::*;
@@ -41,10 +39,9 @@ pub mod keystone_forwarder {
         state.authority_nonce = authority_nonce;
         state.owner = ctx.accounts.owner.key();
 
-        emit!(InitializeEmitEvent {
+        emit!(InitializeEmit {
             owner: ctx.accounts.owner.key(),
-            authority_nonce,
-            timestamp: Clock::get()?.unix_timestamp,
+            authority_nonce
         });
 
         Ok(())
@@ -55,9 +52,11 @@ pub mod keystone_forwarder {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
+        let old_owner = state.owner;
         state.proposed_owner = proposed_owner;
 
-        emit!(TransferOwnershipEvent {
+        emit!(OwnershipTransfer {
+            old_owner: old_owner,
             new_owner: proposed_owner
         });
 
@@ -66,11 +65,13 @@ pub mod keystone_forwarder {
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state;
+        let old_owner = state.owner;
         state.owner = state.proposed_owner;
         state.proposed_owner = Pubkey::default();
 
-        emit!(AcceptOwnershipEvent {
-            owner: state.owner
+        emit!(OwnershipAcceptance {
+            old_owner: old_owner,
+            new_owner: state.owner
         });
 
         Ok(())
@@ -210,7 +211,7 @@ pub mod keystone_forwarder {
         execution_state.transmission_id = transmission_id;
         execution_state.success = true;
 
-        emit!(ReportProcessedEvent {
+        emit!(ReportProcessed {
             receiver: ctx.accounts.receiver_program.key(),
             transmission_id,
             result: true,
@@ -291,7 +292,7 @@ fn set_oracles_config(
     oracles_config.f = f;
     oracles_config.signer_addresses = signer_addresses.clone();
 
-    emit!(ConfigSetEvent {
+    emit!(ConfigSet {
         don_id,
         config_version,
         f,

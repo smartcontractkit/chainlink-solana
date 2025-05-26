@@ -42,6 +42,41 @@ let generateEthKeypair = () => {
   };
 };
 
+function waitForEvent<T>(
+  program: any,
+  eventName: string,
+  validate: (event: T, slot: number) => void
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const listener = program.addEventListener(
+      eventName,
+      (event: T, slot: number) => {
+        try {
+          validate(event, slot);
+          resolve(event);
+        } catch (err) {
+          reject(err);
+        } finally {
+          program.removeEventListener(listener);
+        }
+      }
+    );
+  });
+}
+
+function calculateForwarderAuthorityBump(
+  forwarderStatePubkey: PublicKey,
+  programId: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+      forwarderStatePubkey.toBuffer(),
+    ],
+    programId
+  );
+}
+
 let getEthereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12);
 };
@@ -83,12 +118,19 @@ describe("keystone_storage", function () {
   });
 
   it("Is initialized!", async () => {
-    // Check event is emitted
-    const listener = program.addEventListener("InitializeEmitEvent", (event, slot) => {
-      assert.isTrue(event.owner.equals(provider.wallet.publicKey), "Owner set")
-      assert.isNotNull(event.authorityNonce)
-      assert.isNotNull(event.authorityNonce)
-    });
+    let actualState: any;
+
+    const eventPromise = waitForEvent(
+      program,
+      "InitializeEmit",
+      (event: any, slot) => {
+        assert.isNotNull(event.authorityNonce);
+        assert.isTrue(
+          event.owner.equals(provider.wallet.publicKey),
+          "Owner set"
+        );
+      }
+    );
 
     await program.methods
       .initialize()
@@ -100,9 +142,11 @@ describe("keystone_storage", function () {
       .signers([forwarderState])
       .rpc();
 
-    const actualState = await program.account.forwarderState.fetch(
+    actualState = await program.account.forwarderState.fetch(
       forwarderState.publicKey
     );
+
+    await eventPromise;
 
     assert.isTrue(
       actualState.owner.equals(provider.wallet.publicKey),
@@ -113,28 +157,26 @@ describe("keystone_storage", function () {
       "proposed owner is 0"
     );
     assert.equal(actualState.version, 1, "version 1");
-    await program.removeEventListener(listener);
   });
 
   it("Transfer ownership and back", async () => {
     const proposedOwner = Keypair.generate();
 
     // transfer ownership event emitted
-    const transferOwnershipEventPromise = new Promise((resolve, reject) => {
-      const listener = program.addEventListener("TransferOwnershipEvent", (event, slot) => {
-        try {
-          assert.isTrue(
-            event.newOwner.equals(proposedOwner.publicKey),
-            "new owner key emitted"
-          );
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      });
-    });
+    const transferOwnershipEventPromise = waitForEvent(
+      program,
+      "OwnershipTransfer",
+      (event: any, slot) => {
+        assert.isTrue(
+          event.newOwner.equals(proposedOwner.publicKey),
+          "new owner key emitted"
+        );
+        assert.isTrue(
+          event.oldOwner.equals(provider.wallet.publicKey),
+          "new owner key emitted"
+        );
+      }
+    );
 
     // current owner initiates transfer to proposed owner
     await program.methods
@@ -149,6 +191,8 @@ describe("keystone_storage", function () {
       forwarderState.publicKey
     );
 
+    await transferOwnershipEventPromise;
+
     assert.isTrue(
       actualState1.owner.equals(provider.wallet.publicKey),
       "owner should be same"
@@ -158,18 +202,20 @@ describe("keystone_storage", function () {
       "proposed owner set"
     );
 
-    const eventPromise = new Promise((resolve, reject) => {
-      const listener = program.addEventListener("AcceptOwnershipEvent", (event, slot) => {
-        try {
-          assert.isTrue(event.owner.equals(proposedOwner.publicKey), "accept owner key emitted");
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener); // clean up
-        }
-      });
-    });
+    const acceptOwnershipEventPromise = waitForEvent(
+      program,
+      "OwnershipAcceptance",
+      (event: any, slot) => {
+        assert.isTrue(
+          event.newOwner.equals(proposedOwner.publicKey),
+          "accept owner key emitted"
+        );
+        assert.isTrue(
+          event.oldOwner.equals(provider.wallet.publicKey),
+          "accept owner key emitted"
+        );
+      }
+    );
 
     // proposed owner accepts
     await program.methods
@@ -180,6 +226,8 @@ describe("keystone_storage", function () {
       })
       .signers([proposedOwner])
       .rpc();
+
+    await acceptOwnershipEventPromise;
 
     const actualState2 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
@@ -299,22 +347,16 @@ describe("keystone_storage", function () {
       )
     );
 
-    // Check event is emitted
-    const configSetEventPromise = new Promise((resolve, reject) => {
-      const listener = program.addEventListener("ConfigSetEvent", (event, slot) => {
-        try {
-          assert.isTrue(event.donId === 7, "don Id set");
-          assert.isTrue(event.f === f, "f is equal");
-          assert.isNotNull(event.signers, "signers not null");
-          assert.isTrue(event.configVersion === 3, "config version is 3");
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      });
-    });
+    const configPromise = waitForEvent(
+      program,
+      "ConfigSet",
+      (event: any, slot) => {
+        assert.isTrue(event.donId === 7, "don Id set");
+        assert.isTrue(event.f === f, "f is equal");
+        assert.isNotNull(event.signers, "signers not null");
+        assert.isTrue(event.configVersion === 3, "config version is 3");
+      }
+    );
 
     // update to new f
     await program.methods
@@ -335,6 +377,8 @@ describe("keystone_storage", function () {
     const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
       oraclesConfigStorage
     );
+
+    await configPromise;
 
     assert.equal(
       configId,
@@ -405,7 +449,7 @@ describe("keystone_storage", function () {
 
     // console.log(`tx size w/ 17 nodes ${serializedTx.length}`);
 
-     await provider.sendAndConfirm(signedTx);
+    await provider.sendAndConfirm(signedTx);
 
     const actualConfig = await program.account.oraclesConfig.fetch(
       oraclesConfigStorage
@@ -455,11 +499,8 @@ describe("keystone_storage", function () {
       .digest();
 
     const [forwarderAuthorityStorage, forwarderAuthorityBump] =
-      PublicKey.findProgramAddressSync(
-        [
-          Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-          forwarderState.publicKey.toBuffer(),
-        ],
+      calculateForwarderAuthorityBump(
+        forwarderState.publicKey,
         program.programId
       );
 
@@ -573,21 +614,19 @@ describe("keystone_storage", function () {
       units: 1_400_000,
     });
 
-    // Check event is emitted
-    const reportProcessedEventPromise = new Promise((resolve, reject) => {
-      const listener = program.addEventListener("ReportProcessedEvent", (event, slot) => {
-        try {
-          assert.isTrue(receiver.equals(event.receiver), "receiver pub key emitted");
-          assert.isTrue(event.result, "Successful report emitted");
-          assert.isNotNull(event.transmissionId, "Transmission Id present");
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      })
-    });
+    const reportPromise = waitForEvent(
+      program,
+      "ReportProcessed",
+      (event: any, slot) => {
+        console.log(event);
+        assert.isTrue(
+          receiver.equals(event.receiver),
+          "receiver pub key emitted"
+        );
+        assert.isTrue(event.result, "Successful report emitted");
+        assert.isNotNull(event.transmissionId, "Transmission Id present");
+      }
+    );
 
     const ix = await program.methods
       .report(dataBytes)
@@ -608,6 +647,8 @@ describe("keystone_storage", function () {
         },
       ])
       .instruction();
+
+    // await reportPromise;
 
     const slot = await provider.connection.getSlot();
     const [lookupTableInst, lookupTableAddress] =
@@ -766,5 +807,6 @@ describe("keystone_storage", function () {
       }
     }
 
+    await reportPromise;
   });
 });

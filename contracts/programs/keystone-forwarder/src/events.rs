@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 
 #[event]
-pub struct ReportProcessedEvent {
+pub struct ReportProcessed {
     pub receiver: Pubkey,
     pub transmission_id: [u8; 32],
     pub result: bool,
 }
 
 #[event]
-pub struct ConfigSetEvent {
+pub struct ConfigSet {
     pub don_id: u32,
     pub config_version: u32,
     pub f: u8,
@@ -16,18 +16,19 @@ pub struct ConfigSetEvent {
 }
 
 #[event]
-pub struct InitializeEmitEvent {
-  pub owner: Pubkey,
-  pub authority_nonce: u8,
-  pub timestamp: i64,
+pub struct InitializeEmit {
+    pub owner: Pubkey,
+    pub authority_nonce: u8,
 }
 
 #[event]
-pub struct TransferOwnershipEvent {
-  pub new_owner: Pubkey
+pub struct OwnershipTransfer {
+    pub old_owner: Pubkey,
+    pub new_owner: Pubkey,
 }
 
 #[event]
-pub struct AcceptOwnershipEvent {
-  pub owner: Pubkey
+pub struct OwnershipAcceptance {
+    pub old_owner: Pubkey,
+    pub new_owner: Pubkey,
 }

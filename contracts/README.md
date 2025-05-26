@@ -52,6 +52,7 @@ anchor test
 ### Using nix shell to test
 
 1. In `shell.nix` comment out:
+
 ```
 # (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
 # lld_11
@@ -62,8 +63,9 @@ to use local version of `rustup` and `cargo`
 2. Ensure `ts/` is built with `/ts && pnpm build`
 
 3. As of 05/21/2025 works with:
- - `cargo 1.79.0 (ffa9cf99a 2024-06-03)`
- - `rustc 1.79.0 (129f3b996 2024-06-10)`
+
+- `cargo 1.79.0 (ffa9cf99a 2024-06-03)`
+- `rustc 1.79.0 (129f3b996 2024-06-10)`
 
 4. `anchor build && anchor test`
 
