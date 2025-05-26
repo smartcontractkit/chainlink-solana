@@ -1256,10 +1256,10 @@ github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135/go.mod h1:NkvE4iQgiT7dMCP6U3xPELHhWhN5Xr6rHC0axRebyMU=
 github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250514200342-5169fbe9e28d h1:+I0fUEPUE2W45bjDrPsZgTogK//1yZo29hIREgDTGL8=
 github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250514200342-5169fbe9e28d/go.mod h1:7SIisRODXILBOqkUYvdfosemV6ttDTR+AjGHPws7DoA=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250514200342-5169fbe9e28d h1:D2wyPOBhJXueq/P7Ux1HCntZ7pUB2rPXQxSeO3cN7iQ=
-github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250514200342-5169fbe9e28d/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250514200342-5169fbe9e28d h1:9ys7cetSe40Ne53Z0xKfvrs3TfDjJuBHIsVUA4hOzyk=
-github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250514200342-5169fbe9e28d/go.mod h1:zYqPBBRUXUQ/L+aD4Q7phnYsfVeC5rDBXtPt1VYwtws=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a h1:bFYBcW0cmhq0G8NSjPxSFfL/fVODuhEGluyWOxJTqqk=
+github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a h1:O28vgyHM7QF1YLg1BwkQSIbOYA+t0RiH9+b+k90GPG8=
+github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a/go.mod h1:zYqPBBRUXUQ/L+aD4Q7phnYsfVeC5rDBXtPt1VYwtws=
 github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250501150903-3e93089d9ad5 h1:hkMi+WgGrRvPXWToGE2NEeXjd6SnIq+rjFK5yj75dlE=
 github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250501150903-3e93089d9ad5/go.mod h1:5tMRH1DeFx0E/o1EG7Yyx9EFtgMC06CSZFc+kP70uVw=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 h1:55Izmj3bEFD2o0tWpuEd3OFV/pcIQiiaPZP7uJqi1GQ=
