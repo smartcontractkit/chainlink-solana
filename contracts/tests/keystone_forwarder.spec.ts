@@ -118,8 +118,6 @@ describe("keystone_storage", function () {
   });
 
   it("Is initialized!", async () => {
-    let actualState: any;
-
     const eventPromise = waitForEvent(
       program,
       "InitializeEmit",
@@ -142,7 +140,7 @@ describe("keystone_storage", function () {
       .signers([forwarderState])
       .rpc();
 
-    actualState = await program.account.forwarderState.fetch(
+    const actualState = await program.account.forwarderState.fetch(
       forwarderState.publicKey
     );
 
