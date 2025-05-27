@@ -110,7 +110,10 @@ func (p *blocksSorter) readNextReadyBlock() *types.Block {
 		return nil
 	}
 
-	slotNumber := element.Value.(uint64)
+	slotNumber, ok := element.Value.(uint64)
+	if !ok {
+		return nil
+	}
 	block, ok := p.readyBlocks[slotNumber]
 	if !ok {
 		return nil
