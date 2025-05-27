@@ -151,6 +151,10 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 				results[idx].err = fmt.Errorf("returnVal is unexpected type: %T, expected %T", results[idx].returnVal, &[]byte{})
 				continue
 			}
+			if returnVal == nil {
+				results[idx].err = errors.New("returnVal is nil")
+				continue
+			}
 			*returnVal = solana.WrappedSol.Bytes()
 			continue
 		}
