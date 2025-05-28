@@ -44,7 +44,7 @@ func TestClient_Reader_Integration(t *testing.T) {
 	// check balance
 	bal, err := c.Balance(ctx, pubKey)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(100_000_000_000), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
+	assert.Equal(t, 100*solana.LAMPORTS_PER_SOL, bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
 
 	// check SlotHeight
 	slot0, err := c.SlotHeight(ctx)
@@ -239,12 +239,18 @@ func TestClient_Writer_Integration(t *testing.T) {
 	assert.NoError(t, err)
 
 	// check signature statuses
-	time.Sleep(2 * time.Second) // wait for processing
-	statuses, err := c.SignatureStatuses(ctx, []solana.Signature{sigSuccess, sigFail})
-	assert.NoError(t, err)
-
-	assert.Nil(t, statuses[0].Err)
-	assert.NotNil(t, statuses[1].Err)
+	// try waiting for tx to execute - reduce flakiness
+	require.Eventually(t, func() bool {
+		res, statusErr := c.SignatureStatuses(ctx, []solana.Signature{sigSuccess, sigFail})
+		require.NoError(t, statusErr)
+		require.Equal(t, 2, len(res))
+		if res[0] == nil || res[1] == nil {
+			return false
+		}
+		require.Nil(t, res[0].Err)
+		require.NotNil(t, res[1].Err)
+		return true
+	}, 5*time.Second, 500*time.Millisecond)
 
 	getTxResult, err := c.GetTransaction(ctx, sigSuccess)
 	assert.NoError(t, err)
@@ -266,10 +272,6 @@ func TestClient_Writer_Integration(t *testing.T) {
 
 func TestClient_GetBlocks(t *testing.T) {
 	url := solanatesting.SetupLocalSolNode(t)
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	pubKey := privKey.PublicKey()
-	solanatesting.FundTestAccounts(t, []solana.PublicKey{pubKey}, url)
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -393,7 +395,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 		if res[0] == nil {
 			return false
 		}
-		return res[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed
+		return res[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed || res[0].ConfirmationStatus == rpc.ConfirmationStatusFinalized
 	}, 5*time.Second, 500*time.Millisecond)
 
 	// expect one sender has only sent one tx

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/freeport"
 
 	solanaclient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -221,9 +222,10 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		// Start live validator and setup test environment
 		t.Parallel()
 		ledgerDir := t.TempDir()
-		port := commonutils.MustRandomPort(t)
-		faucetPort := commonutils.MustRandomPort(t)
-		cmd, url := startValidator(t, ledgerDir, port, faucetPort, true)
+		ports, err := solanatesting.TwoConsecutiveFreeports(t)
+		require.NoError(t, err)
+		faucetPort := strconv.Itoa(freeport.GetOne(t))
+		cmd, url := startValidator(t, ledgerDir, strconv.Itoa(ports[0]), faucetPort, true)
 		ctx, cl, txmInstance, senderPubKey, receiverPubKey, obs := setup(t, url, true)
 
 		// Back up the ledger after transferring funds
@@ -245,7 +247,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		_ = cmd.Wait()
 		require.NoError(t, os.RemoveAll(ledgerDir))
 		require.NoError(t, copyDir(cleanLedgerBackupDir, ledgerDir))
-		startValidator(t, ledgerDir, port, faucetPort, false)
+		startValidator(t, ledgerDir, strconv.Itoa(ports[0]), faucetPort, false)
 
 		// Check tx is not finalized yet and reorg is detected
 		status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
