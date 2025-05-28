@@ -23,12 +23,12 @@ pub struct InitializeEmit {
 
 #[event]
 pub struct OwnershipTransfer {
-    pub old_owner: Pubkey,
-    pub new_owner: Pubkey,
+    pub current_owner: Pubkey,
+    pub proposed_owner: Pubkey,
 }
 
 #[event]
 pub struct OwnershipAcceptance {
-    pub old_owner: Pubkey,
+    pub previous_owner: Pubkey,
     pub new_owner: Pubkey,
 }

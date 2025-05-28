@@ -166,12 +166,12 @@ describe("keystone_storage", function () {
       "OwnershipTransfer",
       (event: any, slot) => {
         assert.isTrue(
-          event.newOwner.equals(proposedOwner.publicKey),
-          "new owner key emitted"
+          event.proposedOwner.equals(proposedOwner.publicKey),
+          "proposed owner key emitted"
         );
         assert.isTrue(
-          event.oldOwner.equals(provider.wallet.publicKey),
-          "new owner key emitted"
+          event.currentOwner.equals(provider.wallet.publicKey),
+          "current owner key emitted"
         );
       }
     );
@@ -206,11 +206,11 @@ describe("keystone_storage", function () {
       (event: any, slot) => {
         assert.isTrue(
           event.newOwner.equals(proposedOwner.publicKey),
-          "accept owner key emitted"
+          "new owner key emitted"
         );
         assert.isTrue(
-          event.oldOwner.equals(provider.wallet.publicKey),
-          "accept owner key emitted"
+          event.previousOwner.equals(provider.wallet.publicKey),
+          "previous owner key emitted"
         );
       }
     );
