@@ -103,13 +103,9 @@ func empty(t *testing.T, txm *Txm, prom soltxmProm) bool {
 
 // waits for the provided function to evaluate to true within the provided duration amount of time
 func waitFor(t *testing.T, waitDuration time.Duration, txm *Txm, prom soltxmProm, f func(*testing.T, *Txm, soltxmProm) bool) {
-	for i := 0; i < int(waitDuration.Seconds()*1.5); i++ {
-		if f(t, txm, prom) {
-			return
-		}
-		time.Sleep(time.Second)
-	}
-	assert.NoError(t, errors.New("unable to confirm inflight txs is empty"))
+	require.Eventually(t, func() bool {
+		return f(t, txm, prom)
+	}, waitDuration, time.Second, "unable to confirm inflight txs is empty")
 }
 
 func TestTxm(t *testing.T) {
