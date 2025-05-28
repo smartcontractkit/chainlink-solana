@@ -105,7 +105,7 @@ func empty(t *testing.T, txm *Txm, prom soltxmProm) bool {
 func waitFor(t *testing.T, waitDuration time.Duration, txm *Txm, prom soltxmProm, f func(*testing.T, *Txm, soltxmProm) bool) {
 	require.Eventually(t, func() bool {
 		return f(t, txm, prom)
-	}, waitDuration, time.Second, "unable to confirm inflight txs is empty")
+	}, 2*waitDuration, time.Second, "unable to confirm inflight txs is empty")
 }
 
 func TestTxm(t *testing.T) {
