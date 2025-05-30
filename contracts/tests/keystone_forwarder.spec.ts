@@ -48,16 +48,32 @@ function waitForEvent<T>(
   validate: (event: T, slot: number) => void
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const listener = program.addEventListener(
+    let listener: number | null = null;
+    
+    // Set a timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      if (listener !== null) {
+        program.removeEventListener(listener);
+      }
+      reject(new Error(`Event '${eventName}' timed out after 30 seconds`));
+    }, 30000);
+
+    listener = program.addEventListener(
       eventName,
       (event: T, slot: number) => {
         try {
           validate(event, slot);
+          clearTimeout(timeout);
+          if (listener !== null) {
+            program.removeEventListener(listener);
+          }
           resolve(event);
         } catch (err) {
+          clearTimeout(timeout);
+          if (listener !== null) {
+            program.removeEventListener(listener);
+          }
           reject(err);
-        } finally {
-          program.removeEventListener(listener);
         }
       }
     );
