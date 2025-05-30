@@ -285,7 +285,7 @@ pub struct OnReport<'info> {
     // behavior if we don't include legacy store ... 
     // legacy_store | legacy feeds config
     // N                N     - skips logic altogether
-    // N                Y     - if it is in a report, don't write but log about feeds
+    // N                Y     - if it is in a report, don't write but log about feeds that would be affected?
     // Y                N     - ERROR state
     // Y                Y     - if it is in a report, writes to the legacy feed
     
@@ -325,11 +325,16 @@ pub struct OnReport<'info> {
     // )]
     // pub permission_flag: UncheckedAccount<'info>
 
-    // included if and only if both legacy_store and legacy_feeds_config is included
-    // if only 1 or 0 or the legacy_store / legacy_feeds_config accounts are included
-    // this must not be included
-
     // M transmission feed accounts
+    // should be sorted
+    // 
+    // included if and only if both legacy_store and legacy_feeds_config is included.
+    // if only 1 or 0 or the legacy_store / legacy_feeds_config accounts are included
+    // this should not be included.
+    //
+    // note: not all of the legacy feed accounts supplied may be written to because there is
+    // a write_disabled flag per account
+    //  
     // pub legacy_feed: UncheckedAccount<'info>
 
 }

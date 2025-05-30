@@ -81,6 +81,11 @@ pub struct WritePermissionFlag {}
 pub struct LegacyFeedEntry {
     pub data_id: [u8; 16],
     pub legacy_feed: Pubkey,
+    // functions mainly as a killswitch in case of emergencies
+    // under normal operations, this is expected to be 0
+    // 0 = enabled. 1 = disabled
+    // regardless of what this flag is, if legacy_store or legacy_feed_config is not passed into report, writes cannot occur
+    pub write_disabled: u8    
 }
 
 // in reality, there are only ~14 legacy feeds, but we provide a healthy buffer

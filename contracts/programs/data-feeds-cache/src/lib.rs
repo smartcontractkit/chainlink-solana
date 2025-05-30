@@ -137,15 +137,35 @@ pub mod data_feeds_cache {
 
     // todo: should i write out the entire logic for this? it should
     // probably query the contract... and feed ids of each one as a precaution?
+    // should make write enabled by default?
+    // what would be the use case to have them 
+    // if you enable them by default, and then 
     pub fn init_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+
         set_legacy_feeds_config(
-            true, &mut ctx.accounts.legacy_feeds_config, ctx.accounts.legacy_store.key(), ctx.remaining_accounts, data_ids
+            true, 
+            &mut ctx.accounts.legacy_feeds_config, 
+            ctx.accounts.legacy_store.key(), 
+            ctx.remaining_accounts, 
+            &data_ids,
+            &vec![0_u8; data_ids.len()]
         )
     }
 
-    pub fn update_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+    pub fn update_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, write_disabled: Vec<bool>) -> Result<()> {
+        let write_disabled: Vec<u8> = write_disabled
+            .iter()
+            .copied() // &bool → bool
+            .map(|f| f as u8)
+            .collect();
+
         set_legacy_feeds_config(
-            false, &mut ctx.accounts.legacy_feeds_config, ctx.accounts.legacy_store.key(), ctx.remaining_accounts, data_ids
+            false, 
+            &mut ctx.accounts.legacy_feeds_config, 
+            ctx.accounts.legacy_store.key(), 
+            ctx.remaining_accounts, 
+            &data_ids,
+            &write_disabled
         )
     }
 
@@ -415,6 +435,9 @@ pub mod data_feeds_cache {
     // // todo: change report and metadata to &[u8]
     pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
         // todo: check if legacy_store and legacy_feed_config are both there
+        let legacy_feed_config_included = ctx.accounts.legacy_feeds_config.is_some();
+        let legacy_store_included = ctx.accounts.legacy_store.is_some();
+
 
         // first assume we don't have legacy_store or legacy_feed_config
 
@@ -422,10 +445,17 @@ pub mod data_feeds_cache {
 
         let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
 
+        let len = received_decimal_reports.len();
 
-        let report_account_infos = &ctx.remaining_accounts[..received_decimal_reports.len()];
-        // todo: adjust indexing if we have legacy store
-        let permission_flag_account_infos = &ctx.remaining_accounts[received_decimal_reports.len()..]; 
+        let report_account_infos = &ctx.remaining_accounts[..len];
+        let permission_flag_account_infos = &ctx.remaining_accounts[len..2*len]; 
+        let legacy_feed_account_infos = &ctx.remaining_accounts[2*len..];
+
+        // legacy_feed_account_infos are sorted by data id for easy access later
+        // is a feature flag required??? for now... no 
+        // if something goes wrong, we have an immediate kill switch though to remove the depenency. so maybe!?
+        // but it's easier t
+        // do we have 
 
         require!(
             report_account_infos.len() == received_decimal_reports.len() &&
@@ -478,6 +508,14 @@ pub mod data_feeds_cache {
             };
 
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
+
+
+
+            // if let (Some(a), Some(b)) = (ctx.accounts.legacy_store, ctx.accounts.legacy_feeds_config) {
+
+
+            //     // Both are Some, and you can use a and b here
+            // }
 
             // todo: add event here
 
@@ -579,8 +617,9 @@ fn get_workflow_metadata(metadata: &[u8]) -> Result<(&[u8], &[u8])> {
     Ok((workflow_name, workflow_owner))
 }
 
-fn set_legacy_feeds_config(init: bool, config: &mut AccountLoader<LegacyFeedsConfig>, legacy_store: Pubkey, legacy_feeds: &[AccountInfo], data_ids: Vec<[u8; 16]>) -> Result<()> {
-    require!(data_ids.len() == legacy_feeds.len(), DataCacheError::ArrayLengthMismatch);
+fn set_legacy_feeds_config(init: bool, config: &mut AccountLoader<LegacyFeedsConfig>, legacy_store: Pubkey, legacy_feeds: &[AccountInfo], data_ids: &[[u8; 16]], write_disabled: &[u8]) -> Result<()> {
+    require!(data_ids.len() == legacy_feeds.len() && data_ids.len() == write_disabled.len(), DataCacheError::ArrayLengthMismatch);
+
 
     let mut legacy_feeds_config = if init {
         config.load_init()?
@@ -597,7 +636,11 @@ fn set_legacy_feeds_config(init: bool, config: &mut AccountLoader<LegacyFeedsCon
     for (i, data_id) in data_ids.iter().enumerate() {
         require!(prev_data_id < *data_id, DataCacheError::IdsMustStrictlyIncrease);
 
-        legacy_feeds_config.id_to_feed.push(LegacyFeedEntry { data_id: data_id.clone(), legacy_feed: legacy_feeds[i].key() });
+        legacy_feeds_config.id_to_feed.push(LegacyFeedEntry { 
+            data_id: data_id.clone(),
+            legacy_feed: legacy_feeds[i].key(),
+            write_disabled: write_disabled[i]
+        });
 
         prev_data_id = *data_id; 
     };
