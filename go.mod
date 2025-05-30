@@ -22,8 +22,8 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250515132731-ad40fab9b75e
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250519161208-80bc8b13c0e7
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
-	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250514200342-5169fbe9e28d
-	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250514200342-5169fbe9e28d
+	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a
+	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/freeport v0.1.0
 	github.com/smartcontractkit/libocr v0.0.0-20250513175559-61c382d6cee4
 	github.com/stretchr/testify v1.10.0

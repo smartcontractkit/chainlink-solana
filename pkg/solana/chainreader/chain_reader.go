@@ -602,7 +602,10 @@ func (s *ContractReaderService) addEventRead(
 		return err
 	}
 
-	pf := setPollingFilterOverrides(common, conf.PollingFilter)
+	pf, err := setPollingFilterOverrides(common, conf.PollingFilter)
+	if err != nil {
+		return fmt.Errorf("failed to set polling filter overrides: %w", err)
+	}
 
 	eventIdl, isOk := idlDef.(codec.IdlEvent)
 	if !isOk {
@@ -918,7 +921,7 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	return pdaAddresses, nil
 }
 
-func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*config.PollingFilter) config.PollingFilter {
+func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*config.PollingFilter) (config.PollingFilter, error) {
 	final := reflect.New(reflect.TypeOf(common).Elem())
 	valOfF := final.Elem()
 	allOverrides := append([]*config.PollingFilter{common}, overrides...)
@@ -946,5 +949,10 @@ func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*confi
 		}
 	}
 
-	return final.Elem().Interface().(config.PollingFilter)
+	filter, ok := final.Elem().Interface().(config.PollingFilter)
+	if !ok {
+		return config.PollingFilter{}, fmt.Errorf("encountered unexpected type: %T, expected: %T", final.Elem().Interface(), config.PollingFilter{})
+	}
+
+	return filter, nil
 }

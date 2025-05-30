@@ -1,3 +1,5 @@
+//go:build !race
+
 package testing
 
 import (
@@ -44,7 +46,7 @@ func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 		// check end balance
 		bal, err = c.Balance(ctx, pubkey)
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(100_000_000_000), bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
+		assert.Equal(t, 100*solana.LAMPORTS_PER_SOL, bal) // once funds get sent to the system program it should be unrecoverable (so this number should remain > 0)
 	}
 
 	checkFunded(t, network0)

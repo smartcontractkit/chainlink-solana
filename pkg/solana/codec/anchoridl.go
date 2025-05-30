@@ -313,10 +313,10 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if typeFound {
 				return fmt.Errorf("multiple types found for IdlType: %s", spew.Sdump(temp))
 			}
-			if _, ok := got.([]interface{}); !ok {
+			arrVal, ok := got.([]interface{})
+			if !ok {
 				return fmt.Errorf("array is not in expected format: %s", spew.Sdump(got))
 			}
-			arrVal := got.([]interface{})
 			if len(arrVal) != 2 {
 				return fmt.Errorf("array is not of expected length: %s", spew.Sdump(got))
 			}
@@ -324,8 +324,11 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if err := utilz.TranscodeJSON(arrVal[0], &target.Thing); err != nil {
 				return err
 			}
-
-			target.Num = int(arrVal[1].(float64))
+			num, ok := arrVal[1].(float64)
+			if !ok {
+				return fmt.Errorf("value is unexpected type: %T, expected float64", arrVal[1])
+			}
+			target.Num = int(num)
 			env.AsIdlTypeArray = &target
 		}
 	default:

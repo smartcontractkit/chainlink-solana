@@ -17,6 +17,12 @@ import (
 	"github.com/smartcontractkit/freeport"
 )
 
+const (
+	fundingTimeout    = 30 * time.Second
+	fundingTimestep   = 500 * time.Millisecond
+	fundingMaxRetries = 5
+)
+
 func SetupLocalSolNode(t *testing.T) string {
 	t.Helper()
 
@@ -29,12 +35,13 @@ func SetupLocalSolNode(t *testing.T) string {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := freeport.GetN(t, 2)
-	portStr := strconv.Itoa(port[0])
+	ports, err := TwoConsecutiveFreeports(t)
+	require.NoError(t, err)
+	portStr := strconv.Itoa(ports[0])
 
 	faucetPort := freeport.GetOne(t)
 	url := "http://127.0.0.1:" + portStr
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
@@ -83,41 +90,75 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
+func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, client *rpc.Client, attempts int) error {
 	t.Helper()
 
-	var errKeys []solana.PublicKey
-	for i, key := range keys {
-		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
-			account,
-			"--url", url,
-		).Output()
-		if err != nil {
-			if attempts <= 0 {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
-				}
-				return err
-			}
-			errKeys = append(errKeys, key)
-		}
-	}
-	// call FundTestAccountsWithRetry recursively with keys that errored, decrement attempts to cap the number of retries
-	if len(errKeys) > 0 {
-		if attempts <= 0 {
-			return fmt.Errorf("failed to fund solana accounts")
-		}
-		time.Sleep(500 * time.Millisecond)
-		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
+	if attempts <= 0 {
+		return fmt.Errorf("failed to fund accounts within %d tries", fundingMaxRetries)
 	}
 
-	return nil
+	out, err := client.GetHealth(t.Context())
+	if err != nil || out != rpc.HealthOk {
+		t.Log("client RPC not healthy when trying to fund account")
+		return errors.New("client not healthy when funding account")
+	}
+
+	sigs := []solana.Signature{}
+	for _, v := range keys {
+		sig, err := client.RequestAirdrop(t.Context(), v, 100*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
+		require.NoError(t, err)
+		sigs = append(sigs, sig)
+	}
+
+	// wait for confirmation so later transactions don't fail
+	remaining := keys
+	initTime := time.Now()
+
+	for elapsed := time.Since(initTime); elapsed < fundingTimeout; elapsed = time.Since(initTime) {
+		time.Sleep(fundingTimestep)
+
+		statusRes, sigErr := client.GetSignatureStatuses(t.Context(), true, sigs...)
+		require.NoError(t, sigErr)
+		require.NotNil(t, statusRes)
+		require.NotNil(t, statusRes.Value)
+
+		accountsWithNonFinalizedFunding := []solana.PublicKey{}
+		for i, res := range statusRes.Value {
+			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
+				accountsWithNonFinalizedFunding = append(accountsWithNonFinalizedFunding, keys[i])
+			}
+		}
+		remaining = accountsWithNonFinalizedFunding
+
+		if len(remaining) == 0 {
+			return nil // all done!
+		}
+	}
+
+	return FundTestAccountsWithRetry(t, remaining, client, attempts-1) // recursive call with only remaining & with fewer attempts
 }
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	err := FundTestAccountsWithRetry(t, keys, url, 5)
+	client := rpc.New(url)
+	err := FundTestAccountsWithRetry(t, keys, client, fundingMaxRetries)
 	require.NoError(t, err)
+}
+
+func TwoConsecutiveFreeports(t *testing.T) ([]int, error) {
+	t.Helper()
+	// track unused ports until consecutive ones are found or max retries is reached
+	// ports are not immediately returned to avoid re-fetching the same ones again
+	var unusedPorts []int
+	// try a maximum of 5 times
+	for range 5 {
+		ports := freeport.GetN(t, 2)
+		if ports[0]+1 == ports[1] {
+			freeport.Return(unusedPorts)
+			return ports, nil
+		}
+		unusedPorts = append(unusedPorts, ports...)
+	}
+	freeport.Return(unusedPorts)
+	return nil, errors.New("failed to fetch 2 consecutive ports")
 }
