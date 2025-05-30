@@ -7,13 +7,13 @@ import (
 )
 
 type TestDSORM struct {
-	ds      sqlutil.DataSource
+	ds sqlutil.DataSource
 }
 
 // NewTestORM creates a test DSORM which contains method only used by tests
 func NewTestORM(ds sqlutil.DataSource) *TestDSORM {
 	return &TestDSORM{
-		ds:      ds,
+		ds: ds,
 	}
 }
 
