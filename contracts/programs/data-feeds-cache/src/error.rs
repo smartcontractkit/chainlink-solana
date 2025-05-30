@@ -57,6 +57,9 @@ pub enum DataCacheError {
     OutOfBounds,
 
     #[msg("invalid update permission")]
-    InvalidUpdatePermission
+    InvalidUpdatePermission,
+
+    #[msg("ids must strictly increase")]
+    IdsMustStrictlyIncrease,
 
 }
