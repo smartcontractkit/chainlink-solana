@@ -11,6 +11,14 @@ pub struct DecimalFeedConfigSet {
     pub stale_permission_flags: Vec<Pubkey>
 }
 
+// todo: should be per
+#[event]
+pub struct LegacyFeedsReported {
+    pub data_ids: Vec<[u8; 16]>,
+    pub legacy_feeds: Vec<Pubkey>,
+    pub legacy_feeds_updated: bool
+}
+
 // #[derive(BorshSerialize, BorshDeserialize)]
 // pub struct EmittedWorkflowMetadata {
 //     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)

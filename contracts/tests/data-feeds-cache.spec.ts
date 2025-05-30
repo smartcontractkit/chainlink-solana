@@ -63,7 +63,8 @@ type WorkflowMetadata = {
 
 type LegacyFeedEntry = {
   dataId: number[],
-  legacyFeed: PublicKey
+  legacyFeed: PublicKey,
+  writeDisabled: number
 }
 
 // If expected array may be of smaller length than actual array
@@ -273,7 +274,8 @@ describe("data feeds cache", function () {
           len: new BN(1),
           xs: [{
             dataId: Array.from(feedD.dataId),
-            legacyFeed: feedAdminA.keypair.publicKey
+            legacyFeed: feedAdminA.keypair.publicKey,
+            writeDisabled: 0
           }]
         };
         
@@ -293,9 +295,14 @@ describe("data feeds cache", function () {
 
     it("Update", async () => {
 
+      const dataIds = [feedD.dataId, feedC.dataId].sort((a, b) => a.compare(b))
+
       await program
       .methods
-      .updateLegacyFeedsConfig([feedD.dataId, feedC.dataId] as any)
+      .updateLegacyFeedsConfig(
+        dataIds as any, 
+        [true, true]
+      )
       .accounts({
         owner: provider.publicKey,
         state: defaultCacheState.publicKey,
@@ -319,27 +326,31 @@ describe("data feeds cache", function () {
 
       const actualState = await program.account.legacyFeedsConfig.fetch(legacyFeedConfigAccount);
 
+      console.log(actualState.idToFeed.xs[0], 'xtra small')
+
       const expectedEntry: ArrayVec<LegacyFeedEntry> = {
         len: new BN(2),
         xs: [
           {
-            dataId: Array.from(feedD.dataId),
-            legacyFeed: reportSender.keypair.publicKey
+            dataId: Array.from(dataIds[0]),
+            legacyFeed: reportSender.keypair.publicKey,
+            writeDisabled: 1,
           },
           {
-            dataId: Array.from(feedC.dataId),
-            legacyFeed: feedAdminA.keypair.publicKey
+            dataId: Array.from(dataIds[1]),
+            legacyFeed: feedAdminA.keypair.publicKey,
+            writeDisabled: 1,
           },
         ]
       };
       
       const entryEq = (a: LegacyFeedEntry, b: LegacyFeedEntry) => {
-          return a.legacyFeed.equals(b.legacyFeed) && Buffer.from(a.dataId).equals(Buffer.from(b.dataId));
+          return a.legacyFeed.equals(b.legacyFeed) && Buffer.from(a.dataId).equals(Buffer.from(b.dataId)) && a.writeDisabled == b.writeDisabled;
       }
 
       assert.isTrue(
         arrayVecEquals(expectedEntry, actualState.idToFeed, entryEq),
-        "workflow metadata equal"
+        "entries equal"
       )
 
       assert.isTrue(actualState.legacyStore.equals(forwarderProgram.programId));
