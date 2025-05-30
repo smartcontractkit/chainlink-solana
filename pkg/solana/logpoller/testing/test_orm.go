@@ -18,13 +18,13 @@ func NewTestORM(ds sqlutil.DataSource) *TestDSORM {
 }
 
 // HasFilterByEventName checks if a filter exists for the provided event name
-func (o *TestDSORM) HasFilterByEventName(ctx context.Context, chainID, eventName string) (bool, error) {
+func (o *TestDSORM) HasFilterByEventName(ctx context.Context, chainID, eventName string, address []byte) (bool, error) {
 	query := `
 		SELECT COUNT(1) FROM solana.log_poller_filters 
-			WHERE is_deleted = false AND chain_id = $1 AND event_name = $2 LIMIT 1`
+			WHERE is_deleted = false AND chain_id = $1 AND event_name = $2 AND address = $3 LIMIT 1`
 
 	var exists int
-	if err := o.ds.GetContext(ctx, &exists, query, chainID, eventName); err != nil {
+	if err := o.ds.GetContext(ctx, &exists, query, chainID, eventName, address); err != nil {
 		return false, err
 	}
 
