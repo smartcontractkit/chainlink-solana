@@ -13,7 +13,7 @@ mod error;
 mod event;
 
 use context::*;
-use state::{AdminList, FeedConfig, WorkflowMetadata};
+use state::{AdminList, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig, ReceivedDecimalReport, WorkflowMetadata};
 use error::{DataCacheError, AuthError};
 use common::{ZERO_DATA_ID, ZERO_ADDRESS, MAX_WORKFLOW_METADATAS};
 use event::{DecimalFeedConfigSet};
@@ -25,7 +25,7 @@ pub mod data_feeds_cache {
     use anchor_lang::{solana_program::{program::invoke_signed, system_instruction}, Discriminator};
     use state::{ReceivedDecimalReport, WorkflowMetadata};
 
-    use crate::{common::ANCHOR_DISCRIMINATOR, state::{DecimalReport, WritePermissionFlag}};
+    use crate::{common::ANCHOR_DISCRIMINATOR, state::{DecimalReport, LegacyFeedEntry, WritePermissionFlag}};
 
     use super::*;
 
@@ -137,28 +137,21 @@ pub mod data_feeds_cache {
 
     // todo: should i write out the entire logic for this? it should
     // probably query the contract... and feed ids of each one as a precaution?
-    // pub fn init_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>) -> Result<()> {
-    //     // ensure data_ids are sorted,
+    pub fn init_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+        set_legacy_feeds_config(
+            true, &mut ctx.accounts.legacy_feeds_config, ctx.accounts.legacy_store.key(), ctx.remaining_accounts, data_ids
+        )
+    }
 
+    pub fn update_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>) -> Result<()> {
+        set_legacy_feeds_config(
+            false, &mut ctx.accounts.legacy_feeds_config, ctx.accounts.legacy_store.key(), ctx.remaining_accounts, data_ids
+        )
+    }
 
-    //     for (i, data_id) in data_ids.iter().enumerate() {
-
-    //     }
-    //     // len(data_ids) == len(legacy_feeds)
-    //     let legacy_feeds_config = &mut ctx.accounts.legacy_feeds_config.load_init()?;
-    //     legacy_feeds_config.
-    //     Ok(())
-    // }
-
-    // pub fn set_legacy_feeds_config(ctx: Context<UpdateLegacyFeedsConfig>, data_ids: Vec<[u8; 16]>, legacy_feeds: Vec<Pubkey>, legacy_store: Pubkey) -> Result<()> {
-    //     // data_ids are sorted,
-    //     // len(data_ids) == len(legacy_feeds)
-    //     Ok(())
-    // }
-
-    // pub fn close_legacy_feeds_config(ctx: Context<InitLegacyFeedsConfig>) -> Result<()> {
-    //     Ok(())
-    // }
+    pub fn close_legacy_feeds_config(_ctx: Context<CloseLegacyFeedsConfig>) -> Result<()> {
+        Ok(())
+    }
 
 
     // in general, you always add before removing for making things
@@ -425,9 +418,10 @@ pub mod data_feeds_cache {
 
         // first assume we don't have legacy_store or legacy_feed_config
 
-        let (workflow_owner, workflow_name) = get_workflow_metadata(&metadata)?;
+        let (workflow_name, workflow_owner) = get_workflow_metadata(&metadata)?;
 
         let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
+
 
         let report_account_infos = &ctx.remaining_accounts[..received_decimal_reports.len()];
         // todo: adjust indexing if we have legacy store
@@ -439,9 +433,14 @@ pub mod data_feeds_cache {
             DataCacheError::ArrayLengthMismatch
         );
 
+
         for (i, received_decimal_report) in received_decimal_reports.iter().enumerate() {
             let ReceivedDecimalReport { data_id, answer, timestamp } = received_decimal_report;
 
+            // panic!("len {:?} , data_id {:?} , forwarder authority {:?} , workflow owner {:?}, workflow name {:?}", 
+            // received_decimal_reports.len(), data_id,  &ctx.accounts.forwarder_authority.key(), workflow_owner, workflow_name
+            
+            // );
             // 1. check that sender has permission to write
 
                 let report_hash = create_report_hash(
@@ -484,15 +483,36 @@ pub mod data_feeds_cache {
 
         };
 
-
-
         Ok(())
     }
 
-    pub fn test_option(ctx: Context<TestOption>) -> Result<()> {
 
-        Ok(())
-    }
+    // pub fn on_report(ctx: Context<TestOption>) -> Result<()> {
+    //     match &ctx.accounts.legacy_store {
+    //         Some(x) => {
+    //             let y = x.key();
+    //             // panic!("its some!, {:?}", x.key());
+    //             // panic!("its some! {:}", y);
+    //         },
+    //         None => {
+    //             panic!("its none!")
+    //         },
+    //     }
+
+    //     // match ctx.accounts.cache_state {
+    //     //     Some(_) => {
+    //     //         panic!("its some");
+    //     //     },
+    //     //     None => {
+    //     //         panic!("its none");
+    //     //     }
+
+    //     // };
+
+    //     // panic!("len {:?} and key {:?} ", ctx.remaining_accounts.len(), ctx.remaining_accounts[0].key());
+
+    //     Ok(())
+    // }
 
     // pub fn set_decimal_feed_configs(ctx: Context<SetDecimalFeedConfigs>, data_ids: Vec<[u8; 2]>, descriptions: Vec<String>, workflow_metadatas: Vec<WorkflowMetadata>) -> Result<()> {
     //     Ok(())
@@ -554,7 +574,33 @@ fn close_account(account: AccountInfo, destination: AccountInfo) -> Result<()> {
 // report_id              offset  62, size  2
 fn get_workflow_metadata(metadata: &[u8]) -> Result<(&[u8], &[u8])> {
     let workflow_name = metadata.get(32..42).ok_or(DataCacheError::OutOfBounds)?;
-    let workflow_owner = metadata.get(42..52).ok_or(DataCacheError::OutOfBounds)?;
+    let workflow_owner = metadata.get(42..62).ok_or(DataCacheError::OutOfBounds)?;
 
     Ok((workflow_name, workflow_owner))
+}
+
+fn set_legacy_feeds_config(init: bool, config: &mut AccountLoader<LegacyFeedsConfig>, legacy_store: Pubkey, legacy_feeds: &[AccountInfo], data_ids: Vec<[u8; 16]>) -> Result<()> {
+    require!(data_ids.len() == legacy_feeds.len(), DataCacheError::ArrayLengthMismatch);
+
+    let mut legacy_feeds_config = if init {
+        config.load_init()?
+    } else {
+        config.load_mut()?
+    };
+
+    // reset the array
+    legacy_feeds_config.id_to_feed.clear();
+
+    legacy_feeds_config.legacy_store = legacy_store;
+
+    let mut prev_data_id = [0_u8; 16];
+    for (i, data_id) in data_ids.iter().enumerate() {
+        require!(prev_data_id < *data_id, DataCacheError::IdsMustStrictlyIncrease);
+
+        legacy_feeds_config.id_to_feed.push(LegacyFeedEntry { data_id: data_id.clone(), legacy_feed: legacy_feeds[i].key() });
+
+        prev_data_id = *data_id; 
+    };
+
+    Ok(())
 }

@@ -8,6 +8,9 @@ import * as chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import { assert } from "chai";
 
+import { Forwarder } from "./utils";
+import { KeystoneForwarder } from "../target/types/keystone_forwarder";
+
 chai.use(chaiAsPromised);
 
 type Signer = {
@@ -56,6 +59,11 @@ type WorkflowMetadata = {
   allowedSender: PublicKey, 
   allowedWorkflowOwner: number[], 
   allowedWorkflowName: number[]
+}
+
+type LegacyFeedEntry = {
+  dataId: number[],
+  legacyFeed: PublicKey
 }
 
 // If expected array may be of smaller length than actual array
@@ -113,8 +121,14 @@ const randomWorkflowMetadata = (allowedSender: PublicKey) => {
   return {
     allowedSender: allowedSender, // todo: replace with something else
     allowedWorkflowOwner: randomBytes(20),
-    allowedWorkflowName: randomBytes(32),
+    allowedWorkflowName: randomBytes(10),
   }
+}
+
+const newWorkflows = (n: number, allowedSender: PublicKey) => {
+  return Array.from({length: n}).map(() => {
+    return randomWorkflowMetadata(allowedSender)
+  });
 }
 
 describe("data feeds cache", function () {
@@ -130,15 +144,22 @@ describe("data feeds cache", function () {
 
   let feedA: Feed;
   let feedB: Feed;
+  let feedC: Feed;
+  let feedD: Feed;
   let otherFeeds: Array<Feed>;
+
   
   const defaultCacheState = Keypair.generate();
 
   const program = anchor.workspace.DataFeedsCache as Program<DataFeedsCache>;
 
+  const forwarderProgram = anchor.workspace.KeystoneForwarder as Program<KeystoneForwarder>;
+
+
+
   before(async () => {
     [feedAdminA, reportSender, ...otherSigners] = await newSigners(defaultConnection, 5);
-    [feedA, feedB, ...otherFeeds] = newFeeds(5);
+    [feedA, feedB, feedC, feedD, ...otherFeeds] = newFeeds(5);
   });
 
   const feedConfigPDA = (dataId: Buffer) => {
@@ -171,6 +192,17 @@ describe("data feeds cache", function () {
         Buffer.from(anchor.utils.bytes.utf8.encode("decimal_report")),
         defaultCacheState.publicKey.toBuffer(),
         dataId,
+      ],
+      program.programId 
+    );
+    return pda
+  }
+
+  const legacyFeedsConfigPDA = () => {
+    const [pda, _bump] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode("legacy_feeds_config")),
+        defaultCacheState.publicKey.toBuffer()
       ],
       program.programId 
     );
@@ -213,6 +245,128 @@ describe("data feeds cache", function () {
 
   });
 
+  describe("Legacy Feed Config Operations", function () {
+    const legacyFeedConfigAccount = legacyFeedsConfigPDA();
+
+    it("Initialize", async () => {
+
+      await program
+        .methods
+        .initLegacyFeedsConfig([feedD.dataId] as any)
+        .accounts({
+          owner: provider.publicKey,
+          state: defaultCacheState.publicKey,
+          legacyStore: program.programId, // just put a dummy value here 
+          legacyFeedsConfig: legacyFeedConfigAccount,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .remainingAccounts([{
+          pubkey: feedAdminA.keypair.publicKey,     // again, just use a dummy value
+          isSigner: false,
+          isWritable: true
+        }])
+        .rpc();
+
+        const actualState = await program.account.legacyFeedsConfig.fetch(legacyFeedConfigAccount);
+
+        const expectedEntry: ArrayVec<LegacyFeedEntry> = {
+          len: new BN(1),
+          xs: [{
+            dataId: Array.from(feedD.dataId),
+            legacyFeed: feedAdminA.keypair.publicKey
+          }]
+        };
+        
+        const entryEq = (a: LegacyFeedEntry, b: LegacyFeedEntry) => {
+            return a.legacyFeed.equals(b.legacyFeed) && Buffer.from(a.dataId).equals(Buffer.from(b.dataId));
+        }
+  
+        assert.isTrue(
+          arrayVecEquals(expectedEntry, actualState.idToFeed, entryEq),
+          "workflow metadata equal"
+        )
+
+        assert.isTrue(actualState.legacyStore.equals(program.programId));
+
+
+    });
+
+    it("Update", async () => {
+
+      await program
+      .methods
+      .updateLegacyFeedsConfig([feedD.dataId, feedC.dataId] as any)
+      .accounts({
+        owner: provider.publicKey,
+        state: defaultCacheState.publicKey,
+        legacyStore: forwarderProgram.programId, // just put a dummy value here 
+        legacyFeedsConfig: legacyFeedConfigAccount,
+      })
+      .remainingAccounts([
+        {
+          pubkey: reportSender.keypair.publicKey,     // again, just use a dummy value
+          isSigner: false,
+          isWritable: true
+        },
+        {
+          pubkey: feedAdminA.keypair.publicKey,     // again, just use a dummy value
+          isSigner: false,
+          isWritable: true
+        },
+
+      ])
+      .rpc();
+
+      const actualState = await program.account.legacyFeedsConfig.fetch(legacyFeedConfigAccount);
+
+      const expectedEntry: ArrayVec<LegacyFeedEntry> = {
+        len: new BN(2),
+        xs: [
+          {
+            dataId: Array.from(feedD.dataId),
+            legacyFeed: reportSender.keypair.publicKey
+          },
+          {
+            dataId: Array.from(feedC.dataId),
+            legacyFeed: feedAdminA.keypair.publicKey
+          },
+        ]
+      };
+      
+      const entryEq = (a: LegacyFeedEntry, b: LegacyFeedEntry) => {
+          return a.legacyFeed.equals(b.legacyFeed) && Buffer.from(a.dataId).equals(Buffer.from(b.dataId));
+      }
+
+      assert.isTrue(
+        arrayVecEquals(expectedEntry, actualState.idToFeed, entryEq),
+        "workflow metadata equal"
+      )
+
+      assert.isTrue(actualState.legacyStore.equals(forwarderProgram.programId));
+
+    });
+
+    it("Close", async () => {
+      await program
+      .methods
+      .closeLegacyFeedsConfig()
+      .accounts({
+        owner: provider.publicKey,
+        state: defaultCacheState.publicKey,
+        legacyFeedsConfig: legacyFeedConfigAccount
+      })
+      .rpc();
+
+      assert.isRejected(program.account.writePermissionFlag.fetch(legacyFeedConfigAccount), /Account does not exist/);
+
+
+
+
+    });
+
+  })
+  
+
   // todo: add more tests -- 
   // b. if you pass in the wrong length
   // c. if feed admin is not authorized
@@ -221,6 +375,7 @@ describe("data feeds cache", function () {
 
     const feedAReportPDA = decimalReportPDA(feedA.dataId);
     const feedBReportPDA = decimalReportPDA(feedB.dataId);
+    const feedCReportPDA = decimalReportPDA(feedC.dataId);
 
     // test initialization
     await program.methods
@@ -245,7 +400,7 @@ describe("data feeds cache", function () {
 
       // test initialization with existing feed as well
       await program.methods
-      .initDecimalReports([feedA.dataId, feedB.dataId] as any)
+      .initDecimalReports([feedA.dataId, feedB.dataId, feedC.dataId] as any)
       .accounts({
         feedAdmin: feedAdminA.provider.publicKey,
         state: defaultCacheState.publicKey,
@@ -261,6 +416,11 @@ describe("data feeds cache", function () {
           pubkey: feedBReportPDA,
           isSigner: false,
           isWritable: true
+        },
+        {
+          pubkey: feedCReportPDA,
+          isSigner: false,
+          isWritable: true
         }
       ])
       .signers([feedAdminA.keypair])
@@ -271,6 +431,9 @@ describe("data feeds cache", function () {
 
       const feedBState = await program.account.decimalReport.fetch(feedBReportPDA);
       assert.equal(feedBState.timestamp, 0, "timestamp 0");
+
+      const feedCState = await program.account.decimalReport.fetch(feedCReportPDA);
+      assert.equal(feedCState.timestamp, 0, "timestamp 0");
   });
 
   it("Set Feed Configs + Close Stale Accounts", async () => {
@@ -279,7 +442,9 @@ describe("data feeds cache", function () {
 
     const descriptions = [feedA.description];
 
-    const workflowMetadatas = [randomWorkflowMetadata(reportSender.provider.publicKey)];
+    const workflowMetadatas = [
+      randomWorkflowMetadata(reportSender.provider.publicKey)
+    ];
 
     const reportHash = getReportHash(
       dataIds[0], 
@@ -486,7 +651,127 @@ describe("data feeds cache", function () {
 
   it("Updates reports", async () => {
 
-    // need to basically initialize the keystone forwarder
+    const forwarder = new Forwarder(forwarderProgram, provider)
+    .withState(Keypair.generate())
+    .withOracles(1, 12, 41);
+
+    await forwarder.initialize()
+    await forwarder.initOraclesConfig();
+
+    // first we must update the workflow metadata to work with the desired receiver
+
+    const workflowMetadatasC = newWorkflows(1, forwarder.forwarderAuthority[0])
+
+    const dataIds = [feedC.dataId]
+
+    const reportHash = getReportHash(
+      dataIds[0], 
+      workflowMetadatasC[0].allowedSender.toBuffer(),
+      workflowMetadatasC[0].allowedWorkflowOwner,
+      workflowMetadatasC[0].allowedWorkflowName
+    );
+
+    // find the PDAs
+
+    const feedConfigAccount = feedConfigPDA(dataIds[0]);
+    const permissionFlagAccount = permissionFlagPDA(reportHash);
+
+    await program.methods
+    .setDecimalFeedConfigs(
+      [feedC.dataId] as any,
+      [feedC.description] as any,
+      workflowMetadatasC
+    )
+    .accounts({
+      feedAdmin: feedAdminA.provider.publicKey, // todo: do we need to use owner here isntead? (probably not)
+      state: defaultCacheState.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId
+    })
+    .remainingAccounts([
+      {
+        pubkey: feedConfigAccount,
+        isSigner: false,
+        isWritable: true
+      },
+      {
+        pubkey: permissionFlagAccount,
+        isSigner: false,
+        isWritable: true
+      }
+    ])
+    .signers([feedAdminA.keypair])
+    .rpc();
+
+
+      const singleReport = program.coder.types.encode("ReceivedDecimalReport", {
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedC.dataId
+      });
+
+      const lenPrefix = Buffer.alloc(4);
+      lenPrefix.writeUInt32LE(1, 0);
+
+    // Step 3: Concatenate length + all reports
+    const fullEncodedVec = Buffer.concat([lenPrefix, singleReport]);
+
+    const feedCReportPDA = decimalReportPDA(feedC.dataId);
+    const permissionFlagCPDA = permissionFlagPDA(reportHash);
+
+
+    console.log('data id', feedC.dataId, `forwarderAUthority ${forwarder.forwarderAuthority[0].toBase58()}`,
+    'workflow owner:', workflowMetadatasC[0].allowedWorkflowOwner, 'workflow name:', workflowMetadatasC[0].allowedWorkflowName)
+
+
+
+    // console.log(`data id ${feedC.dataId}, forwarderAUthority ${forwarder.forwarderAuthority[0].toBase58()} 
+    // workflow owner:  ${workflowMetadatas[0].allowedWorkflowOwner}, workflow name:  ${workflowMetadatas[0].allowedWorkflowName}`)
+
+
+    // make it work with the right report hash permissions
+      await forwarder.report(
+        program.programId,
+        fullEncodedVec,
+        workflowMetadatasC[0].allowedWorkflowName,
+        workflowMetadatasC[0].allowedWorkflowOwner,
+       [ {
+          pubkey: defaultCacheState.publicKey,
+          isSigner: false,
+          isWritable: false,
+          },
+          {
+            pubkey: program.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: program.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedCReportPDA,
+            isSigner: false,
+            isWritable: true
+          },
+          {
+            pubkey: permissionFlagCPDA,
+            isSigner: false,
+            isWritable: true
+          },
+       ]
+        
+      )
+
+
+    const updatedReport = await program.account.decimalReport.fetch(feedCReportPDA);
+    assert.isTrue(updatedReport.answer.eq(new BN(321)), 'answers match');
+    assert.isTrue(updatedReport.timestamp == 123, 'answers match');
 
 
   })

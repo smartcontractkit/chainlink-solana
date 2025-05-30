@@ -1,12 +1,14 @@
 use anchor_lang::prelude::*;
 use keystone_forwarder::ID as FORWARDER_ID;
-use keystone_forwarder::ForwarderState;
+use keystone_forwarder::ForwarderState; 
+use store::Transmissions;
 
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::program::DataFeedsCache;
 use crate::state::CacheState;
 use crate::state::LegacyFeedsConfig;
 use crate::error::AuthError;
+
 
 // SetDecimalsFeedConfig
 
@@ -71,19 +73,25 @@ pub struct InitLegacyFeedsConfig<'info> {
     pub state: AccountLoader<'info, CacheState>,
 
     #[account(executable)]
-    /// CHECK: We don't use Program<> here since it can be any program, "executable" is enough
+    /// CHECK: We don't use Program<> here since it can be any program that obeys the interface, "executable" is enough
     pub legacy_store: UncheckedAccount<'info>,
 
     #[account(
         init,
         payer = owner,
-        space = ANCHOR_DISCRIMINATOR, // todo add legacy feeds config size
+        space = ANCHOR_DISCRIMINATOR + LegacyFeedsConfig::INIT_SPACE, // todo add legacy feeds config size
         seeds = [b"legacy_feeds_config", state.key().as_ref()],
         bump
     )]
     pub legacy_feeds_config: AccountLoader<'info, LegacyFeedsConfig>,
 
     pub system_program: Program<'info, System>,
+
+    // in ctx.remaining_accounts N legacy feeds (to match N legacy data ids)
+    // we do not enforce an account type because the account struct is subject to change
+    // and knowing its schema is not the responsibility of the cache program but the store
+    // we just need to know what the account address is for verification purposes
+    // pub legacy_feed: UncheckedAccount<'info> 
 }
 
 // todo: the offchain code will need to wrap add/remove data_ids mappings
@@ -94,6 +102,10 @@ pub struct UpdateLegacyFeedsConfig<'info> {
 
     pub state: AccountLoader<'info, CacheState>,
 
+    #[account(executable)]
+    /// CHECK: We don't use Program<> here since it can be any program that obeys the interface, "executable" is enough
+    pub legacy_store: UncheckedAccount<'info>,
+
     #[account(
         mut,
         seeds = [b"legacy_feeds_config", state.key().as_ref()],
@@ -101,7 +113,11 @@ pub struct UpdateLegacyFeedsConfig<'info> {
     )]
     pub legacy_feeds_config: AccountLoader<'info, LegacyFeedsConfig>,
 
-    pub system_program: Program<'info, System>,
+    // in ctx.remaining_accounts N legacy feeds (to match N legacy data ids)
+    // we do not enforce an account type because the account struct is subject to change
+    // and knowing its schema is not the responsibility of the cache program but the store
+    // we just need to know what the account address is for verification purposes
+    // pub legacy_feed: UncheckedAccount<'info> 
 }
 
 #[derive(Accounts)]
@@ -317,3 +333,6 @@ pub struct OnReport<'info> {
     // pub legacy_feed: UncheckedAccount<'info>
 
 }
+
+#[derive(Accounts)]
+pub struct DummyCtx {}

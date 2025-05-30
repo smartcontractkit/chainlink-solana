@@ -20,7 +20,7 @@ pub struct CacheState {
     pub feed_admins: AdminList
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct ReceivedDecimalReport {
     pub timestamp: u32,
     pub answer: u128,
@@ -68,7 +68,7 @@ arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
 pub struct WorkflowMetadata {
     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)
     pub allowed_workflow_owner: [u8; 20], // ─╮ Address of the workflow owner
-    pub allowed_workflow_name: [u8; 32] // ──╯ Name of the workflow UTF-bytes encoded
+    pub allowed_workflow_name: [u8; 10] // ──╯ Name of the workflow UTF-bytes encoded
 }
 
 #[account]
@@ -77,6 +77,7 @@ pub struct WritePermissionFlag {}
 
 // 16 + 32 = 48 bytes
 #[zero_copy]
+#[derive(InitSpace)]
 pub struct LegacyFeedEntry {
     pub data_id: [u8; 16],
     pub legacy_feed: Pubkey,
@@ -87,6 +88,7 @@ const MAX_ENTRIES: usize = 64;
 
 // 48 * 64 + 8 = 3080
 #[zero_copy]
+#[derive(InitSpace)]
 pub struct LegacyFeedList {
     // entries are sorted by data_id for quick lookup during on_report
     pub xs: [LegacyFeedEntry; MAX_ENTRIES],
@@ -100,6 +102,7 @@ arrayvec!(LegacyFeedList, LegacyFeedEntry, u64);
 // flagged feeds need to be written to the legacy store
 // we can assume there's only going to be a limited amount of legacy feeds
 #[account(zero_copy)]
+#[derive(InitSpace)]
 pub struct LegacyFeedsConfig {
     pub id_to_feed: LegacyFeedList,
     pub legacy_store: Pubkey,
