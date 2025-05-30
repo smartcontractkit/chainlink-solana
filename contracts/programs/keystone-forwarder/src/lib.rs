@@ -5,6 +5,9 @@ use common::{
     FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, REPORT_CONTEXT_LEN, SIGNATURE_LEN,
     STATE_VERSION,
 };
+
+use events::{ConfigSet, InitializeEmit, OwnershipAcceptance, OwnershipTransfer, ReportProcessed};
+
 use context::*;
 pub use error::*;
 pub use state::{ExecutionState, ForwarderState, OraclesConfig};
@@ -13,6 +16,7 @@ use utils::{extract_transmission_id, get_config_id};
 mod common;
 mod context;
 mod error;
+mod events;
 mod state;
 mod utils;
 
@@ -35,6 +39,11 @@ pub mod keystone_forwarder {
         state.authority_nonce = authority_nonce;
         state.owner = ctx.accounts.owner.key();
 
+        emit!(InitializeEmit {
+            owner: ctx.accounts.owner.key(),
+            authority_nonce
+        });
+
         Ok(())
     }
 
@@ -43,15 +52,27 @@ pub mod keystone_forwarder {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
+        let state_current_owner = state.owner;
         state.proposed_owner = proposed_owner;
+
+        emit!(OwnershipTransfer {
+            current_owner: state_current_owner,
+            proposed_owner: state.proposed_owner
+        });
 
         Ok(())
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state;
+        let state_previous_owner = state.owner;
         state.owner = state.proposed_owner;
         state.proposed_owner = Pubkey::default();
+
+        emit!(OwnershipAcceptance {
+            previous_owner: state_previous_owner,
+            new_owner: state.owner
+        });
 
         Ok(())
     }
@@ -76,6 +97,7 @@ pub mod keystone_forwarder {
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config;
+
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
 
@@ -189,6 +211,12 @@ pub mod keystone_forwarder {
         execution_state.transmission_id = transmission_id;
         execution_state.success = true;
 
+        emit!(ReportProcessed {
+            receiver: ctx.accounts.receiver_program.key(),
+            transmission_id,
+            result: true,
+        });
+
         Ok(())
     }
 }
@@ -262,7 +290,14 @@ fn set_oracles_config(
 
     oracles_config.config_id = get_config_id(don_id, config_version);
     oracles_config.f = f;
-    oracles_config.signer_addresses = signer_addresses;
+    oracles_config.signer_addresses = signer_addresses.clone();
+
+    emit!(ConfigSet {
+        don_id,
+        config_version,
+        f,
+        signers: signer_addresses,
+    });
 
     Ok(())
 }
