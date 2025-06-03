@@ -1,19 +1,41 @@
 use anchor_lang::prelude::*;
+use crate::common::MAX_ACCTS;
+use arrayvec::arrayvec;
+
+#[zero_copy]
+#[derive(InitSpace)]
+pub struct SignerAddresses {
+    pub xs: [[u8; 20]; MAX_ACCTS],  // Fixed array of 64 addresses (20 bytes each)
+    pub len: u8,                    // Length fits in u8 since MAX_ACCTS is 64
+    pub _padding: [u8; 7],          // Padding for proper alignment
+}
+
+impl Default for SignerAddresses {
+    fn default() -> Self {
+        Self {
+            xs: [[0u8; 20]; MAX_ACCTS],
+            len: 0,
+            _padding: [0; 7],
+        }
+    }
+}
+
+// Apply the arrayvec macro to get all the utility methods
+arrayvec!(SignerAddresses, [u8; 20], u8);
 
 // combination of solidity's OracleSet and the configId mapping
-#[account]
+#[account(zero_copy)]
+#[derive(InitSpace)]
 pub struct OraclesConfig {
-    pub config_id: u64,
+    pub config_id: u64,                              // 4 bytes
     pub f: u8,
-    pub signer_addresses: Vec<[u8; 20]>,
+    pub _padding: [u8; 7],                           // 7 bytes padding for alignment
+    pub signer_addresses: SignerAddresses,    // 64*20 + 1 + 7 = 1288 bytes
 }
 
 impl OraclesConfig {
-    pub const INIT_SPACE: usize = 8 + 1 + 4;
-
-    pub fn space_with_signers(num_signers: usize) -> usize {
-        Self::INIT_SPACE + (num_signers * 20)
-    }
+    // 8 + 8 + 1 + 7 + (64*20 + 1 + 7) = 8 + 8 + 1 + 7 + 1288 = 1312 bytes
+    pub const INIT_SPACE: usize = 8 + 8 + 1 + 7 + (MAX_ACCTS * 20 + 1 + 7);
 }
 
 #[account]

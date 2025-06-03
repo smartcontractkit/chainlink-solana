@@ -11,3 +11,5 @@ pub const SIGNATURE_LEN: usize = 65;
 
 pub const FORWARDER_METADATA_LENGTH: usize = 45;
 pub const METADATA_LENGTH: usize = 109;
+
+pub const MAX_ACCTS: usize = 64;
