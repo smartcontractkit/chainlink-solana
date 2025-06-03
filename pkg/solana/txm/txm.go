@@ -784,30 +784,8 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	}
 
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
-	if cfg.DependencyTxID != "" {
-		go func(msg pendingTx, depID string) {
-			ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
-			defer cancel()
-			status, err := txm.waitForTxStatus(ctx, depID, commontypes.Finalized)
-			if err != nil {
-				txm.lggr.Errorw("dependency transaction did not reach desired state", "id", msg.id, "dependencyTx", depID, "error", err)
-				errorStatus := txmutils.Errored
-				if status == commontypes.Fatal {
-					errorStatus = txmutils.FatallyErrored
-				}
-				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
-				if err != nil {
-					txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
-				}
-				return
-			}
-			select {
-			case txm.chSend <- msg:
-				txm.lggr.Debugw("enqueued tx after dependency complete", "id", msg.id, "dependencyTxID", depID)
-			default:
-				txm.lggr.Errorw("failed to enqueue tx after dependency", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
-			}
-		}(msg, cfg.DependencyTxID)
+	if len(cfg.DependencyTxMeta.DependencyTxs) > 0 {
+		go txm.waitForDependencyTxs(msg, cfg.DependencyTxMeta)
 		return nil
 	}
 
@@ -820,32 +798,114 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus commontypes.TransactionStatus) (commontypes.TransactionStatus, error) {
+func (txm *Txm) waitForDependencyTxs(msg pendingTx, depMeta txmutils.DependencyTxMeta) {
+	ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
+	defer cancel()
+	err := txm.waitForTxStatus(ctx, depMeta)
+	if err != nil {
+		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
+		// IgnoreDependencyError is used by clean up transactions that are expected to be dropped in normal scenarios
+		if depMeta.IgnoreDependencyError {
+			return
+		}
+		txm.lggr.Errorw("dependency transactions did not reach desired statuses", "id", msg.id, "error", err)
+		err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.Errored, TxDependencyFail)
+		if err != nil {
+			txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
+		}
+		return
+	}
+
+	client, err := txm.client.Get(ctx)
+	if err != nil {
+		txm.lggr.Errorw("failed to get client while waiting for dependency transactions", "error", err)
+		return
+	}
+	// Fetch latest blockhash
+	blockhash, err := client.LatestBlockhash(ctx)
+	if err != nil {
+		txm.lggr.Errorw("failed to fetch latest blockhash ", "error", err)
+		return
+	}
+	// Update the dependent transaction's blockhash because waiting for dependency transactions reduced the existing one's validity
+	msg.tx.Message.RecentBlockhash = blockhash.Value.Blockhash
+	msg.lastValidBlockHeight = blockhash.Value.LastValidBlockHeight
+
+	select {
+	case txm.chSend <- msg:
+		txm.lggr.Debugw("enqueued tx after dependencies completed", "id", msg.id, "dependencyTxCount", len(depMeta.DependencyTxs))
+	default:
+		txm.lggr.Errorw("failed to enqueue tx after dependencies", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+	}
+}
+
+func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.DependencyTxMeta) error {
 	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
 	defer cancel()
 
 	backoff := 1 * time.Second
 	maxBackoff := 8 * time.Second
 
+	remaining := depMeta.DependencyTxs
+	unexpectedStatuses := 0
+
 	for {
 		select {
 		case <-waitCtx.Done():
-			return commontypes.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
+			return fmt.Errorf("context ended while waiting for %d transaction's desired status", len(remaining))
 		case <-time.After(backoff):
-			status, err := txm.GetTransactionStatus(waitCtx, transactionID)
-			if err != nil {
-				return status, fmt.Errorf("error fetching transaction status: %w", err)
-			}
-			switch status {
-			case commontypes.Failed, commontypes.Fatal:
-				return status, fmt.Errorf("transaction %s failed", transactionID)
-			default:
-				if status >= desiredStatus {
-					// if status is equal to or greater than desired status, return
-					txm.lggr.Debugw("transaction reached state", "status", status, "id", transactionID)
-					return status, nil
+			txAwaitingDesiredStatus := make([]txmutils.DependencyTx, 0, len(remaining))
+			for _, meta := range remaining {
+				status, err := txm.GetTransactionStatus(waitCtx, meta.TxID)
+				// This would only happen if the transaction status has been cleared from storage
+				if err != nil || status == commontypes.Unknown {
+					// If failed to get status, considered the dependency tx as errored. Check if success was expected.
+					if !isErroredStatus(meta.DesiredStatus) {
+						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						unexpectedStatuses++
+					}
+					// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
+					// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
+					continue
 				}
-				// otherwise keep polling
+				switch status {
+				case commontypes.Failed, commontypes.Fatal:
+					if !isErroredStatus(meta.DesiredStatus) {
+						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						unexpectedStatuses++
+						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
+						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
+						continue
+					}
+					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+				case commontypes.Finalized, commontypes.Unconfirmed, commontypes.Pending:
+					if isErroredStatus(meta.DesiredStatus) {
+						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						unexpectedStatuses++
+						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
+						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
+						continue
+					}
+					if status < meta.DesiredStatus {
+						// keep polling if tx has not reached desired status
+						txAwaitingDesiredStatus = append(txAwaitingDesiredStatus, meta)
+						continue
+					}
+					// if status is equal to or greater than desired status, skip adding to remaining txID list
+					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+				default:
+					return fmt.Errorf("unexpected status encountered: %d", status)
+				}
+			}
+			remaining = txAwaitingDesiredStatus
+			// all dependency transactions have reached a completed status, return
+			// otherwise continue polling
+			if len(remaining) == 0 {
+				// Return error if any of the dependency transactions were in unexpected statuses to avoid queueing the dependent transaction
+				if unexpectedStatuses > 0 {
+					return fmt.Errorf("%d transactions have unexpected statuses", unexpectedStatuses)
+				}
+				return nil
 			}
 		}
 		backoff *= 2
@@ -853,6 +913,10 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desir
 			backoff = maxBackoff
 		}
 	}
+}
+
+func isErroredStatus(status commontypes.TransactionStatus) bool {
+	return status == commontypes.Failed || status == commontypes.Fatal
 }
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses

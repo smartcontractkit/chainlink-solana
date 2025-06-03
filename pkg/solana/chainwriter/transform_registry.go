@@ -23,7 +23,7 @@ import (
 
 const MandatoryExecuteAccounts = 12
 
-func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string, uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
+func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, string, uint32, []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -45,7 +45,7 @@ type commonTokenTransferAccounts struct {
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string, computeUnitLimitOverhead uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, tableMap map[string]map[string][]*solana.AccountMeta, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -57,10 +57,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		return nil, nil, nil, fmt.Errorf("failed to calculate compute unit limit: %w", err)
 	}
 
-	options := []txmutils.SetTxConfig{
-		txmutils.SetEstimateComputeUnitLimit(false),
-		txmutils.SetComputeUnitLimit(computeUnits),
-	}
+	options = append(options, txmutils.SetEstimateComputeUnitLimit(false), txmutils.SetComputeUnitLimit(computeUnits))
 
 	if len(accounts) < MandatoryExecuteAccounts {
 		return nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", MandatoryExecuteAccounts, len(accounts))
@@ -107,7 +104,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ string, _ uint32, options []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -123,9 +120,7 @@ func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args 
 		transformedAccounts = accounts[:len(accounts)-1]
 	}
 
-	options := []txmutils.SetTxConfig{
-		txmutils.SetEstimateComputeUnitLimit(true),
-	}
+	options = append(options, txmutils.SetEstimateComputeUnitLimit(true))
 
 	return args, transformedAccounts, options, nil
 }

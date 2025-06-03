@@ -24,7 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
-const ServiceName = "SolanaChainWriter"
+const (
+	ServiceName     = "SolanaChainWriter"
+	MaxSolanaTxSize = 1232
+)
 
 type SolanaChainWriterService struct {
 	lggr   logger.Logger
@@ -66,6 +69,8 @@ type MethodConfig struct {
 	ArgsTransform   string `json:"argsTransform,omitempty"`
 	// Overhead added to calculated compute units in the args transform
 	ComputeUnitLimitOverhead uint32 `json:"ComputeUnitLimitOverhead,omitempty"`
+	// Configs for buffering payloads to support larger transaction sizes for this method
+	BufferPayloadMethod string `json:"bufferPayloadMethod,omitempty"`
 }
 
 func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
@@ -302,19 +307,21 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing fee payer address: %w", err), debugID)
 	}
 
-	var ataUUID string
+	options := []txmutils.SetTxConfig{}
 	if len(methodConfig.ATAs) > 0 {
 		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
 		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
 		if ataErr != nil {
 			return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 		}
+		var ataUUID string
 		if ataUUID, err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
 			return errorWithDebugID(fmt.Errorf("error creating ATAs: %w", err), debugID)
 		}
+		// Wait till ATA creation is finalized before proceeding with the main transaction
+		options = append(options, txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: ataUUID, DesiredStatus: types.Finalized}}))
 	}
 
-	options := []txmutils.SetTxConfig{}
 	// Transform args if necessary
 	if methodConfig.ArgsTransform != "" {
 		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
@@ -322,7 +329,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
 		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
-		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverhead)
+		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverhead, options)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
@@ -360,12 +367,32 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		solana.TransactionPayer(feePayer),
 		solana.TransactionAddressTables(filteredLookupTableMap),
 	)
-
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
-	if ataUUID != "" {
-		options = append(options, txmutils.SetDependencyTxID(ataUUID))
+
+	// Get the transaction bytes to validate size
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		return errorWithDebugID(fmt.Errorf("error marshaling transaction: %w", err), debugID)
+	}
+
+	if len(txBytes) > MaxSolanaTxSize {
+		var bufferErr error
+		accounts, options, bufferErr = s.handleTxBuffering(ctx, methodConfig, contractName, method, transactionID, accounts, programID, feePayer, args, options, len(txBytes))
+		if bufferErr != nil {
+			return errorWithDebugID(fmt.Errorf("error handling transaction buffering: %w", err), debugID)
+		}
+		// Recreate transaction with empty payload and new account list which includes the buffer PDA
+		tx, err = solana.NewTransaction(
+			[]solana.Instruction{solana.NewInstruction(programID, accounts, []byte{})},
+			blockhash.Value.Blockhash,
+			solana.TransactionPayer(feePayer),
+			solana.TransactionAddressTables(filteredLookupTableMap),
+		)
+		if err != nil {
+			return errorWithDebugID(fmt.Errorf("error reconstructing transaction with empty payload: %w", err), debugID)
+		}
 	}
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
@@ -476,6 +503,40 @@ func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt 
 	}
 
 	return resultMap, nil
+}
+
+func (s *SolanaChainWriterService) handleTxBuffering(ctx context.Context, methodConfig MethodConfig, contractName, method, transactionID string, accounts solana.AccountMetaSlice, programID, feePayer solana.PublicKey, args any, options []txmutils.SetTxConfig, payloadSize int) (solana.AccountMetaSlice, []txmutils.SetTxConfig, error) {
+	// Return error if transaction too large and method to write to buffer is not provided
+	if methodConfig.BufferPayloadMethod == "" {
+		return nil, nil, fmt.Errorf("transaction size %d exceeds limit %d", payloadSize, MaxSolanaTxSize)
+	}
+
+	// Check registry for method to create buffer intstructions
+	createBufferIxs, err := FindCreateBufferInstructionsMethod(methodConfig.BufferPayloadMethod)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error finding buffer method for name %s: %w", methodConfig.BufferPayloadMethod, err)
+	}
+	// Use method to create the instructions to write to the on-chain buffer
+	var bufferIxs []solana.Instruction
+	var closeBufferIx solana.Instruction
+	bufferIxs, accounts, closeBufferIx, err = createBufferIxs(ctx, args, accounts, programID, feePayer)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating buffer instructions: %w", err)
+	}
+	// Send the buffer transactions and track the IDs to mark the main transaction as dependent
+	bufferTxIDs, err := s.sendBufferInstructions(ctx, bufferIxs, closeBufferIx, methodConfig, contractName, method, transactionID, feePayer)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error enqueuing buffer transactions: %w", err)
+	}
+	// Mark execute transaction as dependent on the buffer transactions
+	// Wait till buffer transactions are finalized before proceeding with the main transaction
+	bufferTxs := make([]txmutils.DependencyTx, 0, len(bufferTxIDs))
+	for _, id := range bufferTxIDs {
+		bufferTxs = append(bufferTxs, txmutils.DependencyTx{TxID: id, DesiredStatus: types.Finalized})
+	}
+	options = append(options, txmutils.AppendDependencyTxs(bufferTxs))
+
+	return accounts, options, nil
 }
 
 func getLookupTableAddresses(ctx context.Context, client client.MultiClient, tableAddress solana.PublicKey) (solana.PublicKeySlice, error) {
