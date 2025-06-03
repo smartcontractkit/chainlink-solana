@@ -1,19 +1,20 @@
 use anchor_lang::prelude::*;
+use crate::common::MAX_ACCTS;
 
 // combination of solidity's OracleSet and the configId mapping
-#[account]
+#[account(zero_copy)]
+#[derive(bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
 pub struct OraclesConfig {
-    pub config_id: u64,
+    pub config_id: u64,                              // 4 bytes
     pub f: u8,
-    pub signer_addresses: Vec<[u8; 20]>,
+    pub _padding: [u8; 7],                           // 7 bytes padding for alignment
+    pub signer_addresses: [[u8; 20]; MAX_ACCTS],    // Fixed size: 20 * MAX_ACCTS + 8 bytes
 }
 
 impl OraclesConfig {
-    pub const INIT_SPACE: usize = 8 + 1 + 4;
-
-    pub fn space_with_signers(num_signers: usize) -> usize {
-        Self::INIT_SPACE + (num_signers * 20)
-    }
+    // discriminator + config_id + f + padding + (address_size * max_addresses) + arrayvec_overhead
+    pub const INIT_SPACE: usize = 8 + 4 + 1 + 7 + (20 * 64) + 8; 
 }
 
 #[account]

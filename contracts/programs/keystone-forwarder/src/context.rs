@@ -38,7 +38,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>)]
+#[instruction(don_id: u32, config_version: u32, f: u8)]
 pub struct InitOraclesConfig<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -47,9 +47,9 @@ pub struct InitOraclesConfig<'info> {
         payer = owner,
         seeds = [b"config", state.key().as_ref(), &get_config_id(don_id, config_version).to_be_bytes()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + OraclesConfig::space_with_signers(signer_addresses.len())
+        space = OraclesConfig::INIT_SPACE,
     )]
-    pub oracles_config: Account<'info, OraclesConfig>,
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>, // must be the same owner as the one in the state account
@@ -65,12 +65,10 @@ pub struct UpdateOraclesConfig<'info> {
     #[account(
         mut,
         seeds = [b"config", state.key().as_ref(), &get_config_id(don_id, config_version).to_be_bytes()],
-        bump,
-        realloc = ANCHOR_DISCRIMINATOR + OraclesConfig::space_with_signers(signer_addresses.len()),
-        realloc::payer = owner,
-        realloc::zero = true
+        bump
     )]
-    pub oracles_config: Account<'info, OraclesConfig>,
+
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>,
@@ -89,7 +87,7 @@ pub struct CloseOraclesConfig<'info> {
         bump,
         close = owner
     )]
-    pub oracles_config: Account<'info, OraclesConfig>,
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>, // must be the same owner as the one in the state account
@@ -105,7 +103,7 @@ pub struct Report<'info> {
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
-    pub oracles_config: Account<'info, OraclesConfig>,
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut)]
     pub transmitter: Signer<'info>,

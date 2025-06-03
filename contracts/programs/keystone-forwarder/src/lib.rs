@@ -13,6 +13,8 @@ pub use error::*;
 pub use state::{ExecutionState, ForwarderState, OraclesConfig};
 use utils::{extract_transmission_id, get_config_id};
 
+use crate::common::MAX_ACCTS;
+
 mod common;
 mod context;
 mod error;
@@ -84,7 +86,7 @@ pub mod keystone_forwarder {
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.oracles_config;
+        let config = &mut ctx.accounts.oracles_config.load_mut()?;
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -96,7 +98,7 @@ pub mod keystone_forwarder {
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.oracles_config;
+        let config = &mut ctx.accounts.oracles_config.load_mut()?;
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -120,7 +122,7 @@ pub mod keystone_forwarder {
         require!(data.len() > min_data_size, ForwarderError::InvalidReport);
 
         // get config
-        let oracles_config = &ctx.accounts.oracles_config;
+        let oracles_config = ctx.accounts.oracles_config.load()?;
         let f = oracles_config.f;
         require!(f != 0, ForwarderError::InvalidConfig);
 
@@ -138,7 +140,7 @@ pub mod keystone_forwarder {
         let data = &data[total_signature_len..];
         let hashed_report = hash::hash(data).to_bytes();
 
-        verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
+        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
         let raw_report_end = data.len() - REPORT_CONTEXT_LEN;
@@ -225,7 +227,7 @@ pub mod keystone_forwarder {
 fn verify_signatures(
     hashed_report: &[u8; 32],
     signatures: &[u8],
-    oracles_config: &Account<OraclesConfig>,
+    oracles_config: &OraclesConfig,
     num_signers: usize,
 ) -> Result<()> {
     // ensure MAX_SIGNERS fit in the bits of uniques
@@ -260,7 +262,7 @@ fn verify_signatures(
 }
 
 fn set_oracles_config(
-    oracles_config: &mut Account<OraclesConfig>,
+    oracles_config: &mut OraclesConfig,
     don_id: u32,
     config_version: u32,
     f: u8,
@@ -290,7 +292,13 @@ fn set_oracles_config(
 
     oracles_config.config_id = get_config_id(don_id, config_version);
     oracles_config.f = f;
-    oracles_config.signer_addresses = signer_addresses.clone();
+    // Zero out the existing signer addresses array before writing new ones
+    oracles_config.signer_addresses = [[0u8; 20]; MAX_ACCTS];
+
+    // Add the new signer addresses
+    for (i, &addr) in signer_addresses.iter().enumerate() {
+        oracles_config.signer_addresses[i] = addr;
+    }
 
     emit!(ConfigSet {
         don_id,
