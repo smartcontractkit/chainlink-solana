@@ -14,9 +14,8 @@ pub struct DecimalFeedConfigSet {
 // todo: should be per
 #[event]
 pub struct LegacyFeedsReported {
-    pub data_ids: Vec<[u8; 16]>,
-    pub legacy_feeds: Vec<Pubkey>,
-    pub legacy_feeds_updated: bool
+    pub feeds_skipped: Vec<[u8; 16]>,
+    pub feeds_written: Vec<[u8; 16]>
 }
 
 // #[derive(BorshSerialize, BorshDeserialize)]

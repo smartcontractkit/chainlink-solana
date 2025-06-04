@@ -17,7 +17,9 @@ arrayvec!(AdminList, Pubkey, u64);
 pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    pub feed_admins: AdminList
+    pub feed_admins: AdminList,
+    pub legacy_writer_nonce: u8,    // pda writing to the legacy feeds 
+    pub _padding: [u8; 7],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
@@ -25,6 +27,12 @@ pub struct ReceivedDecimalReport {
     pub timestamp: u32,
     pub answer: u128,
     pub data_id: [u8; 16],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CacheTransmission {
+    pub timestamp: u32,
+    pub answer: u128
 }
 
 #[account]
