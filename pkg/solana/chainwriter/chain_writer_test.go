@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -967,13 +966,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			},
 		}
 
-		// Marshal the abstract report to json just for testing purposes.
-		encodedReport, err := json.Marshal(abstractReport)
-		require.NoError(t, err)
-
 		args := ccipsolana.SVMExecCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
-			Report:        encodedReport,
+			Report:        make([]byte, 200), // Set report to arbitrary bytes for test. Ensure it doesn't cause tx to exceed the max solana tx size.
 			Info: ccipocr3.ExecuteReportInfo{
 				MerkleRoots:     []ccipocr3.MerkleRootChain{},
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},
