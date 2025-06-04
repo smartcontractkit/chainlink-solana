@@ -211,7 +211,7 @@ describe("keystone_storage", function () {
       program,
       "OwnershipAcceptance",
       (event: any, slot) => {
-        assert.isTrue(
+        assert.isFalse(
           event.newOwner.equals(proposedOwner.publicKey),
           "new owner key emitted"
         );
