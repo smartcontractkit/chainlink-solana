@@ -220,7 +220,7 @@ describe("keystone_storage", function () {
     );
 
     // proposed owner accepts
-    await program.methods
+   await program.methods
       .acceptOwnership()
       .accounts({
         state: forwarderState.publicKey,
@@ -229,6 +229,9 @@ describe("keystone_storage", function () {
       .signers([proposedOwner])
       .rpc();
 
+    console.log('transfer');
+    // place after another call in order to flush events
+    await transferOwnershipEventPromise;
     const actualState2 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
     );
@@ -252,6 +255,10 @@ describe("keystone_storage", function () {
       })
       .signers([proposedOwner])
       .rpc();
+
+    console.log('accept')
+    // place after another call in order to flush events
+    await acceptOwnershipEventPromise
 
     const actualState3 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
@@ -287,11 +294,6 @@ describe("keystone_storage", function () {
       actualState4.proposedOwner.equals(PublicKey.default),
       "proposed owner is 0"
     );
-
-    await Promise.all([
-      transferOwnershipEventPromise,
-      acceptOwnershipEventPromise,
-    ]);
   });
 
   it("Initialize New Oracles Config, Update", async () => {
