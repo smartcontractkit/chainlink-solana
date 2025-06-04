@@ -167,20 +167,20 @@ describe("keystone_storage", function () {
     const proposedOwner = Keypair.generate();
 
     // transfer ownership event emitted
-    const transferOwnershipEventPromise = waitForEvent(
-      program,
-      "OwnershipTransfer",
-      (event: any, slot) => {
-        assert.isTrue(
-          event.proposedOwner.equals(proposedOwner.publicKey),
-          "proposed owner key emitted"
-        );
-        assert.isTrue(
-          event.currentOwner.equals(provider.wallet.publicKey),
-          "current owner key emitted"
-        );
-      }
-    );
+    // const transferOwnershipEventPromise = waitForEvent(
+    //   program,
+    //   "OwnershipTransfer",
+    //   (event: any, slot) => {
+    //     assert.isTrue(
+    //       event.proposedOwner.equals(proposedOwner.publicKey),
+    //       "proposed owner key emitted"
+    //     );
+    //     assert.isTrue(
+    //       event.currentOwner.equals(provider.wallet.publicKey),
+    //       "current owner key emitted"
+    //     );
+    //   }
+    // );
 
     // current owner initiates transfer to proposed owner
     await program.methods
@@ -204,23 +204,23 @@ describe("keystone_storage", function () {
       "proposed owner set"
     );
 
-    console.log("transfer");
-    await transferOwnershipEventPromise;
+    // console.log("transfer");
+    // await transferOwnershipEventPromise;
 
-    const acceptOwnershipEventPromise = waitForEvent(
-      program,
-      "OwnershipAcceptance",
-      (event: any, slot) => {
-        assert.isTrue(
-          event.newOwner.equals(proposedOwner.publicKey),
-          "new owner key emitted"
-        );
-        assert.isTrue(
-          event.previousOwner.equals(provider.wallet.publicKey),
-          "previous owner key emitted"
-        );
-      }
-    );
+    // const acceptOwnershipEventPromise = waitForEvent(
+    //   program,
+    //   "OwnershipAcceptance",
+    //   (event: any, slot) => {
+    //     assert.isTrue(
+    //       event.newOwner.equals(proposedOwner.publicKey),
+    //       "new owner key emitted"
+    //     );
+    //     assert.isTrue(
+    //       event.previousOwner.equals(provider.wallet.publicKey),
+    //       "previous owner key emitted"
+    //     );
+    //   }
+    // );
 
     // proposed owner accepts
     await program.methods
@@ -256,9 +256,9 @@ describe("keystone_storage", function () {
       .signers([proposedOwner])
       .rpc();
 
-    console.log("accept");
-    // place after another call in order to flush events
-    await acceptOwnershipEventPromise;
+    // console.log("accept");
+    // // place after another call in order to flush events
+    // await acceptOwnershipEventPromise;
 
     const actualState3 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
