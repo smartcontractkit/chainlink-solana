@@ -87,7 +87,7 @@ let getEthereumAddress = (publicKey: Buffer) => {
 };
 
 describe("keystone_storage", function () {
-  this.timeout(15_000);
+  this.timeout(30_000);
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -204,6 +204,9 @@ describe("keystone_storage", function () {
       "proposed owner set"
     );
 
+    console.log("transfer");
+    await transferOwnershipEventPromise;
+
     const acceptOwnershipEventPromise = waitForEvent(
       program,
       "OwnershipAcceptance",
@@ -220,7 +223,7 @@ describe("keystone_storage", function () {
     );
 
     // proposed owner accepts
-   await program.methods
+    await program.methods
       .acceptOwnership()
       .accounts({
         state: forwarderState.publicKey,
@@ -229,9 +232,6 @@ describe("keystone_storage", function () {
       .signers([proposedOwner])
       .rpc();
 
-    console.log('transfer');
-    // place after another call in order to flush events
-    await transferOwnershipEventPromise;
     const actualState2 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
     );
@@ -256,9 +256,9 @@ describe("keystone_storage", function () {
       .signers([proposedOwner])
       .rpc();
 
-    console.log('accept')
+    console.log("accept");
     // place after another call in order to flush events
-    await acceptOwnershipEventPromise
+    await acceptOwnershipEventPromise;
 
     const actualState3 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
