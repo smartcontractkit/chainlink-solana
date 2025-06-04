@@ -288,7 +288,10 @@ describe("keystone_storage", function () {
       "proposed owner is 0"
     );
 
-    await Promise.all([transferOwnershipEventPromise, acceptOwnershipEventPromise])
+    await Promise.all([
+      transferOwnershipEventPromise,
+      acceptOwnershipEventPromise,
+    ]);
   });
 
   it("Initialize New Oracles Config, Update", async () => {
