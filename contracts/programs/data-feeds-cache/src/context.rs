@@ -297,6 +297,10 @@ pub struct OnReport<'info> {
     )]
     pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>,
 
+    /// CHECK: This is a PDA
+    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
+    pub legacy_writer: Option<UncheckedAccount<'info>>,
+
     pub system_program: Program<'info, System>,
 
     // remaining accounts (N data ids, M legacy feeds)
@@ -333,7 +337,7 @@ pub struct OnReport<'info> {
     // this should not be included.
     //
     // note: not all of the legacy feed accounts supplied may be written to because there is
-    // a write_disabled flag per account
+    // a write_disabled flag per account. assume this is sorted. 
     //  
     // pub legacy_feed: UncheckedAccount<'info>
 

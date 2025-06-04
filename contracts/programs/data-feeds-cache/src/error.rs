@@ -62,4 +62,8 @@ pub enum DataCacheError {
     #[msg("ids must strictly increase")]
     IdsMustStrictlyIncrease,
 
+    #[msg("missing legacy feed account")]
+    MissingLegacyFeedAccount,
+
+
 }

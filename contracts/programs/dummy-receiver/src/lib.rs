@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use keystone_forwarder::ForwarderState;
 use keystone_forwarder::ID as FORWARDER_ID;
 
+
 declare_id!("5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L");
 
 // THIS IS UN-AUDITED CODE USED FOR TESTING PURPOSES ONLY
@@ -16,6 +17,7 @@ pub mod dummy_receiver {
         Ok(())
     }
 
+    // as a mock receiver
     pub fn on_report<'info>(
         ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
         metadata: Vec<u8>,
@@ -50,6 +52,17 @@ pub mod dummy_receiver {
 
         Ok(())
     }
+
+    // as a mock legacy store
+    pub fn cache_submit(ctx: Context<CacheSubmit>, rounds: Vec<CacheTransmission>) -> Result<()> {
+        emit!(Submit{
+            rounds: rounds,
+            feeds: ctx.remaining_accounts.iter().map(|x| x.key()).collect()
+        });
+
+        Ok(())
+    }
+
 }
 
 #[error_code]
@@ -98,4 +111,27 @@ pub struct OnReport<'info> {
     #[account(mut)]
     pub report_state: Account<'info, LatestReport>,
     // remaining accounts may be passed in
+}
+
+// legacy store
+
+#[derive(Accounts)]
+pub struct CacheSubmit<'info> {
+    pub authority: Signer<'info>
+
+    // N OCR2 feeds in ctx.remaining_accounts
+   // #[account(mut)]
+   // pub feed: Account<'info, Transmissions>,
+}
+
+#[event]
+pub struct Submit {
+    rounds: Vec<CacheTransmission>,
+    feeds: Vec<Pubkey>
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CacheTransmission {
+    pub timestamp: u32,
+    pub answer: u128
 }

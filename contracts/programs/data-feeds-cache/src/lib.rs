@@ -1,5 +1,6 @@
 
 use anchor_lang::prelude::*;
+use anchor_lang::ZeroCopy;
 use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
 use std::{io::Write, ops::DerefMut};
 use std::io::Cursor;
@@ -13,7 +14,7 @@ mod error;
 mod event;
 
 use context::*;
-use state::{AdminList, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig, ReceivedDecimalReport, WorkflowMetadata};
+use state::{AdminList, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig, ReceivedDecimalReport, WorkflowMetadata, CacheTransmission};
 use error::{DataCacheError, AuthError};
 use common::{ZERO_DATA_ID, ZERO_ADDRESS, MAX_WORKFLOW_METADATAS};
 use event::{DecimalFeedConfigSet};
@@ -22,10 +23,12 @@ use anchor_lang::solana_program::hash;
 #[program]
 pub mod data_feeds_cache {
 
-    use anchor_lang::{solana_program::{program::invoke_signed, system_instruction}, Discriminator};
+    use std::cmp::Ordering;
+
+    use anchor_lang::{solana_program::{program::invoke_signed, system_instruction, instruction::Instruction}, Discriminator};
     use state::{ReceivedDecimalReport, WorkflowMetadata};
 
-    use crate::{common::ANCHOR_DISCRIMINATOR, state::{DecimalReport, LegacyFeedEntry, WritePermissionFlag}};
+    use crate::{common::ANCHOR_DISCRIMINATOR, event::LegacyFeedsReported, state::{CacheTransmission, DecimalReport, LegacyFeedEntry, WritePermissionFlag}};
 
     use super::*;
 
@@ -43,6 +46,12 @@ pub mod data_feeds_cache {
 
         // todo: can probably remove
         state.proposed_owner = Pubkey::default();
+
+        let (_, authority_nonce) = Pubkey::find_program_address(
+            &[b"legacy_writer", ctx.accounts.state.key().as_ref()],
+            &crate::ID,
+        );
+        state.legacy_writer_nonce = authority_nonce;
 
         Ok(())
     }
@@ -433,11 +442,27 @@ pub mod data_feeds_cache {
     }
 
     // // todo: change report and metadata to &[u8]
-    pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
-        // todo: check if legacy_store and legacy_feed_config are both there
-        let legacy_feed_config_included = ctx.accounts.legacy_feeds_config.is_some();
-        let legacy_store_included = ctx.accounts.legacy_store.is_some();
+    pub fn on_report<'info>(ctx: Context<'_, '_, '_, 'info, OnReport<'info>>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()> {
 
+        // todo: check if legacy_store and legacy_feed_config are both there
+        // let legacy_feed_config_included = ctx.accounts.legacy_feeds_config.is_some();
+        // let legacy_store_included = ctx.accounts.legacy_store.is_some();
+
+        let legacy_feeds_config = if let Some(loader) = &ctx.accounts.legacy_feeds_config {
+            let loader = loader.load()?;
+            // check legacy feed entries are sorted by data id
+            require!(loader.id_to_feed.windows(2).all(|w| w[0].data_id < w[1].data_id), DataCacheError::IdsMustStrictlyIncrease);
+            
+            // if included, check that the legacy store passed in via account context the same as the one in the config
+            if let Some(legacy_store) = &ctx.accounts.legacy_store {
+                // panic!("in context {:?} vs in config {:?}", legacy_store.key, &loader.legacy_store);
+                require!(legacy_store.key == &loader.legacy_store, DataCacheError::AccountMismatch);
+            };
+
+            Some(loader)
+        } else {
+            None
+        };
 
         // first assume we don't have legacy_store or legacy_feed_config
 
@@ -451,11 +476,12 @@ pub mod data_feeds_cache {
         let permission_flag_account_infos = &ctx.remaining_accounts[len..2*len]; 
         let legacy_feed_account_infos = &ctx.remaining_accounts[2*len..];
 
-        // legacy_feed_account_infos are sorted by data id for easy access later
-        // is a feature flag required??? for now... no 
-        // if something goes wrong, we have an immediate kill switch though to remove the depenency. so maybe!?
-        // but it's easier t
-        // do we have 
+        // sorted by key
+        let legacy_accounts_sorted = legacy_feed_account_infos
+            .windows(2)
+            .all(|w| w[0].key.lt(w[1].key) );
+
+        require!(legacy_accounts_sorted, DataCacheError::AddressesMustStrictlyIncrease);
 
         require!(
             report_account_infos.len() == received_decimal_reports.len() &&
@@ -463,22 +489,26 @@ pub mod data_feeds_cache {
             DataCacheError::ArrayLengthMismatch
         );
 
+        let mut candidate_legacy_writes: Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)> = Vec::new();
 
         for (i, received_decimal_report) in received_decimal_reports.iter().enumerate() {
-            let ReceivedDecimalReport { data_id, answer, timestamp } = received_decimal_report;
+            // let ReceivedDecimalReport { data_id, answer, timestamp } = received_decimal_report;
 
-            // panic!("len {:?} , data_id {:?} , forwarder authority {:?} , workflow owner {:?}, workflow name {:?}", 
-            // received_decimal_reports.len(), data_id,  &ctx.accounts.forwarder_authority.key(), workflow_owner, workflow_name
-            
-            // );
+
             // 1. check that sender has permission to write
 
-                let report_hash = create_report_hash(
-                data_id, 
+
+            let report_hash = create_report_hash(
+                &received_decimal_report.data_id, 
                 &ctx.accounts.forwarder_authority.key(), 
                 workflow_owner, 
                 workflow_name
             );
+
+            // panic!("len {:?} , data_id {:?} , forwarder authority {:?} , workflow owner {:?}, workflow name {:?} report hash {:?}", 
+            // received_decimal_reports.len(), received_decimal_report.data_id,  &ctx.accounts.forwarder_authority.key(), workflow_owner, workflow_name, report_hash
+            
+            // );
 
             let (curr_permission_flag, _) = Pubkey::find_program_address(
                 &[b"permission_flag", ctx.accounts.cache_state.key().as_ref(), &report_hash],
@@ -494,7 +524,7 @@ pub mod data_feeds_cache {
 
             // 2. check report account is valid
             let (curr_report, _) = Pubkey::find_program_address(
-                &[b"decimal_report", ctx.accounts.cache_state.key().as_ref(), data_id],
+                &[b"decimal_report", ctx.accounts.cache_state.key().as_ref(), &received_decimal_report.data_id],
                 &crate::ID,
             );
 
@@ -503,23 +533,148 @@ pub mod data_feeds_cache {
             let mut dst = report_account_infos[i].try_borrow_mut_data()?;
 
             let updated_report = DecimalReport{
-                answer: answer.clone(), 
-                timestamp: timestamp.clone()
+                answer: received_decimal_report.answer.clone(), 
+                timestamp: received_decimal_report.timestamp.clone()
             };
 
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
 
+            // todo: add dfc update event here
 
+            // 3. check if the report is also associated with a legacy feed
+            // a. search config by data_id to get the account key
+            // b. search passed in legacy_feed_account_infos by key
 
-            // if let (Some(a), Some(b)) = (ctx.accounts.legacy_store, ctx.accounts.legacy_feeds_config) {
+            if let Some(config) = &legacy_feeds_config {
 
+                // a given legacy feed will only write under conditions
+                // I. legacy feed config is provided 
+                // II. data id is associated with a legacy feed in the config
+                // III. the legacy store is provided
+                // IV. legacy writer is provided 
+                // V. writes are not disabled for that legacy feed
+                // VI. the legacy feed is provided in account context
+  
 
-            //     // Both are Some, and you can use a and b here
-            // }
+                // condition I and II: if the data id is associated with a legacy feed 
+                if let Some(entry) = config
+                    .id_to_feed
+                    .binary_search_by(|e| e.data_id.cmp(&received_decimal_report.data_id))
+                    .ok()
+                    .and_then(|index| config.id_to_feed.get(index))
+                {
+                    candidate_legacy_writes.push((entry, received_decimal_report));
+                }
 
-            // todo: add event here
+            }
 
         };
+
+        // or add generic dfc event out here
+
+        // seperate out write disabled entries
+        let write_disabled_entries: Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)> = candidate_legacy_writes
+            .iter()
+            .filter(|e| e.0.write_disabled != 0)
+            .cloned()
+            .collect();
+
+        let write_enabled_entries: Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)> = candidate_legacy_writes
+            .iter()
+            .filter(|e| e.0.write_disabled == 0)
+            .cloned()
+            .collect();
+
+        let mut write_occured = false;
+
+        // condition III & condition IV
+        if let (Some(legacy_store), Some(legacy_writer)) = (&ctx.accounts.legacy_store, &ctx.accounts.legacy_writer) {
+            // use legacy_store and legacy_writer here
+        
+            let mut ordered_legacy_feed_account_infos: Vec<&AccountInfo> = Vec::new();
+
+            // condition V
+            for entry in write_enabled_entries.iter() {
+                // condition VI: error if legacy feed account not supplied in account context
+                let account = legacy_feed_account_infos
+                    .binary_search_by(|a| a.key.cmp(&entry.0.legacy_feed))
+                    .map(|i| &legacy_feed_account_infos[i])
+                    .map_err(|_| DataCacheError::MissingLegacyFeedAccount)?;
+
+                ordered_legacy_feed_account_infos.push(account);
+            }
+
+            // write to store program
+            if write_enabled_entries.len() > 0 {
+                
+                let metas: Vec<AccountMeta> = std::iter::once(AccountMeta {
+                    pubkey: legacy_writer.key(),
+                    is_signer: true,
+                    is_writable: false,
+                })
+                .chain(
+                    ordered_legacy_feed_account_infos.iter().map(|acc| AccountMeta {
+                        pubkey: *acc.key,
+                        is_signer: false,
+                        is_writable: true,
+                    }),
+                )
+                .collect();
+
+                let account_infos: Vec<AccountInfo<'info>> = std::iter::once(legacy_writer.to_account_info())
+                    .chain(ordered_legacy_feed_account_infos.iter().map(|val| val.to_account_info() ))
+                    .collect();
+
+                // payload begins with the Anchor discriminator
+                let mut payload = hash::hash("global:cache_submit".as_bytes()).to_bytes()[..8].to_vec();
+
+                let transmissions: Vec<CacheTransmission> = write_enabled_entries.iter().map(|e| {
+                    CacheTransmission{
+                        timestamp: e.1.timestamp,
+                        answer: e.1.answer
+                    }
+                })
+                .collect();
+
+                payload.extend(transmissions.try_to_vec()?);
+
+                let cache_state_key = ctx.accounts.cache_state.key();
+
+                let ix = Instruction::new_with_bytes(legacy_store.key(), &payload, metas);
+                let signer_seeds = &[
+                    b"legacy_writer",
+                    cache_state_key.as_ref(),
+                    &[ctx.accounts.cache_state.load()?.legacy_writer_nonce]
+                ];
+
+                invoke_signed(&ix, &account_infos, &[signer_seeds])?;
+
+                write_occured = true;
+
+            }
+
+
+
+        }
+
+        // emit legacy event only if there w
+        if candidate_legacy_writes.len() > 0 {
+
+            let (feeds_skipped, feeds_written) = if write_occured {
+                (write_disabled_entries, write_enabled_entries)
+            } else {
+                (candidate_legacy_writes, vec![])
+            };
+
+            emit!(
+                LegacyFeedsReported{
+                    feeds_skipped: feeds_skipped.iter().map(|e| e.0.data_id ).collect(),
+                    feeds_written: feeds_written.iter().map(|e| e.0.data_id).collect(),
+                }
+            );
+
+        }
+
 
         Ok(())
     }
