@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/relayer/api"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -44,6 +45,14 @@ func (txm verifyTxSize) HealthReport() map[string]error {
 }
 
 func (txm verifyTxSize) Name() string {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) GetTxState(ctx context.Context, transactionID string) (txmutils.TxState, error) {
+	panic("implement me")
+}
+
+func (txm verifyTxSize) SubmitTransaction(ctx context.Context, request api.TransactionRequest) (string, error) {
 	panic("implement me")
 }
 

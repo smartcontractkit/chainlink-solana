@@ -39,7 +39,10 @@ type TxManager interface {
 	// - If a txID is provided, it will be used to identify the tx. Otherwise, a random UUID will be generated.
 	// - The caller needs to set the tx.Message.RecentBlockhash and provide the corresponding lastValidBlockHeight. These values are obtained from the GetLatestBlockhash RPC call.
 	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
+	//Deprecated: Gets the transactions statues into the common TxStatus for all chains.
 	GetTransactionStatus(ctx context.Context, transactionID string) (relaytypes.TransactionStatus, error)
+	//Gets the internal state of a TX in the transaction manager.
+	GetTxStatus(ctx context.Context, transactionID string) (txmutils.TxState, error)
 }
 
 var _ relaytypes.Relayer = &Relayer{}

@@ -18,8 +18,8 @@ import (
 
 func TestSetupLocalSolNode_SimultaneousNetworks(t *testing.T) {
 	// run two networks
-	network0 := SetupLocalSolNode(t)
-	network1 := SetupLocalSolNode(t)
+	network0 := SetupLocalSolNode(t).URL
+	network1 := SetupLocalSolNode(t).URL
 
 	account := solana.NewWallet()
 	pubkey := account.PublicKey()

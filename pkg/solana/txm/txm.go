@@ -48,6 +48,7 @@ type TxManager interface {
 	services.Service
 	Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
 	GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error)
+	GetTxStatus(ctx context.Context, transactionID string) (txmutils.TxState, error)
 }
 
 var _ TxManager = (*Txm)(nil)
@@ -853,6 +854,14 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desir
 			backoff = maxBackoff
 		}
 	}
+}
+
+func (txm *Txm) GetTxStatus(ctx context.Context, transactionID string) (txmutils.TxState, error) {
+	state, exists := txm.txs.GetTxState(transactionID)
+	if !exists {
+		return txmutils.Errored, fmt.Errorf("failed to find transaction with id %s", transactionID)
+	}
+	return state, nil
 }
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses

@@ -15,7 +15,7 @@ import (
 )
 
 func initializeMultiNodeClient(t *testing.T) *MultiNodeClient {
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)

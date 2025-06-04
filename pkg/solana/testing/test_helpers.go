@@ -2,6 +2,7 @@ package testing
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -14,6 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/freeport"
 )
 
@@ -23,12 +27,41 @@ const (
 	fundingMaxRetries = 5
 )
 
-func SetupLocalSolNode(t *testing.T) string {
+type SolanaValidatorNode struct {
+	URL     string
+	WS_URL  *string
+	chainID *string
+}
+
+func (svn *SolanaValidatorNode) GetChainID(ctx context.Context) (string, error) {
+	if svn.chainID != nil {
+		return *svn.chainID, nil
+	}
+	clientConfig := config.NewDefault()
+	requestTimeout := 5 * time.Second
+	logger, _ := logger.New()
+	nodeClient, err := client.NewClient(svn.URL, clientConfig, requestTimeout, logger)
+	if err != nil {
+		return "", err
+	}
+	chainID, err := nodeClient.ChainID(ctx)
+	if err != nil {
+		return "", err
+	}
+	strChainID := chainID.String()
+	svn.chainID = &strChainID
+	return strChainID, nil
+}
+
+func SetupLocalSolNode(t *testing.T) SolanaValidatorNode {
 	t.Helper()
 
-	url, _ := SetupLocalSolNodeWithFlags(t)
+	url, wsURL := SetupLocalSolNodeWithFlags(t)
 
-	return url
+	return SolanaValidatorNode{
+		URL:    url,
+		WS_URL: &wsURL,
+	}
 }
 
 // SetupLocalSolNode sets up a local solana node via solana cli, and returns the url

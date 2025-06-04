@@ -274,7 +274,7 @@ func ptr[T any](t T) *T {
 
 func TestChain_Transact(t *testing.T) {
 	ctx := t.Context()
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
 	// transaction parameters
@@ -406,7 +406,7 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 
 func TestChain_MultiNode_TransactionSender(t *testing.T) {
 	ctx := t.Context()
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	lgr := logger.Test(t)
 
 	// transaction parameters
@@ -523,7 +523,7 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	cfg.Nodes = []*solcfg.Node{
 		{
 			Name: ptr("primary"),
-			URL:  config.MustParseURL(solanatesting.SetupLocalSolNode(t)),
+			URL:  config.MustParseURL(solanatesting.SetupLocalSolNode(t).URL),
 		},
 	}
 

@@ -28,7 +28,7 @@ import (
 
 func TestClient_Reader_Integration(t *testing.T) {
 	ctx := t.Context()
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
@@ -164,7 +164,7 @@ func TestClient_Reader_ChainID(t *testing.T) {
 }
 
 func TestClient_Writer_Integration(t *testing.T) {
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()
@@ -271,7 +271,7 @@ func TestClient_Writer_Integration(t *testing.T) {
 }
 
 func TestClient_GetBlocks(t *testing.T) {
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
@@ -297,7 +297,7 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	requestTimeout := 5 * time.Second
 	lggr := logger.Test(t)
 	cfg := config.NewDefault()
@@ -322,7 +322,7 @@ func TestClient_GetLatestBlockHeight(t *testing.T) {
 func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	ctx := t.Context()
 	// set up environment
-	url := solanatesting.SetupLocalSolNode(t)
+	url := solanatesting.SetupLocalSolNode(t).URL
 	privKey, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	pubKey := privKey.PublicKey()

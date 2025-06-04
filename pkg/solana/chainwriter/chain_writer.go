@@ -372,6 +372,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	// Enqueue transaction
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
+		
 		return errorWithDebugID(fmt.Errorf("error enqueuing transaction: %w", err), debugID)
 	}
 
