@@ -42,6 +42,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 
 	// Extract raw report and root from args
 	rawReport := execCallArgs.Report
+	reportLen := uint32(len(rawReport)) //nolint:gosec // length of raw report can never exceed the uint32 max
 	bufferID, err := uuid.New().MarshalBinary()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to marshal uuid into bytes: %w", err)
@@ -57,7 +58,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	}
 
 	// Create empty buffer instruction to calculate an accurate chunk size
-	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, uint32(len(rawReport)), []byte{}, 0, bufferPDA, offrampConfigPDA, feePayer) //nolint:gosec // length of raw report can never exceed the uint32 max
+	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, reportLen, []byte{}, 0, bufferPDA, offrampConfigPDA, feePayer)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to build empty buffer instruction: %w", err)
 	}
@@ -69,7 +70,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	bufferIxs := make([]solana.Instruction, 0, len(chunks))
 
 	for i, chunkPayload := range chunks {
-		ix, ixErr := buildBufferExecutionReportIx(bufferID, uint32(len(rawReport)), chunkPayload, uint8(i), bufferPDA, offrampConfigPDA, feePayer) //nolint:gosec // length of raw report can never exceed the uint32 max
+		ix, ixErr := buildBufferExecutionReportIx(bufferID, reportLen, chunkPayload, uint8(i), bufferPDA, offrampConfigPDA, feePayer)
 		if ixErr != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build buffer instruction: %w", ixErr)
 		}
@@ -89,7 +90,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 		return nil, nil, nil, nil, fmt.Errorf("failed to build close execution report buffer instruction: %w", err)
 	}
 
-	// Transform args to empty out the report since the buffer will be used instead
+	// Transform args to clear out the report since the buffer will be used instead
 	execCallArgs.Report = []byte{}
 
 	return bufferIxs, closeBufferIx, accounts, execCallArgs, nil
@@ -233,6 +234,7 @@ func extractChunks(rawReport []byte, emptyBufferIx solana.Instruction) ([][]byte
 
 	// Use the empty buffer tx overhead to calculate the largest chunk size that can be supported
 	chunkSize := MaxSolanaTxSize - len(emptyTxBytes)
+	fmt.Println("ChunkSize", chunkSize)
 
 	chunkCount := len(rawReport) / chunkSize
 	if len(rawReport)%chunkSize != 0 {
