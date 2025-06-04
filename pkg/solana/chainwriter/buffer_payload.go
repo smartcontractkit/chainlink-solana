@@ -18,6 +18,7 @@ import (
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+// FindCreateBufferInstructionsMethod returns the method associated to the id defined in the ChainWriter configs to be used to generate program/method specific info to write to a buffer
 func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, solana.AccountMetaSlice, solana.PublicKey, solana.PublicKey) ([]solana.Instruction, solana.Instruction, solana.AccountMetaSlice, any, error), error) {
 	switch id {
 	case "CCIPExecutionReportBuffer":
@@ -27,7 +28,11 @@ func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, s
 	}
 }
 
-// CCIPExecutionReportBuffer creates the list of instructions needed to write to an on-chain buffer for large transactions. It creates a close buffer instruction for cleanup in case of any failures.
+// CCIPExecutionReportBuffer contains the logic to write the raw report to a buffer for the CCIP execute method
+// - Creates the list of instructions needed to write to an on-chain buffer
+// - Creates a close buffer instruction for cleanup in case of any failures
+// - Updates the accounts list with the buffer PDA
+// - Updates the args to clear out the raw report field which the buffer is used for
 func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.AccountMetaSlice, programID, feePayer solana.PublicKey) ([]solana.Instruction, solana.Instruction, solana.AccountMetaSlice, any, error) {
 	var execCallArgs ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &execCallArgs)
@@ -106,7 +111,13 @@ func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayloa
 	return ix, nil
 }
 
-// sendBufferInstructions enqueues the transactions to write to the on-chain buffer. It tracks unique IDs for each and returns them to be used as dependency IDs for the main transaction.
+// sendBufferInstructions handles building transactions, queueing them, and marking them with the appropriate dependencies
+// - Builds and queues the transactions to write to the buffer
+// - Tracks the unqiue tx IDs for each buffer transaction
+// - Build and queues the main transaction with the new accounts list and transformed payload
+// - Marks the main transaction as dependent on all of the buffer transactions
+// - Bulds and queues the close buffer transaction
+// - Marks it as dependent on the failure of the main transaction or buffer transactions
 func (s *SolanaChainWriterService) sendBufferInstructions(
 	ctx context.Context,
 	bufferIxs []solana.Instruction,
@@ -138,20 +149,20 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	s.lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferTxIDs))
 
 	for i, ix := range bufferIxs {
-		bufferTx, bufferErr := solana.NewTransaction(
+		bufferTx, bufferTxErr := solana.NewTransaction(
 			[]solana.Instruction{ix},
 			blockhash.Value.Blockhash,
 			solana.TransactionPayer(feePayer),
 		)
-		if bufferErr != nil {
-			return fmt.Errorf("failed to build buffer transaction: %w", bufferErr)
+		if bufferTxErr != nil {
+			return fmt.Errorf("failed to build buffer transaction: %w", bufferTxErr)
 		}
 
 		bufferUUID := fmt.Sprintf("Buffer-%d-%s", i, uuid.NewString())
 
 		// Enqueue execution report buffer transaction
-		if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, bufferTx, &bufferUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); err != nil {
-			return fmt.Errorf("error enqueuing buffer transaction: %w", err)
+		if bufferErr := s.txm.Enqueue(ctx, methodConfig.FromAddress, bufferTx, &bufferUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); bufferErr != nil {
+			return fmt.Errorf("error enqueuing buffer transaction: %w", bufferErr)
 		}
 		bufferTxIDs = append(bufferTxIDs, bufferUUID)
 	}
@@ -162,7 +173,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	for _, id := range bufferTxIDs {
 		bufferTxs = append(bufferTxs, txmutils.DependencyTx{TxID: id, DesiredStatus: types.Finalized})
 	}
-	options = append(options, txmutils.AppendDependencyTxs(bufferTxs))
+	mainOpts := append(options, txmutils.AppendDependencyTxs(bufferTxs))
 
 	s.lggr.Debugw("Encoding new transformed payload for transaction using buffer", "contract", contractName, "method", method)
 	transformedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
@@ -182,12 +193,12 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", txID, "debugID", debugID)
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, mainTx, &txID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
+	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, mainTx, &txID, blockhash.Value.LastValidBlockHeight, mainOpts...); err != nil {
 		return fmt.Errorf("error enqueuing maintransaction: %w", err)
 	}
 
 	closeBufferUUID := fmt.Sprintf("CloseBuffer-%s", uuid.NewString())
-	opts := []txmutils.SetTxConfig{
+	closeOpts := []txmutils.SetTxConfig{
 		txmutils.SetEstimateComputeUnitLimit(true),
 		// Mark close buffer transaction as dependent on the main transaction. Only send the close buffer transaction if main transaction marked as failed
 		// Main transaction would be marked as failed if any of the buffer transactions failed or if itself failed
@@ -195,7 +206,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		// Ignore dependency errors because this transaction is expected to be dropped in the happy path
 		txmutils.SetDependencyTxMetaIgnoreError(true),
 	}
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, opts...); err != nil {
+	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, closeOpts...); err != nil {
 		return fmt.Errorf("error enqueuing close buffer transaction: %w", err)
 	}
 

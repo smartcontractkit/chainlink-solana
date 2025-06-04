@@ -377,10 +377,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	if len(txBytes) > MaxSolanaTxSize {
-		if bufferErr := s.handleTxBuffering(ctx, methodConfig, contractName, method, transactionID, debugID, accounts, programID, feePayer, args, options, filteredLookupTableMap, len(txBytes)); bufferErr != nil {
-			return errorWithDebugID(fmt.Errorf("error handling transaction buffering: %w", err), debugID)
+		// Return error if transaction too large and method to write to buffer is not provided
+		if methodConfig.BufferPayloadMethod == "" {
+			return errorWithDebugID(fmt.Errorf("transaction size %d exceeds limit %d", len(txBytes), MaxSolanaTxSize), debugID)
 		}
-		// handleTxBuffering takes care of queueing the main transaction in the correct order of dependencies so we should exit early here
+		if bufferErr := s.handleTxBuffering(ctx, methodConfig, contractName, method, transactionID, debugID, accounts, programID, feePayer, args, options, filteredLookupTableMap); bufferErr != nil {
+			return errorWithDebugID(fmt.Errorf("error handling transaction buffering: %w", bufferErr), debugID)
+		}
+		// handleTxBuffering takes care of queueing the main transaction in the correct order of dependencies so we should exit early
 		return nil
 	}
 
@@ -508,13 +512,7 @@ func (s *SolanaChainWriterService) handleTxBuffering(
 	args any,
 	options []txmutils.SetTxConfig,
 	lookupTableMap map[solana.PublicKey]solana.PublicKeySlice,
-	payloadSize int,
 ) error {
-	// Return error if transaction too large and method to write to buffer is not provided
-	if methodConfig.BufferPayloadMethod == "" {
-		return fmt.Errorf("transaction size %d exceeds limit %d", payloadSize, MaxSolanaTxSize)
-	}
-
 	// Check registry for method to create buffer intstructions
 	createBufferIxs, err := FindCreateBufferInstructionsMethod(methodConfig.BufferPayloadMethod)
 	if err != nil {
