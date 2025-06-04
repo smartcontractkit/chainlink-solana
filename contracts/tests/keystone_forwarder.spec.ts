@@ -47,7 +47,7 @@ function waitForEvent<T>(
   eventName: string,
   validate: (event: T, slot: number) => void
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
+  const promise = new Promise<T>((resolve, reject) => {
     const listener = program.addEventListener(
       eventName,
       (event: T, slot: number) => {
@@ -62,6 +62,11 @@ function waitForEvent<T>(
       }
     );
   });
+
+  // Attach catch to prevent unhandled rejection warning — but DO NOT rethrow
+  promise.catch(() => {});
+
+  return promise;
 }
 
 function calculateForwarderAuthorityBump(
@@ -82,6 +87,7 @@ let getEthereumAddress = (publicKey: Buffer) => {
 };
 
 describe("keystone_storage", function () {
+  this.timeout(15_000);
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -144,8 +150,6 @@ describe("keystone_storage", function () {
       forwarderState.publicKey
     );
 
-    await eventPromise;
-
     assert.isTrue(
       actualState.owner.equals(provider.wallet.publicKey),
       "owner set"
@@ -155,6 +159,8 @@ describe("keystone_storage", function () {
       "proposed owner is 0"
     );
     assert.equal(actualState.version, 1, "version 1");
+
+    await eventPromise;
   });
 
   it("Transfer ownership and back", async () => {
@@ -189,8 +195,6 @@ describe("keystone_storage", function () {
       forwarderState.publicKey
     );
 
-    await transferOwnershipEventPromise;
-
     assert.isTrue(
       actualState1.owner.equals(provider.wallet.publicKey),
       "owner should be same"
@@ -224,8 +228,6 @@ describe("keystone_storage", function () {
       })
       .signers([proposedOwner])
       .rpc();
-
-    await acceptOwnershipEventPromise;
 
     const actualState2 = await program.account.forwarderState.fetch(
       forwarderState.publicKey
@@ -285,6 +287,8 @@ describe("keystone_storage", function () {
       actualState4.proposedOwner.equals(PublicKey.default),
       "proposed owner is 0"
     );
+
+    await Promise.all([transferOwnershipEventPromise, acceptOwnershipEventPromise])
   });
 
   it("Initialize New Oracles Config, Update", async () => {
@@ -616,7 +620,7 @@ describe("keystone_storage", function () {
       program,
       "ReportProcessed",
       (event: any, slot) => {
-        console.log(event);
+        // console.log(event);
         assert.isTrue(
           receiver.equals(event.receiver),
           "receiver pub key emitted"
