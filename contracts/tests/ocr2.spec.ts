@@ -89,7 +89,8 @@ describe("ocr2", () => {
 
   const workspace = anchor.workspace;
   const program = anchor.workspace.Ocr2 as Program<Ocr2>;
-  const accessController = anchor.workspace.AccessController as Program<AccessController>;
+  const accessController = anchor.workspace
+    .AccessController as Program<AccessController>;
 
   let token: PublicKey;
   let storeAuthority: PublicKey, storeNonce: number;

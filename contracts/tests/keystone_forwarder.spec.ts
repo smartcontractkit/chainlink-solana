@@ -19,41 +19,9 @@ import * as secp256k1 from "secp256k1";
 import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
-import { generateEthKeypair, signMessage } from "./utils";
-
-
-
+import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-
-
-function waitForEvent<T>(
-  program: any,
-  eventName: string,
-  validate: (event: T, slot: number) => void
-): Promise<T> {
-  const promise = new Promise<T>((resolve, reject) => {
-    const listener = program.addEventListener(
-      eventName,
-      (event: T, slot: number) => {
-        try {
-          validate(event, slot);
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      }
-    );
-  });
-
-  // Attach catch to prevent unhandled rejection warning — but DO NOT rethrow
-  promise.catch(() => {});
-
-  return promise;
-}
 
 function calculateForwarderAuthorityBump(
   forwarderStatePubkey: PublicKey,
@@ -286,7 +254,6 @@ describe("keystone_storage", function () {
     const donId = 7;
     const configVersion = 3;
     const configId: bigint = (7n << 32n) | 3n; // 64 bytes
-
 
     const configIdBytes = Buffer.alloc(8);
     configIdBytes.writeBigUInt64BE(configId);
@@ -604,8 +571,6 @@ describe("keystone_storage", function () {
       reportContextBytes,
     ]);
 
-    deleteTheseDataBytes = dataBytes;
-
     const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
       units: 1_400_000,
     });
@@ -802,173 +767,5 @@ describe("keystone_storage", function () {
         assert.fail(`Unexpected error: ${err.message}`);
       }
     }
-
   });
-
-  // it("temp", async () => {
-
-  //   const [forwarderAuthorityStorage, forwarderAuthorityBump] =
-  //   PublicKey.findProgramAddressSync(
-  //     [
-  //       Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-  //       forwarderState.publicKey.toBuffer(),
-  //     ],
-  //     program.programId
-  //   );
-
-
-  //     // delete from here:
-
-  //     const dfcProgram = anchor.workspace.DataFeedsCache as Program<DataFeedsCache>;
-  //     const defaultCacheState = Keypair.generate();
-
-
-  //   let workflowExecutionId = 20;
-  //   let reportId = 11;
-
-  //   const workflowExecutionIdBytes = Buffer.alloc(32);
-  //   workflowExecutionIdBytes.writeUint8(workflowExecutionId, 31); // write at last byte for BigEndian
-
-  //   const reportIdBytes = Buffer.alloc(2);
-  //   reportIdBytes.writeUint16BE(reportId);
-
-  //     const transmissionIdBytes = createHash("sha256")
-  //     .update(
-  //       Buffer.concat([
-  //         dfcProgram.programId.toBuffer(),
-  //         workflowExecutionIdBytes,
-  //         reportIdBytes,
-  //       ])
-  //     )
-  //     .digest();
-
-  //     const [executionStateStorage, executionStateBump] =
-  //     PublicKey.findProgramAddressSync(
-  //       [
-  //         Buffer.from(anchor.utils.bytes.utf8.encode("execution_state")),
-  //         forwarderState.publicKey.toBuffer(),
-  //         transmissionIdBytes,
-  //       ],
-  //       program.programId
-  //     );
-
-    
-  
-  //     await dfcProgram.methods
-  //       .initialize([provider.publicKey]) // todo: add owner here as well
-  //       .accounts({
-  //         state: defaultCacheState.publicKey,
-  //         owner: provider.publicKey,
-  //         systemProgram: anchor.web3.SystemProgram.programId
-  //       })
-  //       .signers([defaultCacheState])
-  //       .rpc();
-
-  //       console.log("da defaultDaCache", defaultCacheState.publicKey.toBase58());
-  //       console.log("da oracles storage", defaultOraclesConfigStorage.toBase58());
-  //       console.log("forwarder program id", program.programId.toBase58());
-        
-  //       const ix = await program.methods
-  //       .report(deleteTheseDataBytes)
-  //       .accounts({
-  //         state: forwarderState.publicKey,
-  //         oraclesConfig: defaultOraclesConfigStorage,
-  //         transmitter: provider.wallet.publicKey,
-  //         forwarderAuthority: forwarderAuthorityStorage,
-  //         executionState: executionStateStorage,
-  //         receiverProgram: dfcProgram.programId,
-  //         systemProgram: anchor.web3.SystemProgram.programId,
-  //       })
-  //       .remainingAccounts([
-  //         {
-  //           pubkey: program.programId,
-  //           isSigner: false,
-  //           isWritable: false,
-  //         },
-  //         {
-  //           pubkey: dfcProgram.programId,
-  //           isSigner: false,
-  //           isWritable: false
-  //         },
-  //         {
-  //           pubkey: defaultCacheState.publicKey,
-  //           isSigner: false,
-  //           isWritable: true
-  //         }
-  //       ])
-  //       .instruction();
-
-  //       const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
-  //         units: 1_400_000,
-  //       });
-
-  //       const reportMessage = new TransactionMessage({
-  //         payerKey: provider.wallet.publicKey, // Account paying for the transaction
-  //         recentBlockhash: (await provider.connection.getLatestBlockhash())
-  //           .blockhash, // Latest blockhash
-  //         instructions: [computeLimitIx, ix], // Instructions to be included in the transaction
-  //       }).compileToV0Message();
-
-
-
-  //       const tx = new VersionedTransaction(reportMessage);
-
-  //       const signedTx = await provider.wallet.signTransaction(tx);
-
-  //       await provider.sendAndConfirm(signedTx);
-  
-
-  // });
-
-  // it("temp 2", async () => {
-  //   const dfcProgram = anchor.workspace.DataFeedsCache as Program<DataFeedsCache>;
-  //   const defaultCacheState = Keypair.generate();
-
-  //   await dfcProgram.methods
-  //   .initialize([provider.publicKey]) // todo: add owner here as well
-  //   .accounts({
-  //     state: defaultCacheState.publicKey,
-  //     owner: provider.publicKey,
-  //     systemProgram: anchor.web3.SystemProgram.programId
-  //   })
-  //   .signers([defaultCacheState])
-  //   .rpc();
-
-
-  //   const forwarder = new Forwarder(program, provider)
-  //     .withState(Keypair.generate())
-  //     .withOracles(1, 12, 41);
-
-  //   await forwarder.initialize()
-
-  //   await forwarder.initOraclesConfig();
-
-  //   await forwarder.report(
-  //     dfcProgram.programId, 
-  //     Buffer.from([]),
-  //     [
-  //       {
-  //         pubkey: dfcProgram.programId,
-  //         isSigner: false,
-  //         isWritable: false,
-  //       },
-  //       {
-  //         pubkey: dfcProgram.programId,
-  //         isSigner: false,
-  //         isWritable: false
-  //       },
-  //       {
-  //         pubkey: defaultCacheState.publicKey,
-  //         isSigner: false,
-  //         isWritable: true
-  //       }
-  //     ]
-
-  //   )
-
-
-
-  // })
-
-
 });

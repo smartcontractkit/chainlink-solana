@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use keystone_forwarder::ForwarderState;
 use keystone_forwarder::ID as FORWARDER_ID;
 
-
 declare_id!("5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L");
 
 // THIS IS UN-AUDITED CODE USED FOR TESTING PURPOSES ONLY
@@ -53,16 +52,29 @@ pub mod dummy_receiver {
         Ok(())
     }
 
+    // pub fn initialize_mock_legacy_store(_ctx: Context<InitializeMockLegacyStore>) -> Result<()> {
+    //     Ok(())
+    // }
+
     // as a mock legacy store
     pub fn cache_submit(ctx: Context<CacheSubmit>, rounds: Vec<CacheTransmission>) -> Result<()> {
-        emit!(Submit{
+        // // just assume that ctx.remaining_accounts[0] is the LatestCacheSubmission account
+
+        // let mut dst = ctx.remaining_accounts[0].try_borrow_mut_data()?;
+        // let new_submission = LatestCacheSubmission {
+        //     signer: ctx.accounts.authority.key(),
+        //     data: rounds.clone(),
+        //     accounts: ctx.remaining_accounts.iter().map(|x| x.key()).collect()
+        // };
+        // new_submission.serialize(&mut &mut dst[8..])?;
+
+        emit!(Submit {
             rounds: rounds,
             feeds: ctx.remaining_accounts.iter().map(|x| x.key()).collect()
         });
 
         Ok(())
     }
-
 }
 
 #[error_code]
@@ -115,23 +127,46 @@ pub struct OnReport<'info> {
 
 // legacy store
 
+// #[account]
+// #[derive(Default, InitSpace)]
+// pub struct LatestCacheSubmission {
+//     pub signer: Pubkey,
+//     #[max_len(10)]
+//     pub data: Vec<CacheTransmission>, // just overallocate space
+//     #[max_len(10)]
+//     pub accounts: Vec<Pubkey>,        // just overallocate space
+// }
+
+// #[derive(Accounts)]
+// pub struct InitializeMockLegacyStore<'info> {
+//     #[account(mut)]
+//     pub signer: Signer<'info>,
+
+//      #[account(
+//         init,
+//         payer = signer,
+//         space = 8 + LatestCacheSubmission::INIT_SPACE,
+//     )]
+//     pub cache_submission: Account<'info, LatestCacheSubmission>,
+
+//     pub system_program: Program<'info, System>,
+// }
+
 #[derive(Accounts)]
 pub struct CacheSubmit<'info> {
-    pub authority: Signer<'info>
-
-    // N OCR2 feeds in ctx.remaining_accounts
-   // #[account(mut)]
-   // pub feed: Account<'info, Transmissions>,
+    pub authority: Signer<'info>, // N OCR2 feeds in ctx.remaining_accounts
+                                  // #[account(mut)]
+                                  // pub feed: Account<'info, Transmissions>,
 }
 
 #[event]
 pub struct Submit {
     rounds: Vec<CacheTransmission>,
-    feeds: Vec<Pubkey>
+    feeds: Vec<Pubkey>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct CacheTransmission {
     pub timestamp: u32,
-    pub answer: u128
+    pub answer: u128,
 }
