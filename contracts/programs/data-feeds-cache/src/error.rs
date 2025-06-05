@@ -22,7 +22,6 @@ pub enum AuthError {
 
 #[error_code]
 pub enum DataCacheError {
-
     #[msg("config is empty")]
     EmptyConfig,
 
@@ -64,6 +63,4 @@ pub enum DataCacheError {
 
     #[msg("missing legacy feed account")]
     MissingLegacyFeedAccount,
-
-
 }

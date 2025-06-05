@@ -1,4 +1,7 @@
-use anchor_lang::prelude::{borsh::{BorshDeserialize, BorshSerialize}, *};
+use anchor_lang::prelude::{
+    borsh::{BorshDeserialize, BorshSerialize},
+    *,
+};
 use arrayvec::arrayvec;
 
 // 64 * 32 + 8 = 2056
@@ -18,7 +21,7 @@ pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub feed_admins: AdminList,
-    pub legacy_writer_nonce: u8,    // pda writing to the legacy feeds 
+    pub legacy_writer_nonce: u8, // pda writing to the legacy feeds
     pub _padding: [u8; 7],
 }
 
@@ -32,7 +35,7 @@ pub struct ReceivedDecimalReport {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct CacheTransmission {
     pub timestamp: u32,
-    pub answer: u128
+    pub answer: u128,
 }
 
 #[account]
@@ -42,21 +45,21 @@ pub struct DecimalReport {
     pub answer: u128,
 }
 
-// account also derived by the dataId 
+// account also derived by the dataId
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct FeedConfig {
     // UTF-bytes encoded
-    pub description: [u8; 32], 
+    pub description: [u8; 32],
     pub workflow_metadata: WorkflowMetadataList,
-    pub stale_permission_accounts: AccountList
+    pub stale_permission_accounts: AccountList,
 }
 
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct AccountList {
     pub xs: [Pubkey; MAX_ENTRIES],
-    pub len: u64
+    pub len: u64,
 }
 arrayvec!(AccountList, Pubkey, u64);
 
@@ -68,15 +71,13 @@ pub struct WorkflowMetadataList {
 }
 arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
 
-
 // #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, InitSpace)]
 #[zero_copy]
-
 #[derive(InitSpace, BorshSerialize, BorshDeserialize)]
 pub struct WorkflowMetadata {
     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)
     pub allowed_workflow_owner: [u8; 20], // ─╮ Address of the workflow owner
-    pub allowed_workflow_name: [u8; 10] // ──╯ Name of the workflow UTF-bytes encoded
+    pub allowed_workflow_name: [u8; 10], // ──╯ Name of the workflow UTF-bytes encoded
 }
 
 #[account]
@@ -93,7 +94,7 @@ pub struct LegacyFeedEntry {
     // under normal operations, this is expected to be 0
     // 0 = enabled. 1 = disabled
     // regardless of what this flag is, if legacy_store or legacy_feed_config is not passed into report, writes cannot occur
-    pub write_disabled: u8    
+    pub write_disabled: u8,
 }
 
 // in reality, there are only ~14 legacy feeds, but we provide a healthy buffer

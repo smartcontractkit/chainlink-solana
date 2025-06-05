@@ -1,4 +1,7 @@
-use anchor_lang::prelude::{borsh::{BorshDeserialize, BorshSerialize}, *};
+use anchor_lang::prelude::{
+    borsh::{BorshDeserialize, BorshSerialize},
+    *,
+};
 
 use crate::state::WorkflowMetadata;
 
@@ -8,14 +11,14 @@ pub struct DecimalFeedConfigSet {
     pub decimals: u8,
     pub description: [u8; 32],
     pub workflow_metadatas: Vec<WorkflowMetadata>,
-    pub stale_permission_flags: Vec<Pubkey>
+    pub stale_permission_flags: Vec<Pubkey>,
 }
 
 // todo: should be per
 #[event]
 pub struct LegacyFeedsReported {
     pub feeds_skipped: Vec<[u8; 16]>,
-    pub feeds_written: Vec<[u8; 16]>
+    pub feeds_written: Vec<[u8; 16]>,
 }
 
 // #[derive(BorshSerialize, BorshDeserialize)]
