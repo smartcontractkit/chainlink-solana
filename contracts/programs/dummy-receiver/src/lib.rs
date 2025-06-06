@@ -69,7 +69,7 @@ pub mod dummy_receiver {
         // new_submission.serialize(&mut &mut dst[8..])?;
 
         emit!(Submit {
-            rounds: rounds,
+            rounds,
             feeds: ctx.remaining_accounts.iter().map(|x| x.key()).collect()
         });
 

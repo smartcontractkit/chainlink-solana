@@ -911,15 +911,17 @@ describe("data feeds cache", function () {
 
     it("Updates feed A and feed B with legacy write ", async () => {
       // sorted legacy feed accounts need to be passed into remaining account context
-      const sortedDummyLegacyFeedAccountMetas =
-        dummyLegacyFeedAccountMetas.sort((a, b) =>
-          a.pubkey.toBuffer().compare(b.pubkey.toBuffer())
-        );
+      const sortedDummyLegacyFeedAccountMetas = [
+        ...dummyLegacyFeedAccountMetas,
+      ].sort((a, b) => a.pubkey.toBuffer().compare(b.pubkey.toBuffer()));
+
+      // console.log(`expect legacyFeeds`, 'to be paired with', dummyLegacyFeedAccounts.map(d => d.publicKey.toBase58()))
 
       const submissionEvent = waitForEvent(
         mockLegacyStoreProgram,
         "Submit",
         (event: any, slot) => {
+          // console.log('event feeds', event);
           assert.strictEqual(
             event.feeds.length,
             dummyLegacyFeedAccountMetas.length
