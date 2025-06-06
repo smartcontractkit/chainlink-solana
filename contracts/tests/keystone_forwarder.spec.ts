@@ -15,7 +15,7 @@ import { createHash } from "crypto";
 import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
 import chaiAsPromised from "chai-as-promised";
 
-chai.use(chaiAsPromised);
+// chai.use(chaiAsPromised);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
