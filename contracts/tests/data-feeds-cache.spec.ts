@@ -4,6 +4,7 @@ import {
   Program,
   Wallet,
   getProvider,
+  BN
 } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import {
@@ -12,7 +13,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
-import BN from "bn.js";
 import { createHash, randomBytes } from "crypto";
 import * as chai from "chai";
 import chaiAsPromised from "chai-as-promised";
