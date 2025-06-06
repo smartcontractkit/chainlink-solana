@@ -7,17 +7,17 @@
 
 The data feeds cache (DFC) is a receiver program that is the receipient of the forwarder contract's payload. For more information on how this works, please reference the forwarder documentation. 
 
-In general, the Solana DFC has the same features as the EVM DFC:
+In general, the Solana DFC has the same features as a [prior version](https://github.com/smartcontractkit/chainlink-data-feeds-2.0/blob/develop/contracts/src/v0.8/data-feeds/DataFeedsCache.sol) (as opposed to the [latest version](https://github.com/smartcontractkit/chainlink/blob/83ccf038841caaaf97f404d71c585bdd3232cc22/contracts/src/v0.8/data-feeds/DataFeedsCache.sol)). You should use the older version as reference:
 1. Configure the decimal reports
-    a. updates permission storage variable(s)
-    b. updates feed config storage variables(s)
-2. Accept payload from the forwarder via the "on_report" instruction
+    * updates permission storage variable(s)
+    * updates feed config storage variables(s)
+2. Accept payload from the forwarder in `on_report` and update the feed report
 
 However there are a couple differences in the Solana DFC
-1. Does not support proxying, so there is no such mapping to maintain a proxy to a dataIds. In this way, it's more similar to an older version of EVM DFC which does not support proxying. (todo: add links)
+1. Does not support proxying, so there is no such mapping to maintain a proxy to a dataIds. In this way, it's more similar to the older version of EVM DFC which does not support proxying.
 2. When updating the decimal report config of a feed, if the specific workflow is no longer referenced, the permission flag account is marked as "stale" and is to be removed in a subsequent instruction.
-3. Support for writing to Solana DF 1.0 legacy store and feeds. This can be enabled or disabled depending on the accounts passed in.
-4. We only support decimal reports and not bundled reports (changing product requirements)
+3. Support for writing to Solana DF 1.0 legacy store and feeds. This can be enabled or disabled depending on flags and optional accounts passed in.
+4. We only support decimal reports and not bundled reports (product decision)
 
 In order to accomodate variable number of feeds being configured and reported to at a time, the Solana DFC relies greatly on implicit accounts in the context (ctx.remaining_accounts).
 
@@ -325,7 +325,7 @@ Then, you have N x M permission flag accounts which are ordered by the data_id f
 
 Below is an example.
 
-
+```
 // ex: data_ids: [1, 2]
 // workflow metdatas [5, 6, 7]
 // ctx remaining accounts:
@@ -333,8 +333,9 @@ Below is an example.
 // [2-feed-config]  |
 // [flag-1-5] [flag-1-6] [flag-1-7]  |- permission_flag_accounts
 // [flag-2-5] [flag-2-6] [flag-2-7]  |
+```
 
-
+```
 #[derive(Accounts)]
 pub struct SetDecimalFeedConfigs<'info> {
     // todo: inline check if it is an admin
@@ -370,6 +371,7 @@ pub struct SetDecimalFeedConfigs<'info> {
     // )]
     // pub permission_flag: UncheckedAccount<'info>
 }
+```
 
 
 ### close_stale_permission_accounts
