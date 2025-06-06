@@ -90,58 +90,42 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, client *rpc.Client, attempts int) error {
+func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
 	t.Helper()
 
-	if attempts <= 0 {
-		return fmt.Errorf("failed to fund accounts within %d tries", fundingMaxRetries)
-	}
-
-	out, err := client.GetHealth(t.Context())
-	if err != nil || out != rpc.HealthOk {
-		t.Log("client RPC not healthy when trying to fund account")
-		return errors.New("client not healthy when funding account")
-	}
-
-	sigs := []solana.Signature{}
-	for _, v := range keys {
-		sig, err := client.RequestAirdrop(t.Context(), v, 100*solana.LAMPORTS_PER_SOL, rpc.CommitmentFinalized)
-		require.NoError(t, err)
-		sigs = append(sigs, sig)
-	}
-
-	// wait for confirmation so later transactions don't fail
-	remaining := keys
-	initTime := time.Now()
-
-	for elapsed := time.Since(initTime); elapsed < fundingTimeout; elapsed = time.Since(initTime) {
-		time.Sleep(fundingTimestep)
-
-		statusRes, sigErr := client.GetSignatureStatuses(t.Context(), true, sigs...)
-		require.NoError(t, sigErr)
-		require.NotNil(t, statusRes)
-		require.NotNil(t, statusRes.Value)
-
-		accountsWithNonFinalizedFunding := []solana.PublicKey{}
-		for i, res := range statusRes.Value {
-			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
-				accountsWithNonFinalizedFunding = append(accountsWithNonFinalizedFunding, keys[i])
+	var errKeys []solana.PublicKey
+	for i, key := range keys {
+		account := keys[i].String()
+		_, err := exec.Command("solana", "airdrop", "100",
+			account,
+			"--url", url,
+		).Output()
+		if err != nil {
+			if attempts <= 0 {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
+				}
+				return err
 			}
-		}
-		remaining = accountsWithNonFinalizedFunding
-
-		if len(remaining) == 0 {
-			return nil // all done!
+			errKeys = append(errKeys, key)
 		}
 	}
+	// call FundTestAccountsWithRetry recursively with keys that errored, decrement attempts to cap the number of retries
+	if len(errKeys) > 0 {
+		if attempts <= 0 {
+			return fmt.Errorf("failed to fund solana accounts")
+		}
+		time.Sleep(500 * time.Millisecond)
+		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
+	}
 
-	return FundTestAccountsWithRetry(t, remaining, client, attempts-1) // recursive call with only remaining & with fewer attempts
+	return nil
 }
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	client := rpc.New(url)
-	err := FundTestAccountsWithRetry(t, keys, client, fundingMaxRetries)
+	err := FundTestAccountsWithRetry(t, keys, url, fundingMaxRetries)
 	require.NoError(t, err)
 }
 

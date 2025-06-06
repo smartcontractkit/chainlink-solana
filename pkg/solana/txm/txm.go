@@ -834,7 +834,7 @@ func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
 
 	select {
 	case txm.chSend <- msg:
-		txm.lggr.Debugw("enqueued tx after dependencies completed", "id", msg.id, "dependencyTxCount", len(depMeta.DependencyTxs))
+		txm.lggr.Debugw("enqueued tx after dependencies reached desired state", "id", msg.id, "dependencyTxCount", len(depMeta.DependencyTxs))
 	default:
 		txm.lggr.Errorw("failed to enqueue tx after dependencies", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
 	}
