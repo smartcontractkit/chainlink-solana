@@ -345,14 +345,10 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
 
-	s.lggr.Debugw("Encoding transaction payload", "contract", contractName, "method", method)
-	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
+	encodedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
-
-	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
-	encodedPayload = append(discriminator[:], encodedPayload...)
 
 	// Fetch latest blockhash
 	blockhash, err := s.client.LatestBlockhash(ctx)
@@ -400,8 +396,9 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 // GetTransactionStatus returns the current status of a transaction in the underlying chain's TXM.
 func (s *SolanaChainWriterService) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	s.lggr.Debugw("Fetching transaction status", "tx", transactionID)
-	return s.txm.GetTransactionStatus(ctx, transactionID)
+	status, err := s.txm.GetTransactionStatus(ctx, transactionID)
+	s.lggr.Debugw("Fetching transaction status", "tx", transactionID, "status", status)
+	return status, err
 }
 
 // GetFeeComponents retrieves the associated gas costs for executing a transaction.
@@ -496,6 +493,18 @@ func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt 
 	}
 
 	return resultMap, nil
+}
+
+func (s *SolanaChainWriterService) encodePayload(ctx context.Context, args any, methodConfig MethodConfig, contractName, method string) ([]byte, error) {
+	s.lggr.Debugw("Encoding transaction payload", "contract", contractName, "method", method)
+	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
+	if err != nil {
+		return nil, fmt.Errorf("error encoding transaction payload: %w", err)
+	}
+
+	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	encodedPayload = append(discriminator[:], encodedPayload...)
+	return encodedPayload, nil
 }
 
 // handleTxBuffering handles the creation, queuing, and dependency tracking for transactions that require writing their payload to a buffer

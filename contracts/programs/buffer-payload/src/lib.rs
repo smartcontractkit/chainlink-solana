@@ -24,13 +24,26 @@ pub mod buffer_payload {
 
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteContext<'info>>,
+        report: Vec<u8>,
+        fail: bool,
     ) -> Result<()> {
-         require!(deserialize_from_buffer_account(ctx.accounts.buffer.to_account_info().as_ref()).is_ok(), Error::FailedToDeserializeReport);
+        if report.is_empty() {
+            require!(!fail, Error::ForcedFailure);
+            let (_, buffered_bytes) = deserialize_from_buffer_account(
+                ctx.remaining_accounts
+                    .last()
+                    .ok_or(Error::ReportUnavailable)?,
+            )?;
 
-         let buffer = &ctx.accounts.buffer;
-         buffer.close(ctx.accounts.authority.to_account_info())?;
+            let buffer = Account::<Buffer>::try_from(ctx.remaining_accounts.last().unwrap())?;
+            let report_length = buffer.report_length.try_into().unwrap();
+            require!(buffered_bytes == report_length, Error::Incomplete);
 
-         Ok(())
+            buffer.close(ctx.accounts.authority.to_account_info())?;
+        }
+        // no-op if report provided directly
+
+        Ok(())
     }
 
     pub fn buffer_execution_report<'info>(
@@ -39,8 +52,11 @@ pub mod buffer_payload {
         report_length: u32,
         chunk: Vec<u8>,
         chunk_index: u8,
+        num_chunks: u8,
     ) -> Result<()> {
-       ctx.accounts.buffer.add_chunk(report_length, &chunk, chunk_index)
+        ctx.accounts
+            .buffer
+            .add_chunk(report_length, &chunk, chunk_index, num_chunks)
     }
 
     pub fn close_execution_report_buffer(
@@ -53,29 +69,22 @@ pub mod buffer_payload {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-     #[account(
+    #[account(
+        init,
+        payer = authority,
         seeds = [CONFIG],
         bump,
+        space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE
     )]
     pub config: Account<'info, Config>,
 
-     #[account(mut)]
+    #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: Vec<u8>, report_length: u32)]
 pub struct ExecuteContext<'info> {
-   #[account(
-        init_if_needed,
-        payer = authority,
-        seeds = [EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
-        bump,
-        space = ANCHOR_DISCRIMINATOR + Buffer::INIT_SPACE + report_length as usize
-    )]
-    pub buffer: Account<'info, Buffer>,
-
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -84,7 +93,7 @@ pub struct ExecuteContext<'info> {
 #[derive(Accounts)]
 #[instruction(buffer_id: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
 pub struct BufferContext<'info> {
-     #[account(
+    #[account(
         init_if_needed,
         payer = authority,
         seeds = [EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
@@ -105,14 +114,13 @@ pub struct BufferContext<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(buffer_id: Vec<u8>, report_length: u32, chunk: Vec<u8>, chunk_index: u8)]
+#[instruction(buffer_id: Vec<u8>)]
 pub struct CloseBufferContext<'info> {
-     #[account(
-        init_if_needed,
-        payer = authority,
+    #[account(
+        mut,
         seeds = [EXECUTION_REPORT_BUFFER, &buffer_id, authority.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Buffer::INIT_SPACE + report_length as usize
+        close = authority
     )]
     pub buffer: Account<'info, Buffer>,
 
@@ -126,22 +134,22 @@ pub struct CloseBufferContext<'info> {
 pub struct Buffer {
     pub version: u8,
     pub chunk_bitmap: u64,
-    pub total_chunks: u32,
+    pub total_chunks: u8,
     pub chunk_length: u32,
     pub report_length: u32,
     #[max_len(0)]
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Report {
-    pub report: Vec<u8>
+    pub report: Vec<u8>,
 }
 
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Config {
-    pub owner: Pubkey
+    pub owner: Pubkey,
 }
 
 #[error_code]
@@ -160,8 +168,10 @@ pub enum Error {
     InvalidChunkSize,
     #[msg("Report buffer is not complete: chunks are missing")]
     Incomplete,
-    #[msg("Report wasn't provided either directly or via buffer")]
+    #[msg("Report wasn't provided via buffer")]
     ReportUnavailable,
     #[msg("Failed to deserialize report")]
-    FailedToDeserializeReport
+    FailedToDeserializeReport,
+    #[msg("Forced failure")]
+    ForcedFailure,
 }

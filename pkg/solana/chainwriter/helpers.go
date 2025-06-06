@@ -39,6 +39,14 @@ func FetchTestContractIDL() string {
 	return testContractIDL
 }
 
+//go:embed testBufferContractIDL.json
+var testBufferContractIDL string
+
+// FetchTestContractIDL returns the IDL for chain components test contract
+func FetchTestBufferContractIDL() string {
+	return testBufferContractIDL
+}
+
 var (
 	errFieldNotFound = errors.New("key not found")
 )

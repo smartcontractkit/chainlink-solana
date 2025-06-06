@@ -2,6 +2,7 @@ package chainwriter
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -14,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -34,6 +34,10 @@ func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, s
 // - Updates the accounts list with the buffer PDA
 // - Updates the args to clear out the raw report field which the buffer is used for
 func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.AccountMetaSlice, programID, feePayer solana.PublicKey) ([]solana.Instruction, solana.Instruction, solana.AccountMetaSlice, any, error) {
+	// Max 64 chunks is supported by the CCIP execution report buffer because of the bitmap used to track already uploaded chunks
+	// TODO: Add link to chainlink-ccip code with this limit once merged to develop
+	const maxNumChunks = 64
+
 	var execCallArgs ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &execCallArgs)
 	if err != nil {
@@ -57,8 +61,10 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 		return nil, nil, nil, nil, fmt.Errorf("failed to calculate offramp condig PDA: %w", err)
 	}
 
+	ccip_offramp.ProgramID = programID
+
 	// Create empty buffer instruction to calculate an accurate chunk size
-	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, reportLen, []byte{}, 0, bufferPDA, offrampConfigPDA, feePayer)
+	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, reportLen, []byte{}, 0, 1, bufferPDA, offrampConfigPDA, feePayer)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to build empty buffer instruction: %w", err)
 	}
@@ -67,10 +73,14 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to extract chunks: %w", err)
 	}
+	if len(chunks) > maxNumChunks {
+		return nil, nil, nil, nil, fmt.Errorf("number of chunks exceeds limit: report requires %d chunks, buffer supports max %d chunks", len(chunks), maxNumChunks)
+	}
+
 	bufferIxs := make([]solana.Instruction, 0, len(chunks))
 
 	for i, chunkPayload := range chunks {
-		ix, ixErr := buildBufferExecutionReportIx(bufferID, reportLen, chunkPayload, uint8(i), bufferPDA, offrampConfigPDA, feePayer)
+		ix, ixErr := buildBufferExecutionReportIx(bufferID, reportLen, chunkPayload, uint8(i), uint8(len(chunks)), bufferPDA, offrampConfigPDA, feePayer) //nolint:gosec // number of chunks is validated to be within uint8 max above
 		if ixErr != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build buffer instruction: %w", ixErr)
 		}
@@ -96,12 +106,13 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	return bufferIxs, closeBufferIx, accounts, execCallArgs, nil
 }
 
-func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayload []byte, index uint8, bufferPDA, offrampConfigPDA, feePayer solana.PublicKey) (solana.Instruction, error) {
+func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayload []byte, index uint8, numChunks uint8, bufferPDA, offrampConfigPDA, feePayer solana.PublicKey) (solana.Instruction, error) {
 	ix, ixErr := ccip_offramp.NewBufferExecutionReportInstruction(
 		bufferID,
 		reportLen,
 		chunkPayload,
 		index,
+		numChunks,
 		bufferPDA,
 		offrampConfigPDA,
 		feePayer,
@@ -147,7 +158,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		return fmt.Errorf("failed to build close buffer transaction: %w", err)
 	}
 
-	s.lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferTxIDs))
+	s.lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferIxs))
 
 	for i, ix := range bufferIxs {
 		bufferTx, bufferTxErr := solana.NewTransaction(
@@ -176,8 +187,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 	mainOpts := append(options, txmutils.AppendDependencyTxs(bufferTxs))
 
-	s.lggr.Debugw("Encoding new transformed payload for transaction using buffer", "contract", contractName, "method", method)
-	transformedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
+	transformedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
 	if err != nil {
 		return fmt.Errorf("error encoding transformed payload for transaction using buffer: %w", err)
 	}
@@ -207,6 +217,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		// Ignore dependency errors because this transaction is expected to be dropped in the happy path
 		txmutils.SetDependencyTxMetaIgnoreError(true),
 	}
+	s.lggr.Debugw("Queuing close buffer transaction, only sends if buffer or main transcation fails", "contract", contractName, "method", method, "closeBufferTxID", closeBufferUUID, "mainTxID", txID)
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, closeOpts...); err != nil {
 		return fmt.Errorf("error enqueuing close buffer transaction: %w", err)
 	}
@@ -232,9 +243,9 @@ func extractChunks(rawReport []byte, emptyBufferIx solana.Instruction) ([][]byte
 		return nil, fmt.Errorf("failed to marshal empty buffer tx: %w", err)
 	}
 
-	// Use the empty buffer tx overhead to calculate the largest chunk size that can be supported
-	chunkSize := MaxSolanaTxSize - len(emptyTxBytes)
-	fmt.Println("ChunkSize", chunkSize)
+	// Use the empty buffer base64 encoded tx size to calculate the largest encoded chunk size that can be supported
+	// Use the decoded length of the encoded chunk size to determine the max number of bytes the payload can be
+	chunkSize := base64.StdEncoding.DecodedLen(MaxSolanaTxSize - base64.StdEncoding.EncodedLen(len(emptyTxBytes)))
 
 	chunkCount := len(rawReport) / chunkSize
 	if len(rawReport)%chunkSize != 0 {

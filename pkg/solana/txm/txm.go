@@ -755,19 +755,6 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		v(&cfg)
 	}
 
-	// Perform compute unit limit estimation after storing transaction
-	// If error found during simulation, transaction should be in storage to mark accordingly
-	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
-		if simErr != nil {
-			return fmt.Errorf("transaction failed simulation: %w", simErr)
-		}
-		// If estimation returns 0 compute unit limit without error, fallback to original config
-		if computeUnitLimit != 0 {
-			cfg.ComputeUnitLimit = computeUnitLimit
-		}
-	}
-
 	msg := pendingTx{
 		id:                   id,
 		tx:                   *tx,
@@ -784,9 +771,22 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	}
 
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
-	if len(cfg.DependencyTxMeta.DependencyTxs) > 0 {
-		go txm.waitForDependencyTxs(msg, cfg.DependencyTxMeta)
+	if len(msg.cfg.DependencyTxMeta.DependencyTxs) > 0 {
+		go txm.waitForDependencyTxs(msg)
 		return nil
+	}
+
+	// Perform compute unit limit estimation after storing transaction
+	// If error found during simulation, transaction should be in storage to mark accordingly
+	if msg.cfg.EstimateComputeUnitLimit {
+		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
+		if simErr != nil {
+			return fmt.Errorf("transaction failed simulation: %w", simErr)
+		}
+		// If estimation returns 0 compute unit limit without error, fallback to original config
+		if computeUnitLimit != 0 {
+			msg.cfg.ComputeUnitLimit = computeUnitLimit
+		}
 	}
 
 	select {
@@ -798,9 +798,10 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForDependencyTxs(msg pendingTx, depMeta txmutils.DependencyTxMeta) {
+func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
 	ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
 	defer cancel()
+	depMeta := msg.cfg.DependencyTxMeta
 	err := txm.waitForTxStatus(ctx, depMeta)
 	if err != nil {
 		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
@@ -861,7 +862,7 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 				if err != nil || status == commontypes.Unknown {
 					// If failed to get status, considered the dependency tx as errored. Check if success was expected.
 					if !isErroredStatus(meta.DesiredStatus) {
-						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						txm.lggr.Debugw("dependency transaction required to be successful status but encountered errored status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
 						unexpectedStatuses++
 					}
 					// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
@@ -871,16 +872,16 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 				switch status {
 				case commontypes.Failed, commontypes.Fatal:
 					if !isErroredStatus(meta.DesiredStatus) {
-						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						txm.lggr.Debugw("dependency transaction required to be successful status but encountered errored status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
 						unexpectedStatuses++
 						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
 						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
 						continue
 					}
 					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
-				case commontypes.Finalized, commontypes.Unconfirmed, commontypes.Pending:
+				case commontypes.Finalized, commontypes.Unconfirmed:
 					if isErroredStatus(meta.DesiredStatus) {
-						txm.lggr.Debugw("dependency transaction encountered unexpected status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						txm.lggr.Debugw("dependency transaction required to be errored status but encountered successful status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
 						unexpectedStatuses++
 						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
 						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
@@ -893,6 +894,9 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 					}
 					// if status is equal to or greater than desired status, skip adding to remaining txID list
 					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+				case commontypes.Pending:
+					// Pending could represent the tx still awaiting broadcast. We don't have the info to make any decisions on its status so allow polling to continue
+					txAwaitingDesiredStatus = append(txAwaitingDesiredStatus, meta)
 				default:
 					return fmt.Errorf("unexpected status encountered: %d", status)
 				}
