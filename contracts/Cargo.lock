@@ -904,6 +904,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dummy-receiver"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "keystone-forwarder",
+]
+
+[[package]]
 name = "ed25519"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1162,6 +1170,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
 dependencies = [
  "cpufeatures",
+]
+
+[[package]]
+name = "keystone-forwarder"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "solana-program",
 ]
 
 [[package]]
