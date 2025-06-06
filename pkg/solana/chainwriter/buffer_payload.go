@@ -24,7 +24,7 @@ func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, s
 	case "CCIPExecutionReportBuffer":
 		return CCIPExecutionReportBuffer, nil
 	default:
-		return nil, fmt.Errorf("transform not found")
+		return nil, fmt.Errorf("create buffer instructions method not found")
 	}
 }
 

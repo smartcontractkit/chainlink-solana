@@ -701,7 +701,7 @@ func (txm *Txm) reap() {
 		case <-ticker.C:
 			reapCount := txm.txs.TrimFinalizedErroredTxs()
 			if reapCount > 0 {
-				txm.lggr.Debugf("Reaped %d finalized or errored transactions", reapCount)
+				txm.lggr.Debugw("Reaped finalized or errored transactions", "reapCount", reapCount)
 			}
 		}
 		ticker.Reset()
