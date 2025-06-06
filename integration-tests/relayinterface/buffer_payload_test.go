@@ -158,7 +158,7 @@ func Test_BufferPayload(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			// Check logs for dependent transactions getting queued
-			depTxQueuedLogs := logs.FilterMessageSnippet("enqueued tx after dependencies reached desired state")
+			depTxQueuedLogs := logs.FilterMessageSnippet("enqueued tx after dependencies reached desired status")
 			// Check filtered logs to see if the close buffer transcation specifically was queued
 			for _, log := range depTxQueuedLogs.All() {
 				for key, field := range log.ContextMap() {
