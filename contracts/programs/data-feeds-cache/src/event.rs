@@ -1,7 +1,4 @@
-use anchor_lang::prelude::{
-    borsh::{BorshSerialize},
-    *,
-};
+use anchor_lang::prelude::{borsh::BorshSerialize, *};
 
 use crate::state::WorkflowMetadata;
 

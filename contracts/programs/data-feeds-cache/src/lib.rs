@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
+use anchor_lang::prelude::*;
 use std::io::Cursor;
 use std::{io::Write, ops::DerefMut};
 
@@ -11,13 +11,13 @@ mod error;
 mod event;
 mod state;
 
-use common::{MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID, ANCHOR_DISCRIMINATOR};
+use common::{ANCHOR_DISCRIMINATOR, MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
 use context::*;
 use error::{AuthError, DataCacheError};
 use event::{DecimalFeedConfigSet, LegacyFeedsReported};
 use state::{
-    AdminList, CacheTransmission, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
-    ReceivedDecimalReport, WorkflowMetadata, WritePermissionFlag, DecimalReport,
+    AdminList, CacheTransmission, DecimalReport, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
+    ReceivedDecimalReport, WorkflowMetadata, WritePermissionFlag,
 };
 
 use anchor_lang::solana_program::hash;
@@ -510,10 +510,7 @@ pub mod data_feeds_cache {
 
             let mut curr_feed_config = loader.load_mut()?;
             // close stale accounts
-            for stale_account_key in curr_feed_config
-                .stale_permission_accounts
-                .iter()
-            {
+            for stale_account_key in curr_feed_config.stale_permission_accounts.iter() {
                 let curr_stale_account_info = stale_permission_flag_account_infos[flag_idx].clone();
                 require!(
                     stale_account_key == curr_stale_account_info.key,
