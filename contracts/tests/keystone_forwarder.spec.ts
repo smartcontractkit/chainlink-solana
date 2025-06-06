@@ -13,6 +13,9 @@ import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
 import { createHash } from "crypto";
 import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
+import chaiAsPromised from "chai-as-promised";
+
+chai.use(chaiAsPromised);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -5,13 +5,13 @@ import {
   BN
 } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
+import { KeystoneForwarder } from "../target/types/keystone_forwarder";
+import { DummyReceiver } from "../target/types/dummy_receiver";
 import {
   AccountMeta,
   Keypair,
   PublicKey,
 } from "@solana/web3.js";
-import { KeystoneForwarder } from "../target/types/keystone_forwarder";
-import { DummyReceiver } from "../target/types/dummy_receiver";
 import chaiAsPromised from "chai-as-promised";
 import { assert } from "chai";
 import {
