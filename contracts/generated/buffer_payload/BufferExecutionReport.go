@@ -25,7 +25,7 @@ type BufferExecutionReport struct {
 	// [2] = [WRITE, SIGNER] authority
 	//
 	// [3] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewBufferExecutionReportInstructionBuilder creates a new `BufferExecutionReport` instruction builder.
@@ -74,7 +74,7 @@ func (inst *BufferExecutionReport) SetBufferAccount(buffer ag_solanago.PublicKey
 
 // GetBufferAccount gets the "buffer" account.
 func (inst *BufferExecutionReport) GetBufferAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetConfigAccount sets the "config" account.
@@ -85,7 +85,7 @@ func (inst *BufferExecutionReport) SetConfigAccount(config ag_solanago.PublicKey
 
 // GetConfigAccount gets the "config" account.
 func (inst *BufferExecutionReport) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -96,7 +96,7 @@ func (inst *BufferExecutionReport) SetAuthorityAccount(authority ag_solanago.Pub
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *BufferExecutionReport) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -107,7 +107,7 @@ func (inst *BufferExecutionReport) SetSystemProgramAccount(systemProgram ag_sola
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *BufferExecutionReport) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(3)
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst BufferExecutionReport) Build() *Instruction {
@@ -184,10 +184,10 @@ func (inst *BufferExecutionReport) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       buffer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(2)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(3)))
+						accountsBranch.Child(ag_format.Meta("       buffer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})

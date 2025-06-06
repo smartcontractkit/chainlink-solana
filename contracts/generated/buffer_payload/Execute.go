@@ -18,7 +18,7 @@ type Execute struct {
 	// [0] = [WRITE, SIGNER] authority
 	//
 	// [1] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewExecuteInstructionBuilder creates a new `Execute` instruction builder.
@@ -49,7 +49,7 @@ func (inst *Execute) SetAuthorityAccount(authority ag_solanago.PublicKey) *Execu
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *Execute) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -60,7 +60,7 @@ func (inst *Execute) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Execute) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 func (inst Execute) Build() *Instruction {
@@ -119,8 +119,8 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[1]))
 					})
 				})
 		})

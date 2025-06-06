@@ -19,7 +19,7 @@ type CloseExecutionReportBuffer struct {
 	// [1] = [WRITE, SIGNER] authority
 	//
 	// [2] = [] systemProgram
-	ag_solanago.AccountMetaSlice `bin:"-"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCloseExecutionReportBufferInstructionBuilder creates a new `CloseExecutionReportBuffer` instruction builder.
@@ -44,7 +44,7 @@ func (inst *CloseExecutionReportBuffer) SetBufferAccount(buffer ag_solanago.Publ
 
 // GetBufferAccount gets the "buffer" account.
 func (inst *CloseExecutionReportBuffer) GetBufferAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(0)
+	return inst.AccountMetaSlice[0]
 }
 
 // SetAuthorityAccount sets the "authority" account.
@@ -55,7 +55,7 @@ func (inst *CloseExecutionReportBuffer) SetAuthorityAccount(authority ag_solanag
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CloseExecutionReportBuffer) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(1)
+	return inst.AccountMetaSlice[1]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
@@ -66,7 +66,7 @@ func (inst *CloseExecutionReportBuffer) SetSystemProgramAccount(systemProgram ag
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *CloseExecutionReportBuffer) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(2)
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst CloseExecutionReportBuffer) Build() *Instruction {
@@ -124,9 +124,9 @@ func (inst *CloseExecutionReportBuffer) EncodeToTree(parent ag_treeout.Branches)
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       buffer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice.Get(2)))
+						accountsBranch.Child(ag_format.Meta("       buffer", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
