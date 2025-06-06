@@ -2,23 +2,16 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import {
-  AccountMeta,
   AddressLookupTableProgram,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  sendAndConfirmTransaction,
-  Transaction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
-import { randomBytes, createHash } from "crypto";
-import * as secp256k1 from "secp256k1";
-import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
-import { DummyReceiver } from "../target/types/dummy_receiver";
-import { DataFeedsCache } from "../target/types/data_feeds_cache";
+import { createHash } from "crypto";
 import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
