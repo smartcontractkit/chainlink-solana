@@ -36,6 +36,7 @@ pub mod buffer_payload {
             )?;
 
             let buffer = Account::<Buffer>::try_from(ctx.remaining_accounts.last().unwrap())?;
+            require!(buffer.is_complete(), Error::Incomplete);
             let report_length = buffer.report_length.try_into().unwrap();
             require!(buffered_bytes == report_length, Error::Incomplete);
 
