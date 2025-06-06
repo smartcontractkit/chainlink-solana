@@ -184,9 +184,9 @@ func Test_BufferPayload(t *testing.T) {
 
 func initializeAndRunCW(t *testing.T, lggr logger.Logger, multiClient client.MultiClient, txm *txm.Txm, config chainwriter.ChainWriterConfig) *chainwriter.SolanaChainWriterService {
 	cw, err := chainwriter.NewSolanaChainWriterService(lggr, multiClient, txm, nil, config)
-		require.NoError(t, err)
-		servicetest.Run(t, cw)
-		return cw
+	require.NoError(t, err)
+	servicetest.Run(t, cw)
+	return cw
 }
 
 func initializeTestContract(t *testing.T, client *rpc.Client, sender solana.PrivateKey, programID solana.PublicKey) {
