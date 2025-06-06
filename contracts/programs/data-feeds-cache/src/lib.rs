@@ -202,10 +202,6 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    // in general, you always add before removing for making things
-    // migration-friendly.
-    // so we can add the new feed_configs, keep track of the permissions to be deleted
-    // in a follow up transaction
     pub fn set_decimal_feed_configs<'info>(
         ctx: Context<'_, '_, 'info, 'info, SetDecimalFeedConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,

@@ -1,18 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
-import {
-  Program,
-  getProvider,
-  BN
-} from "@coral-xyz/anchor";
+import { Program, getProvider, BN } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
-import {
-  AccountMeta,
-  Keypair,
-  PublicKey,
-} from "@solana/web3.js";
-import chaiAsPromised from "chai-as-promised";
+import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
+// import chaiAsPromised from "chai-as-promised";
 import { assert } from "chai";
 import {
   ArrayVec,
@@ -31,7 +23,7 @@ import {
   WorkflowMetadata,
 } from "./utils";
 
-chai.use(chaiAsPromised);
+// chai.use(chaiAsPromised);
 
 describe("data feeds cache", function () {
   this.timeout(15_000);
@@ -357,12 +349,23 @@ describe("data feeds cache", function () {
           })
           .rpc();
 
-        assert.isRejected(
-          cacheProgram.account.writePermissionFlag.fetch(
+        try {
+          await cacheProgram.account.writePermissionFlag.fetch(
             legacyFeedConfigAccount2
-          ),
-          /Account does not exist/
-        );
+          );
+          assert.fail("Account should not exist anymore");
+        } catch (err) {
+          if (!err.message.includes("Account does not exist")) {
+            assert.fail("Account should not exist anymore");
+          }
+        }
+
+        // assert.isRejected(
+        //   cacheProgram.account.writePermissionFlag.fetch(
+        //     legacyFeedConfigAccount2
+        //   ),
+        //   /Account does not exist/
+        // );
       });
     });
   });
@@ -754,12 +757,23 @@ describe("data feeds cache", function () {
         );
       }
 
-      assert.isRejected(
-        cacheProgram.account.writePermissionFlag.fetch(
+      try {
+        await cacheProgram.account.writePermissionFlag.fetch(
           feedAPermissionFlagAccount
-        ),
-        /Account does not exist/
-      );
+        );
+        assert.fail("Account should not exist anymore");
+      } catch (err) {
+        if (!err.message.includes("Account does not exist")) {
+          assert.fail("Account should not exist anymore");
+        }
+      }
+
+      // assert.isRejected(
+      //   cacheProgram.account.writePermissionFlag.fetch(
+      //     feedAPermissionFlagAccount
+      //   ),
+      //   /Account does not exist/
+      // );
     });
   });
 

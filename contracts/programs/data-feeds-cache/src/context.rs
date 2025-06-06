@@ -151,8 +151,6 @@ pub struct InitDecimalReports<'info> {
     // pub report: UncheckedAccount<'info>
 }
 
-// you may need to close old config accounts, init new ones
-// use realloc if possible
 #[derive(Accounts)]
 pub struct SetDecimalFeedConfigs<'info> {
     // todo: inline check if it is an admin
@@ -187,9 +185,6 @@ pub struct SetDecimalFeedConfigs<'info> {
     //     bump
     // )]
     // pub permission_flag: UncheckedAccount<'info>
-
-    // it's more of a usability question. you could stuff many of these ixs into one transaction,
-    // but you'd duplicate the signer and state variables...
 }
 
 #[derive(Accounts)]
@@ -267,6 +262,7 @@ pub struct OnReport<'info> {
     #[account(executable)]
     pub legacy_store: Option<UncheckedAccount<'info>>,
 
+    // omit if you don't want to write to the store
     // behavior if we don't include legacy store ...
     // legacy_store | legacy feeds config
     // N                N     - skips logic altogether

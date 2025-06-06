@@ -425,6 +425,7 @@ describe("keystone_storage", function () {
 
     try {
       await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+      assert.fail("Account should not exist anymore");
     } catch (err) {
       if (!err.message.includes("Account does not exist")) {
         assert.fail("Account should not exist anymore");
