@@ -1,5 +1,5 @@
 use anchor_lang::prelude::{
-    borsh::{BorshDeserialize, BorshSerialize},
+    borsh::{BorshSerialize},
     *,
 };
 

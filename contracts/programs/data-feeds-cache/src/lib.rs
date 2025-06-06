@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::ZeroCopy;
 use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
 use std::io::Cursor;
 use std::{io::Write, ops::DerefMut};
@@ -12,31 +11,22 @@ mod error;
 mod event;
 mod state;
 
-use common::{MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
+use common::{MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID, ANCHOR_DISCRIMINATOR};
 use context::*;
 use error::{AuthError, DataCacheError};
-use event::DecimalFeedConfigSet;
+use event::{DecimalFeedConfigSet, LegacyFeedsReported};
 use state::{
     AdminList, CacheTransmission, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
-    ReceivedDecimalReport, WorkflowMetadata,
+    ReceivedDecimalReport, WorkflowMetadata, WritePermissionFlag, DecimalReport,
 };
 
 use anchor_lang::solana_program::hash;
 #[program]
 pub mod data_feeds_cache {
 
-    use std::cmp::Ordering;
-
     use anchor_lang::{
         solana_program::{instruction::Instruction, program::invoke_signed, system_instruction},
         Discriminator,
-    };
-    use state::{ReceivedDecimalReport, WorkflowMetadata};
-
-    use crate::{
-        common::ANCHOR_DISCRIMINATOR,
-        event::LegacyFeedsReported,
-        state::{CacheTransmission, DecimalReport, LegacyFeedEntry, WritePermissionFlag},
     };
 
     use super::*;
@@ -52,7 +42,7 @@ pub mod data_feeds_cache {
                 &prev_admin <= admin,
                 DataCacheError::AddressesMustStrictlyIncrease
             );
-            state.feed_admins.push(admin.clone());
+            state.feed_admins.push(*admin);
             prev_admin = *admin;
         }
 
@@ -232,7 +222,7 @@ pub mod data_feeds_cache {
         );
 
         require!(
-            workflow_metadatas.len() != 0 && descriptions.len() != 0,
+            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
             DataCacheError::EmptyConfig
         );
 
@@ -340,7 +330,7 @@ pub mod data_feeds_cache {
                     DataCacheError::UnclosedPermissionFlags
                 );
 
-                for (i, metadata) in feed_config.workflow_metadata.iter().enumerate() {
+                for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
 
                     let derived_report_hash = create_report_hash(
@@ -446,27 +436,20 @@ pub mod data_feeds_cache {
                     stale_permission_flag_accounts.remove(index);
                 }
 
-                feed_config.workflow_metadata.push(metadata.clone());
-                // new_workflow_metadata.push(metadata.clone());
+                feed_config.workflow_metadata.push(*metadata);
             }
 
-            feed_config.description = descriptions[i].clone();
+            feed_config.description = descriptions[i];
 
             feed_config.stale_permission_accounts.clear();
             stale_permission_flag_accounts.iter().for_each(|f| {
-                feed_config.stale_permission_accounts.push(f.clone());
+                feed_config.stale_permission_accounts.push(*f);
             });
 
-            // can also move to inside the for loop
-            // feed_config.workflow_metadata.clear();
-            // workflow_metadatas.iter().for_each(|w| {
-            //     feed_config.workflow_metadata.push(w.clone());
-            // });
-
             emit!(DecimalFeedConfigSet {
-                data_id: curr_data_id.clone(),
+                data_id: *curr_data_id,
                 decimals: get_decimals(curr_data_id),
-                description: descriptions[i].clone(),
+                description: descriptions[i],
                 workflow_metadatas: workflow_metadatas.clone(),
                 stale_permission_flags: stale_permission_flag_accounts
             });
@@ -527,10 +510,9 @@ pub mod data_feeds_cache {
 
             let mut curr_feed_config = loader.load_mut()?;
             // close stale accounts
-            for (i, stale_account_key) in curr_feed_config
+            for stale_account_key in curr_feed_config
                 .stale_permission_accounts
                 .iter()
-                .enumerate()
             {
                 let curr_stale_account_info = stale_permission_flag_account_infos[flag_idx].clone();
                 require!(
@@ -673,8 +655,8 @@ pub mod data_feeds_cache {
             let mut dst = report_account_infos[i].try_borrow_mut_data()?;
 
             let updated_report = DecimalReport {
-                answer: received_decimal_report.answer.clone(),
-                timestamp: received_decimal_report.timestamp.clone(),
+                answer: received_decimal_report.answer,
+                timestamp: received_decimal_report.timestamp,
             };
 
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
@@ -745,7 +727,7 @@ pub mod data_feeds_cache {
             }
 
             // write to store program
-            if write_enabled_entries.len() > 0 {
+            if !write_enabled_entries.is_empty() {
                 let metas: Vec<AccountMeta> = std::iter::once(AccountMeta {
                     pubkey: legacy_writer.key(),
                     is_signer: true,
@@ -800,8 +782,8 @@ pub mod data_feeds_cache {
             }
         }
 
-        // emit legacy event only if there w
-        if candidate_legacy_writes.len() > 0 {
+        // emit legacy event only if there were candidates identified by the feed config
+        if !candidate_legacy_writes.is_empty() {
             let (feeds_skipped, feeds_written) = if write_occured {
                 (write_disabled_entries, write_enabled_entries)
             } else {
@@ -870,7 +852,7 @@ fn create_report_hash(data_id: &[u8], sender: &Pubkey, owner: &[u8], name: &[u8]
 fn get_decimals(data_id: &[u8; 16]) -> u8 {
     let report_type = data_id[7];
 
-    if report_type >= 0x20 && report_type <= 0x60 {
+    if (0x20..=0x60).contains(&report_type) {
         report_type - 32
     } else {
         0
@@ -939,7 +921,7 @@ fn set_legacy_feeds_config(
         );
 
         legacy_feeds_config.id_to_feed.push(LegacyFeedEntry {
-            data_id: data_id.clone(),
+            data_id: *data_id,
             legacy_feed: legacy_feeds[i].key(),
             write_disabled: write_disabled[i],
         });

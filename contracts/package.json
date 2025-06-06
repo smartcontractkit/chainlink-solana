@@ -21,7 +21,7 @@
   },
   "scripts": {
     "format": "pnpm prettier --write .",
-    "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/**.spec.ts"
+    "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/**.ts"
   },
   "devDependencies": {
     "@types/chai-as-promised": "^8.0.2",
