@@ -65,6 +65,11 @@ func Test_BufferPayload(t *testing.T) {
 		return sig[:]
 	}, nil).Maybe()
 
+	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+	txmgr := txm.NewTxm("localnet", loader, nil, cfg, mkey, lgr)
+	err = txmgr.Start(t.Context())
+	require.NoError(t, err)
+
 	programID := solana.MustPublicKeyFromBase58(testBufferContractPubKey)
 	initializeTestContract(t, rpcClient, sender, programID)
 
@@ -104,14 +109,10 @@ func Test_BufferPayload(t *testing.T) {
 	}
 
 	t.Run("happy path, writes payload to buffer, uses buffer for main transaction", func(t *testing.T) {
-		txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
-		err = txm.Start(t.Context())
-		require.NoError(t, err)
-
 		methodConfig := cwConfig.Programs[contractName].Methods[methodName]
-		methodConfig.InputModifications = append(methodConfig.InputModifications, &commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}})
+		methodConfig.InputModifications = []commoncodec.ModifierConfig{&commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}}}
 		cwConfig.Programs[contractName].Methods[methodName] = methodConfig
-		cw := initializeAndRunCW(t, lggr, multiClient, txm, cwConfig)
+		cw := initializeAndRunCW(t, lggr, multiClient, txmgr, cwConfig)
 		args := ccipsolana.SVMExecCallArgs{
 			Report: make([]byte, 2000), // Requires 3 buffer transactions
 		}
@@ -123,14 +124,10 @@ func Test_BufferPayload(t *testing.T) {
 	})
 
 	t.Run("sends main transaction without buffer when report is within size limit", func(t *testing.T) {
-		txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
-		err = txm.Start(t.Context())
-		require.NoError(t, err)
-
 		methodConfig := cwConfig.Programs[contractName].Methods[methodName]
-		methodConfig.InputModifications = append(methodConfig.InputModifications, &commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}})
+		methodConfig.InputModifications = []commoncodec.ModifierConfig{&commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}}}
 		cwConfig.Programs[contractName].Methods[methodName] = methodConfig
-		cw := initializeAndRunCW(t, lggr, multiClient, txm, cwConfig)
+		cw := initializeAndRunCW(t, lggr, multiClient, txmgr, cwConfig)
 
 		args := ccipsolana.SVMExecCallArgs{
 			Report: make([]byte, 200), // Does not require buffer
@@ -143,16 +140,12 @@ func Test_BufferPayload(t *testing.T) {
 	})
 
 	t.Run("writes payload to buffer, main transaction fails, buffer is closed in follow up transaction", func(t *testing.T) {
-		lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
-		txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lgr)
-		err = txm.Start(t.Context())
-		require.NoError(t, err)
-
 		methodConfig := cwConfig.Programs[contractName].Methods[methodName]
-		methodConfig.InputModifications = append(methodConfig.InputModifications, &commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": true}})
+		// Configure the main transaction to fail
+		methodConfig.InputModifications = []commoncodec.ModifierConfig{&commoncodec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": true}}}
 		cwConfig.Programs[contractName].Methods[methodName] = methodConfig
 
-		cw := initializeAndRunCW(t, lggr, multiClient, txm, cwConfig)
+		cw := initializeAndRunCW(t, lggr, multiClient, txmgr, cwConfig)
 
 		args := ccipsolana.SVMExecCallArgs{
 			Report: make([]byte, 2000), // Requires 3 buffer transactions
@@ -164,7 +157,8 @@ func Test_BufferPayload(t *testing.T) {
 		waitForStatus(t, cw, txID, false)
 
 		require.Eventually(t, func() bool {
-			depTxQueuedLogs := logs.FilterMessageSnippet("enqueued tx after dependencies completed") // Check logs for dependent transactions getting queued
+			// Check logs for dependent transactions getting queued
+			depTxQueuedLogs := logs.FilterMessageSnippet("enqueued tx after dependencies completed")
 			// Check filtered logs to see if the close buffer transcation specifically was queued
 			for _, log := range depTxQueuedLogs.All() {
 				for key, field := range log.ContextMap() {
