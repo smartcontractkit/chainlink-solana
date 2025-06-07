@@ -567,8 +567,14 @@ func CalculateTxSize(tx *solana.Transaction) (int, error) {
 	copyTx := *tx
 
 	// Set instructions and fields that are added further downstream with arbitrary values to get an accurate tx size
-	fees.SetComputeUnitPrice(&copyTx, 0)
-	fees.SetComputeUnitLimit(&copyTx, 0)
+	err := fees.SetComputeUnitPrice(&copyTx, 0)
+	if err != nil {
+		return 0, fmt.Errorf("failed to set compute unit price instruction: %w", err)
+	}
+	err = fees.SetComputeUnitLimit(&copyTx, 0)
+	if err != nil {
+		return 0, fmt.Errorf("failed to set compute unit limit instruction: %w", err)
+	}
 	copyTx.Signatures = append(copyTx.Signatures, solana.Signature{})
 
 	// Get the transaction bytes with all releavnt fields added
