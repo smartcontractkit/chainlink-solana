@@ -22,7 +22,7 @@ func Test_CCIPExecutionReportBuffer(t *testing.T) {
 		bufferIxs, closeBufferIx, newAccounts, newArgs, err := chainwriter.CCIPExecutionReportBuffer(t.Context(), args, accounts, prorgamID, feePayer)
 		require.NoError(t, err)
 
-		require.Len(t, bufferIxs, 3)
+		require.Len(t, bufferIxs, 2)
 		bufferIx := bufferIxs[0]
 		require.Len(t, bufferIx.Accounts(), 4)
 		bufferIxPDA := bufferIx.Accounts()[0] // First account is the buffer PDA

@@ -177,7 +177,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 
 	mainTxSize, err := CalculateTxSize(mainTx)
 	if err != nil {
-		return fmt.Errorf("failed to calculate the size of the new main tx: %w", err) 
+		return fmt.Errorf("failed to calculate the size of the new main tx: %w", err)
 	}
 
 	// Sanity check in case the transaction is still oversized

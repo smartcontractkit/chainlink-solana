@@ -703,8 +703,8 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			"buffer_payload": {
 				Methods: map[string]chainwriter.MethodConfig{
 					"execute": {
-						FromAddress:       admin.String(),
-						ChainSpecificName: "execute",
+						FromAddress:         admin.String(),
+						ChainSpecificName:   "execute",
 						BufferPayloadMethod: "CCIPExecutionReportBuffer",
 						InputModifications: codec.ModifiersConfig{
 							&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
@@ -817,13 +817,13 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 		type BufferArgs struct {
 			Report []byte
-			Fail bool
+			Fail   bool
 		}
 
 		t.Run("submits as single transaction if tx small enough", func(t *testing.T) {
 			args := BufferArgs{
 				Report: make([]byte, 963),
-				Fail: false,
+				Fail:   false,
 			}
 
 			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
@@ -848,7 +848,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		t.Run("submits buffer transactions, main transaction, and conditional close buffer transaction if tx too large", func(t *testing.T) {
 			args := BufferArgs{
 				Report: make([]byte, 964),
-				Fail: false,
+				Fail:   false,
 			}
 
 			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
