@@ -2,7 +2,6 @@ package chainwriter
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -149,6 +148,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 
 	bufferTxIDs := make([]string, 0, len(bufferIxs))
 
+	// Create close buffer transaction
 	closeBufferTx, err := solana.NewTransaction(
 		[]solana.Instruction{closeBufferIx},
 		blockhash.Value.Blockhash,
@@ -156,6 +156,35 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	)
 	if err != nil {
 		return fmt.Errorf("failed to build close buffer transaction: %w", err)
+	}
+
+	// Encode new main tx payload with transformed args
+	transformedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
+	if err != nil {
+		return fmt.Errorf("error encoding transformed payload for transaction using buffer: %w", err)
+	}
+
+	// Recreate transaction with transformed payload and new account list which includes the buffer PDA
+	mainTx, err := solana.NewTransaction(
+		[]solana.Instruction{solana.NewInstruction(programID, accounts, transformedPayload)},
+		blockhash.Value.Blockhash,
+		solana.TransactionPayer(feePayer),
+		solana.TransactionAddressTables(lookupTableMap),
+	)
+	if err != nil {
+		return fmt.Errorf("error reconstructing transaction with empty payload: %w", err)
+	}
+
+	mainTxSize, err := CalculateTxSize(mainTx)
+	if err != nil {
+		return fmt.Errorf("failed to calculate the size of the new main tx: %w", err) 
+	}
+
+	// Sanity check in case the transaction is still oversized
+	// Possible if it includes too many accounts that are not part of a lookup table
+	// Perform check before queueing any transactions to fail early
+	if mainTxSize > MaxSolanaTxSize {
+		return fmt.Errorf("main transaction still oversized after buffering. new size: %d, max size: %d", mainTxSize, MaxSolanaTxSize)
 	}
 
 	s.lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferIxs))
@@ -186,22 +215,6 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		bufferTxs = append(bufferTxs, txmutils.DependencyTx{TxID: id, DesiredStatus: types.Finalized})
 	}
 	mainOpts := append(options, txmutils.AppendDependencyTxs(bufferTxs))
-
-	transformedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
-	if err != nil {
-		return fmt.Errorf("error encoding transformed payload for transaction using buffer: %w", err)
-	}
-
-	// Recreate transaction with transformed payload and new account list which includes the buffer PDA
-	mainTx, err := solana.NewTransaction(
-		[]solana.Instruction{solana.NewInstruction(programID, accounts, transformedPayload)},
-		blockhash.Value.Blockhash,
-		solana.TransactionPayer(feePayer),
-		solana.TransactionAddressTables(lookupTableMap),
-	)
-	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error reconstructing transaction with empty payload: %w", err), debugID)
-	}
 
 	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", txID, "debugID", debugID)
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, mainTx, &txID, blockhash.Value.LastValidBlockHeight, mainOpts...); err != nil {
@@ -237,15 +250,14 @@ func extractChunks(rawReport []byte, emptyBufferIx solana.Instruction) ([][]byte
 	if err != nil {
 		return nil, fmt.Errorf("failed to build empty buffer tx: %w", err)
 	}
-	// Get the empty buffer transaction bytes to calculate the tx overhead
-	emptyTxBytes, err := emptyBufferTx.MarshalBinary()
+
+	emptyTxSize, err := CalculateTxSize(emptyBufferTx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal empty buffer tx: %w", err)
+		return nil, fmt.Errorf("failed to calculate tx size: %w", err)
 	}
 
-	// Use the empty buffer base64 encoded tx size to calculate the largest encoded chunk size that can be supported
-	// Use the decoded length of the encoded chunk size to determine the max number of bytes the payload can be
-	chunkSize := base64.StdEncoding.DecodedLen(MaxSolanaTxSize - base64.StdEncoding.EncodedLen(len(emptyTxBytes)))
+	// Use the empty buffer tx size to calculate the largest chunk size that can be supported
+	chunkSize := MaxSolanaTxSize - emptyTxSize - 1
 
 	chunkCount := len(rawReport) / chunkSize
 	if len(rawReport)%chunkSize != 0 {

@@ -366,16 +366,16 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error constructing transaction: %w", err), debugID)
 	}
 
-	// Get the transaction bytes to validate size
-	txBytes, err := tx.MarshalBinary()
+	// Calculate the transaction size to validate it fits within Solana limit
+	txSize, err := CalculateTxSize(tx)
 	if err != nil {
-		return errorWithDebugID(fmt.Errorf("error marshaling transaction: %w", err), debugID)
+		return errorWithDebugID(fmt.Errorf("failed to calculate tx size: %w", err), debugID)
 	}
 
-	if len(txBytes) > MaxSolanaTxSize {
+	if txSize > MaxSolanaTxSize {
 		// Return error if transaction too large and method to write to buffer is not provided
 		if methodConfig.BufferPayloadMethod == "" {
-			return errorWithDebugID(fmt.Errorf("transaction size %d exceeds limit %d", len(txBytes), MaxSolanaTxSize), debugID)
+			return errorWithDebugID(fmt.Errorf("transaction size %d exceeds limit %d", txSize, MaxSolanaTxSize), debugID)
 		}
 		if bufferErr := s.handleTxBuffering(ctx, methodConfig, contractName, method, transactionID, debugID, accounts, programID, feePayer, args, options, filteredLookupTableMap); bufferErr != nil {
 			return errorWithDebugID(fmt.Errorf("error handling transaction buffering: %w", bufferErr), debugID)
@@ -558,6 +558,25 @@ func getLookupTableAddresses(ctx context.Context, client client.MultiClient, tab
 		return nil, fmt.Errorf("error decoding address lookup table state: %w", err)
 	}
 	return alt.Addresses, nil
+}
+
+func CalculateTxSize(tx *solana.Transaction) (int, error) {
+	if tx == nil {
+		return 0, errors.New("tx is nulll")
+	}
+	copyTx := *tx
+
+	// Set instructions and fields that are added further downstream with arbitrary values to get an accurate tx size
+	fees.SetComputeUnitPrice(&copyTx, 0)
+	fees.SetComputeUnitLimit(&copyTx, 0)
+	copyTx.Signatures = append(copyTx.Signatures, solana.Signature{})
+
+	// Get the transaction bytes with all releavnt fields added
+	txBytes, err := copyTx.MarshalBinary()
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling transaction: %w", err)
+	}
+	return len(txBytes), nil
 }
 
 func (s *SolanaChainWriterService) Start(_ context.Context) error {
