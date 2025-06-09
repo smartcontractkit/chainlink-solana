@@ -193,6 +193,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		// Do not retry and exit early if fails
 		cancel()
 		stateTransitionErr := txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.Errored, TxFailReject)
+		txm.lggr.Errorw("tx failed initial transmit", "id", msg.id, "err", initSendErr)
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", errors.Join(initSendErr, stateTransitionErr))
 	}
 
@@ -778,15 +779,9 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 
 	// Perform compute unit limit estimation after storing transaction
 	// If error found during simulation, transaction should be in storage to mark accordingly
-	if msg.cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
-		if simErr != nil {
-			return fmt.Errorf("transaction failed simulation: %w", simErr)
-		}
-		// If estimation returns 0 compute unit limit without error, fallback to original config
-		if computeUnitLimit != 0 {
-			msg.cfg.ComputeUnitLimit = computeUnitLimit
-		}
+	msg, err = txm.setMsgComputeUnitLimit(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("transaction failed compute unit limit estimation: %w", err)
 	}
 
 	select {
@@ -804,8 +799,8 @@ func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
 	depMeta := msg.cfg.DependencyTxMeta
 	err := txm.waitForTxStatus(ctx, depMeta)
 	if err != nil {
-		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
 		// IgnoreDependencyError is used by clean up transactions that are expected to be dropped in normal scenarios
+		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
 		if depMeta.IgnoreDependencyError {
 			return
 		}
@@ -831,6 +826,12 @@ func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
 	// Update the dependent transaction's blockhash because waiting for dependency transactions reduced the existing one's validity
 	msg.tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 	msg.lastValidBlockHeight = blockhash.Value.LastValidBlockHeight
+
+	// Estimate compute unit limit if flag is enabled and set the appropriate value in msg config before queueing
+	msg, err = txm.setMsgComputeUnitLimit(ctx, msg)
+	if err != nil {
+		return
+	}
 
 	select {
 	case txm.chSend <- msg:
@@ -946,59 +947,10 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 }
 
-func deepCopyTx(tx solanaGo.Transaction) solanaGo.Transaction {
-	// Clone the signatures.
-	sigs := make([]solanaGo.Signature, len(tx.Signatures))
-	copy(sigs, tx.Signatures)
-
-	// Clone the message.
-	msg := tx.Message
-
-	// Deep-copy AccountKeys.
-	accountKeys := make([]solanaGo.PublicKey, len(msg.AccountKeys))
-	copy(accountKeys, msg.AccountKeys)
-
-	// Deep-copy Instructions.
-	instructions := make([]solanaGo.CompiledInstruction, len(msg.Instructions))
-	for i, instr := range msg.Instructions {
-		newInstr := solanaGo.CompiledInstruction{
-			ProgramIDIndex: instr.ProgramIDIndex,
-			Accounts:       make([]uint16, len(instr.Accounts)),
-			Data:           make([]byte, len(instr.Data)),
-		}
-		copy(newInstr.Accounts, instr.Accounts)
-		copy(newInstr.Data, instr.Data)
-		instructions[i] = newInstr
-	}
-
-	// Deep-copy AddressTableLookups.
-	lookups := make([]solanaGo.MessageAddressTableLookup, len(msg.AddressTableLookups))
-	for i, lookup := range msg.AddressTableLookups {
-		newLookup := solanaGo.MessageAddressTableLookup{
-			AccountKey:      lookup.AccountKey,
-			WritableIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.WritableIndexes)),
-			ReadonlyIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
-		}
-		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
-		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
-		lookups[i] = newLookup
-	}
-
-	// Reassemble the cloned message.
-	msg.AccountKeys = accountKeys
-	msg.Instructions = instructions
-	msg.AddressTableLookups = lookups
-
-	return solanaGo.Transaction{
-		Signatures: sigs,
-		Message:    msg,
-	}
-}
-
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
-	txCopy := deepCopyTx(*tx)
+	txCopy := utils.DeepCopyTx(*tx)
 
 	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
 	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
@@ -1213,6 +1165,23 @@ func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solanaGo.Signature
 	if tx.Meta != nil && len(tx.Meta.LogMessages) > 0 {
 		txm.lggr.Debugw("failed transaction logs", "logs", tx.Meta.LogMessages)
 	}
+}
+
+func (txm *Txm) setMsgComputeUnitLimit(ctx context.Context, msg pendingTx) (pendingTx, error) {
+	if !msg.cfg.EstimateComputeUnitLimit {
+		return msg, nil
+	}
+	// Estimate compute unit limit and return new msg with the appropriate value set
+	computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, &msg.tx, msg.id)
+	if simErr != nil {
+		txm.lggr.Errorw("failed to estimate compute unit limit for transaction", "id", msg.id, "err", simErr)
+		return pendingTx{}, fmt.Errorf("failed to estimate compute unit limit for transaction with ID %s: %w", msg.id, simErr)
+	}
+	// If estimation returns 0 compute unit limit without error, fallback to original config
+	if computeUnitLimit != 0 {
+		msg.cfg.ComputeUnitLimit = computeUnitLimit
+	}
+	return msg, nil
 }
 
 // Close close service

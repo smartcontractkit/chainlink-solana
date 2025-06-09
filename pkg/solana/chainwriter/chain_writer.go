@@ -295,7 +295,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error getting lookup tables: %w", err), debugID)
 	}
 
-	s.lggr.Debugw("Resolving account addresses", "contract", contractName, "method", method)
+	s.lggr.Debugw("Resolving account addresses", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 	// Resolve account metas
 	accounts, err := GetAddresses(ctx, args, methodConfig.Accounts, derivedTableMap, s.client)
 	if err != nil {
@@ -309,7 +309,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 
 	options := []txmutils.SetTxConfig{}
 	if len(methodConfig.ATAs) > 0 {
-		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method)
+		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
 		if ataErr != nil {
 			return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
@@ -328,14 +328,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		if tfErr != nil {
 			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
 		}
-		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method)
+		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverhead, options)
 		if err != nil {
 			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
 	}
 
-	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method)
+	s.lggr.Debugw("Filtering lookup table addresses", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 	// Filter the lookup table addresses based on which accounts are actually used
 	filteredLookupTableMap := s.FilterLookupTableAddresses(accounts, derivedTableMap, staticTableMap)
 
@@ -367,12 +367,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	// Calculate the transaction size to validate it fits within Solana limit
+	// Includes the compute unit price and limit instructions in size to allow room for those to be added downstream in the TXM
 	txSize, err := CalculateTxSize(tx)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("failed to calculate tx size: %w", err), debugID)
 	}
 
 	if txSize > MaxSolanaTxSize {
+		s.lggr.Debugw("Transaction size exceeds the Solana max", "size", txSize, "max", MaxSolanaTxSize, "tx", transactionID, "debugID", debugID)
 		// Return error if transaction too large and method to write to buffer is not provided
 		if methodConfig.BufferPayloadMethod == "" {
 			return errorWithDebugID(fmt.Errorf("transaction size %d exceeds limit %d", txSize, MaxSolanaTxSize), debugID)
@@ -564,7 +566,7 @@ func CalculateTxSize(tx *solana.Transaction) (int, error) {
 	if tx == nil {
 		return 0, errors.New("tx is nulll")
 	}
-	copyTx := *tx
+	copyTx := utils.DeepCopyTx(*tx)
 
 	// Set instructions and fields that are added further downstream with arbitrary values to get an accurate tx size
 	err := fees.SetComputeUnitPrice(&copyTx, 0)
