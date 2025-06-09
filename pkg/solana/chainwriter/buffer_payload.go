@@ -94,7 +94,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 		IsSigner:   false,
 	})
 
-	closeBufferIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID, bufferPDA, feePayer, solana.SystemProgramID).ValidateAndBuild()
+	closeBufferIx, err := ccip_offramp.NewCloseExecutionReportBufferInstruction(bufferID, bufferPDA, offrampConfigPDA, feePayer, solana.SystemProgramID).ValidateAndBuild()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to build close execution report buffer instruction: %w", err)
 	}

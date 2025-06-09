@@ -16,16 +16,18 @@ type CloseExecutionReportBuffer struct {
 
 	// [0] = [WRITE] buffer
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] config
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCloseExecutionReportBufferInstructionBuilder creates a new `CloseExecutionReportBuffer` instruction builder.
 func NewCloseExecutionReportBufferInstructionBuilder() *CloseExecutionReportBuffer {
 	nd := &CloseExecutionReportBuffer{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -47,26 +49,37 @@ func (inst *CloseExecutionReportBuffer) GetBufferAccount() *ag_solanago.AccountM
 	return inst.AccountMetaSlice[0]
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *CloseExecutionReportBuffer) SetConfigAccount(config ag_solanago.PublicKey) *CloseExecutionReportBuffer {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *CloseExecutionReportBuffer) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *CloseExecutionReportBuffer) SetAuthorityAccount(authority ag_solanago.PublicKey) *CloseExecutionReportBuffer {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *CloseExecutionReportBuffer) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *CloseExecutionReportBuffer) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *CloseExecutionReportBuffer {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *CloseExecutionReportBuffer) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst CloseExecutionReportBuffer) Build() *Instruction {
@@ -100,9 +113,12 @@ func (inst *CloseExecutionReportBuffer) Validate() error {
 			return errors.New("accounts.Buffer is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -123,10 +139,11 @@ func (inst *CloseExecutionReportBuffer) EncodeToTree(parent ag_treeout.Branches)
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("       buffer", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -155,11 +172,13 @@ func NewCloseExecutionReportBufferInstruction(
 	bufferId []byte,
 	// Accounts:
 	buffer ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *CloseExecutionReportBuffer {
 	return NewCloseExecutionReportBufferInstructionBuilder().
 		SetBufferId(bufferId).
 		SetBufferAccount(buffer).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
 }

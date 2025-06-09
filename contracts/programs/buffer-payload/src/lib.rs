@@ -125,6 +125,12 @@ pub struct CloseBufferContext<'info> {
     )]
     pub buffer: Account<'info, Buffer>,
 
+    #[account(
+        seeds = [CONFIG],
+        bump,
+    )]
+    pub config: Account<'info, Config>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
