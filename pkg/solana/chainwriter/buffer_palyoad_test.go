@@ -28,7 +28,7 @@ func Test_CCIPExecutionReportBuffer(t *testing.T) {
 		bufferIxPDA := bufferIx.Accounts()[0] // First account is the buffer PDA
 
 		require.NotNil(t, closeBufferIx)
-		require.Len(t, closeBufferIx.Accounts(), 3)
+		require.Len(t, closeBufferIx.Accounts(), 4)
 		closeBufferIxPDA := closeBufferIx.Accounts()[0] // First account is the buffer PDA
 		require.Equal(t, bufferIxPDA, closeBufferIxPDA)
 
