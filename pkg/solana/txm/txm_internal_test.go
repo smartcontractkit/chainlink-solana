@@ -1213,7 +1213,7 @@ func TestTxm_Enqueue(t *testing.T) {
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
-	txCopy := deepCopyTx(tx)
+	txCopy := utils.DeepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)
