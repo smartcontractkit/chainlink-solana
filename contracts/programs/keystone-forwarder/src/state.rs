@@ -1,13 +1,13 @@
-use anchor_lang::prelude::*;
 use crate::common::MAX_ACCTS;
+use anchor_lang::prelude::*;
 use arrayvec::arrayvec;
 
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct SignerAddresses {
-    pub xs: [[u8; 20]; MAX_ACCTS],  // Fixed array of 64 addresses (20 bytes each)
-    pub len: u8,                    // Length fits in u8 since MAX_ACCTS is 64
-    pub _padding: [u8; 7],          // Padding for proper alignment
+    pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 64 addresses (20 bytes each)
+    pub len: u8,                   // Length fits in u8 since MAX_ACCTS is 64
+    pub _padding: [u8; 7],         // Padding for proper alignment
 }
 
 impl Default for SignerAddresses {
@@ -27,10 +27,10 @@ arrayvec!(SignerAddresses, [u8; 20], u8);
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct OraclesConfig {
-    pub config_id: u64,                              // 4 bytes
+    pub config_id: u64, // 4 bytes
     pub f: u8,
-    pub _padding: [u8; 7],                           // 7 bytes padding for alignment
-    pub signer_addresses: SignerAddresses,    // 64*20 + 1 + 7 = 1288 bytes
+    pub _padding: [u8; 7],                 // 7 bytes padding for alignment
+    pub signer_addresses: SignerAddresses, // 64*20 + 1 + 7 = 1288 bytes
 }
 
 impl OraclesConfig {

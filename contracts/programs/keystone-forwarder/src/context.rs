@@ -67,7 +67,6 @@ pub struct UpdateOraclesConfig<'info> {
         seeds = [b"config", state.key().as_ref(), &get_config_id(don_id, config_version).to_be_bytes()],
         bump
     )]
-
     pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
