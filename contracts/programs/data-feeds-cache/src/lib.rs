@@ -9,7 +9,7 @@ mod common;
 mod context;
 mod error;
 mod event;
-mod state;
+pub mod state;
 
 use common::{ANCHOR_DISCRIMINATOR, MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
 use context::*;
@@ -792,43 +792,76 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    // pub fn on_report(ctx: Context<TestOption>) -> Result<()> {
-    //     match &ctx.accounts.legacy_store {
-    //         Some(x) => {
-    //             let y = x.key();
-    //             // panic!("its some!, {:?}", x.key());
-    //             // panic!("its some! {:}", y);
-    //         },
-    //         None => {
-    //             panic!("its none!")
-    //         },
-    //     }
+    pub fn query_feed_metadata(
+        ctx: Context<QueryFeedMetadata>,
+        _data_id: [u8; 16],
+        start_index: u8,
+        max_count: u8,
+    ) -> Result<Vec<WorkflowMetadata>> {
+        let feed_config = ctx.accounts.feed_config.load()?;
 
-    //     // match ctx.accounts.cache_state {
-    //     //     Some(_) => {
-    //     //         panic!("its some");
-    //     //     },
-    //     //     None => {
-    //     //         panic!("its none");
-    //     //     }
+        require!(
+            !feed_config.workflow_metadata.is_empty(),
+            DataCacheError::FeedNotConfigured
+        );
 
-    //     // };
+        let len = feed_config.workflow_metadata.len();
 
-    //     // panic!("len {:?} and key {:?} ", ctx.remaining_accounts.len(), ctx.remaining_accounts[0].key());
+        let start_index: usize = start_index.into();
+        let max_count: usize = max_count.into();
 
-    //     Ok(())
-    // }
+        if start_index >= len {
+            return Ok(Vec::new());
+        }
 
-    // pub fn set_decimal_feed_configs(ctx: Context<SetDecimalFeedConfigs>, data_ids: Vec<[u8; 2]>, descriptions: Vec<String>, workflow_metadatas: Vec<WorkflowMetadata>) -> Result<()> {
-    //     Ok(())
-    // }
+        // max count 0 means take start_index and everything after it
 
-    // // on-chain sdk helper reads from multiple data accounts
-    // // off-chain would read the individual data accounts associated with each one
-    // // are these even a priority for BNY though?
-    // pub fn get_feed_metadata(ctx: Context<GetFeedMetadata>, data_ids: Vec<[u8; 2]>, start_index: usize, max_count: usize) -> Result<()> {
-    //     Ok(())
-    // }
+        let mut end_index = start_index + max_count;
+        end_index = if end_index > len || max_count == 0 {
+            len
+        } else {
+            end_index
+        };
+
+        Ok(feed_config.workflow_metadata[start_index..end_index]
+            .iter()
+            .cloned()
+            .collect())
+    }
+
+    pub fn query_values<'info>(
+        ctx: Context<'_, '_, 'info, 'info, QueryValues<'info>>,
+        data_ids: Vec<[u8; 16]>,
+    ) -> Result<Vec<DecimalReport>> {
+        let mut reports = Vec::new();
+
+        for (i, data_id) in data_ids.iter().enumerate() {
+            let (decimal_report, _) = Pubkey::find_program_address(
+                &[
+                    b"decimal_report",
+                    ctx.accounts.cache_state.key().as_ref(),
+                    data_id,
+                ],
+                &crate::ID,
+            );
+
+            let report_account_info = &ctx.remaining_accounts[i];
+
+            require!(
+                &decimal_report == report_account_info.key,
+                DataCacheError::AccountMismatch
+            );
+
+            let r = Account::<DecimalReport>::try_from(report_account_info)?;
+
+            reports.push(DecimalReport {
+                timestamp: r.timestamp,
+                answer: r.answer,
+            });
+        }
+
+        Ok(reports)
+    }
 }
 
 fn verify_feed_admin(admin: &Signer, admin_list: &AdminList) -> Result<()> {

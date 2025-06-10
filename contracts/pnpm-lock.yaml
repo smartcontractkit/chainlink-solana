@@ -63,6 +63,9 @@ importers:
         specifier: ^4.5.4
         version: 4.9.5
     devDependencies:
+      '@coral-xyz/borsh':
+        specifier: ^0.29.0
+        version: 0.29.0(@solana/web3.js@1.92.3(bufferutil@4.0.8)(utf-8-validate@5.0.10))
       '@types/chai-as-promised':
         specifier: ^8.0.2
         version: 8.0.2
@@ -970,6 +973,12 @@ snapshots:
       - bufferutil
       - encoding
       - utf-8-validate
+
+  '@coral-xyz/borsh@0.29.0(@solana/web3.js@1.92.3(bufferutil@4.0.8)(utf-8-validate@5.0.10))':
+    dependencies:
+      '@solana/web3.js': 1.92.3(bufferutil@4.0.8)(utf-8-validate@5.0.10)
+      bn.js: 5.2.1
+      buffer-layout: 1.2.2
 
   '@coral-xyz/borsh@0.29.0(@solana/web3.js@1.95.3(bufferutil@4.0.8)(utf-8-validate@5.0.10))':
     dependencies:

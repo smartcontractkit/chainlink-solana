@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@types/chai-as-promised": "^8.0.2",
-    "chai-as-promised": "^8.0.1"
+    "chai-as-promised": "^8.0.1",
+    "@coral-xyz/borsh": "^0.29.0"
   }
 }

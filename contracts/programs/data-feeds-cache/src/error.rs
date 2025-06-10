@@ -63,4 +63,7 @@ pub enum DataCacheError {
 
     #[msg("missing legacy feed account")]
     MissingLegacyFeedAccount,
+
+    #[msg("feed not configured")]
+    FeedNotConfigured,
 }

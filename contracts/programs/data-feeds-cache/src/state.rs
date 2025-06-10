@@ -14,7 +14,6 @@ pub struct AdminList {
 
 arrayvec!(AdminList, Pubkey, u64);
 
-// 32 + 32 + 2056 = 2120
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct CacheState {

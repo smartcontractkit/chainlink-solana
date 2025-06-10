@@ -1,5 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program, getProvider, BN } from "@coral-xyz/anchor";
+import { struct, u32, u128, vec, u8, publicKey, array } from "@coral-xyz/borsh";
+import { Program, getProvider, BN, BorshCoder } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
@@ -491,6 +492,116 @@ describe("data feeds cache", function () {
         .rpc();
     });
 
+    it("Get Feed Metadata -- Simple", async () => {
+      // set feed A's config
+
+      const dummyAllowedSender = Keypair.generate();
+
+      // const workflowMetadata = randomWorkflowMetadata(reportSender.provider.publicKey);
+
+      const workflowMetadata = randomWorkflowMetadata(
+        dummyAllowedSender.publicKey
+      );
+
+      const reportHash = getReportHash(
+        feedA.dataId,
+        workflowMetadata.allowedSender.toBuffer(),
+        workflowMetadata.allowedWorkflowOwner,
+        workflowMetadata.allowedWorkflowName
+      );
+
+      // find the PDAs
+
+      const feedAConfigAccount = feedConfigPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+      const feedAPermissionFlagAccount = permissionFlagPDA(
+        cacheStateAccount.publicKey,
+        reportHash
+      );
+
+      await cacheProgram.methods
+        .setDecimalFeedConfigs(
+          [feedA.dataId] as any,
+          [feedA.description] as any,
+          [workflowMetadata]
+        )
+        .accounts({
+          feedAdmin: feedAdminA.provider.publicKey, // todo: do we need to use owner here isntead? (probably not)
+          state: cacheStateAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .remainingAccounts([
+          {
+            pubkey: feedAConfigAccount,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: feedAPermissionFlagAccount,
+            isSigner: false,
+            isWritable: true,
+          },
+        ])
+        .signers([feedAdminA.keypair]) // todo:
+        .rpc();
+
+      const simulateResponse = await cacheProgram.methods
+        .queryFeedMetadata(feedA.dataId as any, new BN(0), new BN(0))
+        .accounts({
+          cacheState: cacheStateAccount.publicKey,
+          feedConfig: feedAConfigAccount,
+        })
+        .signers([])
+        .simulate();
+
+      const [_ixDiscrimiantor, base64Data] = parseReturnData(
+        simulateResponse.raw
+      );
+
+      const WorkflowMetadataLayout = struct([
+        publicKey("allowed_sender"),
+        array(u8(), 20, "allowed_workflow_owner"),
+        array(u8(), 10, "allowed_workflow_name"),
+      ]);
+
+      const WorkflowMetadataVecLayout = vec(WorkflowMetadataLayout);
+
+      const decodedMetadatas = WorkflowMetadataVecLayout.decode(
+        Buffer.from(base64Data, "base64")
+      ) as Array<{
+        allowed_sender: PublicKey;
+        allowed_workflow_owner: Uint8Array;
+        allowed_workflow_name: Uint8Array;
+      }>;
+
+      assert.equal(decodedMetadatas.length, 1, "one workflow found");
+      assert.isTrue(
+        decodedMetadatas[0].allowed_sender.equals(
+          workflowMetadata.allowedSender
+        )
+      );
+      assert.isTrue(
+        Buffer.from(decodedMetadatas[0].allowed_workflow_name).equals(
+          Buffer.from(workflowMetadata.allowedWorkflowName)
+        )
+      );
+      assert.isTrue(
+        Buffer.from(decodedMetadatas[0].allowed_workflow_owner).equals(
+          Buffer.from(workflowMetadata.allowedWorkflowOwner)
+        )
+      );
+
+      // const DecimalReportLayout = struct([
+      //   u32('timestamp'),
+      //   u128('answer'),
+      // ]);
+      // const DecimalReportVecLayout = vec(DecimalReportLayout);
+
+      // const report = DecimalReportVecLayout.decode(Buffer.from(base64Data, 'base64'))
+    });
+
     it(" Set Feed Configs + Close Stale Permission Accounts", async () => {
       // set feed A's config
 
@@ -767,13 +878,6 @@ describe("data feeds cache", function () {
           assert.fail("Account should not exist anymore");
         }
       }
-
-      // assert.isRejected(
-      //   cacheProgram.account.writePermissionFlag.fetch(
-      //     feedAPermissionFlagAccount
-      //   ),
-      //   /Account does not exist/
-      // );
     });
   });
 
@@ -1043,7 +1147,7 @@ describe("data feeds cache", function () {
       await submissionEvent;
     });
 
-    it("Update feed A without legacy write", async () => {
+    it("Update feed A without legacy write + check query method", async () => {
       // first we must update the workflow metadata to work with the desired receiver
 
       // const legacyWorkflowMetadatas = newWorkflows(1, forwarder.forwarderAuthority[0])
@@ -1129,6 +1233,48 @@ describe("data feeds cache", function () {
       );
       assert.isTrue(report1.answer.eq(new BN(321)), "answers match");
       assert.isTrue(report1.timestamp == 123, "answers match");
+
+      const simulateResponse = await cacheProgram.methods
+        .queryValues([feedA.dataId] as any)
+        .accounts({
+          cacheState: cacheStateAccount.publicKey,
+        })
+        .remainingAccounts([
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: false,
+          },
+        ])
+        .signers([])
+        .simulate();
+
+      const [_ixDiscrimiantor, base64Data] = parseReturnData(
+        simulateResponse.raw
+      );
+
+      const DecimalReportLayout = struct([u32("timestamp"), u128("answer")]);
+      const DecimalReportVecLayout = vec(DecimalReportLayout);
+
+      const decodedReportValues = DecimalReportVecLayout.decode(
+        Buffer.from(base64Data, "base64")
+      ) as Array<{ timestamp: number; answer: BN }>;
+
+      assert.equal(decodedReportValues.length, 1, "one report expected");
+      assert.equal(decodedReportValues[0].timestamp, 123, "same timestamp");
+      assert.isTrue(
+        new BN(321).eq(decodedReportValues[0].answer),
+        "same answer"
+      );
     });
   });
 });
+
+const parseReturnData = (logs: readonly string[]) => {
+  const prefix = "Program return: ";
+  const returnLog = logs.find((log) => log.startsWith(prefix));
+  const log = returnLog.slice(prefix.length);
+
+  // [ixDiscrimiantor, base64Data]
+  return log.split(" ", 2);
+};

@@ -5,20 +5,8 @@ use keystone_forwarder::ID as FORWARDER_ID;
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::error::AuthError;
 use crate::state::CacheState;
+use crate::state::FeedConfig;
 use crate::state::LegacyFeedsConfig;
-
-// SetDecimalsFeedConfig
-
-// RemoveFeedConfig
-
-// bunch of query methods... maybe just one? we'll see
-
-// #[derive(Accounts)]
-// pub struct GetFeedMetadata {
-//     // feed config accounts are passed in via ctx.remaining_accounts
-//     // they are verified in the instruction
-// }
-
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
@@ -322,4 +310,36 @@ pub struct OnReport<'info> {
 }
 
 #[derive(Accounts)]
-pub struct DummyCtx {}
+pub struct QueryValues<'info> {
+    #[account()]
+    pub cache_state: AccountLoader<'info, CacheState>,
+
+    // N accounts
+    // #[account(
+    //     mut,
+    //     seeds = [
+    //         b"decimal_report",
+    //         cache_state.key().as_ref()
+    //         data_id,
+    //     ],
+    //     bump
+    // )]
+    // pub report: UncheckedAccount<'info>
+}
+
+#[derive(Accounts)]
+#[instruction(data_id: [u8; 16])]
+pub struct QueryFeedMetadata<'info> {
+    #[account()]
+    pub cache_state: AccountLoader<'info, CacheState>,
+
+    #[account(
+        seeds = [
+            b"feed_config",
+            cache_state.key().as_ref(),
+            &data_id,
+        ],
+        bump
+    )]
+    pub feed_config: AccountLoader<'info, FeedConfig>,
+}
