@@ -6,7 +6,7 @@ import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
 // import chaiAsPromised from "chai-as-promised";
-import { assert } from "chai";
+import { assert, expect } from "chai";
 import {
   ArrayVec,
   arrayVecEquals,
@@ -25,6 +25,16 @@ import {
 } from "./utils";
 
 // chai.use(chaiAsPromised);
+
+const workflowMetadataEq = (a: WorkflowMetadata, b: WorkflowMetadata) => {
+  return (
+    a.allowedSender.equals(b.allowedSender) &&
+    JSON.stringify(a.allowedWorkflowName) ===
+      JSON.stringify(b.allowedWorkflowName) &&
+    JSON.stringify(a.allowedWorkflowOwner) ===
+      JSON.stringify(b.allowedWorkflowOwner)
+  );
+};
 
 describe("data feeds cache", function () {
   this.timeout(15_000);
@@ -124,7 +134,7 @@ describe("data feeds cache", function () {
       const cacheStateAccount = Keypair.generate();
 
       await cacheProgram.methods
-        .initialize([feedAdminA.provider.publicKey]) // todo: add owner here as well
+        .initialize([feedAdminA.provider.publicKey])
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
@@ -285,7 +295,7 @@ describe("data feeds cache", function () {
           .accounts({
             owner: provider.publicKey,
             state: cacheStateAccount.publicKey,
-            legacyStore: mockLegacyStoreProgram.programId, // todo: make sure you verify the feeds passed in
+            legacyStore: mockLegacyStoreProgram.programId,
             legacyFeedsConfig: legacyFeedConfigAccount2,
           })
           .remainingAccounts([
@@ -611,7 +621,7 @@ describe("data feeds cache", function () {
           [workflowMetadata]
         )
         .accounts({
-          feedAdmin: feedAdminA.provider.publicKey, // todo: do we need to use owner here isntead? (probably not)
+          feedAdmin: feedAdminA.provider.publicKey,
           state: cacheStateAccount.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
@@ -627,7 +637,7 @@ describe("data feeds cache", function () {
             isWritable: true,
           },
         ])
-        .signers([feedAdminA.keypair]) // todo:
+        .signers([feedAdminA.keypair])
         .rpc();
 
       const simulateResponse = await cacheProgram.methods
@@ -675,17 +685,9 @@ describe("data feeds cache", function () {
           Buffer.from(workflowMetadata.allowedWorkflowOwner)
         )
       );
-
-      // const DecimalReportLayout = struct([
-      //   u32('timestamp'),
-      //   u128('answer'),
-      // ]);
-      // const DecimalReportVecLayout = vec(DecimalReportLayout);
-
-      // const report = DecimalReportVecLayout.decode(Buffer.from(base64Data, 'base64'))
     });
 
-    it(" Set Feed Configs + Close Stale Permission Accounts", async () => {
+    it("Simple Set Feed Configs", async () => {
       // set feed A's config
 
       const dummyAllowedSender = Keypair.generate();
@@ -721,7 +723,7 @@ describe("data feeds cache", function () {
           [workflowMetadata]
         )
         .accounts({
-          feedAdmin: feedAdminA.provider.publicKey, // todo: do we need to use owner here isntead? (probably not)
+          feedAdmin: feedAdminA.provider.publicKey,
           state: cacheStateAccount.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
@@ -737,7 +739,7 @@ describe("data feeds cache", function () {
             isWritable: true,
           },
         ])
-        .signers([feedAdminA.keypair]) // todo:
+        .signers([feedAdminA.keypair])
         .rpc();
 
       const actualWritePermissionFlag =
@@ -768,16 +770,6 @@ describe("data feeds cache", function () {
         })),
       };
 
-      const workflowMetadataEq = (a: WorkflowMetadata, b: WorkflowMetadata) => {
-        return (
-          a.allowedSender.equals(b.allowedSender) &&
-          JSON.stringify(a.allowedWorkflowName) ===
-            JSON.stringify(b.allowedWorkflowName) &&
-          JSON.stringify(a.allowedWorkflowOwner) ===
-            JSON.stringify(b.allowedWorkflowOwner)
-        );
-      };
-
       assert.isTrue(
         arrayVecEquals(
           expectedWorkflowMetadas,
@@ -786,35 +778,27 @@ describe("data feeds cache", function () {
         ),
         "workflow metadata equal"
       );
+    });
 
-      assert.isTrue(
-        arrayVecEquals<PublicKey>(
-          { xs: [], len: new BN(0) },
-          actualFeedConfig.stalePermissionAccounts,
-          (a, b) => a.equals(b)
-        ),
-        "stale accounts empty"
-      );
+    it("Set Feed Config + Preview Feed Config", async () => {
+      // 1. set config
+      // 2. preview changes from config update
+      // 3. enact config update
 
-      // todo: should work with 0 accounts?
-      // todo: one update and one new
+      const initialDataIds = [feedA.dataId, feedB.dataId];
 
-      // set config of feedA and feedB
+      const initialDescriptions = [randomDescription(), feedB.description]; // change assetA's description while we're at it!
 
-      const dataIds = [feedA.dataId, feedB.dataId];
-
-      const descriptions = [randomDescription(), feedB.description]; // change assetA's description while we're at it!
-
-      const workflowMetadatas = Array.from({ length: 3 }).map(() => {
+      const initialWorkflowMetadatas = Array.from({ length: 3 }).map(() => {
         return randomWorkflowMetadata(reportSender.provider.publicKey);
       });
 
-      const feedConfigAccounts = dataIds.map((id) =>
+      const initialFeedConfigAccounts = initialDataIds.map((id) =>
         feedConfigPDA(cacheStateAccount.publicKey, id)
       );
 
-      const reportHashes: Buffer[] = dataIds.flatMap((dataId) =>
-        workflowMetadatas.map((metadata) =>
+      const initialReportHashes: Buffer[] = initialDataIds.flatMap((dataId) =>
+        initialWorkflowMetadatas.map((metadata) =>
           getReportHash(
             dataId,
             metadata.allowedSender.toBuffer(),
@@ -824,14 +808,14 @@ describe("data feeds cache", function () {
         )
       );
 
-      const permissionFlagAccounts = reportHashes.map((hash) =>
+      const initialPermissionFlagAccounts = initialReportHashes.map((hash) =>
         permissionFlagPDA(cacheStateAccount.publicKey, hash)
       );
 
-      const remainingAccounts = feedConfigAccounts
+      const initialRemainingAccounts = initialFeedConfigAccounts
         .map((acc) => ({ pubkey: acc, isSigner: false, isWritable: true }))
         .concat(
-          permissionFlagAccounts.map((acc) => ({
+          initialPermissionFlagAccounts.map((acc) => ({
             pubkey: acc,
             isSigner: false,
             isWritable: true,
@@ -840,96 +824,140 @@ describe("data feeds cache", function () {
 
       await cacheProgram.methods
         .setDecimalFeedConfigs(
-          dataIds as any,
-          descriptions as any,
-          workflowMetadatas
+          initialDataIds as any,
+          initialDescriptions as any,
+          initialWorkflowMetadatas
         )
         .accounts({
-          feedAdmin: feedAdminA.provider.publicKey, // todo: do we need to use owner here isntead? (probably not)
+          feedAdmin: feedAdminA.provider.publicKey,
           state: cacheStateAccount.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .remainingAccounts(remainingAccounts)
-        .signers([feedAdminA.keypair]) // todo:
+        .remainingAccounts(initialRemainingAccounts)
+        .signers([feedAdminA.keypair])
         .rpc();
 
-      // check the state of stuff here
+      // 2. preview changes
+      const dataIds2 = [feedA.dataId, feedB.dataId];
 
-      const expectedWorkflowMetadas2: ArrayVec<WorkflowMetadata> = {
-        len: new BN(3),
-        xs: workflowMetadatas.map((x) => ({
-          allowedSender: x.allowedSender,
-          allowedWorkflowOwner: Array.from(x.allowedWorkflowOwner),
-          allowedWorkflowName: Array.from(x.allowedWorkflowName),
-        })),
-      };
+      const descriptions2 = [randomDescription(), feedB.description]; // change assetA's description while we're at it!
 
-      let expectedStaleAccounts = [
-        { xs: [feedAPermissionFlagAccount], len: new BN(1) },
-        { xs: [], len: new BN(0) },
-      ];
+      const workflowMetadatas2 = Array.from({ length: 4 }).map(() => {
+        return randomWorkflowMetadata(reportSender.provider.publicKey);
+      });
 
-      for (let i = 0; i < dataIds.length; i++) {
-        const actualFeedConfigAsset =
-          await cacheProgram.account.feedConfig.fetch(feedConfigAccounts[i]);
-        assert.isTrue(
-          Buffer.from(actualFeedConfigAsset.description).equals(
-            descriptions[i]
-          ),
-          "descriptions equal"
-        );
-        assert.isTrue(
-          arrayVecEquals(
-            expectedWorkflowMetadas2,
-            actualFeedConfigAsset.workflowMetadata,
-            workflowMetadataEq
-          ),
-          "workflow metadata equal"
-        );
-        assert.isTrue(
-          arrayVecEquals<PublicKey>(
-            expectedStaleAccounts[i],
-            actualFeedConfigAsset.stalePermissionAccounts,
-            (a, b) => a.equals(b)
-          ),
-          "stale accounts equal"
-        );
-      }
+      const feedConfigAccounts2 = dataIds2.map((id) =>
+        feedConfigPDA(cacheStateAccount.publicKey, id)
+      );
 
-      const remainingAccountsClose = feedConfigAccounts
-        .map((acc) => ({ pubkey: acc, isSigner: false, isWritable: true })) // feed config accounts of feed A and B
+      const reportHashes2: Buffer[] = dataIds2.flatMap((dataId) =>
+        workflowMetadatas2.map((metadata) =>
+          getReportHash(
+            dataId,
+            metadata.allowedSender.toBuffer(),
+            metadata.allowedWorkflowOwner,
+            metadata.allowedWorkflowName
+          )
+        )
+      );
+
+      const permissionFlagAccounts2 = reportHashes2.map((hash) =>
+        permissionFlagPDA(cacheStateAccount.publicKey, hash)
+      );
+
+      const remainingAccounts2 = feedConfigAccounts2
+        .map((acc) => ({ pubkey: acc, isSigner: false, isWritable: true }))
         .concat(
-          // permission flag to be closed
-          [feedAPermissionFlagAccount].map((acc) => ({
+          permissionFlagAccounts2.map((acc) => ({
             pubkey: acc,
             isSigner: false,
             isWritable: true,
           }))
         );
 
-      // todo: add data accounts which don't have any stale accounts
-      // close stale accounts
-      await cacheProgram.methods
-        .closeStalePermissionAccounts(dataIds as any)
+      const simulateResponse = await cacheProgram.methods
+        .previewDecimalFeedConfigs(
+          dataIds2 as any,
+          descriptions2 as any,
+          workflowMetadatas2
+        )
         .accounts({
-          feedAdmin: feedAdminA.provider.publicKey,
           state: cacheStateAccount.publicKey,
         })
-        .remainingAccounts(remainingAccountsClose)
+        .remainingAccounts(remainingAccounts2)
+        .signers([])
+        .simulate();
+
+      console.log(simulateResponse);
+
+      const [_ixDiscrimiantor, base64Data] = parseReturnData(
+        simulateResponse.raw
+      );
+
+      const AccountsVecLayout = vec(publicKey());
+
+      const deletePermissionAccounts = AccountsVecLayout.decode(
+        Buffer.from(base64Data, "base64")
+      ) as Array<PublicKey>;
+
+      assert.equal(deletePermissionAccounts.length, 6); // 6 workflow permissions are to be invalidated
+
+      const array1 = deletePermissionAccounts.map((pk) => pk.toBase58());
+      const array2 = initialPermissionFlagAccounts.map((pk) => pk.toBase58()); // old permission flag accounts
+
+      expect(array1).to.have.deep.members(array2);
+
+      // lastly, do set config
+      await cacheProgram.methods
+        .setDecimalFeedConfigs(
+          dataIds2 as any,
+          descriptions2 as any,
+          workflowMetadatas2
+        )
+        .accounts({
+          feedAdmin: feedAdminA.keypair.publicKey,
+          state: cacheStateAccount.publicKey,
+        })
+        .remainingAccounts(
+          remainingAccounts2.concat(
+            deletePermissionAccounts.map((acc) => ({
+              pubkey: acc,
+              isSigner: false,
+              isWritable: true,
+            }))
+          )
+        )
         .signers([feedAdminA.keypair])
         .rpc();
 
-      expectedStaleAccounts = [
-        { xs: [], len: new BN(0) },
-        { xs: [], len: new BN(0) },
-      ];
+      for (let x of deletePermissionAccounts) {
+        try {
+          await cacheProgram.account.writePermissionFlag.fetch(x);
+          assert.fail("Account should not exist anymore");
+        } catch (err) {
+          if (!err.message.includes("Account does not exist")) {
+            assert.fail("Account should not exist anymore");
+          }
+        }
+      }
 
-      for (let i = 0; i < dataIds.length; i++) {
+      // check the state of stuff here
+
+      const expectedWorkflowMetadas2: ArrayVec<WorkflowMetadata> = {
+        len: new BN(4),
+        xs: workflowMetadatas2.map((x) => ({
+          allowedSender: x.allowedSender,
+          allowedWorkflowOwner: Array.from(x.allowedWorkflowOwner),
+          allowedWorkflowName: Array.from(x.allowedWorkflowName),
+        })),
+      };
+
+      for (let i = 0; i < dataIds2.length; i++) {
         const actualFeedConfigAsset =
-          await cacheProgram.account.feedConfig.fetch(feedConfigAccounts[i]);
+          await cacheProgram.account.feedConfig.fetch(feedConfigAccounts2[i]);
         assert.isTrue(
           Buffer.from(actualFeedConfigAsset.description).equals(
-            descriptions[i]
+            descriptions2[i]
           ),
           "descriptions equal"
         );
@@ -941,25 +969,6 @@ describe("data feeds cache", function () {
           ),
           "workflow metadata equal"
         );
-        assert.isTrue(
-          arrayVecEquals<PublicKey>(
-            expectedStaleAccounts[i],
-            actualFeedConfigAsset.stalePermissionAccounts,
-            (a, b) => a.equals(b)
-          ),
-          "stale accounts equal"
-        );
-      }
-
-      try {
-        await cacheProgram.account.writePermissionFlag.fetch(
-          feedAPermissionFlagAccount
-        );
-        assert.fail("Account should not exist anymore");
-      } catch (err) {
-        if (!err.message.includes("Account does not exist")) {
-          assert.fail("Account should not exist anymore");
-        }
       }
     });
   });

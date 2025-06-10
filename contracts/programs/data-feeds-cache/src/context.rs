@@ -161,7 +161,6 @@ pub struct CloseDecimalReports<'info> {
 #[derive(Accounts)]
 pub struct PreviewDecimalFeedConfigs<'info> {
     pub state: AccountLoader<'info, CacheState>,
-
     // dynamic list of writePermissions. create if not created already, or overwrite as well
 
     // N accounts, N = # of data ids
@@ -212,6 +211,7 @@ pub struct SetDecimalFeedConfigs<'info> {
     //   )]
     //   pub feed_config: UncheckedAccount<'info>
 
+    // Permission accounts that authorize workflows
     // N X M accounts, N = # of data_ids, M = # of workflows
     // #[account(
     //     mut,
@@ -223,27 +223,10 @@ pub struct SetDecimalFeedConfigs<'info> {
     //     bump
     // )]
     // pub permission_flag: UncheckedAccount<'info>
-}
 
-#[derive(Accounts)]
-pub struct CloseStalePermissionAccounts<'info> {
-    #[account(mut)]
-    pub feed_admin: Signer<'info>,
-
-    pub state: AccountLoader<'info, CacheState>,
-    // N accounts, N = # of data ids
-    //   #[account(
-    //     mut,
-    //     seeds = [
-    //         b"feed_config",
-    //         state.key().as_ref()
-    //         data_id,
-    //     ],
-    //     bump
-    //   )]
-    //   pub feed_config: UncheckedAccount<'info>
-
-    // M accounts (which need to be deleted)
+    // Defunct permission accounts that need closing
+    // acquired by simulating "preview_decimal_feed_configs"
+    // L accounts
     // #[account(
     //     mut,
     //     seeds = [

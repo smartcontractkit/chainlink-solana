@@ -246,172 +246,11 @@ pub mod data_feeds_cache {
     // used for tx simulation only
     // no state changes
     pub fn preview_decimal_feed_configs<'info>(
-         ctx: Context<'_, '_, 'info, 'info, PreviewDecimalFeedConfigs<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, PreviewDecimalFeedConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
         descriptions: Vec<[u8; 32]>,
         workflow_metadatas: Vec<WorkflowMetadata>,
     ) -> Result<Vec<Pubkey>> {
-
-        require!(
-            workflow_metadatas.len() <= MAX_WORKFLOW_METADATAS,
-            DataCacheError::MaxWorkflowsExceeded
-        );
-
-        require!(
-            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
-            DataCacheError::EmptyConfig
-        );
-
-        require!(
-            data_ids.len() == descriptions.len(),
-            DataCacheError::ArrayLengthMismatch
-        );
-
-         // check the remaining accounts length has sufficient feed config and permission accounts
-        let expected_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
-
-        require!(
-            ctx.remaining_accounts.len() == expected_len,
-            DataCacheError::MissingAccounts
-        );
-
-        for metadata in workflow_metadatas.iter() {
-            require!(
-                metadata.allowed_sender != Pubkey::default(),
-                DataCacheError::InvalidAddress
-            );
-            require!(
-                !metadata.allowed_workflow_name.is_empty(),
-                DataCacheError::InvalidWorkflowName
-            );
-            require!(
-                metadata.allowed_workflow_owner != ZERO_ADDRESS,
-                DataCacheError::InvalidAddress
-            );
-        }
-
-
-        // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
-        let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
-        let permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..];
-
-        let cache_state_key = ctx.accounts.state.key();
-
-        let mut delete_permission_accounts: Vec<Pubkey> = Vec::new();
-
-        for (i, curr_data_id) in data_ids.iter().enumerate() {
-            require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
-
-            let (curr_feed_config, _) = Pubkey::find_program_address(
-                &[b"feed_config", cache_state_key.as_ref(), curr_data_id],
-                &crate::ID,
-            );
-
-            // the feed config accounts should be in order
-            require!(
-                feed_config_account_infos[i].key() == curr_feed_config,
-                DataCacheError::AccountMismatch
-            );
-
-            let feed_config_exists = feed_config_account_infos[i].data_len() != 0;
-
-            // sorted
-            let mut temp_candidates_deletion: Vec<Pubkey> = Vec::new();
-
-            if feed_config_exists {
-                let feed_config_loader = AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?;
-               
-                let feed_config = feed_config_loader.load()?;
-
-                 for metadata in feed_config.workflow_metadata.iter() {
-                    // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-
-                    let derived_report_hash = create_report_hash(
-                        curr_data_id,
-                        &metadata.allowed_sender,
-                        &metadata.allowed_workflow_owner,
-                        &metadata.allowed_workflow_name,
-                    );
-
-                    let (permission_flag, _) = Pubkey::find_program_address(
-                        &[
-                            b"permission_flag",
-                            cache_state_key.as_ref(),
-                            &derived_report_hash,
-                        ],
-                        &crate::ID,
-                    );
-
-                    sorted_insert(
-                        &mut temp_candidates_deletion,
-                        permission_flag                        
-                    )
-
-                }
-            }
-
-             for (j, metadata) in workflow_metadatas.iter().enumerate() {
-                let report_hash = create_report_hash(
-                    curr_data_id,
-                    &metadata.allowed_sender,
-                    &metadata.allowed_workflow_owner,
-                    &metadata.allowed_workflow_name,
-                );
-                
-                let (curr_permission_flag, _) = Pubkey::find_program_address(
-                    &[
-                        b"permission_flag",
-                        ctx.accounts.state.key().as_ref(),
-                        &report_hash,
-                    ],
-                    &crate::ID,
-                );
-
-                // ex: data_ids: [1, 2]
-                // workflow metdatas [5, 6, 7]
-                // ctx remaining accounts:
-                // [1-feed-config]  |- feed_config_accounts
-                // [2-feed-config]  |
-                // [flag-1-5] [flag-1-6] [flag-1-7]  |- permission_flag_accounts
-                // [flag-2-5] [flag-2-6] [flag-2-7]  |
-
-                let permission_flag_account_info =
-                    &permission_flag_account_infos[i * workflow_metadatas.len() + j];
-
-                // check that it is in the remaining accounts
-                require!(
-                    &curr_permission_flag == permission_flag_account_info.key,
-                    DataCacheError::AccountMismatch
-                );
-
-                // permission flag are removed from deletion set because it's still in use
-                if let Ok(index) = temp_candidates_deletion
-                    .binary_search(&curr_permission_flag)
-                {
-                    temp_candidates_deletion.remove(index);
-                }
-            }
-
-            // add items
-            delete_permission_accounts.extend(temp_candidates_deletion.drain(..))
-            
-        }
-
-        // order has to be exactly the same
-        Ok(delete_permission_accounts)
-    
-    }
-
-    pub fn set_decimal_feed_configs<'info>(
-        ctx: Context<'_, '_, 'info, 'info, SetDecimalFeedConfigs<'info>>,
-        data_ids: Vec<[u8; 16]>,
-        descriptions: Vec<[u8; 32]>,
-        workflow_metadatas: Vec<WorkflowMetadata>,
-    ) -> Result<()> {
-        // check feed admin here
-        let state = &mut ctx.accounts.state.load()?;
-        verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
-
         require!(
             workflow_metadatas.len() <= MAX_WORKFLOW_METADATAS,
             DataCacheError::MaxWorkflowsExceeded
@@ -455,6 +294,163 @@ pub mod data_feeds_cache {
         let permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..];
 
         let cache_state_key = ctx.accounts.state.key();
+
+        let mut delete_permission_accounts: Vec<Pubkey> = Vec::new();
+
+        for (i, curr_data_id) in data_ids.iter().enumerate() {
+            require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
+
+            let (curr_feed_config, _) = Pubkey::find_program_address(
+                &[b"feed_config", cache_state_key.as_ref(), curr_data_id],
+                &crate::ID,
+            );
+
+            // the feed config accounts should be in order
+            require!(
+                feed_config_account_infos[i].key() == curr_feed_config,
+                DataCacheError::AccountMismatch
+            );
+
+            let feed_config_exists = feed_config_account_infos[i].data_len() != 0;
+
+            // sorted
+            let mut temp_candidates_deletion: Vec<Pubkey> = Vec::new();
+
+            if feed_config_exists {
+                let feed_config_loader =
+                    AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?;
+
+                let feed_config = feed_config_loader.load()?;
+
+                for metadata in feed_config.workflow_metadata.iter() {
+                    // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
+
+                    let derived_report_hash = create_report_hash(
+                        curr_data_id,
+                        &metadata.allowed_sender,
+                        &metadata.allowed_workflow_owner,
+                        &metadata.allowed_workflow_name,
+                    );
+
+                    let (permission_flag, _) = Pubkey::find_program_address(
+                        &[
+                            b"permission_flag",
+                            cache_state_key.as_ref(),
+                            &derived_report_hash,
+                        ],
+                        &crate::ID,
+                    );
+
+                    sorted_insert(&mut temp_candidates_deletion, permission_flag)
+                }
+            }
+
+            for (j, metadata) in workflow_metadatas.iter().enumerate() {
+                let report_hash = create_report_hash(
+                    curr_data_id,
+                    &metadata.allowed_sender,
+                    &metadata.allowed_workflow_owner,
+                    &metadata.allowed_workflow_name,
+                );
+
+                let (curr_permission_flag, _) = Pubkey::find_program_address(
+                    &[
+                        b"permission_flag",
+                        ctx.accounts.state.key().as_ref(),
+                        &report_hash,
+                    ],
+                    &crate::ID,
+                );
+
+                // ex: data_ids: [1, 2]
+                // workflow metdatas [5, 6, 7]
+                // ctx remaining accounts:
+                // [1-feed-config]  |- feed_config_accounts
+                // [2-feed-config]  |
+                // [flag-1-5] [flag-1-6] [flag-1-7]  |- permission_flag_accounts
+                // [flag-2-5] [flag-2-6] [flag-2-7]  |
+
+                let permission_flag_account_info =
+                    &permission_flag_account_infos[i * workflow_metadatas.len() + j];
+
+                // check that it is in the remaining accounts
+                require!(
+                    &curr_permission_flag == permission_flag_account_info.key,
+                    DataCacheError::AccountMismatch
+                );
+
+                // permission flag are removed from deletion set because it's still in use
+                if let Ok(index) = temp_candidates_deletion.binary_search(&curr_permission_flag) {
+                    temp_candidates_deletion.remove(index);
+                }
+            }
+
+            // add items
+            delete_permission_accounts.extend(temp_candidates_deletion.drain(..))
+        }
+
+        // order has to be exactly the same
+        Ok(delete_permission_accounts)
+    }
+
+    pub fn set_decimal_feed_configs<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SetDecimalFeedConfigs<'info>>,
+        data_ids: Vec<[u8; 16]>,
+        descriptions: Vec<[u8; 32]>,
+        workflow_metadatas: Vec<WorkflowMetadata>,
+    ) -> Result<()> {
+        // check feed admin here
+        let state = &mut ctx.accounts.state.load()?;
+        verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
+
+        require!(
+            workflow_metadatas.len() <= MAX_WORKFLOW_METADATAS,
+            DataCacheError::MaxWorkflowsExceeded
+        );
+
+        require!(
+            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
+            DataCacheError::EmptyConfig
+        );
+
+        require!(
+            data_ids.len() == descriptions.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
+        // check the remaining accounts length has sufficient feed config and permission accounts
+        let minimum_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
+
+        // you have an unknown of defunct permission accounts as well, so as long as the amount is >= we're good
+        require!(
+            ctx.remaining_accounts.len() >= minimum_len,
+            DataCacheError::MissingAccounts
+        );
+
+        for metadata in workflow_metadatas.iter() {
+            require!(
+                metadata.allowed_sender != Pubkey::default(),
+                DataCacheError::InvalidAddress
+            );
+            require!(
+                !metadata.allowed_workflow_name.is_empty(),
+                DataCacheError::InvalidWorkflowName
+            );
+            require!(
+                metadata.allowed_workflow_owner != ZERO_ADDRESS,
+                DataCacheError::InvalidAddress
+            );
+        }
+
+        // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
+        let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
+        let index = data_ids.len() + data_ids.len() * workflow_metadatas.len();
+        let permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..index];
+        let delete_permission_account_infos = &ctx.remaining_accounts[index..];
+
+        let cache_state_key = ctx.accounts.state.key();
+
+        let mut delete_permission_accounts: Vec<Pubkey> = Vec::new();
 
         for (i, curr_data_id) in data_ids.iter().enumerate() {
             require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
@@ -516,16 +512,11 @@ pub mod data_feeds_cache {
             // load_mut instead of load_mut because we write the discriminator above
             let mut feed_config = feed_config_loader.load_mut()?;
 
-            let mut stale_permission_flag_accounts: Vec<Pubkey> = Vec::new();
+            // sorted
+            let mut temp_candidates_deletion: Vec<Pubkey> = Vec::new();
 
             // so these are the permission accounts you need to delete later
             if feed_config_exists {
-                // check that the stale accounts are empty
-                require!(
-                    feed_config.stale_permission_accounts.is_empty(),
-                    DataCacheError::UnclosedPermissionFlags
-                );
-
                 // go over current workflows
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
@@ -546,7 +537,7 @@ pub mod data_feeds_cache {
                         &crate::ID,
                     );
 
-                    stale_permission_flag_accounts.push(permission_flag);
+                    sorted_insert(&mut temp_candidates_deletion, permission_flag);
                 }
             }
 
@@ -626,12 +617,9 @@ pub mod data_feeds_cache {
                     &mut &permission_flag_account_info.data.borrow()[..],
                 )?;
 
-                // permission flag are removed from stale set because it's still in use
-                if let Some(index) = stale_permission_flag_accounts
-                    .iter()
-                    .position(|&a| a == curr_permission_flag)
-                {
-                    stale_permission_flag_accounts.remove(index);
+                // permission flag are removed from deletion set because it's still in use
+                if let Ok(index) = temp_candidates_deletion.binary_search(&curr_permission_flag) {
+                    temp_candidates_deletion.remove(index);
                 }
 
                 feed_config.workflow_metadata.push(*metadata);
@@ -639,89 +627,28 @@ pub mod data_feeds_cache {
 
             feed_config.description = descriptions[i];
 
-            feed_config.stale_permission_accounts.clear();
-            stale_permission_flag_accounts.iter().for_each(|f| {
-                feed_config.stale_permission_accounts.push(*f);
-            });
-
             emit!(DecimalFeedConfigSet {
                 data_id: *curr_data_id,
                 decimals: get_decimals(curr_data_id),
                 description: descriptions[i],
                 workflow_metadatas: workflow_metadatas.clone(),
-                stale_permission_flags: stale_permission_flag_accounts
             });
+
+            delete_permission_accounts.extend(temp_candidates_deletion.drain(..))
         }
-        // for each data id
 
-        // for each workflow_metadata
+        for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
+            let curr_permission_account_info = &delete_permission_account_infos[i];
 
-        // check the feed_config account.
-        // get the report hash, and add it to a set
-
-        // no need to delete the feed_config since we'll overwrite it
-
-        // for each workflow metadata
-        // fill in the feed_config account
-        // write permission enabled, and if it exists in that earlier set, remove it
-
-        // but you need to know the accounts you need to delete beforehand
-        // so this function needs to be split up
-
-        // needs to be deployment-friendly for adding or removing workflow for data id
-
-        // it gets the report_hash from the feed_config
-        // then it checks the permission of the report_hash
-        Ok(())
-    }
-
-    pub fn close_stale_permission_accounts<'info>(
-        ctx: Context<'_, '_, 'info, 'info, CloseStalePermissionAccounts<'info>>,
-        data_ids: Vec<[u8; 16]>,
-    ) -> Result<()> {
-        let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
-        let stale_permission_flag_account_infos = &ctx.remaining_accounts[data_ids.len()..];
-
-        let mut flag_idx = 0;
-        // for each of the data ids , read the account. should be in order.
-        for (i, curr_data_id) in data_ids.iter().enumerate() {
-            require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
-
-            // derive the PDA
-            // get the existing config feed , see if it's empty or not
-            let (curr_feed_config_key, _feed_config_bump) = Pubkey::find_program_address(
-                &[
-                    b"feed_config",
-                    ctx.accounts.state.key().as_ref(),
-                    curr_data_id,
-                ],
-                &crate::ID,
-            );
-
-            // the feed config accounts should be in order
             require!(
-                feed_config_account_infos[i].key() == curr_feed_config_key,
+                permission_account == curr_permission_account_info.key,
                 DataCacheError::AccountMismatch
             );
 
-            let loader = AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?;
-
-            let mut curr_feed_config = loader.load_mut()?;
-            // close stale accounts
-            for stale_account_key in curr_feed_config.stale_permission_accounts.iter() {
-                let curr_stale_account_info = stale_permission_flag_account_infos[flag_idx].clone();
-                require!(
-                    stale_account_key == curr_stale_account_info.key,
-                    DataCacheError::AccountMismatch
-                );
-                close_account(
-                    curr_stale_account_info,
-                    ctx.accounts.feed_admin.to_account_info(),
-                )?;
-                flag_idx += 1;
-            }
-
-            curr_feed_config.stale_permission_accounts.clear();
+            close_account(
+                curr_permission_account_info.clone(),
+                ctx.accounts.feed_admin.to_account_info(),
+            )?;
         }
 
         Ok(())

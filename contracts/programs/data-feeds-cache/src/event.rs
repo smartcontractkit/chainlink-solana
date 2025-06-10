@@ -8,7 +8,6 @@ pub struct DecimalFeedConfigSet {
     pub decimals: u8,
     pub description: [u8; 32],
     pub workflow_metadatas: Vec<WorkflowMetadata>,
-    pub stale_permission_flags: Vec<Pubkey>,
 }
 
 // todo: should be per

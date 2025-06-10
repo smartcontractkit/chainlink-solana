@@ -51,7 +51,6 @@ pub struct FeedConfig {
     // UTF-bytes encoded
     pub description: [u8; 32],
     pub workflow_metadata: WorkflowMetadataList,
-    pub stale_permission_accounts: AccountList,
 }
 
 #[zero_copy]
