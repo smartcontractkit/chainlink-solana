@@ -667,6 +667,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chainlink_solana_data_feeds_cache"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "borsh 0.9.3",
+ "borsh-derive 0.9.3",
+ "data-feeds-cache",
+ "solana-program",
+]
+
+[[package]]
 name = "chainlink_solana_data_streams"
 version = "1.0.0"
 dependencies = [
