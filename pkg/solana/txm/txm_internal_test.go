@@ -1955,7 +1955,7 @@ func TestTxm_DependencyTx(t *testing.T) {
 		require.NoError(t, err)
 
 		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: mainTxID, DesiredStatus: types.Finalized}}}
-		err = txm.waitForTxStatus(ctx, mainTxMeta)
+		err = txm.waitForDependencyTxs(ctx, mainTxMeta)
 		require.Error(t, err)
 	})
 }

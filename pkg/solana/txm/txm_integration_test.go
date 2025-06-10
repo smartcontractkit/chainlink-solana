@@ -291,11 +291,11 @@ func TestTxm_Integration_DependencyTx(t *testing.T) {
 		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}})}...))
 
 		depTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}}}
-		err := txmInstance.waitForTxStatus(ctx, depTxMeta)
+		err := txmInstance.waitForDependencyTxs(ctx, depTxMeta)
 		require.NoError(t, err)
 
 		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: txID, DesiredStatus: types.Finalized}}}
-		err = txmInstance.waitForTxStatus(ctx, mainTxMeta)
+		err = txmInstance.waitForDependencyTxs(ctx, mainTxMeta)
 		require.NoError(t, err)
 
 		logs := observer.FilterMessageSnippet("enqueued tx after dependencies reached desired status").Len()
@@ -315,11 +315,11 @@ func TestTxm_Integration_DependencyTx(t *testing.T) {
 		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}})}...))
 
 		depTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}}}
-		err := txmInstance.waitForTxStatus(ctx, depTxMeta)
+		err := txmInstance.waitForDependencyTxs(ctx, depTxMeta)
 		require.Error(t, err)
 
 		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: txID, DesiredStatus: types.Finalized}}}
-		err = txmInstance.waitForTxStatus(ctx, mainTxMeta)
+		err = txmInstance.waitForDependencyTxs(ctx, mainTxMeta)
 		require.Error(t, err)
 
 		logs := observer.FilterMessageSnippet("dependency transactions did not reach desired statuses").Len()
