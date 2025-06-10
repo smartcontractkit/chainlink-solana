@@ -321,10 +321,7 @@ func (txm *Txm) retryTx(ctx context.Context, cancel context.CancelFunc, msg pend
 		}
 
 		// updates the exponential backoff delay up to a maximum limit.
-		deltaT = deltaT * 2
-		if deltaT > MaxRetryTimeMs {
-			deltaT = MaxRetryTimeMs
-		}
+		deltaT = min(deltaT*2, MaxRetryTimeMs)
 		tick = time.After(time.Duration(deltaT) * time.Millisecond)
 	}
 }
@@ -773,7 +770,12 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
 	if len(msg.cfg.DependencyTxMeta.DependencyTxs) > 0 {
-		go txm.waitForDependencyTxs(msg)
+		// Transaction dependency feature will not behave as expected if TxRetentionTimeout is set to 0
+		if txm.cfg.TxRetentionTimeout() == 0 {
+			txm.lggr.Error("Invalid configuration encountered. Transaction dependency feature cannot be used with TxRetentionTimeout set to 0")
+			return fmt.Errorf("invalid configuration encountered: %w", err)
+		}
+		go txm.handleDependencyTxs(msg)
 		return nil
 	}
 
@@ -793,11 +795,11 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
-	ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
+func (txm *Txm) handleDependencyTxs(msg pendingTx) {
+	ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForDependencyTxs will merge this with TxConfirmTimeout if non-zero
 	defer cancel()
 	depMeta := msg.cfg.DependencyTxMeta
-	err := txm.waitForTxStatus(ctx, depMeta)
+	err := txm.waitForDependencyTxs(ctx, depMeta)
 	if err != nil {
 		// IgnoreDependencyError is used by clean up transactions that are expected to be dropped in normal scenarios
 		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
@@ -841,8 +843,15 @@ func (txm *Txm) waitForDependencyTxs(msg pendingTx) {
 	}
 }
 
-func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.DependencyTxMeta) error {
-	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+func (txm *Txm) waitForDependencyTxs(ctx context.Context, depMeta txmutils.DependencyTxMeta) error {
+	waitCtx := ctx
+	var cancel context.CancelFunc
+	// Merge context with TxConfirmTimeout if non-zero. Transactions are dropped if they aren't confirmed within TxConfirmTimeout.
+	// No need to continue to poll for status if that timeout is reached.
+	// If TxConfirmTimeout is set to 0, transactions are never dropped so using the parent context (TXM stop channel) is valid.
+	if txm.cfg.TxConfirmTimeout() > 0 {
+		waitCtx, cancel = context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+	}
 	defer cancel()
 
 	backoff := 1 * time.Second
@@ -859,19 +868,12 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 			txAwaitingDesiredStatus := make([]txmutils.DependencyTx, 0, len(remaining))
 			for _, meta := range remaining {
 				status, err := txm.GetTransactionStatus(waitCtx, meta.TxID)
-				// This would only happen if the transaction status has been cleared from storage
-				if err != nil || status == commontypes.Unknown {
-					// If failed to get status, considered the dependency tx as errored. Check if success was expected.
-					if !isErroredStatus(meta.DesiredStatus) {
-						txm.lggr.Debugw("dependency transaction required to be successful status but encountered errored status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
-						unexpectedStatuses++
-					}
-					// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
-					// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
-					continue
-				}
 				switch status {
-				case commontypes.Failed, commontypes.Fatal:
+				case commontypes.Failed, commontypes.Fatal, commontypes.Unknown:
+					// This would only happen if the transaction status has been cleared from storage. Unknown status is only returned for errors
+					if err != nil || status == commontypes.Unknown {
+						txm.lggr.Debugw("failed to find status of dependency transaction", "dependencyTxID", meta.TxID, "err", err.Error())
+					}
 					if !isErroredStatus(meta.DesiredStatus) {
 						txm.lggr.Debugw("dependency transaction required to be successful status but encountered errored status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
 						unexpectedStatuses++
@@ -879,7 +881,9 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
 						continue
 					}
-					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+					if status == commontypes.Failed || status == commontypes.Fatal {
+						txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+					}
 				case commontypes.Finalized, commontypes.Unconfirmed:
 					if isErroredStatus(meta.DesiredStatus) {
 						txm.lggr.Debugw("dependency transaction required to be errored status but encountered successful status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
@@ -913,10 +917,7 @@ func (txm *Txm) waitForTxStatus(ctx context.Context, depMeta txmutils.Dependency
 				return nil
 			}
 		}
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
+		backoff = min(backoff*2, maxBackoff)
 	}
 }
 

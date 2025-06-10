@@ -230,6 +230,8 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		// Ignore dependency errors because this transaction is expected to be dropped in the happy path
 		txmutils.SetDependencyTxMetaIgnoreError(true),
 	}
+
+	// The main transaction closes the buffer automatically so the close buffer transaction is only needed if it fails
 	s.lggr.Debugw("Queuing close buffer transaction, only sends if buffer or main transcation fails", "contract", contractName, "method", method, "closeBufferTxID", closeBufferUUID, "mainTxID", txID)
 	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, closeOpts...); err != nil {
 		return fmt.Errorf("error enqueuing close buffer transaction: %w", err)

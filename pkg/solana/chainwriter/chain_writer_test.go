@@ -41,6 +41,11 @@ type Arguments struct {
 	Seed2       []byte
 }
 
+type BufferArgs struct {
+	Report []byte
+	Fail   bool
+}
+
 var ccipOfframpIDL = ccipsolana.FetchCCIPOfframpIDL()
 var ccipCommonIDL = ccipsolana.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
@@ -807,18 +812,68 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		require.NoError(t, submitErr)
 	})
 
+	t.Run("invalid buffer methods", func(t *testing.T) {
+		recentBlockHash := solana.Hash{}
+
+		customConfig := chainwriter.ChainWriterConfig{
+			Programs: map[string]chainwriter.ProgramConfig{
+				"buffer_payload": {
+					Methods: map[string]chainwriter.MethodConfig{
+						"execute": {
+							FromAddress:       admin.String(),
+							ChainSpecificName: "execute",
+							InputModifications: codec.ModifiersConfig{
+								&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
+							},
+							Accounts: []chainwriter.Lookup{},
+						},
+					},
+					IDL: testBufferContractIDL,
+				},
+			},
+		}
+
+		args := BufferArgs{
+			Report: make([]byte, 2000),
+			Fail:   false,
+		}
+
+		t.Run("fails to submit transaction if size too large without buffer method set", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+			txID := uuid.NewString()
+
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, programID.String(), nil, nil)
+			require.Error(t, submitErr)
+		})
+
+		t.Run("fails to submit transaction if unknown buffer payload method configured", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+			txID := uuid.NewString()
+
+			methodConfig := customConfig.Programs["buffer_payload"].Methods["execute"]
+			methodConfig.BufferPayloadMethod = "BadBufferPayloadMethod"
+			customConfig.Programs["buffer_payload"].Methods["execute"] = methodConfig
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, programID.String(), nil, nil)
+			require.Error(t, submitErr)
+		})
+	})
+
 	t.Run("buffer enabled method", func(t *testing.T) {
+		recentBlockHash := solana.Hash{}
 		// mock txm
 		bufferTXM := txmMocks.NewTxManager(t)
 		// initialize chain writer
 		bufferCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, bufferTXM, ge, cwConfig)
 		require.NoError(t, err)
 		buffer_payload.ProgramID = bufferProgramID
-
-		type BufferArgs struct {
-			Report []byte
-			Fail   bool
-		}
 
 		t.Run("submits as single transaction if tx small enough", func(t *testing.T) {
 			args := BufferArgs{
@@ -835,7 +890,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, chainwriter.MaxSolanaTxSize, txSize)
 
-			recentBlockHash := solana.Hash{}
 			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 			txID := uuid.NewString()
 
@@ -860,7 +914,6 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, chainwriter.MaxSolanaTxSize+1, txSize)
 
-			recentBlockHash := solana.Hash{}
 			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Twice()
 			txID := uuid.NewString()
 
@@ -873,6 +926,53 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 			submitErr := bufferCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, bufferProgramID.String(), nil, nil)
 			require.NoError(t, submitErr)
+		})
+
+		t.Run("fails if transaction is still too large after buffering", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Twice()
+			txID := uuid.NewString()
+
+			customConfig := chainwriter.ChainWriterConfig{
+				Programs: map[string]chainwriter.ProgramConfig{
+					"buffer_payload": {
+						Methods: map[string]chainwriter.MethodConfig{
+							"execute": {
+								FromAddress:         admin.String(),
+								ChainSpecificName:   "execute",
+								BufferPayloadMethod: "CCIPExecutionReportBuffer",
+								InputModifications: codec.ModifiersConfig{
+									&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
+								},
+								Accounts: []chainwriter.Lookup{},
+							},
+						},
+						IDL: testBufferContractIDL,
+					},
+				},
+			}
+
+			methodConfig := customConfig.Programs["buffer_payload"].Methods["execute"]
+			for i := range 40 {
+				methodConfig.Accounts = append(methodConfig.Accounts, chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+					Name:       fmt.Sprintf("randomAccount%d", i),
+					Address:    GetRandomPubKey(t).String(),
+					IsSigner:   false,
+					IsWritable: false,
+				}})
+			}
+			customConfig.Programs["buffer_payload"].Methods["execute"] = methodConfig
+
+			args := BufferArgs{
+				Report: make([]byte, 2000),
+				Fail:   false,
+			}
+
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, bufferProgramID.String(), nil, nil)
+			require.Error(t, submitErr)
 		})
 	})
 }
