@@ -473,6 +473,94 @@ describe("data feeds cache", function () {
       );
       assert.equal(feedCState.timestamp, 0, "timestamp 0");
     });
+
+    it("Close decimal feed reports", async () => {
+        const feedAReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+      const feedBReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedB.dataId
+      );
+      const feedCReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedC.dataId
+      );
+
+      // test initialization with existing feed as well
+      await cacheProgram.methods
+        .initDecimalReports([feedA.dataId, feedB.dataId, feedC.dataId] as any)
+        .accounts({
+          feedAdmin: feedAdminA.provider.publicKey,
+          state: cacheStateAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .remainingAccounts([
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: feedBReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: feedCReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ])
+        .signers([feedAdminA.keypair])
+        .rpc();
+
+        await cacheProgram.account.decimalReport.fetch(feedAReportPDA);
+        await cacheProgram.account.decimalReport.fetch(feedBReportPDA);
+        await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
+
+        // close them
+
+        await cacheProgram.methods
+          .closeDecimalReports(
+            [feedA.dataId, feedB.dataId] as any
+          )
+          .accounts({
+            feedAdmin: feedAdminA.keypair.publicKey,
+            state: cacheStateAccount.publicKey
+          })
+          .remainingAccounts([
+            {
+              pubkey: feedAReportPDA,
+              isSigner: false,
+              isWritable: true
+            },
+            {
+              pubkey: feedBReportPDA,
+              isSigner: false,
+              isWritable: true
+            }
+          ])
+          .signers([feedAdminA.keypair])
+          .rpc()
+
+          for (const reportAccount of [feedAReportPDA, feedBReportPDA]) {
+            try {
+              await cacheProgram.account.writePermissionFlag.fetch(
+                reportAccount
+              );
+              assert.fail("Account should not exist anymore");
+            } catch (err) {
+              if (!err.message.includes("Account does not exist")) {
+                assert.fail("Account should not exist anymore");
+              }
+            }
+          }
+
+        await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
+      
+    } )
   });
 
   describe("Decimal Feed Configuration", function () {

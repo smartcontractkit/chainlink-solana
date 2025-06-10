@@ -95,6 +95,46 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    pub fn close_decimal_reports<'info>(
+        ctx: Context<CloseDecimalReports<'info>>,
+        data_ids: Vec<[u8; 16]>,
+    ) -> Result<()> {
+        let state = &mut ctx.accounts.state.load()?;
+        verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
+
+        let state_key = ctx.accounts.state.key();
+
+        let data_ids_account_infos = ctx.remaining_accounts;
+
+         require!(
+            data_ids.len() == data_ids_account_infos.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
+
+        for (i, data_id) in data_ids.iter().enumerate() {
+            let curr_report_account_info = &data_ids_account_infos[i];
+
+            let (decimal_report, _) = Pubkey::find_program_address(
+                &[b"decimal_report", state_key.as_ref(), data_id],
+                &crate::ID,
+            );
+
+            require!(
+                &decimal_report == curr_report_account_info.key,
+                DataCacheError::AccountMismatch
+            );
+
+            close_account(
+                curr_report_account_info.clone(),
+                ctx.accounts.feed_admin.to_account_info(),
+            )?;
+        }
+
+
+        Ok(())
+    }
+
     pub fn init_decimal_reports<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitDecimalReports<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -125,6 +165,7 @@ pub mod data_feeds_cache {
                 DataCacheError::AccountMismatch
             );
 
+            // if already initialized, skip it
             if curr_report_account_info.data_is_empty() {
                 let rent =
                     Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE);

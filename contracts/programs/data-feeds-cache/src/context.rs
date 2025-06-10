@@ -126,6 +126,27 @@ pub struct InitDecimalReports<'info> {
     pub state: AccountLoader<'info, CacheState>,
 
     pub system_program: Program<'info, System>,
+
+    // N data report accounts
+    // #[account(
+    //     init,
+    //     seeds = [
+    //         b"decimal_report",
+    //         cache_state.key().as_ref()
+    //         data_id,
+    //     ],
+    //     bump
+    // )]
+    // pub report: UncheckedAccount<'info>
+}
+
+#[derive(Accounts)]
+pub struct CloseDecimalReports<'info> {
+    #[account(mut)]
+    pub feed_admin: Signer<'info>,
+
+    pub state: AccountLoader<'info, CacheState>,
+
     // N data report accounts
     // #[account(
     //     init,
@@ -204,25 +225,6 @@ pub struct CloseStalePermissionAccounts<'info> {
     //     bump
     // )]
     // pub permission_flag: UncheckedAccount<'info>
-}
-
-// oh yeah, they have to be remaining accounts...
-
-#[derive(Accounts)]
-pub struct TestOption<'info> {
-    // also verified inline (via the permission account)
-    #[account(owner = FORWARDER_ID)]
-    pub forwarder_state: Account<'info, ForwarderState>,
-
-    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref()], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
-    pub forwarder_authority: Signer<'info>,
-
-    #[account(executable)]
-    pub legacy_store: Option<UncheckedAccount<'info>>,
-
-    #[account()]
-    pub cache_state: Option<AccountLoader<'info, CacheState>>,
-    // add remaining accounts
 }
 
 #[derive(Accounts)]
