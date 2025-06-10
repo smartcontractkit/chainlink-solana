@@ -1,0 +1,24 @@
+[package]
+name = "chainlink_solana_data_feeds_cache"
+description = "Chainlink client for Solana"
+version = "0.0.1"
+edition = "2018"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "chainlink_solana_data_feeds_cache"
+
+[features]
+default = []
+
+[dependencies]
+anchor-spl = "0.29.0"
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+solana-program = "1.17.25"
+borsh = "0.9.1"
+borsh-derive = "0.9.1"
+data-feeds-cache = { path = "../../programs/data-feeds-cache", features = ["cpi"] }
+
