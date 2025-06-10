@@ -126,7 +126,6 @@ pub struct InitDecimalReports<'info> {
     pub state: AccountLoader<'info, CacheState>,
 
     pub system_program: Program<'info, System>,
-
     // N data report accounts
     // #[account(
     //     init,
@@ -146,7 +145,6 @@ pub struct CloseDecimalReports<'info> {
     pub feed_admin: Signer<'info>,
 
     pub state: AccountLoader<'info, CacheState>,
-
     // N data report accounts
     // #[account(
     //     init,
@@ -315,7 +313,6 @@ pub struct OnReport<'info> {
 pub struct QueryValues<'info> {
     #[account()]
     pub cache_state: AccountLoader<'info, CacheState>,
-
     // N accounts
     // #[account(
     //     mut,

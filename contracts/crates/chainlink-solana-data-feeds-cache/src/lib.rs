@@ -8,12 +8,10 @@ pub fn query_values<'info>(
     data_ids: Vec<[u8; 16]>,
     decimal_reports: Vec<AccountInfo<'info>>,
 ) -> Result<Vec<data_feeds_cache::state::DecimalReport>> {
-    let cpi_accounts = data_feeds_cache::cpi::accounts::QueryValues {
-        cache_state
-    };
+    let cpi_accounts = data_feeds_cache::cpi::accounts::QueryValues { cache_state };
 
-    let cpi_ctx = CpiContext::new(data_cache_program, cpi_accounts)
-        .with_remaining_accounts(decimal_reports);
+    let cpi_ctx =
+        CpiContext::new(data_cache_program, cpi_accounts).with_remaining_accounts(decimal_reports);
 
     let values = data_feeds_cache::cpi::query_values(cpi_ctx, data_ids)?.get();
 
@@ -30,12 +28,13 @@ pub fn query_feed_metadata<'info>(
 ) -> Result<Vec<WorkflowMetadata>> {
     let cpi_accounts = data_feeds_cache::cpi::accounts::QueryFeedMetadata {
         cache_state,
-        feed_config
+        feed_config,
     };
 
     let cpi_ctx = CpiContext::new(data_cache_program, cpi_accounts);
 
-    let values = data_feeds_cache::cpi::query_feed_metadata(cpi_ctx, data_id, start_index, max_count)?.get();
+    let values =
+        data_feeds_cache::cpi::query_feed_metadata(cpi_ctx, data_id, start_index, max_count)?.get();
 
     Ok(values)
 }

@@ -475,7 +475,7 @@ describe("data feeds cache", function () {
     });
 
     it("Close decimal feed reports", async () => {
-        const feedAReportPDA = decimalReportPDA(
+      const feedAReportPDA = decimalReportPDA(
         cacheStateAccount.publicKey,
         feedA.dataId
       );
@@ -516,51 +516,46 @@ describe("data feeds cache", function () {
         .signers([feedAdminA.keypair])
         .rpc();
 
-        await cacheProgram.account.decimalReport.fetch(feedAReportPDA);
-        await cacheProgram.account.decimalReport.fetch(feedBReportPDA);
-        await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
+      await cacheProgram.account.decimalReport.fetch(feedAReportPDA);
+      await cacheProgram.account.decimalReport.fetch(feedBReportPDA);
+      await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
 
-        // close them
+      // close them
 
-        await cacheProgram.methods
-          .closeDecimalReports(
-            [feedA.dataId, feedB.dataId] as any
-          )
-          .accounts({
-            feedAdmin: feedAdminA.keypair.publicKey,
-            state: cacheStateAccount.publicKey
-          })
-          .remainingAccounts([
-            {
-              pubkey: feedAReportPDA,
-              isSigner: false,
-              isWritable: true
-            },
-            {
-              pubkey: feedBReportPDA,
-              isSigner: false,
-              isWritable: true
-            }
-          ])
-          .signers([feedAdminA.keypair])
-          .rpc()
+      await cacheProgram.methods
+        .closeDecimalReports([feedA.dataId, feedB.dataId] as any)
+        .accounts({
+          feedAdmin: feedAdminA.keypair.publicKey,
+          state: cacheStateAccount.publicKey,
+        })
+        .remainingAccounts([
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: feedBReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ])
+        .signers([feedAdminA.keypair])
+        .rpc();
 
-          for (const reportAccount of [feedAReportPDA, feedBReportPDA]) {
-            try {
-              await cacheProgram.account.writePermissionFlag.fetch(
-                reportAccount
-              );
-              assert.fail("Account should not exist anymore");
-            } catch (err) {
-              if (!err.message.includes("Account does not exist")) {
-                assert.fail("Account should not exist anymore");
-              }
-            }
+      for (const reportAccount of [feedAReportPDA, feedBReportPDA]) {
+        try {
+          await cacheProgram.account.writePermissionFlag.fetch(reportAccount);
+          assert.fail("Account should not exist anymore");
+        } catch (err) {
+          if (!err.message.includes("Account does not exist")) {
+            assert.fail("Account should not exist anymore");
           }
+        }
+      }
 
-        await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
-      
-    } )
+      await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
+    });
   });
 
   describe("Decimal Feed Configuration", function () {

@@ -106,11 +106,10 @@ pub mod data_feeds_cache {
 
         let data_ids_account_infos = ctx.remaining_accounts;
 
-         require!(
+        require!(
             data_ids.len() == data_ids_account_infos.len(),
             DataCacheError::ArrayLengthMismatch
         );
-
 
         for (i, data_id) in data_ids.iter().enumerate() {
             let curr_report_account_info = &data_ids_account_infos[i];
@@ -130,7 +129,6 @@ pub mod data_feeds_cache {
                 ctx.accounts.feed_admin.to_account_info(),
             )?;
         }
-
 
         Ok(())
     }
