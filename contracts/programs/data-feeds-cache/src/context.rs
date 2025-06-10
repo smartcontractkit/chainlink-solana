@@ -159,6 +159,37 @@ pub struct CloseDecimalReports<'info> {
 }
 
 #[derive(Accounts)]
+pub struct PreviewDecimalFeedConfigs<'info> {
+    pub state: AccountLoader<'info, CacheState>,
+
+    // dynamic list of writePermissions. create if not created already, or overwrite as well
+
+    // N accounts, N = # of data ids
+    //   #[account(
+    //     mut,
+    //     seeds = [
+    //         b"feed_config",
+    //         state.key().as_ref()
+    //         data_id,
+    //     ],
+    //     bump
+    //   )]
+    //   pub feed_config: UncheckedAccount<'info>
+
+    // N X M accounts, N = # of data_ids, M = # of workflows
+    // #[account(
+    //     mut,
+    //     seeds = [
+    //         b"permission_flag",
+    //         state.key().as_ref()
+    //         report_hash,
+    //     ],
+    //     bump
+    // )]
+    // pub permission_flag: UncheckedAccount<'info>
+}
+
+#[derive(Accounts)]
 pub struct SetDecimalFeedConfigs<'info> {
     // todo: inline check if it is an admin
     #[account(mut)]
