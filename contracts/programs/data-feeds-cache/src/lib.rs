@@ -33,7 +33,11 @@ pub mod data_feeds_cache {
         Discriminator,
     };
 
-    use crate::event::{DecimalReportUpdate, InvalidUpdatePermission, StaleDecimalReport};
+    use crate::event::{
+        DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdate, FeedAdminUpdated,
+        InvalidUpdatePermission, LegacyFeedsConfigInitialized, LegacyFeedsConfigUpdated,
+        OwnershipAcceptance, OwnershipTransfer, StaleDecimalReport,
+    };
 
     use super::*;
 
@@ -62,19 +66,27 @@ pub mod data_feeds_cache {
 
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
         let mut state = ctx.accounts.state.load_mut()?;
+        let mut changed = false;
 
         match state.feed_admins.binary_search_by(|a| a.cmp(&admin)) {
             Ok(i) => {
                 if !is_admin {
                     state.feed_admins.remove(i);
+                    changed = true;
                 }
             }
             Err(i) => {
                 if is_admin {
                     state.feed_admins.insert(i, admin);
+                    changed = true;
                 }
             }
-        };
+        }
+
+        if changed {
+            emit!(FeedAdminUpdated { admin, is_admin });
+        }
+
         Ok(())
     }
 
@@ -85,11 +97,21 @@ pub mod data_feeds_cache {
         let state = &mut ctx.accounts.state.load_mut()?;
         state.proposed_owner = proposed_owner;
 
+        emit!(OwnershipTransfer {
+            current_owner: state.owner,
+            proposed_owner: proposed_owner
+        });
+
         Ok(())
     }
 
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
+
+        emit!(OwnershipAcceptance {
+            previous_owner: state.owner,
+            new_owner: state.proposed_owner
+        });
 
         state.owner = std::mem::take(&mut state.proposed_owner);
 
@@ -129,6 +151,8 @@ pub mod data_feeds_cache {
                 curr_report_account_info.clone(),
                 ctx.accounts.feed_admin.to_account_info(),
             )?;
+
+            emit!(DecimalReportClosed { data_id: *data_id });
         }
 
         Ok(())
@@ -190,6 +214,8 @@ pub mod data_feeds_cache {
 
                 let mut dst = curr_report_account_info.try_borrow_mut_data()?;
                 dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&DecimalReport::discriminator());
+
+                emit!(DecimalReportInitialized { data_id: *data_id });
             }
 
             // todo: probably optional... just makes sure the account is the right type
@@ -199,15 +225,12 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    // todo: should i write out the entire logic for this? it should
-    // probably query the contract... and feed ids of each one as a precaution?
-    // should make write enabled by default?
-    // what would be the use case to have them
-    // if you enable them by default, and then
     pub fn init_legacy_feeds_config(
         ctx: Context<InitLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
+        emit!(LegacyFeedsConfigInitialized {});
+
         set_legacy_feeds_config(
             true,
             &mut ctx.accounts.legacy_feeds_config,
@@ -223,6 +246,8 @@ pub mod data_feeds_cache {
         data_ids: Vec<[u8; 16]>,
         write_disabled: Vec<bool>,
     ) -> Result<()> {
+        emit!(LegacyFeedsConfigUpdated {});
+
         let write_disabled: Vec<u8> = write_disabled
             .iter()
             .copied() // &bool → bool

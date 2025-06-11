@@ -39,19 +39,36 @@ pub struct DecimalReportUpdate {
     pub answer: u128,
 }
 
-// #[derive(BorshSerialize, BorshDeserialize)]
-// pub struct EmittedWorkflowMetadata {
-//     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)
-//     pub allowed_workflow_owner: [u8; 20], // ─╮ Address of the workflow owner
-//     pub allowed_workflow_name: [u8; 32] // ──╯ Name of the workflow UTF-bytes encoded
-// }
+#[event]
+pub struct FeedAdminUpdated {
+    pub admin: Pubkey,
+    pub is_admin: bool,
+}
 
-// impl From<&WorkflowMetadata> for EmittedWorkflowMetadata {
-//     fn from(m: &WorkflowMetadata) -> Self {
-//         Self {
-//             allowed_sender: m.allowed_sender.clone(),
-//             allowed_workflow_owner: m.allowed_workflow_owner.clone(),
-//             allowed_workflow_name: m.allowed_workflow_name.clone(),
-//         }
-//     }
-// }
+#[event]
+pub struct OwnershipTransfer {
+    pub current_owner: Pubkey,
+    pub proposed_owner: Pubkey,
+}
+
+#[event]
+pub struct OwnershipAcceptance {
+    pub previous_owner: Pubkey,
+    pub new_owner: Pubkey,
+}
+
+#[event]
+pub struct DecimalReportInitialized {
+    pub data_id: [u8; 16],
+}
+
+#[event]
+pub struct DecimalReportClosed {
+    pub data_id: [u8; 16],
+}
+
+#[event]
+pub struct LegacyFeedsConfigInitialized {}
+
+#[event]
+pub struct LegacyFeedsConfigUpdated {}
