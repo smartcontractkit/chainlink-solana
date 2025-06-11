@@ -318,8 +318,10 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		if ataUUID, err = s.handleATACreation(ctx, createATAInstructions, methodConfig, contractName, method, feePayer); err != nil {
 			return errorWithDebugID(fmt.Errorf("error creating ATAs: %w", err), debugID)
 		}
-		// Wait till ATA creation is finalized before proceeding with the main transaction
-		options = append(options, txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: ataUUID, DesiredStatus: types.Finalized}}))
+		if ataUUID != "" {
+			// Wait till ATA creation is finalized before proceeding with the main transaction
+			options = append(options, txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: ataUUID, DesiredStatus: types.Finalized}}))
+		}
 	}
 
 	// Transform args if necessary
