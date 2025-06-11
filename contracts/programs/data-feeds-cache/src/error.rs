@@ -55,9 +55,6 @@ pub enum DataCacheError {
     #[msg("out of bounds")]
     OutOfBounds,
 
-    #[msg("invalid update permission")]
-    InvalidUpdatePermission,
-
     #[msg("ids must strictly increase")]
     IdsMustStrictlyIncrease,
 
@@ -66,4 +63,7 @@ pub enum DataCacheError {
 
     #[msg("feed not configured")]
     FeedNotConfigured,
+
+    #[msg("invalid length")]
+    InvalidLength,
 }

@@ -29,6 +29,8 @@ pub mod data_feeds_cache {
         Discriminator,
     };
 
+    use crate::event::InvalidUpdatePermission;
+
     use super::*;
 
     // todo, add feed admins? who will also be a zero_copy array
@@ -721,13 +723,11 @@ pub mod data_feeds_cache {
             Vec::new();
 
         for (i, received_decimal_report) in received_decimal_reports.iter().enumerate() {
-            // let ReceivedDecimalReport { data_id, answer, timestamp } = received_decimal_report;
-
             // 1. check that sender has permission to write
 
             let report_hash = create_report_hash(
                 &received_decimal_report.data_id,
-                &ctx.accounts.forwarder_authority.key(),
+                ctx.accounts.forwarder_authority.key,
                 workflow_owner,
                 workflow_name,
             );
@@ -754,10 +754,22 @@ pub mod data_feeds_cache {
             );
 
             // verifies the permission account exists
-            WritePermissionFlag::try_deserialize(
+            if let Err(_) = WritePermissionFlag::try_deserialize(
                 &mut &permission_flag_account_infos[i].data.borrow()[..],
-            )
-            .map_err(|_| DataCacheError::InvalidUpdatePermission)?;
+            ) {
+                emit!(InvalidUpdatePermission {
+                    data_id: received_decimal_report.data_id.clone(),
+                    sender: ctx.accounts.forwarder_authority.key(),
+                    workflow_owner: workflow_owner
+                        .try_into()
+                        .map_err(|_| DataCacheError::InvalidLength)?,
+                    workflow_name: workflow_name
+                        .try_into()
+                        .map_err(|_| DataCacheError::InvalidLength)?,
+                });
+
+                continue;
+            }
 
             // 2. check report account is valid
             let (curr_report, _) = Pubkey::find_program_address(

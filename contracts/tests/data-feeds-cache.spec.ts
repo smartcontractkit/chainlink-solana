@@ -1359,6 +1359,125 @@ describe("data feeds cache", function () {
         "same answer"
       );
     });
+
+    it("Attempt feed A without correct permissions", async () => {
+      const unauthorizedWorkflow = newWorkflows(
+        1,
+        forwarder.forwarderAuthority[0]
+      );
+
+      const reportHash = getReportHash(
+        feedA.dataId,
+        unauthorizedWorkflow[0].allowedSender.toBuffer(),
+        unauthorizedWorkflow[0].allowedWorkflowOwner,
+        unauthorizedWorkflow[0].allowedWorkflowName
+      );
+
+      const singleReport = cacheProgram.coder.types.encode(
+        "ReceivedDecimalReport",
+        {
+          timestamp: new BN(123),
+          answer: new BN(321),
+          dataId: feedA.dataId,
+        }
+      );
+
+      const lenPrefix = Buffer.alloc(4);
+      lenPrefix.writeUInt32LE(1, 0);
+
+      // Step 3: Concatenate length + all reports
+      const fullEncodedVec = Buffer.concat([lenPrefix, singleReport]);
+
+      const feedAReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+      const permissionFlagAPDA = permissionFlagPDA(
+        cacheStateAccount.publicKey,
+        reportHash
+      );
+
+      const invalidUpdatePermissionEvent = waitForEvent(
+        cacheProgram,
+        "InvalidUpdatePermission",
+        (event: any, slot) => {
+          assert.isTrue(
+            Buffer.from(event.dataId).equals(feedA.dataId),
+            "expected data id"
+          );
+          assert.isTrue(
+            unauthorizedWorkflow[0].allowedSender.equals(event.sender),
+            "expected sender"
+          );
+          assert.isTrue(
+            Buffer.from(event.workflowOwner).equals(
+              unauthorizedWorkflow[0].allowedWorkflowOwner
+            ),
+            "expected owner"
+          );
+          assert.isTrue(
+            Buffer.from(event.workflowName).equals(
+              unauthorizedWorkflow[0].allowedWorkflowName
+            ),
+            "expected name"
+          );
+        }
+      );
+
+      // make it work with the right report hash permissions
+      await forwarder.report(
+        cacheProgram.programId,
+        fullEncodedVec,
+        unauthorizedWorkflow[0].allowedWorkflowName,
+        unauthorizedWorkflow[0].allowedWorkflowOwner,
+        [
+          {
+            pubkey: cacheStateAccount.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy store (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy feed config (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy writer (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: permissionFlagAPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ]
+      );
+
+      const report1 = await cacheProgram.account.decimalReport.fetch(
+        feedAReportPDA
+      );
+
+      assert.isTrue(report1.answer.eq(new BN(0)), "unreported");
+      assert.isTrue(report1.timestamp == 0, "unreported");
+
+      await invalidUpdatePermissionEvent;
+    });
   });
 });
 

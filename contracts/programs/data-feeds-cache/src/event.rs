@@ -17,6 +17,14 @@ pub struct LegacyFeedsReported {
     pub feeds_written: Vec<[u8; 16]>,
 }
 
+#[event]
+pub struct InvalidUpdatePermission {
+    pub data_id: [u8; 16],
+    pub sender: Pubkey,
+    pub workflow_owner: [u8; 20],
+    pub workflow_name: [u8; 10],
+}
+
 // #[derive(BorshSerialize, BorshDeserialize)]
 // pub struct EmittedWorkflowMetadata {
 //     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)
