@@ -47,7 +47,7 @@ pub struct InitOraclesConfig<'info> {
         payer = owner,
         seeds = [b"config", state.key().as_ref(), &get_config_id(don_id, config_version).to_be_bytes()],
         bump,
-        space = OraclesConfig::INIT_SPACE,
+        space = 8 + OraclesConfig::INIT_SPACE,
     )]
     pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
