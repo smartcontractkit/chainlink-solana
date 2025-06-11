@@ -6,7 +6,7 @@ use arrayvec::arrayvec;
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct SignerAddresses {
     pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 64 addresses (20 bytes each)
-    pub len: u64
+    pub len: u64,
 }
 
 // Apply the arrayvec macro to get all the utility methods
@@ -16,9 +16,9 @@ arrayvec!(SignerAddresses, [u8; 20], u64);
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct OraclesConfig {
-    pub config_id: u64, // 8 bytes
-    pub f: u8,          // 1 byte
-    pub _padding: [u8; 7], // 7 bytes to align to 8 bytes     
+    pub config_id: u64,                    // 8 bytes
+    pub f: u8,                             // 1 byte
+    pub _padding: [u8; 7],                 // 7 bytes to align to 8 bytes
     pub signer_addresses: SignerAddresses, // 64*20 + 1 + 7 = 1288 bytes
 }
 

@@ -84,7 +84,7 @@ pub mod keystone_forwarder {
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.oracles_config.load_mut()?;
+        let config = &mut ctx.accounts.oracles_config.load_init()?;
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
