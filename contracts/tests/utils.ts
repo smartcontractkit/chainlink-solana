@@ -398,12 +398,15 @@ export class Forwarder {
 
     // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     //  1 + (15*65) + 110 + 96
-    return Buffer.concat([
+
+    const report = Buffer.concat([
       lenSignatureBytes,
       signaturesBytesPacked,
       rawReportBytes,
       reportContextBytes,
     ]);
+
+    return report;
   }
 
   public async report(

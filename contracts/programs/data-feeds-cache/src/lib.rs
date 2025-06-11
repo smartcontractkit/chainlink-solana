@@ -25,11 +25,12 @@ use anchor_lang::solana_program::hash;
 pub mod data_feeds_cache {
 
     use anchor_lang::{
+        prelude::borsh::BorshSerialize,
         solana_program::{instruction::Instruction, program::invoke_signed, system_instruction},
         Discriminator,
     };
 
-    use crate::event::InvalidUpdatePermission;
+    use crate::event::{InvalidUpdatePermission, StaleDecimalReport};
 
     use super::*;
 
@@ -679,7 +680,6 @@ pub mod data_feeds_cache {
 
             // if included, check that the legacy store passed in via account context the same as the one in the config
             if let Some(legacy_store) = &ctx.accounts.legacy_store {
-                // panic!("in context {:?} vs in config {:?}", legacy_store.key, &loader.legacy_store);
                 require!(
                     legacy_store.key == &loader.legacy_store,
                     DataCacheError::AccountMismatch
@@ -695,7 +695,8 @@ pub mod data_feeds_cache {
 
         let (workflow_name, workflow_owner) = get_workflow_metadata(&metadata)?;
 
-        let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report[..])?;
+        let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report)
+            .map_err(|e| DataCacheError::MalformedReport)?;
 
         let len = received_decimal_reports.len();
 
@@ -724,18 +725,12 @@ pub mod data_feeds_cache {
 
         for (i, received_decimal_report) in received_decimal_reports.iter().enumerate() {
             // 1. check that sender has permission to write
-
             let report_hash = create_report_hash(
                 &received_decimal_report.data_id,
                 ctx.accounts.forwarder_authority.key,
                 workflow_owner,
                 workflow_name,
             );
-
-            // panic!("len {:?} , data_id {:?} , forwarder authority {:?} , workflow owner {:?}, workflow name {:?} report hash {:?}",
-            // received_decimal_reports.len(), received_decimal_report.data_id,  &ctx.accounts.forwarder_authority.key(), workflow_owner, workflow_name, report_hash
-
-            // );
 
             let (curr_permission_flag, _) = Pubkey::find_program_address(
                 &[
@@ -745,8 +740,6 @@ pub mod data_feeds_cache {
                 ],
                 &crate::ID,
             );
-
-            // panic!("derived flag {:?} actual flag {:?}", curr_permission_flag, permission_flag_account_infos[i].key);
 
             require!(
                 &curr_permission_flag == permission_flag_account_infos[i].key,
@@ -785,6 +778,22 @@ pub mod data_feeds_cache {
                 &curr_report == report_account_infos[i].key,
                 DataCacheError::AccountMismatch
             );
+
+            // update report
+
+            let latest_report =
+                DecimalReport::try_deserialize(&mut &report_account_infos[i].data.borrow()[..])?;
+
+            // dont update if the received report is stale
+            if received_decimal_report.timestamp <= latest_report.timestamp {
+                emit!(StaleDecimalReport {
+                    data_id: received_decimal_report.data_id.clone(),
+                    received_timestamp: received_decimal_report.timestamp,
+                    latest_timestamp: latest_report.timestamp
+                });
+
+                continue;
+            }
 
             let mut dst = report_account_infos[i].try_borrow_mut_data()?;
 

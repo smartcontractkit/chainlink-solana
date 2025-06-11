@@ -25,6 +25,13 @@ pub struct InvalidUpdatePermission {
     pub workflow_name: [u8; 10],
 }
 
+#[event]
+pub struct StaleDecimalReport {
+    pub data_id: [u8; 16],
+    pub received_timestamp: u32,
+    pub latest_timestamp: u32,
+}
+
 // #[derive(BorshSerialize, BorshDeserialize)]
 // pub struct EmittedWorkflowMetadata {
 //     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)

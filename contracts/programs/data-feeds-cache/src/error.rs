@@ -66,4 +66,7 @@ pub enum DataCacheError {
 
     #[msg("invalid length")]
     InvalidLength,
+
+    #[msg("malformed report")]
+    MalformedReport,
 }

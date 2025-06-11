@@ -1118,8 +1118,6 @@ describe("data feeds cache", function () {
         ...dummyLegacyFeedAccountMetas,
       ].sort((a, b) => a.pubkey.toBuffer().compare(b.pubkey.toBuffer()));
 
-      // console.log(`expect legacyFeeds`, 'to be paired with', dummyLegacyFeedAccounts.map(d => d.publicKey.toBase58()))
-
       const submissionEvent = waitForEvent(
         mockLegacyStoreProgram,
         "Submit",
@@ -1360,6 +1358,171 @@ describe("data feeds cache", function () {
       );
     });
 
+    it("Attempt feed A stale update", async () => {
+      const reportHash = getReportHash(
+        feedA.dataId,
+        legacyWorkflowMetadatas[0].allowedSender.toBuffer(),
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        legacyWorkflowMetadatas[0].allowedWorkflowName
+      );
+
+      const singleReport = cacheProgram.coder.types.encode(
+        "ReceivedDecimalReport",
+        {
+          timestamp: new BN(123),
+          answer: new BN(321),
+          dataId: feedA.dataId,
+        }
+      );
+
+      const lenPrefix = Buffer.alloc(4);
+      lenPrefix.writeUInt32LE(1, 0);
+
+      // Step 3: Concatenate length + all reports
+      const fullEncodedVec = Buffer.concat([lenPrefix, singleReport]);
+
+      const feedAReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+      const permissionFlagAPDA = permissionFlagPDA(
+        cacheStateAccount.publicKey,
+        reportHash
+      );
+
+      // make it work with the right report hash permissions
+      await forwarder.report(
+        cacheProgram.programId,
+        fullEncodedVec,
+        legacyWorkflowMetadatas[0].allowedWorkflowName,
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        [
+          {
+            pubkey: cacheStateAccount.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy store (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy feed config (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy writer (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: permissionFlagAPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ]
+      );
+
+      const report = await cacheProgram.account.decimalReport.fetch(
+        feedAReportPDA
+      );
+      assert.isTrue(report.answer.eq(new BN(321)), "answers match");
+      assert.isTrue(report.timestamp == 123, "answers match");
+
+      const staleReport = cacheProgram.coder.types.encode(
+        "ReceivedDecimalReport",
+        {
+          timestamp: new BN(123),
+          answer: new BN(321),
+          dataId: feedA.dataId,
+        }
+      );
+
+      const staleLenPrefix = Buffer.alloc(4);
+      staleLenPrefix.writeUInt32LE(1, 0);
+
+      // Step 3: Concatenate length + all reports
+      const staleEncodedVec = Buffer.concat([staleLenPrefix, staleReport]);
+
+      const staleReportEvent = waitForEvent(
+        cacheProgram,
+        "StaleDecimalReport",
+        (event: any, slot) => {
+          assert.isTrue(
+            Buffer.from(event.dataId).equals(feedA.dataId),
+            "data ids same"
+          );
+          assert.equal(event.receivedTimestamp, 123);
+          assert.equal(event.latestTimestamp, 123);
+        }
+      );
+
+      // make it work with the right report hash permissions
+      await forwarder.report(
+        cacheProgram.programId,
+        staleEncodedVec,
+        legacyWorkflowMetadatas[0].allowedWorkflowName,
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        [
+          {
+            pubkey: cacheStateAccount.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy store (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy feed config (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy writer (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: permissionFlagAPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ]
+      );
+
+      const report1 = await cacheProgram.account.decimalReport.fetch(
+        feedAReportPDA
+      );
+      assert.isTrue(report1.answer.eq(new BN(321)), "answers match");
+      assert.isTrue(report1.timestamp == 123, "answers match");
+
+      await staleReportEvent;
+    });
+
     it("Attempt feed A without correct permissions", async () => {
       const unauthorizedWorkflow = newWorkflows(
         1,
@@ -1477,6 +1640,156 @@ describe("data feeds cache", function () {
       assert.isTrue(report1.timestamp == 0, "unreported");
 
       await invalidUpdatePermissionEvent;
+    });
+
+    it("Attempt feed A 2x", async () => {
+      const reportHash = getReportHash(
+        feedA.dataId,
+        legacyWorkflowMetadatas[0].allowedSender.toBuffer(),
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        legacyWorkflowMetadatas[0].allowedWorkflowName
+      );
+
+      const singleReport = cacheProgram.coder.types.encode(
+        "ReceivedDecimalReport",
+        {
+          timestamp: new BN(123),
+          answer: new BN(321),
+          dataId: feedA.dataId,
+        }
+      );
+
+      const lenPrefix = Buffer.alloc(4);
+      lenPrefix.writeUInt32LE(1, 0);
+
+      // Step 3: Concatenate length + all reports
+      const fullEncodedVec = Buffer.concat([lenPrefix, singleReport]);
+
+      const feedAReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+      const permissionFlagAPDA = permissionFlagPDA(
+        cacheStateAccount.publicKey,
+        reportHash
+      );
+
+      // make it work with the right report hash permissions
+      await forwarder.report(
+        cacheProgram.programId,
+        fullEncodedVec,
+        legacyWorkflowMetadatas[0].allowedWorkflowName,
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        [
+          {
+            pubkey: cacheStateAccount.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy store (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy feed config (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy writer (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: permissionFlagAPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ]
+      );
+
+      const report = await cacheProgram.account.decimalReport.fetch(
+        feedAReportPDA
+      );
+      assert.isTrue(report.answer.eq(new BN(321)), "answers match");
+      assert.isTrue(report.timestamp == 123, "answers match");
+
+      const newReport = cacheProgram.coder.types.encode(
+        "ReceivedDecimalReport",
+        {
+          timestamp: new BN(323),
+          answer: new BN(721),
+          dataId: feedA.dataId,
+        }
+      );
+
+      const newLenPrefix = Buffer.alloc(4);
+      newLenPrefix.writeUInt32LE(1, 0);
+
+      // Step 3: Concatenate length + all reports
+      const newEncodedVec = Buffer.concat([newLenPrefix, newReport]);
+
+      // make it work with the right report hash permissions
+      await forwarder.report(
+        cacheProgram.programId,
+        newEncodedVec,
+        legacyWorkflowMetadatas[0].allowedWorkflowName,
+        legacyWorkflowMetadatas[0].allowedWorkflowOwner,
+        [
+          {
+            pubkey: cacheStateAccount.publicKey,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy store (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy feed config (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: cacheProgram.programId, // legacy writer (omitted)
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: anchor.web3.SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+          {
+            pubkey: feedAReportPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: permissionFlagAPDA,
+            isSigner: false,
+            isWritable: true,
+          },
+        ]
+      );
+
+      const report1 = await cacheProgram.account.decimalReport.fetch(
+        feedAReportPDA
+      );
+      assert.isTrue(report1.answer.eq(new BN(721)), "answers match");
+      assert.isTrue(report1.timestamp == 323, "answers match");
     });
   });
 });
