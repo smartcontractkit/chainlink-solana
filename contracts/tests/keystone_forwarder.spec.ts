@@ -82,6 +82,58 @@ function calculateForwarderAuthorityBump(
   );
 }
 
+// Helper function to parse oracle config account data
+function parseOraclesConfigAccount(data: Buffer) {
+  // Layout: discriminator(8) + config_id(8) + f(1) + padding(7) + signer_addresses
+  // SignerAddresses layout: xs(64*20) + len(1) + padding(7)
+
+  let offset = 8; // Skip discriminator
+
+  // Read config_id (8 bytes, little-endian)
+  const configId = data.readBigUInt64LE(offset);
+  offset += 8;
+
+  // Read f (1 byte)
+  const f = data.readUInt8(offset);
+  offset += 1;
+
+  // Skip padding (7 bytes)
+  offset += 7;
+
+  // Read SignerAddresses structure
+  // Layout: xs (64*20 bytes) + len (1 byte) + padding (7 bytes)
+  const signerAddressesLen = data.readUInt8(offset + 64 * 20); // len is after xs array
+
+  // Extract the actual addresses from xs array
+  const signerAddresses = [];
+  for (let i = 0; i < signerAddressesLen; i++) {
+    const addressOffset = offset + i * 20;
+    const address = data.slice(addressOffset, addressOffset + 20);
+    signerAddresses.push(address);
+  }
+
+  return {
+    configId,
+    f,
+    signerAddresses,
+  };
+}
+
+// Helper function to get and parse oracle config account
+async function getOraclesConfigAccount(
+  program: any,
+  oraclesConfigStorage: PublicKey
+) {
+  const accountInfo = await program.provider.connection.getAccountInfo(
+    oraclesConfigStorage
+  );
+  if (!accountInfo) {
+    throw new Error("Account not found");
+  }
+
+  return parseOraclesConfigAccount(accountInfo.data);
+}
+
 let getEthereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12);
 };
@@ -341,18 +393,27 @@ describe("keystone_storage", function () {
       })
       .rpc();
 
-    const actualConfig = await program.account.oraclesConfig.fetch(
+    // const actualConfig = await program.account.oraclesConfig.fetch(
+    //   oraclesConfigStorage
+    // );
+
+    // Parse initial config using helper function
+    const initialConfig = await getOraclesConfigAccount(
+      program,
       oraclesConfigStorage
     );
 
-    assert.equal(configId, actualConfig.configId, "config ids should equal");
-    assert.equal(1, actualConfig.f, "f should equal");
-    assert.equal(actualConfig.signerAddresses.length, 4, "4 signer addresses");
-    assert.isTrue(
-      actualConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(initialEthAddresses[i])
-      )
-    );
+    assert.equal(configId, initialConfig.configId, "config ids should equal");
+    assert.equal(1, initialConfig.f, "f should equal");
+    assert.equal(initialConfig.signerAddresses.length, 4, "4 signer addresses");
+    for (let i = 0; i < initialConfig.signerAddresses.length; i++) {
+      assert.isTrue(
+        initialConfig.signerAddresses[i].equals(
+          Buffer.from(initialEthAddresses[i])
+        ),
+        `Signer address ${i} should match`
+      );
+    }
 
     const configPromise = waitForEvent(
       program,
@@ -381,23 +442,33 @@ describe("keystone_storage", function () {
       })
       .rpc();
 
-    const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
+    // const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
+    //   oraclesConfigStorage
+    // );
+
+    // Parse updated config using helper function
+    const updatedConfig = await getOraclesConfigAccount(
+      program,
       oraclesConfigStorage
     );
 
     await configPromise;
 
     assert.equal(
-      configId,
-      actualUpdatedConfig.configId,
+      Number(configId),
+      Number(updatedConfig.configId),
       "config ids should equal"
     );
-    assert.equal(f, actualUpdatedConfig.f, "f should equal");
-    assert.isTrue(
-      actualUpdatedConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(signerEthAddresses[i])
-      )
-    );
+    assert.equal(f, updatedConfig.f, "f should equal");
+
+    for (let i = 0; i < updatedConfig.signerAddresses.length; i++) {
+      assert.isTrue(
+        updatedConfig.signerAddresses[i].equals(
+          Buffer.from(signerEthAddresses[i])
+        ),
+        `Updated signer address ${i} should match`
+      );
+    }
   });
 
   it("Close oracle config", async () => {
