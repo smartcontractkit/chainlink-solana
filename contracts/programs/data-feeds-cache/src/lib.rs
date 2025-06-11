@@ -17,7 +17,7 @@ use context::*;
 use error::{AuthError, DataCacheError};
 use event::{DecimalFeedConfigSet, LegacyFeedsReported};
 use state::{
-    AdminList, CacheTransmission, DecimalReport, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
+    AccountList, CacheTransmission, DecimalReport, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
     ReceivedDecimalReport, WorkflowMetadata, WritePermissionFlag,
 };
 
@@ -1043,7 +1043,7 @@ pub mod data_feeds_cache {
     }
 }
 
-fn verify_feed_admin(admin: &Signer, admin_list: &AdminList) -> Result<()> {
+fn verify_feed_admin(admin: &Signer, admin_list: &AccountList) -> Result<()> {
     let is_admin = admin_list.binary_search(admin.key).is_ok();
     require!(is_admin, AuthError::Unauthorized);
 

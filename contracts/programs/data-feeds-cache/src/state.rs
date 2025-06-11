@@ -1,25 +1,18 @@
+use std::mem;
+
 use anchor_lang::prelude::{
     borsh::{BorshDeserialize, BorshSerialize},
     *,
 };
 use arrayvec::arrayvec;
-
-// 64 * 32 + 8 = 2056
-#[zero_copy]
-#[derive(InitSpace)]
-pub struct AdminList {
-    pub xs: [Pubkey; MAX_ENTRIES],
-    pub len: u64,
-}
-
-arrayvec!(AdminList, Pubkey, u64);
+use static_assertions::const_assert;
 
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    pub feed_admins: AdminList,
+    pub feed_admins: AccountList,
     pub legacy_writer_nonce: u8, // pda writing to the legacy feeds
     pub _padding: [u8; 7],
 }
@@ -62,6 +55,9 @@ pub struct AccountList {
     pub len: u64,
 }
 arrayvec!(AccountList, Pubkey, u64);
+const_assert!(
+    mem::size_of::<AccountList>() == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ENTRIES
+);
 
 #[zero_copy]
 #[derive(InitSpace)]
@@ -70,6 +66,12 @@ pub struct WorkflowMetadataList {
     pub len: u64,
 }
 arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
+const_assert!(
+    mem::size_of::<WorkflowMetadataList>()
+        == mem::size_of::<u64>()
+            + (mem::size_of::<Pubkey>() + mem::size_of::<[u8; 20]>() + mem::size_of::<[u8; 10]>())
+                * MAX_ENTRIES
+);
 
 // #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, InitSpace)]
 #[zero_copy]
@@ -100,7 +102,6 @@ pub struct LegacyFeedEntry {
 // in reality, there are only ~14 legacy feeds, but we provide a healthy buffer
 const MAX_ENTRIES: usize = 64;
 
-// 48 * 64 + 8 = 3080
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct LegacyFeedList {
@@ -108,9 +109,13 @@ pub struct LegacyFeedList {
     pub xs: [LegacyFeedEntry; MAX_ENTRIES],
     pub len: u64,
 }
-
 arrayvec!(LegacyFeedList, LegacyFeedEntry, u64);
-// todo: add the assertion
+const_assert!(
+    mem::size_of::<LegacyFeedList>()
+        == mem::size_of::<u64>()
+            + (mem::size_of::<[u8; 16]>() + mem::size_of::<Pubkey>() + mem::size_of::<u8>())
+                * MAX_ENTRIES
+);
 
 // 3080 + 32 = 3112 (can use init)
 // flagged feeds need to be written to the legacy store

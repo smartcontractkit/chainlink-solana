@@ -876,6 +876,7 @@ dependencies = [
  "arrayvec 1.0.1",
  "bytemuck",
  "keystone-forwarder",
+ "static_assertions",
  "store",
 ]
 
