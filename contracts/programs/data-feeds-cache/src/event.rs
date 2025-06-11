@@ -32,6 +32,13 @@ pub struct StaleDecimalReport {
     pub latest_timestamp: u32,
 }
 
+#[event]
+pub struct DecimalReportUpdate {
+    pub data_id: [u8; 16],
+    pub timestamp: u32,
+    pub answer: u128,
+}
+
 // #[derive(BorshSerialize, BorshDeserialize)]
 // pub struct EmittedWorkflowMetadata {
 //     pub allowed_sender: Pubkey, // Address of the sender allowed to send new reports (forwarder)

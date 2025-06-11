@@ -11,6 +11,7 @@ mod error;
 mod event;
 pub mod state;
 
+use anchor_lang::solana_program::hash;
 use common::{ANCHOR_DISCRIMINATOR, MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
 use context::*;
 use error::{AuthError, DataCacheError};
@@ -20,7 +21,9 @@ use state::{
     ReceivedDecimalReport, WorkflowMetadata, WritePermissionFlag,
 };
 
-use anchor_lang::solana_program::hash;
+// derived from hash::hash("global:cache_submit".as_bytes()).to_bytes()[..8].to_vec()
+pub const SUBMIT_DISCRIMINATOR: [u8; 8] = [173, 69, 171, 96, 179, 143, 243, 226];
+
 #[program]
 pub mod data_feeds_cache {
 
@@ -30,11 +33,10 @@ pub mod data_feeds_cache {
         Discriminator,
     };
 
-    use crate::event::{InvalidUpdatePermission, StaleDecimalReport};
+    use crate::event::{DecimalReportUpdate, InvalidUpdatePermission, StaleDecimalReport};
 
     use super::*;
 
-    // todo, add feed admins? who will also be a zero_copy array
     pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
@@ -42,15 +44,12 @@ pub mod data_feeds_cache {
         let mut prev_admin = Pubkey::default();
         for admin in feed_admins.iter() {
             require!(
-                &prev_admin <= admin,
+                &prev_admin < admin,
                 DataCacheError::AddressesMustStrictlyIncrease
             );
             state.feed_admins.push(*admin);
             prev_admin = *admin;
         }
-
-        // todo: can probably remove
-        state.proposed_owner = Pubkey::default();
 
         let (_, authority_nonce) = Pubkey::find_program_address(
             &[b"legacy_writer", ctx.accounts.state.key().as_ref()],
@@ -92,17 +91,16 @@ pub mod data_feeds_cache {
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
 
-        state.owner = state.proposed_owner;
-        state.proposed_owner = Pubkey::default();
+        state.owner = std::mem::take(&mut state.proposed_owner);
 
         Ok(())
     }
 
-    pub fn close_decimal_reports<'info>(
-        ctx: Context<CloseDecimalReports<'info>>,
+    pub fn close_decimal_reports(
+        ctx: Context<CloseDecimalReports>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
-        let state = &mut ctx.accounts.state.load()?;
+        let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
         let state_key = ctx.accounts.state.key();
@@ -141,15 +139,16 @@ pub mod data_feeds_cache {
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
         // check feed admin here
-        let state = &mut ctx.accounts.state.load()?;
+        let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
         let state_key = ctx.accounts.state.key();
 
         let data_ids_account_infos = ctx.remaining_accounts;
 
-        require!(
-            data_ids.len() == data_ids_account_infos.len(),
+        require_eq!(
+            data_ids.len(),
+            data_ids_account_infos.len(),
             DataCacheError::ArrayLengthMismatch
         );
 
@@ -166,7 +165,7 @@ pub mod data_feeds_cache {
                 DataCacheError::AccountMismatch
             );
 
-            // if already initialized, skip it
+            // only initialize if required
             if curr_report_account_info.data_is_empty() {
                 let rent =
                     Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE);
@@ -389,7 +388,7 @@ pub mod data_feeds_cache {
             }
 
             // add items
-            delete_permission_accounts.extend(temp_candidates_deletion.drain(..))
+            delete_permission_accounts.append(&mut temp_candidates_deletion);
         }
 
         // order has to be exactly the same
@@ -637,7 +636,7 @@ pub mod data_feeds_cache {
                 workflow_metadatas: workflow_metadatas.clone(),
             });
 
-            delete_permission_accounts.extend(temp_candidates_deletion.drain(..))
+            delete_permission_accounts.append(&mut temp_candidates_deletion)
         }
 
         for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
@@ -696,7 +695,7 @@ pub mod data_feeds_cache {
         let (workflow_name, workflow_owner) = get_workflow_metadata(&metadata)?;
 
         let received_decimal_reports = Vec::<ReceivedDecimalReport>::try_from_slice(&report)
-            .map_err(|e| DataCacheError::MalformedReport)?;
+            .map_err(|_| DataCacheError::MalformedReport)?;
 
         let len = received_decimal_reports.len();
 
@@ -747,11 +746,13 @@ pub mod data_feeds_cache {
             );
 
             // verifies the permission account exists
-            if let Err(_) = WritePermissionFlag::try_deserialize(
+            if WritePermissionFlag::try_deserialize(
                 &mut &permission_flag_account_infos[i].data.borrow()[..],
-            ) {
+            )
+            .is_err()
+            {
                 emit!(InvalidUpdatePermission {
-                    data_id: received_decimal_report.data_id.clone(),
+                    data_id: received_decimal_report.data_id,
                     sender: ctx.accounts.forwarder_authority.key(),
                     workflow_owner: workflow_owner
                         .try_into()
@@ -787,7 +788,7 @@ pub mod data_feeds_cache {
             // dont update if the received report is stale
             if received_decimal_report.timestamp <= latest_report.timestamp {
                 emit!(StaleDecimalReport {
-                    data_id: received_decimal_report.data_id.clone(),
+                    data_id: received_decimal_report.data_id,
                     received_timestamp: received_decimal_report.timestamp,
                     latest_timestamp: latest_report.timestamp
                 });
@@ -803,6 +804,12 @@ pub mod data_feeds_cache {
             };
 
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
+
+            emit!(DecimalReportUpdate {
+                answer: received_decimal_report.answer,
+                timestamp: received_decimal_report.timestamp,
+                data_id: received_decimal_report.data_id
+            });
 
             // todo: add dfc update event here
 
@@ -897,8 +904,7 @@ pub mod data_feeds_cache {
                         .collect();
 
                 // payload begins with the Anchor discriminator
-                let mut payload =
-                    hash::hash("global:cache_submit".as_bytes()).to_bytes()[..8].to_vec();
+                let mut payload = SUBMIT_DISCRIMINATOR.to_vec();
 
                 let transmissions: Vec<CacheTransmission> = write_enabled_entries
                     .iter()
@@ -919,7 +925,8 @@ pub mod data_feeds_cache {
                     &[ctx.accounts.cache_state.load()?.legacy_writer_nonce],
                 ];
 
-                invoke_signed(&ix, &account_infos, &[signer_seeds])?;
+                invoke_signed(&ix, &account_infos, &[signer_seeds])
+                    .map_err(|_| DataCacheError::FailedLegacyWrite)?;
 
                 write_occured = true;
             }
@@ -973,10 +980,7 @@ pub mod data_feeds_cache {
             end_index
         };
 
-        Ok(feed_config.workflow_metadata[start_index..end_index]
-            .iter()
-            .cloned()
-            .collect())
+        Ok(feed_config.workflow_metadata[start_index..end_index].to_vec())
     }
 
     pub fn query_values<'info>(

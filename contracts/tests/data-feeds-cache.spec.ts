@@ -1122,7 +1122,6 @@ describe("data feeds cache", function () {
         mockLegacyStoreProgram,
         "Submit",
         (event: any, slot) => {
-          // console.log('event feeds', event);
           assert.strictEqual(
             event.feeds.length,
             dummyLegacyFeedAccountMetas.length

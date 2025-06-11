@@ -69,4 +69,7 @@ pub enum DataCacheError {
 
     #[msg("malformed report")]
     MalformedReport,
+
+    #[msg("failed legacy write")]
+    FailedLegacyWrite,
 }
