@@ -1170,6 +1170,7 @@ dependencies = [
  "arrayvec 1.0.1",
  "bytemuck",
  "solana-program",
+ "static_assertions",
 ]
 
 [[package]]

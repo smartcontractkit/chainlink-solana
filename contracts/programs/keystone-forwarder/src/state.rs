@@ -1,25 +1,31 @@
 use crate::common::MAX_ACCTS;
 use anchor_lang::prelude::*;
 use arrayvec::arrayvec;
+use static_assertions::const_assert;
+use std::mem;
 
 #[zero_copy]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
-pub struct SignerAddresses {
+pub struct SignerAddressList {
     pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 64 addresses (20 bytes each)
     pub len: u64,
 }
 
 // Apply the arrayvec macro to get all the utility methods
-arrayvec!(SignerAddresses, [u8; 20], u64);
+arrayvec!(SignerAddressList, [u8; 20], u64);
+const_assert!(
+    mem::size_of::<SignerAddressList>()
+        == mem::size_of::<u64>() + mem::size_of::<[u8; 20]>() * MAX_ACCTS
+);
 
 // combination of solidity's OracleSet and the configId mapping
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct OraclesConfig {
-    pub config_id: u64,                    // 8 bytes
-    pub f: u8,                             // 1 byte
-    pub _padding: [u8; 7],                 // 7 bytes to align to 8 bytes
-    pub signer_addresses: SignerAddresses, // 64*20 + 1 + 7 = 1288 bytes
+    pub config_id: u64,                      // 8 bytes
+    pub f: u8,                               // 1 byte
+    pub _padding: [u8; 7],                   // 7 bytes to align to 8 bytes
+    pub signer_addresses: SignerAddressList, // 64*20 + 1 + 7 = 1288 bytes
 }
 
 #[account]
