@@ -329,6 +329,9 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 					},
 				}
 				SubmitTransactionToCW(t, it, cw, "storeTokenAccount", args, bound, types.Finalized)
+
+				// Resubmit the same transaction to test ATA creation is skipped when the account already exists
+				SubmitTransactionToCW(t, it, cw, "storeTokenAccount", args, bound, types.Finalized)
 			},
 		},
 	}
