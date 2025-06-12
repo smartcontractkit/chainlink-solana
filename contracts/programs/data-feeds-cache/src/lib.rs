@@ -129,8 +129,9 @@ pub mod data_feeds_cache {
 
         let data_ids_account_infos = ctx.remaining_accounts;
 
-        require!(
-            data_ids.len() == data_ids_account_infos.len(),
+        require_eq!(
+            data_ids.len(),
+            data_ids_account_infos.len(),
             DataCacheError::ArrayLengthMismatch
         );
 
@@ -142,8 +143,9 @@ pub mod data_feeds_cache {
                 &crate::ID,
             );
 
-            require!(
-                &decimal_report == curr_report_account_info.key,
+            require_keys_eq!(
+                decimal_report,
+                *curr_report_account_info.key,
                 DataCacheError::AccountMismatch
             );
 
@@ -184,8 +186,9 @@ pub mod data_feeds_cache {
                 &crate::ID,
             );
 
-            require!(
-                &decimal_report == curr_report_account_info.key,
+            require_keys_eq!(
+                decimal_report,
+                *curr_report_account_info.key,
                 DataCacheError::AccountMismatch
             );
 
@@ -278,8 +281,9 @@ pub mod data_feeds_cache {
         descriptions: Vec<[u8; 32]>,
         workflow_metadatas: Vec<WorkflowMetadata>,
     ) -> Result<Vec<Pubkey>> {
-        require!(
-            workflow_metadatas.len() <= MAX_WORKFLOW_METADATAS,
+        require_gte!(
+            MAX_WORKFLOW_METADATAS,
+            workflow_metadatas.len(),
             DataCacheError::MaxWorkflowsExceeded
         );
 
@@ -288,22 +292,25 @@ pub mod data_feeds_cache {
             DataCacheError::EmptyConfig
         );
 
-        require!(
-            data_ids.len() == descriptions.len(),
+        require_eq!(
+            data_ids.len(),
+            descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let expected_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
 
-        require!(
-            ctx.remaining_accounts.len() == expected_len,
+        require_eq!(
+            ctx.remaining_accounts.len(),
+            expected_len,
             DataCacheError::MissingAccounts
         );
 
         for metadata in workflow_metadatas.iter() {
-            require!(
-                metadata.allowed_sender != Pubkey::default(),
+            require_keys_neq!(
+                metadata.allowed_sender,
+                Pubkey::default(),
                 DataCacheError::InvalidAddress
             );
             require!(
@@ -333,8 +340,9 @@ pub mod data_feeds_cache {
             );
 
             // the feed config accounts should be in order
-            require!(
-                feed_config_account_infos[i].key() == curr_feed_config,
+            require_keys_eq!(
+                *feed_config_account_infos[i].key,
+                curr_feed_config,
                 DataCacheError::AccountMismatch
             );
 
@@ -401,8 +409,9 @@ pub mod data_feeds_cache {
                     &permission_flag_account_infos[i * workflow_metadatas.len() + j];
 
                 // check that it is in the remaining accounts
-                require!(
-                    &curr_permission_flag == permission_flag_account_info.key,
+                require_keys_eq!(
+                    curr_permission_flag,
+                    *permission_flag_account_info.key,
                     DataCacheError::AccountMismatch
                 );
 
@@ -430,8 +439,9 @@ pub mod data_feeds_cache {
         let state = &mut ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-        require!(
-            workflow_metadatas.len() <= MAX_WORKFLOW_METADATAS,
+        require_gte!(
+            MAX_WORKFLOW_METADATAS,
+            workflow_metadatas.len(),
             DataCacheError::MaxWorkflowsExceeded
         );
 
@@ -440,8 +450,9 @@ pub mod data_feeds_cache {
             DataCacheError::EmptyConfig
         );
 
-        require!(
-            data_ids.len() == descriptions.len(),
+        require_eq!(
+            data_ids.len(),
+            descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
 
@@ -449,14 +460,16 @@ pub mod data_feeds_cache {
         let minimum_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
 
         // you have an unknown of defunct permission accounts as well, so as long as the amount is >= we're good
-        require!(
-            ctx.remaining_accounts.len() >= minimum_len,
+        require_gte!(
+            ctx.remaining_accounts.len(),
+            minimum_len,
             DataCacheError::MissingAccounts
         );
 
         for metadata in workflow_metadatas.iter() {
-            require!(
-                metadata.allowed_sender != Pubkey::default(),
+            require_keys_neq!(
+                metadata.allowed_sender,
+                Pubkey::default(),
                 DataCacheError::InvalidAddress
             );
             require!(
@@ -490,8 +503,9 @@ pub mod data_feeds_cache {
             );
 
             // the feed config accounts should be in order
-            require!(
-                feed_config_account_infos[i].key() == curr_feed_config,
+            require_keys_eq!(
+                *feed_config_account_infos[i].key,
+                curr_feed_config,
                 DataCacheError::AccountMismatch
             );
 
@@ -602,8 +616,9 @@ pub mod data_feeds_cache {
                     &permission_flag_account_infos[i * workflow_metadatas.len() + j];
 
                 // check that it is in the remaining accounts
-                require!(
-                    &curr_permission_flag == permission_flag_account_info.key,
+                require_keys_eq!(
+                    curr_permission_flag,
+                    *permission_flag_account_info.key,
                     DataCacheError::AccountMismatch
                 );
 
@@ -667,8 +682,9 @@ pub mod data_feeds_cache {
         for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
             let curr_permission_account_info = &delete_permission_account_infos[i];
 
-            require!(
-                permission_account == curr_permission_account_info.key,
+            require_keys_eq!(
+                *permission_account,
+                *curr_permission_account_info.key,
                 DataCacheError::AccountMismatch
             );
 
@@ -704,8 +720,9 @@ pub mod data_feeds_cache {
 
             // if included, check that the legacy store passed in via account context the same as the one in the config
             if let Some(legacy_store) = &ctx.accounts.legacy_store {
-                require!(
-                    legacy_store.key == &loader.legacy_store,
+                require_keys_eq!(
+                    *legacy_store.key,
+                    loader.legacy_store,
                     DataCacheError::AccountMismatch
                 );
             };
@@ -738,9 +755,15 @@ pub mod data_feeds_cache {
             DataCacheError::AddressesMustStrictlyIncrease
         );
 
-        require!(
-            report_account_infos.len() == received_decimal_reports.len()
-                && permission_flag_account_infos.len() == received_decimal_reports.len(),
+        require_eq!(
+            report_account_infos.len(),
+            received_decimal_reports.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
+        require_eq!(
+            permission_flag_account_infos.len(),
+            received_decimal_reports.len(),
             DataCacheError::ArrayLengthMismatch
         );
 
@@ -765,8 +788,9 @@ pub mod data_feeds_cache {
                 &crate::ID,
             );
 
-            require!(
-                &curr_permission_flag == permission_flag_account_infos[i].key,
+            require_keys_eq!(
+                curr_permission_flag,
+                *permission_flag_account_infos[i].key,
                 DataCacheError::AccountMismatch
             );
 
@@ -800,8 +824,9 @@ pub mod data_feeds_cache {
                 &crate::ID,
             );
 
-            require!(
-                &curr_report == report_account_infos[i].key,
+            require_keys_eq!(
+                curr_report,
+                *report_account_infos[i].key,
                 DataCacheError::AccountMismatch
             );
 
@@ -1026,8 +1051,9 @@ pub mod data_feeds_cache {
 
             let report_account_info = &ctx.remaining_accounts[i];
 
-            require!(
-                &decimal_report == report_account_info.key,
+            require_keys_eq!(
+                decimal_report,
+                *report_account_info.key,
                 DataCacheError::AccountMismatch
             );
 
