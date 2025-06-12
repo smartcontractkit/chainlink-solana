@@ -322,6 +322,7 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 			return nil, err
 		}
 		sequenceOfValues[idx] = types.Sequence{
+			TxHash: entry.TxHash,
 			Cursor: entry.Cursor,
 			Head:   entry.Head,
 			Data:   &value,

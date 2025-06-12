@@ -402,7 +402,9 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 	sequences := make([]types.Sequence, len(logs))
 
 	for idx := range logs {
+		txHashSignature := logs[idx].TxHash.ToSolana()
 		sequences[idx] = types.Sequence{
+			TxHash: txHashSignature[:],
 			Cursor: logpoller.FormatContractReaderCursor(logs[idx]),
 			Head: types.Head{
 				Height:    fmt.Sprint(logs[idx].BlockNumber),
