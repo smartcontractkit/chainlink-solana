@@ -1,0 +1,242 @@
+{
+  "version": "0.1.0",
+  "name": "buffer_payload",
+  "instructions": [
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "report",
+          "type": "bytes"
+        },
+        {
+          "name": "fail",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "bufferExecutionReport",
+      "accounts": [
+        {
+          "name": "buffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        },
+        {
+          "name": "reportLength",
+          "type": "u32"
+        },
+        {
+          "name": "chunk",
+          "type": "bytes"
+        },
+        {
+          "name": "chunkIndex",
+          "type": "u8"
+        },
+        {
+          "name": "numChunks",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "closeExecutionReportBuffer",
+      "accounts": [
+        {
+          "name": "buffer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bufferId",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Buffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "chunkBitmap",
+            "type": "u64"
+          },
+          {
+            "name": "totalChunks",
+            "type": "u8"
+          },
+          {
+            "name": "chunkLength",
+            "type": "u32"
+          },
+          {
+            "name": "reportLength",
+            "type": "u32"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "Report",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "report",
+            "type": "bytes"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 7000,
+      "name": "AlreadyContainsChunk",
+      "msg": "The report buffer already contains that chunk"
+    },
+    {
+      "code": 7001,
+      "name": "AlreadyInitialized",
+      "msg": "The report buffer is already initialized"
+    },
+    {
+      "code": 7002,
+      "name": "InvalidLength",
+      "msg": "Invalid length for report buffer"
+    },
+    {
+      "code": 7003,
+      "name": "InvalidChunkIndex",
+      "msg": "Chunk lies outside the report buffer"
+    },
+    {
+      "code": 7004,
+      "name": "ChunkSizeTooSmall",
+      "msg": "Chunk size is too small."
+    },
+    {
+      "code": 7005,
+      "name": "InvalidChunkSize",
+      "msg": "Invalid chunk size. Remember that the last chunk should be right-padded with zeros."
+    },
+    {
+      "code": 7006,
+      "name": "Incomplete",
+      "msg": "Report buffer is not complete: chunks are missing"
+    },
+    {
+      "code": 7007,
+      "name": "ReportUnavailable",
+      "msg": "Report wasn't provided via buffer"
+    },
+    {
+      "code": 7008,
+      "name": "FailedToDeserializeReport",
+      "msg": "Failed to deserialize report"
+    },
+    {
+      "code": 7009,
+      "name": "ForcedFailure",
+      "msg": "Forced failure"
+    }
+  ]
+}
