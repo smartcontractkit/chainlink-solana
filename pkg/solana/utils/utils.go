@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/gagliardetto/solana-go"
+
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -35,5 +37,54 @@ func InjectAddressModifier(inputModifications, outputModifications commoncodec.M
 			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
 			outputModifications[i] = addrModifierConfig
 		}
+	}
+}
+
+func DeepCopyTx(tx solana.Transaction) solana.Transaction {
+	// Clone the signatures.
+	sigs := make([]solana.Signature, len(tx.Signatures))
+	copy(sigs, tx.Signatures)
+
+	// Clone the message.
+	msg := tx.Message
+
+	// Deep-copy AccountKeys.
+	accountKeys := make([]solana.PublicKey, len(msg.AccountKeys))
+	copy(accountKeys, msg.AccountKeys)
+
+	// Deep-copy Instructions.
+	instructions := make([]solana.CompiledInstruction, len(msg.Instructions))
+	for i, instr := range msg.Instructions {
+		newInstr := solana.CompiledInstruction{
+			ProgramIDIndex: instr.ProgramIDIndex,
+			Accounts:       make([]uint16, len(instr.Accounts)),
+			Data:           make([]byte, len(instr.Data)),
+		}
+		copy(newInstr.Accounts, instr.Accounts)
+		copy(newInstr.Data, instr.Data)
+		instructions[i] = newInstr
+	}
+
+	// Deep-copy AddressTableLookups.
+	lookups := make([]solana.MessageAddressTableLookup, len(msg.AddressTableLookups))
+	for i, lookup := range msg.AddressTableLookups {
+		newLookup := solana.MessageAddressTableLookup{
+			AccountKey:      lookup.AccountKey,
+			WritableIndexes: make(solana.Uint8SliceAsNum, len(lookup.WritableIndexes)),
+			ReadonlyIndexes: make(solana.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
+		}
+		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
+		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
+		lookups[i] = newLookup
+	}
+
+	// Reassemble the cloned message.
+	msg.AccountKeys = accountKeys
+	msg.Instructions = instructions
+	msg.AddressTableLookups = lookups
+
+	return solana.Transaction{
+		Signatures: sigs,
+		Message:    msg,
 	}
 }
