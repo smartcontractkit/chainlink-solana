@@ -23,8 +23,7 @@ pub struct ReceivedDecimalReport {
     pub answer: u128,
     pub data_id: [u8; 16],
 }
-// 36 *2 + 4
-// 16 + 20 + 4
+// 16 + 20 + 4 = 40 bytes
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct CacheTransmission {

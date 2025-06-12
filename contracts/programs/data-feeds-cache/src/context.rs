@@ -239,6 +239,21 @@ pub struct SetDecimalFeedConfigs<'info> {
     // pub permission_flag: UncheckedAccount<'info>
 }
 
+// So for internal data feeds use case:
+//
+// max_payload_size = 333
+
+// best case (no legacy feeds)
+// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N) ==> N = 7.7
+//       ^payload ^accounts
+
+// worst case (all reports are tied with legacy feeds)
+// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
+// N = 7.5
+
+// So we can at most support 7 decimal feed reports with ALTs
+
+// ```
 #[derive(Accounts)]
 pub struct OnReport<'info> {
     // #[account(owner = FORWARDER_ID)]
@@ -256,29 +271,18 @@ pub struct OnReport<'info> {
     #[account()]
     pub cache_state: AccountLoader<'info, CacheState>,
 
-    // some data cache instances may not care about the legacy feeds so they
-    // will omit them both and legacy feed logic will be skipped
-
     // omit if you don't want to write to the store
-    // inline: check that the store equals the one set in the legacy_feeds_config
     #[account(executable)]
     pub legacy_store: Option<UncheckedAccount<'info>>,
 
     // omit if you don't want to write to the store
-    // behavior if we don't include legacy store ...
-    // legacy_store | legacy feeds config
-    // N                N     - skips logic altogether
-    // N                Y     - if it is in a report, don't write but log about feeds that would be affected?
-    // Y                N     - ERROR state
-    // Y                Y     - if it is in a report, writes to the legacy feed
-
-    // we can emit an event that says if it's writing or not
     #[account(
         seeds = [b"legacy_feeds_config", cache_state.key().as_ref()], // todo: add the current state
         bump
     )]
     pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>,
 
+    // omit if you don't want to write to the store
     /// CHECK: This is a PDA
     #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,

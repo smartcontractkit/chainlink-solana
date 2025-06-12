@@ -15,7 +15,7 @@ In general, the Solana DFC has the same features as a [prior version](https://gi
 
 However there are a couple differences in the Solana DFC
 1. Does not support proxying, so there is no such mapping to maintain a proxy to a dataIds. In this way, it's more similar to the older version of EVM DFC which does not support proxying.
-2. When updating the decimal report config of a feed, if the specific workflow is no longer referenced, the permission flag account is marked as "stale" and is to be removed in a subsequent instruction.
+2. Before updating the decimal report config of a feed, you must simulate `preview_decimal_feed_config` instruction in order to know ahead of time what defunct write permission accounts to remove. 
 3. Support for writing to Solana DF 1.0 legacy store and feeds. This can be enabled or disabled depending on flags and optional accounts passed in.
 4. We only support decimal reports and not bundled reports (product decision)
 
@@ -67,12 +67,9 @@ This is a zero copy account. The workflow_metadata is a fixed size arrayvec whic
 pub struct FeedConfig {
     // UTF-bytes encoded
     pub description: [u8; 32],
-    pub workflow_metadata: WorkflowMetadataList,
-    pub stale_permission_accounts: AccountList,
+    pub workflow_metadata: WorkflowMetadataList
 }
 ```
-
-You'll notice a new field `stale_permission_accounts`. This is to store the permission accounts that are not referenced anymore. For example, let's say originally your workflow_metadata is [A, B, C]. If you update feedConfig to [A, B, D], C is no longer authorized to report on behalf of the feed, so it's permission account is marked for closing. The account closing happens in `close_stale_permission_accounts` in order to avoid complexity.
 
 ```
 #[account(
@@ -243,8 +240,6 @@ pub struct InitDecimalReports<'info> {
 }
 ```
 
-### close_decimal_reports (TODO: add this)
-
 ### init_legacy_feeds_config 
 
 Contains legacy store / feed information. As a recap, the DF 1.0 store owns the feed accounts which contain the actual data. There is 1 store program and multiple feed accounts which are updated.
@@ -323,6 +318,8 @@ First, you have N feed config accounts which match the order of the `data_ids` p
 
 Then, you have N x M permission flag accounts which are ordered by the data_id first and workflow second. 
 
+Lastly you have L defunct permission accounts which are to be closed. You get these by simulating the preview_decimal_feed_configs instruction and passing them here.
+
 Below is an example.
 
 ```
@@ -370,13 +367,62 @@ pub struct SetDecimalFeedConfigs<'info> {
     //     bump
     // )]
     // pub permission_flag: UncheckedAccount<'info>
+
+
+    // Defunct permission accounts that need closing
+    // acquired by simulating "preview_decimal_feed_configs"
+    // L accounts
+    // #[account(
+    //     mut,
+    //     seeds = [
+    //         b"permission_flag",
+    //         state.key().as_ref()
+    //         report_hash,
+    //     ],
+    //     bump
+    // )]
+    // pub permission_flag: UncheckedAccount<'info>
 }
 ```
 
 
-### close_stale_permission_accounts
+### preview_decimal_feed_configs
 
-Should be immediately called after set_decimal_feed_configs.
+This is to preview the permission accounts that are not referenced anymore and thus can be deleted. For example, let's say originally your workflow_metadata is [A, B, C]. If you update feedConfig to [A, B, D], C is no longer authorized to report on behalf of the feed, so it's permission account is closed in `set_decimal_feed_configs`. You must however know this ahead of time because you are required to specify all accounts that are touched.
+
+Note that the account context is different between set_decimal_feed_configs and preview_decimal_feed_configs. Anyone can all this instruction and of course you don't pass in the defunct account permissions in this context.
+
+```
+#[derive(Accounts)]
+pub struct PreviewDecimalFeedConfigs<'info> {
+    pub state: AccountLoader<'info, CacheState>,
+    // dynamic list of writePermissions. create if not created already, or overwrite as well
+
+    // N accounts, N = # of data ids
+    //   #[account(
+    //     mut,
+    //     seeds = [
+    //         b"feed_config",
+    //         state.key().as_ref()
+    //         data_id,
+    //     ],
+    //     bump
+    //   )]
+    //   pub feed_config: UncheckedAccount<'info>
+
+    // N X M accounts, N = # of data_ids, M = # of workflows
+    // #[account(
+    //     mut,
+    //     seeds = [
+    //         b"permission_flag",
+    //         state.key().as_ref()
+    //         report_hash,
+    //     ],
+    //     bump
+    // )]
+    // pub permission_flag: UncheckedAccount<'info>
+}
+```
 
 ### on_report
 
@@ -482,4 +528,35 @@ The structure of the remaining accounts is
 * Then at the very end are all the legacy feed accounts that are associated with the received reports in the payload. For example, if the received reports is reporting on feeds that do not have a legacy feed this will be 0, otherwise it will be non-zero. 
 
 Note that if you supply legacy_feeds in remaining accounts that are not required nothing bad will occur. If you have disabled the writes through any of the mechanism listed earlier, you can also omit passing legacy feeds in the ctx.remaining_accounts entirely. However, if you legacy feeds are enabled, then you must supply all the legacy feed accounts in ctx.remaining_accounts or else the transaction will revert because it expects it to included.
+
+So for internal data feeds use case we said in the forwarder README that
+```
+ max_payload_size = 333
+```
+
+Based on the payload encoding and account contexts of data feed cache on_report, here are the estimated number of decimal reports that can be sent in one transmission:
+
+
+Best case (no legacy feeds)
+
+```
+333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N)
+
+N = 7.7
+```
+* 4 + 40*N is the total payload size for N `ReceivedDecimalReport`s
+* Remember we're using the address lookup table, so accounts take 1 byte only
+
+Worst case (all reports are tied with legacy feeds)
+
+```
+333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
+
+N = 7.5
+```
+* in the account context calculations, we use 3N over 2N because the extra N comes from the legacy feed accounts in ctx.remaining_accounts
+
+So we can at most support 7 decimal feed reports with ALTs
+
+
 
