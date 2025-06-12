@@ -5,7 +5,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 pub const REPORT_CONTEXT_LEN: usize = 96;
 
 // our don size is directly limited by the transaction size during on_report's signature verification
-pub const MAX_ORACLES: usize = 17;
+pub const MAX_ORACLES: usize = 16;
 
 pub const SIGNATURE_LEN: usize = 65;
 

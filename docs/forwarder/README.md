@@ -139,7 +139,8 @@ As noted above, it is crucial that the receiver program verify the forwarder aut
 
 ## transaction size
 
-Solana places a hard 1232 byte limit on transaction sizes. For the report instruction, we want to make sure we have enough space left over for the receiver payload given that accounts and signatures will take up significant space in the transaction.
+
+Solana places a hard 1232 byte limit on transaction sizes. For the report instruction, we want to make sure we have enough space left over for the receiver payload given that accounts and signatures will take up significant space in the transaction. We place a maximum of 16 oracles in the DON so that the report signature will only have at max 5 signatures. All the tx size calculations are based off this scenario of f = 5 which yields the least left over space for the payload.
 
 The anchor tests simulate the transaction so we can get a good idea of the amount leftover. To make things simple, the test has a 1 byte payload and only passes 1 additional remaining account in the report instruction.
 

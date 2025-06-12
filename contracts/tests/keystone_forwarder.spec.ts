@@ -14,6 +14,7 @@ import { assert } from "chai";
 import { createHash } from "crypto";
 import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
 import chaiAsPromised from "chai-as-promised";
+import { DummyReceiver } from "../target/types/dummy_receiver";
 
 // chai.use(chaiAsPromised);
 
@@ -369,7 +370,7 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    const signers = Array.from({ length: 17 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 16 }, () => generateEthKeypair());
     signers.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
