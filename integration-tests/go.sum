@@ -1250,8 +1250,8 @@ github.com/smartcontractkit/chainlink-ccip v0.0.0-20250523142134-2057cda8d221 h1
 github.com/smartcontractkit/chainlink-ccip v0.0.0-20250523142134-2057cda8d221/go.mod h1:Pw1pSK/XqEKELzGbZ5ht/xzja1iXpODqMqISQNlaZ9w=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed h1:rjtXQLTCLa/+AmMwMTP5WwJUdPBeBAF3Ivwc1GXetBw=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed/go.mod h1:k3/Z6AvwurPUlfuDFEonRbkkiTSgNSrtVNhJEWNlUZA=
-github.com/smartcontractkit/chainlink-common v0.7.1-0.20250522183927-44d96a7ad0e5 h1:xyWbyQ7zEogNbx4e9kzhoShIDaxHlj9KFcebiThLwGQ=
-github.com/smartcontractkit/chainlink-common v0.7.1-0.20250522183927-44d96a7ad0e5/go.mod h1:TF9ZqBV0QA3X1T4BoLGp0FfJpOQOcQ+ggKu1MlsWKYw=
+github.com/smartcontractkit/chainlink-common v0.7.1-0.20250612121922-2298f64737bf h1:qMkV2bFdCesvIvqTSvPkCUghI7WLbRhLl/knRgfGs2Y=
+github.com/smartcontractkit/chainlink-common v0.7.1-0.20250612121922-2298f64737bf/go.mod h1:H7gOuN4Jzf+DWllfP5Pb7AiCWBMQrDX1D1KYXAEhdnw=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7 h1:9wh1G+WbXwPVqf0cfSRSgwIcaXTQgvYezylEAfwmrbw=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7/go.mod h1:yaDOAZF6MNB+NGYpxGCUc+owIdKrjvFW0JODdTcQ3V0=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250417193446-eeb0a7d1e049 h1:7HwYt8rDz1ehTcB28oNipdTZUtV17F2sfkLTLtMJC4c=
@@ -1268,8 +1268,8 @@ github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65
 github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a/go.mod h1:jo+cUqNcHwN8IF7SInQNXDZ8qzBsyMpnLdYbDswviFc=
 github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a h1:O28vgyHM7QF1YLg1BwkQSIbOYA+t0RiH9+b+k90GPG8=
 github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a/go.mod h1:zYqPBBRUXUQ/L+aD4Q7phnYsfVeC5rDBXtPt1VYwtws=
-github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250516160234-c2e27f791437 h1:Vd1kN9ks1JeGvVkzOaJnZjLlhL+biDupDdJEx5HVbx0=
-github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250516160234-c2e27f791437/go.mod h1:HHGeDUpAsPa0pmOx7wrByCitjQ0mbUxf0R9v+g67uCA=
+github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250604191313-8f161cf29ad5 h1:Qrz1cG/myK+EUEz4aLfz1pS4cODit7v61BuXq3MDifk=
+github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250604191313-8f161cf29ad5/go.mod h1:HHGeDUpAsPa0pmOx7wrByCitjQ0mbUxf0R9v+g67uCA=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0 h1:55Izmj3bEFD2o0tWpuEd3OFV/pcIQiiaPZP7uJqi1GQ=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.10.0/go.mod h1:/dVVLXrsp+V0AbcYGJo3XMzKg3CkELsweA/TTopCsKE=
 github.com/smartcontractkit/chainlink-protos/orchestrator v0.6.0 h1:3H8vMqP9eEhS/pCSPKsSXMoOo6mLy65ZFNZOc3DTFSk=
@@ -1296,8 +1296,8 @@ github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250526150927-4f
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250526150927-4f3a3be02b55/go.mod h1:+FnJonl6w0Z04BIygm28WaETfF+EgbnQJEuJMms5yc8=
 github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250526150927-4f3a3be02b55 h1:G3gRmGVznDqZRSif7JBVhgkvUlm4MqpkGBlDvP80XFY=
 github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250526150927-4f3a3be02b55/go.mod h1:0FkjaKladxd8pyZCRay6IpmM7tr/RwHinAE9ZSBxtyM=
-github.com/smartcontractkit/freeport v0.1.0 h1:3MZHeti5m+tSTBCq5R8rhawFHxrnQZYBZVL+xgS1sPo=
-github.com/smartcontractkit/freeport v0.1.0/go.mod h1:T4zH9R8R8lVWKfU7tUvYz2o2jMv1OpGCdpY2j2QZXzU=
+github.com/smartcontractkit/freeport v0.1.1 h1:B5fhEtmgomdIhw03uPVbVTP6oPv27fBhZsoZZMSIS8I=
+github.com/smartcontractkit/freeport v0.1.1/go.mod h1:T4zH9R8R8lVWKfU7tUvYz2o2jMv1OpGCdpY2j2QZXzU=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20250513175559-61c382d6cee4 h1:pFqWExLVU/i9zYWVb4KR2K6mDFCg3+LyeqF/fsmxlAk=
