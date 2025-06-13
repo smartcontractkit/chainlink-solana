@@ -388,9 +388,9 @@ pub struct SetDecimalFeedConfigs<'info> {
 
 ### preview_decimal_feed_configs
 
-This is to preview the permission accounts that are not referenced anymore and thus can be deleted. For example, let's say originally your workflow_metadata is [A, B, C]. If you update feedConfig to [A, B, D], C is no longer authorized to report on behalf of the feed, so it's permission account is closed in `set_decimal_feed_configs`. You must however know this ahead of time because you are required to specify all accounts that are touched.
+This instruction is only meant to be simulated off-chain before calling `set_decimal_feeds_config`. It does not change account state. This is to preview the permission accounts that are not referenced anymore and thus can be deleted. For example, let's say originally your workflow_metadata is [A, B, C]. If you update feedConfig to [A, B, D], C is no longer authorized to report on behalf of the feed, so it's permission account is closed in `set_decimal_feed_configs`. You must however know this ahead of time because you are required to specify all accounts that are touched.
 
-Note that the account context is different between set_decimal_feed_configs and preview_decimal_feed_configs. Anyone can all this instruction and of course you don't pass in the defunct account permissions in this context.
+Note that the account context is different between set_decimal_feed_configs and preview_decimal_feed_configs. Anyone can call this instruction and of course you don't pass in the defunct account permissions in this context (figuring that out is the purpose of this instruction)
 
 ```
 #[derive(Accounts)]
