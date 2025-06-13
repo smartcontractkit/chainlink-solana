@@ -1201,7 +1201,10 @@ name = "keystone-forwarder"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "arrayvec 1.0.1",
+ "bytemuck",
  "solana-program",
+ "static_assertions",
 ]
 
 [[package]]
