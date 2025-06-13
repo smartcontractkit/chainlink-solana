@@ -49,7 +49,12 @@ Run anchor tests (automatically tests against a local node).
 anchor test
 ```
 
-### Using nix shell to test
+### Using nix shell to test locally
+
+Make sure you have run this in the contracts/ folder
+```
+solana-keygen new -o id.json
+```
 
 1. In `shell.nix` comment out:
 

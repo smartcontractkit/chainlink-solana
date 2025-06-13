@@ -7,7 +7,7 @@
 
 The data feeds cache (DFC) is a receiver program that is the receipient of the forwarder contract's payload. For more information on how this works, please reference the forwarder documentation. 
 
-In general, the Solana DFC has the same features as a [prior version](https://github.com/smartcontractkit/chainlink-data-feeds-2.0/blob/develop/contracts/src/v0.8/data-feeds/DataFeedsCache.sol) (as opposed to the [latest version](https://github.com/smartcontractkit/chainlink/blob/83ccf038841caaaf97f404d71c585bdd3232cc22/contracts/src/v0.8/data-feeds/DataFeedsCache.sol)). You should use the older version as reference:
+In general, the Solana DFC has the same features as a [prior version](https://github.com/smartcontractkit/chainlink-data-feeds-2.0/blob/develop/contracts/src/v0.8/data-feeds/DataFeedsCache.sol) (as opposed to the [latest version](https://github.com/smartcontractkit/chainlink/blob/83ccf038841caaaf97f404d71c585bdd3232cc22/contracts/src/v0.8/data-feeds/DataFeedsCache.sol)). You should use the older version as reference (however some of the behavior such as emitting events for invalid report permission and stale reports instead of reverting is similar to the latest EVM version):
 1. Configure the decimal reports
     * updates permission storage variable(s)
     * updates feed config storage variables(s)
