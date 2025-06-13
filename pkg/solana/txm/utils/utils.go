@@ -9,6 +9,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type TxState int
@@ -211,7 +213,21 @@ type TxConfig struct {
 	EstimateComputeUnitLimit bool   // enable compute limit estimations using simulation
 	ComputeUnitLimit         uint32 // compute unit limit
 
-	DependencyTxID string // transaction ID to wait for before broadcasting
+	DependencyTxMeta DependencyTxMeta // transaction IDs to wait for before broadcasting
+}
+
+type DependencyTxMeta struct {
+	// List of transactions and their desired statuses this transaction is dependent on
+	DependencyTxs []DependencyTx
+	// Flag to ignore dependency errors. Used by clean up transactions that are normally expected to be dropped
+	IgnoreDependencyError bool
+}
+
+type DependencyTx struct {
+	// ID the transaction is dependent on
+	TxID string
+	// Desired status of the dependency transaction. Note: Failed and Fatal will be treated as the same.
+	DesiredStatus commontypes.TransactionStatus
 }
 
 type SetTxConfig func(*TxConfig)
@@ -251,8 +267,13 @@ func SetEstimateComputeUnitLimit(v bool) SetTxConfig {
 		cfg.EstimateComputeUnitLimit = v
 	}
 }
-func SetDependencyTxID(v string) SetTxConfig {
+func AppendDependencyTxs(v []DependencyTx) SetTxConfig {
 	return func(cfg *TxConfig) {
-		cfg.DependencyTxID = v
+		cfg.DependencyTxMeta.DependencyTxs = append(cfg.DependencyTxMeta.DependencyTxs, v...)
+	}
+}
+func SetDependencyTxMetaIgnoreError(v bool) SetTxConfig {
+	return func(cfg *TxConfig) {
+		cfg.DependencyTxMeta.IgnoreDependencyError = v
 	}
 }

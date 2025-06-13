@@ -193,6 +193,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		// Do not retry and exit early if fails
 		cancel()
 		stateTransitionErr := txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.Errored, TxFailReject)
+		txm.lggr.Errorw("tx failed initial transmit", "id", msg.id, "err", initSendErr)
 		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed initial transmit: %w", errors.Join(initSendErr, stateTransitionErr))
 	}
 
@@ -320,10 +321,7 @@ func (txm *Txm) retryTx(ctx context.Context, cancel context.CancelFunc, msg pend
 		}
 
 		// updates the exponential backoff delay up to a maximum limit.
-		deltaT = deltaT * 2
-		if deltaT > MaxRetryTimeMs {
-			deltaT = MaxRetryTimeMs
-		}
+		deltaT = min(deltaT*2, MaxRetryTimeMs)
 		tick = time.After(time.Duration(deltaT) * time.Millisecond)
 	}
 }
@@ -701,7 +699,7 @@ func (txm *Txm) reap() {
 		case <-ticker.C:
 			reapCount := txm.txs.TrimFinalizedErroredTxs()
 			if reapCount > 0 {
-				txm.lggr.Debugf("Reaped %d finalized or errored transactions", reapCount)
+				txm.lggr.Debugw("Reaped finalized or errored transactions", "reapCount", reapCount)
 			}
 		}
 		ticker.Reset()
@@ -755,19 +753,6 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		v(&cfg)
 	}
 
-	// Perform compute unit limit estimation after storing transaction
-	// If error found during simulation, transaction should be in storage to mark accordingly
-	if cfg.EstimateComputeUnitLimit {
-		computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, tx, id)
-		if simErr != nil {
-			return fmt.Errorf("transaction failed simulation: %w", simErr)
-		}
-		// If estimation returns 0 compute unit limit without error, fallback to original config
-		if computeUnitLimit != 0 {
-			cfg.ComputeUnitLimit = computeUnitLimit
-		}
-	}
-
 	msg := pendingTx{
 		id:                   id,
 		tx:                   *tx,
@@ -784,31 +769,21 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	}
 
 	// If a dependency transaction ID is provided, handle waiting and enqueuing asynchronously.
-	if cfg.DependencyTxID != "" {
-		go func(msg pendingTx, depID string) {
-			ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForTxStatus will merge this with TxConfirmTimeout
-			defer cancel()
-			status, err := txm.waitForTxStatus(ctx, depID, commontypes.Finalized)
-			if err != nil {
-				txm.lggr.Errorw("dependency transaction did not reach desired state", "id", msg.id, "dependencyTx", depID, "error", err)
-				errorStatus := txmutils.Errored
-				if status == commontypes.Fatal {
-					errorStatus = txmutils.FatallyErrored
-				}
-				err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), errorStatus, TxDependencyFail)
-				if err != nil {
-					txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
-				}
-				return
-			}
-			select {
-			case txm.chSend <- msg:
-				txm.lggr.Debugw("enqueued tx after dependency complete", "id", msg.id, "dependencyTxID", depID)
-			default:
-				txm.lggr.Errorw("failed to enqueue tx after dependency", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
-			}
-		}(msg, cfg.DependencyTxID)
+	if len(msg.cfg.DependencyTxMeta.DependencyTxs) > 0 {
+		// Transaction dependency feature will not behave as expected if TxRetentionTimeout is set to 0
+		if txm.cfg.TxRetentionTimeout() == 0 {
+			txm.lggr.Error("Invalid configuration encountered. Transaction dependency feature cannot be used with TxRetentionTimeout set to 0")
+			return fmt.Errorf("invalid configuration encountered: %w", err)
+		}
+		go txm.handleDependencyTxs(msg)
 		return nil
+	}
+
+	// Perform compute unit limit estimation after storing transaction
+	// If error found during simulation, transaction should be in storage to mark accordingly
+	msg, err = txm.setMsgComputeUnitLimit(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("transaction failed compute unit limit estimation: %w", err)
 	}
 
 	select {
@@ -820,39 +795,134 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 	return nil
 }
 
-func (txm *Txm) waitForTxStatus(ctx context.Context, transactionID string, desiredStatus commontypes.TransactionStatus) (commontypes.TransactionStatus, error) {
-	waitCtx, cancel := context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+func (txm *Txm) handleDependencyTxs(msg pendingTx) {
+	ctx, cancel := txm.chStop.NewCtx() // NOTE: waitForDependencyTxs will merge this with TxConfirmTimeout if non-zero
+	defer cancel()
+	depMeta := msg.cfg.DependencyTxMeta
+	err := txm.waitForDependencyTxs(ctx, depMeta)
+	if err != nil {
+		// IgnoreDependencyError is used by clean up transactions that are expected to be dropped in normal scenarios
+		// No need to log or store error for dependent transactions if dependency tx reached unexpected status
+		if depMeta.IgnoreDependencyError {
+			return
+		}
+		txm.lggr.Errorw("dependency transactions did not reach desired statuses", "id", msg.id, "error", err)
+		err = txm.txs.OnPrebroadcastError(msg.id, txm.cfg.TxRetentionTimeout(), txmutils.Errored, TxDependencyFail)
+		if err != nil {
+			txm.lggr.Errorw("failed to mark transaction as errored", "id", msg.id, "error", err)
+		}
+		return
+	}
+
+	client, err := txm.client.Get(ctx)
+	if err != nil {
+		txm.lggr.Errorw("failed to get client while waiting for dependency transactions", "error", err)
+		return
+	}
+	// Fetch latest blockhash
+	blockhash, err := client.LatestBlockhash(ctx)
+	if err != nil {
+		txm.lggr.Errorw("failed to fetch latest blockhash ", "error", err)
+		return
+	}
+	// Update the dependent transaction's blockhash because waiting for dependency transactions reduced the existing one's validity
+	msg.tx.Message.RecentBlockhash = blockhash.Value.Blockhash
+	msg.lastValidBlockHeight = blockhash.Value.LastValidBlockHeight
+
+	// Estimate compute unit limit if flag is enabled and set the appropriate value in msg config before queueing
+	msg, err = txm.setMsgComputeUnitLimit(ctx, msg)
+	if err != nil {
+		return
+	}
+
+	select {
+	case txm.chSend <- msg:
+		txm.lggr.Debugw("enqueued tx after dependencies reached desired status", "id", msg.id, "dependencyTxCount", len(depMeta.DependencyTxs))
+	default:
+		txm.lggr.Errorw("failed to enqueue tx after dependencies", "queueFull", len(txm.chSend) == MaxQueueLen, "tx", msg)
+	}
+}
+
+func (txm *Txm) waitForDependencyTxs(ctx context.Context, depMeta txmutils.DependencyTxMeta) error {
+	waitCtx := ctx
+	var cancel context.CancelFunc
+	// Merge context with TxConfirmTimeout if non-zero. Transactions are dropped if they aren't confirmed within TxConfirmTimeout.
+	// No need to continue to poll for status if that timeout is reached.
+	// If TxConfirmTimeout is set to 0, transactions are never dropped so using the parent context (TXM stop channel) is valid.
+	if txm.cfg.TxConfirmTimeout() > 0 {
+		waitCtx, cancel = context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+	}
 	defer cancel()
 
 	backoff := 1 * time.Second
 	maxBackoff := 8 * time.Second
 
+	remaining := depMeta.DependencyTxs
+	unexpectedStatuses := 0
+
 	for {
 		select {
 		case <-waitCtx.Done():
-			return commontypes.Unknown, fmt.Errorf("context ended while waiting for finality of transaction %s", transactionID)
+			return fmt.Errorf("context ended while waiting for %d transaction's desired status", len(remaining))
 		case <-time.After(backoff):
-			status, err := txm.GetTransactionStatus(waitCtx, transactionID)
-			if err != nil {
-				return status, fmt.Errorf("error fetching transaction status: %w", err)
-			}
-			switch status {
-			case commontypes.Failed, commontypes.Fatal:
-				return status, fmt.Errorf("transaction %s failed", transactionID)
-			default:
-				if status >= desiredStatus {
-					// if status is equal to or greater than desired status, return
-					txm.lggr.Debugw("transaction reached state", "status", status, "id", transactionID)
-					return status, nil
+			txAwaitingDesiredStatus := make([]txmutils.DependencyTx, 0, len(remaining))
+			for _, meta := range remaining {
+				status, err := txm.GetTransactionStatus(waitCtx, meta.TxID)
+				switch status {
+				case commontypes.Failed, commontypes.Fatal, commontypes.Unknown:
+					// This would only happen if the transaction status has been cleared from storage. Unknown status is only returned for errors
+					if err != nil || status == commontypes.Unknown {
+						txm.lggr.Debugw("failed to find status of dependency transaction", "dependencyTxID", meta.TxID, "err", err.Error())
+					}
+					if !isErroredStatus(meta.DesiredStatus) {
+						txm.lggr.Debugw("dependency transaction required to be successful status but encountered errored status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						unexpectedStatuses++
+						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
+						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
+						continue
+					}
+					if status == commontypes.Failed || status == commontypes.Fatal {
+						txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+					}
+				case commontypes.Finalized, commontypes.Unconfirmed:
+					if isErroredStatus(meta.DesiredStatus) {
+						txm.lggr.Debugw("dependency transaction required to be errored status but encountered successful status", "status", status, "desiredStatus", meta.DesiredStatus, "dependencyTxID", meta.TxID)
+						unexpectedStatuses++
+						// Allow status poll to continue before marking the dependent transaction as errored in case other transactions are dependent on it
+						// Returning the error early could cause unexpected behavior if the assumption is all preceding transactions are completed
+						continue
+					}
+					if status < meta.DesiredStatus {
+						// keep polling if tx has not reached desired status
+						txAwaitingDesiredStatus = append(txAwaitingDesiredStatus, meta)
+						continue
+					}
+					// if status is equal to or greater than desired status, skip adding to remaining txID list
+					txm.lggr.Debugw("dependency transaction reached desired status", "status", status, "desiredStatus", meta.DesiredStatus, "id", meta.TxID)
+				case commontypes.Pending:
+					// Pending could represent the tx still awaiting broadcast. We don't have the info to make any decisions on its status so allow polling to continue
+					txAwaitingDesiredStatus = append(txAwaitingDesiredStatus, meta)
+				default:
+					return fmt.Errorf("unexpected status encountered: %d", status)
 				}
-				// otherwise keep polling
+			}
+			remaining = txAwaitingDesiredStatus
+			// all dependency transactions have reached a completed status, return
+			// otherwise continue polling
+			if len(remaining) == 0 {
+				// Return error if any of the dependency transactions were in unexpected statuses to avoid queueing the dependent transaction
+				if unexpectedStatuses > 0 {
+					return fmt.Errorf("%d transactions have unexpected statuses", unexpectedStatuses)
+				}
+				return nil
 			}
 		}
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
-		}
+		backoff = min(backoff*2, maxBackoff)
 	}
+}
+
+func isErroredStatus(status commontypes.TransactionStatus) bool {
+	return status == commontypes.Failed || status == commontypes.Fatal
 }
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
@@ -878,59 +948,10 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 }
 
-func deepCopyTx(tx solanaGo.Transaction) solanaGo.Transaction {
-	// Clone the signatures.
-	sigs := make([]solanaGo.Signature, len(tx.Signatures))
-	copy(sigs, tx.Signatures)
-
-	// Clone the message.
-	msg := tx.Message
-
-	// Deep-copy AccountKeys.
-	accountKeys := make([]solanaGo.PublicKey, len(msg.AccountKeys))
-	copy(accountKeys, msg.AccountKeys)
-
-	// Deep-copy Instructions.
-	instructions := make([]solanaGo.CompiledInstruction, len(msg.Instructions))
-	for i, instr := range msg.Instructions {
-		newInstr := solanaGo.CompiledInstruction{
-			ProgramIDIndex: instr.ProgramIDIndex,
-			Accounts:       make([]uint16, len(instr.Accounts)),
-			Data:           make([]byte, len(instr.Data)),
-		}
-		copy(newInstr.Accounts, instr.Accounts)
-		copy(newInstr.Data, instr.Data)
-		instructions[i] = newInstr
-	}
-
-	// Deep-copy AddressTableLookups.
-	lookups := make([]solanaGo.MessageAddressTableLookup, len(msg.AddressTableLookups))
-	for i, lookup := range msg.AddressTableLookups {
-		newLookup := solanaGo.MessageAddressTableLookup{
-			AccountKey:      lookup.AccountKey,
-			WritableIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.WritableIndexes)),
-			ReadonlyIndexes: make(solanaGo.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
-		}
-		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
-		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
-		lookups[i] = newLookup
-	}
-
-	// Reassemble the cloned message.
-	msg.AccountKeys = accountKeys
-	msg.Instructions = instructions
-	msg.AddressTableLookups = lookups
-
-	return solanaGo.Transaction{
-		Signatures: sigs,
-		Message:    msg,
-	}
-}
-
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
-	txCopy := deepCopyTx(*tx)
+	txCopy := utils.DeepCopyTx(*tx)
 
 	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
 	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
@@ -1145,6 +1166,23 @@ func (txm *Txm) fetchTransactionLogs(ctx context.Context, sig solanaGo.Signature
 	if tx.Meta != nil && len(tx.Meta.LogMessages) > 0 {
 		txm.lggr.Debugw("failed transaction logs", "logs", tx.Meta.LogMessages)
 	}
+}
+
+func (txm *Txm) setMsgComputeUnitLimit(ctx context.Context, msg pendingTx) (pendingTx, error) {
+	if !msg.cfg.EstimateComputeUnitLimit {
+		return msg, nil
+	}
+	// Estimate compute unit limit and return new msg with the appropriate value set
+	computeUnitLimit, simErr := txm.EstimateComputeUnitLimit(ctx, &msg.tx, msg.id)
+	if simErr != nil {
+		txm.lggr.Errorw("failed to estimate compute unit limit for transaction", "id", msg.id, "err", simErr)
+		return pendingTx{}, fmt.Errorf("failed to estimate compute unit limit for transaction with ID %s: %w", msg.id, simErr)
+	}
+	// If estimation returns 0 compute unit limit without error, fallback to original config
+	if computeUnitLimit != 0 {
+		msg.cfg.ComputeUnitLimit = computeUnitLimit
+	}
+	return msg, nil
 }
 
 // Close close service

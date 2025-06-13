@@ -600,6 +600,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "buffer-payload"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "solana-program",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
