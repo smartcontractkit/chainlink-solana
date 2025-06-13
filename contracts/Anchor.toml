@@ -26,9 +26,13 @@ test = "pnpm run test"
 # TODO: add pubkeys
 
 [programs.localnet]
+# note: replace underscores "_" with dashes "-" for "anchor test" to use declared program id
 access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+buffer-payload = "85bivLENWAX36kyWC9zemZu9H3D88J79wXdHgR6ZmZHX"
 contract-reader-interface = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 contract-reader-interface-secondary = "9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf"
+dummy_receiver = "5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L"
+keystone_forwarder = "whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz"
 log-read-test = "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4"
 ocr_2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ" # need to rename the idl to satisfy anchor.js...
 store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"

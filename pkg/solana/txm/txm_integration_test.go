@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/freeport"
 
 	solanaclient "github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -221,9 +222,10 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		// Start live validator and setup test environment
 		t.Parallel()
 		ledgerDir := t.TempDir()
-		port := commonutils.MustRandomPort(t)
-		faucetPort := commonutils.MustRandomPort(t)
-		cmd, url := startValidator(t, ledgerDir, port, faucetPort, true)
+		ports, err := solanatesting.TwoConsecutiveFreeports(t)
+		require.NoError(t, err)
+		faucetPort := strconv.Itoa(freeport.GetOne(t))
+		cmd, url := startValidator(t, ledgerDir, strconv.Itoa(ports[0]), faucetPort, true)
 		ctx, cl, txmInstance, senderPubKey, receiverPubKey, obs := setup(t, url, true)
 
 		// Back up the ledger after transferring funds
@@ -245,7 +247,7 @@ func TestTxm_Integration_Reorg(t *testing.T) {
 		_ = cmd.Wait()
 		require.NoError(t, os.RemoveAll(ledgerDir))
 		require.NoError(t, copyDir(cleanLedgerBackupDir, ledgerDir))
-		startValidator(t, ledgerDir, port, faucetPort, false)
+		startValidator(t, ledgerDir, strconv.Itoa(ports[0]), faucetPort, false)
 
 		// Check tx is not finalized yet and reorg is detected
 		status, errGetStatus := txmInstance.GetTransactionStatus(ctx, txID)
@@ -279,48 +281,48 @@ func TestTxm_Integration_DependencyTx(t *testing.T) {
 
 	t.Run("Successfully executes with dependency tx", func(t *testing.T) {
 		t.Parallel()
-		depTxID := "dependency-tx-id-success"
 
+		depTxID := "dependency-tx-id-success"
 		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
 
 		txID := "main-tx-id-success"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
-		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}})}...))
 
-		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		depTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}}}
+		err := txmInstance.waitForDependencyTxs(ctx, depTxMeta)
 		require.NoError(t, err)
-		require.Equal(t, types.Finalized, status)
 
-		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
+		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: txID, DesiredStatus: types.Finalized}}}
+		err = txmInstance.waitForDependencyTxs(ctx, mainTxMeta)
 		require.NoError(t, err)
-		require.Equal(t, types.Finalized, status)
 
-		logs := observer.FilterMessageSnippet("enqueued tx after dependency complete").Len()
+		logs := observer.FilterMessageSnippet("enqueued tx after dependencies reached desired status").Len()
 		require.Equal(t, 1, logs, "Expected dependency tx log message not found")
 	})
 
 	t.Run("Fails when dependency tx fails", func(t *testing.T) {
 		t.Parallel()
-		depTxID := "dependency-tx-id-fail"
 
+		depTxID := "dependency-tx-id-fail"
 		// Create and enqueue a tx that will fail due to insufficient balance
 		depTx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, 10000000000*solana.LAMPORTS_PER_SOL, true)
 		require.NoError(t, txmInstance.Enqueue(ctx, "", depTx, &depTxID, lastValidBlockHeight))
 
 		txID := "main-tx-id-fail"
 		tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, true)
-		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depTxID)}...))
+		require.NoError(t, txmInstance.Enqueue(ctx, depTxID, tx, &txID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}})}...))
 
-		status, err := txmInstance.waitForTxStatus(ctx, depTxID, types.Finalized)
+		depTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: depTxID, DesiredStatus: types.Finalized}}}
+		err := txmInstance.waitForDependencyTxs(ctx, depTxMeta)
 		require.Error(t, err)
-		require.Equal(t, types.Fatal, status)
 
-		status, err = txmInstance.waitForTxStatus(ctx, txID, types.Finalized)
+		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: txID, DesiredStatus: types.Finalized}}}
+		err = txmInstance.waitForDependencyTxs(ctx, mainTxMeta)
 		require.Error(t, err)
-		require.Equal(t, types.Fatal, status)
 
-		logs := observer.FilterMessageSnippet("dependency transaction did not reach desired state").Len()
+		logs := observer.FilterMessageSnippet("dependency transactions did not reach desired statuses").Len()
 		require.Equal(t, 1, logs, "Expected dependency tx failure log message not found")
 	})
 }
