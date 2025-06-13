@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { ProgramError, BN } from "@coral-xyz/anchor";
+import { ProgramError, BN, Program } from "@coral-xyz/anchor";
 import * as borsh from "borsh";
 import {
   LAMPORTS_PER_SOL,
@@ -26,6 +26,8 @@ import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Round as OCRRound, OCR2Feed } from "@chainlink/solana-sdk";
+import { Ocr2 } from "../target/types/ocr_2";
+import { AccessController } from "../target/types/access_controller";
 
 // generate a new keypair using `solana-keygen new -o id.json`
 
@@ -86,8 +88,9 @@ describe("ocr2", () => {
   const rounds = 15; // number of rounds submitted
 
   const workspace = anchor.workspace;
-  const program = anchor.workspace.Ocr2;
-  const accessController = anchor.workspace.AccessController;
+  const program = anchor.workspace.Ocr2 as Program<Ocr2>;
+  const accessController = anchor.workspace
+    .AccessController as Program<AccessController>;
 
   let token: PublicKey;
   let storeAuthority: PublicKey, storeNonce: number;

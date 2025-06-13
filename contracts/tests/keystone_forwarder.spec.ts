@@ -6,68 +6,19 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  sendAndConfirmTransaction,
-  Transaction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
-import { randomBytes, createHash } from "crypto";
-import * as secp256k1 from "secp256k1";
-import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
+import { createHash } from "crypto";
+import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
+import chaiAsPromised from "chai-as-promised";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 
+// chai.use(chaiAsPromised);
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function signMessage(message: Buffer, secretKey: Buffer) {
-  const { signature, recid: recovery } = secp256k1.ecdsaSign(
-    message,
-    secretKey
-  );
-  return {
-    signature: Buffer.from(signature),
-    recovery, // useful for pubkey recovery
-  };
-}
-
-let generateEthKeypair = () => {
-  let secretKey = randomBytes(32);
-  let publicKey = secp256k1.publicKeyCreate(secretKey, false).slice(1);
-  let ethereumAddress = getEthereumAddress(Buffer.from(publicKey));
-  return {
-    secretKey,
-    publicKey,
-    ethereumAddress,
-  };
-};
-
-function waitForEvent<T>(
-  program: any,
-  eventName: string,
-  validate: (event: T, slot: number) => void
-): Promise<T> {
-  const promise = new Promise<T>((resolve, reject) => {
-    const listener = program.addEventListener(
-      eventName,
-      (event: T, slot: number) => {
-        try {
-          validate(event, slot);
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      }
-    );
-  });
-
-  // Attach catch to prevent unhandled rejection warning — but DO NOT rethrow
-  promise.catch(() => {});
-
-  return promise;
-}
 
 function calculateForwarderAuthorityBump(
   forwarderStatePubkey: PublicKey,
@@ -490,7 +441,7 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    const signers = Array.from({ length: 17 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 16 }, () => generateEthKeypair());
     signers.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
@@ -546,6 +497,7 @@ describe("keystone_storage", function () {
 
     try {
       await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+      assert.fail("Account should not exist anymore");
     } catch (err) {
       if (!err.message.includes("Account does not exist")) {
         assert.fail("Account should not exist anymore");
@@ -884,7 +836,5 @@ describe("keystone_storage", function () {
         assert.fail(`Unexpected error: ${err.message}`);
       }
     }
-
-    await reportPromise;
   });
 });
