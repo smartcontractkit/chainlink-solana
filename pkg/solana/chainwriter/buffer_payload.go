@@ -34,7 +34,7 @@ func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, s
 // - Updates the args to clear out the raw report field which the buffer is used for
 func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.AccountMetaSlice, programID, feePayer solana.PublicKey) ([]solana.Instruction, solana.Instruction, solana.AccountMetaSlice, any, error) {
 	// Max 64 chunks is supported by the CCIP execution report buffer because of the bitmap used to track already uploaded chunks
-	// TODO: Add link to chainlink-ccip code with this limit once merged to develop
+	// https://github.com/smartcontractkit/chainlink-ccip/blob/c36be4fc94127a780c0146714ac89c93b6f906f7/chains/solana/contracts/programs/ccip-offramp/src/instructions/v1/buffering.rs#L124
 	const maxNumChunks = 64
 
 	var execCallArgs ccipsolana.SVMExecCallArgs
