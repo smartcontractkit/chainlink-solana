@@ -230,7 +230,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 			log.ExpiresAt = &expiresAt
 		}
 
-		lp.lggr.Infof("found matching event %v", log)
+		lp.lggr.Infow("found matching event", "log", log, "filter", filter)
 
 		logs = append(logs, log)
 	}
