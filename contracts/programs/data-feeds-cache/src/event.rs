@@ -68,7 +68,16 @@ pub struct DecimalReportClosed {
 }
 
 #[event]
-pub struct LegacyFeedsConfigInitialized {}
+pub struct LegacyFeedsConfigInitialized {
+    pub config: Pubkey
+}
 
 #[event]
-pub struct LegacyFeedsConfigUpdated {}
+pub struct LegacyFeedsConfigUpdated {
+    pub config: Pubkey
+}
+
+#[event]
+pub struct CacheInitialized {
+    pub state: Pubkey
+}
