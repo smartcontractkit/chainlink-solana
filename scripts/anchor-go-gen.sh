@@ -5,10 +5,6 @@ set -e
 for idl_path_str in "contracts/target/idl"/*
 do
   filename=$(basename "$idl_path_str")
-  if [[ "$filename" == "dummy_receiver.json" || "$filename" == "keystone_forwarder.json" ]]; then
-    echo "Skipping $filename"
-    continue
-  fi
   
   IFS='/' read -r -a idl_path <<< "${idl_path_str}"
   IFS='.' read -r -a idl_name <<< "${idl_path[3]}"
