@@ -191,7 +191,12 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts instruction: %w", err)
 		}
-		tx, err := solana.NewTransaction([]solana.Instruction{deriveAccountsIx}, blockhash.Value.Blockhash, solana.TransactionPayer(transmitter))
+		deriveAccountsIxData, err := deriveAccountsIx.Data()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to encode account derivation instruction data: %w", err)
+		}
+		deriveAccountsSolIx := solana.NewInstruction(offramp, deriveAccountsIx.Accounts(), deriveAccountsIxData)
+		tx, err := solana.NewTransaction([]solana.Instruction{deriveAccountsSolIx}, blockhash.Value.Blockhash, solana.TransactionPayer(transmitter))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts transaction: %w", err)
 		}
