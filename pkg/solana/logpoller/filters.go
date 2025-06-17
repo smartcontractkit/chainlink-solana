@@ -199,6 +199,8 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 		return fmt.Errorf("failed to insert filter: %w", err)
 	}
 
+	fl.lggr.Infow("Registered filter", "name", filter.Name, "eventName", filter.EventName)
+
 	filter.ID = filterID
 	fl.addToIndices(filter, decoder)
 
