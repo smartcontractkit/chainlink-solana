@@ -2,5 +2,5 @@
 
 set -euxo pipefail
 
-sh -c "$(curl -sSfL https://release.anza.xyz/v2.1.21/install)"
+sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.17/install)"
 echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
