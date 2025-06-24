@@ -9,6 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
@@ -77,11 +78,14 @@ type bindingsRegistry struct {
 	namespaceBindings map[string]*namespaceBinding
 	// key is namespace
 	addressShareGroups map[string]*addressShareGroup
+	lggr logger.Logger
 }
 
 func newBindingsRegistry() *bindingsRegistry {
+	lggr, _ := logger.New()
 	return &bindingsRegistry{
 		namespaceBindings: make(map[string]*namespaceBinding),
+		lggr: lggr,
 	}
 }
 
@@ -172,19 +176,24 @@ func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, bindin
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.lggr.Debug("Binding registry: handle address sharing check")
 	if err := r.handleAddressSharing(binding); err != nil {
 		return err
 	}
 
+	r.lggr.Debug("Binding registry: binding exists check")
 	namespace, nbsExist := r.namespaceBindings[binding.Name]
 	if !nbsExist {
 		return fmt.Errorf("%w: no namespace named %s", types.ErrInvalidConfig, binding.Name)
 	}
 
+	r.lggr.Debugw("Binding registry: parse address", "address", binding.Address)
 	address, err := solana.PublicKeyFromBase58(binding.Address)
 	if err != nil {
 		return err
 	}
+
+	r.lggr.Debugw("Binding registry", "address", address.String())
 
 	return errors.Join(
 		namespace.Bind(ctx, reg, address),

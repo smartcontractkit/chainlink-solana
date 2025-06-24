@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -43,6 +44,7 @@ type eventReadBinding struct {
 	key            solana.PublicKey
 	bound          bool
 	registerCalled bool
+	lggr logger.Logger
 }
 
 func newEventReadBinding(
@@ -52,6 +54,7 @@ func newEventReadBinding(
 	readDefinition config.ReadDefinition,
 	conf config.PollingFilter,
 ) *eventReadBinding {
+	lggr, _ := logger.New()
 	binding := &eventReadBinding{
 		filter:         newSyncedFilter(),
 		namespace:      namespace,
@@ -60,6 +63,7 @@ func newEventReadBinding(
 		reader:         reader,
 		readDefinition: readDefinition,
 		conf:           conf,
+		lggr: lggr,
 	}
 
 	binding.remapper = remapHelper{binding.remapPrimitive}
@@ -68,18 +72,21 @@ func newEventReadBinding(
 }
 
 func (b *eventReadBinding) Bind(ctx context.Context, address solana.PublicKey) error {
+	b.lggr.Debugw("Event read bind: set binding", "address", address.String())
 	b.setBinding(address)
 
 	if b.filter == nil {
 		return nil
 	}
 
+	b.lggr.Debugw("Event read bind: set filter address", "address", address.String())
 	b.filter.SetAddress(address)
 
 	if !b.filter.Dirty() {
 		return nil
 	}
 
+	b.lggr.Debugw("Event read bind: update", "address", address.String())
 	return b.update(ctx)
 }
 
@@ -126,20 +133,24 @@ func (b *eventReadBinding) update(ctx context.Context) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
+	b.lggr.Debug("Event Read Binding Update: filter check")
 	if b.filter == nil {
 		return nil
 	}
 
+	b.lggr.Debug("Event Read Binding Update: bound check")
 	if !b.bound {
 		return nil
 	}
 
+	b.lggr.Debug("Event Read Binding Update: register called check")
 	if !b.registerCalled {
 		return nil
 	}
 
 	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
 
+	b.lggr.Debugw("Event Read Binding Update: filter update", "name", newName)
 	return b.filter.Update(ctx, b.reader, newName)
 }
 

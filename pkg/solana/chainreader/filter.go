@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -18,16 +19,21 @@ type syncedFilter struct {
 	filter     logpollertypes.Filter
 
 	dirty bool
+	lggr logger.Logger
 }
 
 func newSyncedFilter() *syncedFilter {
-	return &syncedFilter{}
+	lggr, _ := logger.New()
+	return &syncedFilter{
+		lggr: lggr,
+	}
 }
 
 func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, updatedName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.lggr.Debugw("Filter update: dirty check", "address", r.filter.Address.String())
 	if !r.dirty {
 		return nil
 	}
@@ -35,6 +41,7 @@ func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, up
 	oldName := r.filter.Name
 	r.filter.Name = updatedName
 
+	r.lggr.Debugw("Filter update: register", "address", r.filter.Address.String())
 	if err := r.register(ctx, registrar); err != nil {
 		return err
 	}
@@ -42,6 +49,7 @@ func (r *syncedFilter) Update(ctx context.Context, registrar filterRegistrar, up
 	// filter updated successfully, it's not dirty anymore
 	r.dirty = false
 
+	r.lggr.Debugw("Filter update: unregister old filter", "address", r.filter.Address.String())
 	return r.unregister(ctx, registrar, oldName)
 }
 
@@ -52,8 +60,11 @@ func (r *syncedFilter) Register(ctx context.Context, registrar filterRegistrar) 
 }
 
 func (r *syncedFilter) register(ctx context.Context, registrar filterRegistrar) error {
+	r.lggr.Debugw("Filter update: filter exists check", "address", r.filter.Address.String())
 	if !registrar.HasFilter(ctx, r.filter.Name) {
+		r.lggr.Debugw("Filter update: register filter", "address", r.filter.Address.String())
 		if err := registrar.RegisterFilter(ctx, r.filter); err != nil {
+			r.lggr.Errorw("Filter update: register", "address", r.filter.Address.String(), "error", err.Error())
 			return FilterError{
 				Err:    fmt.Errorf("%w: %s", types.ErrInternal, err.Error()),
 				Action: "register",

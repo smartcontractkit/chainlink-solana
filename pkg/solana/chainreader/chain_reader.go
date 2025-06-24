@@ -338,6 +338,7 @@ func (s *ContractReaderService) QueryKey(ctx context.Context, contract types.Bou
 // part of a share group.
 func (s *ContractReaderService) Bind(ctx context.Context, bindings []types.BoundContract) error {
 	for idx := range bindings {
+		s.lggr.Debugw("ChainReader Bind", "address", bindings[idx].Address)
 		if s.lookup.hasAddress(bindings[idx].Name, bindings[idx].Address) {
 			continue
 		}
