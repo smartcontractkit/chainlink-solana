@@ -625,6 +625,7 @@ func (s *ContractReaderService) addEventRead(
 
 	eventDef := codec.EventIDLTypes{Event: eventIdl, Types: idl.Types}
 
+	s.lggr.Debugw("Add read to codec", "contract", namespace, "readName", genericName)
 	if err := s.addReadToCodec(s.parsed, namespace, genericName, idl, eventIdl, eventIdl, readDefinition); err != nil {
 		return err
 	}
@@ -639,9 +640,12 @@ func (s *ContractReaderService) addEventRead(
 	)
 
 	s.shouldStartLP = true
+	s.lggr.Debugw("Set filter", "contract", namespace, "readName", genericName)
 	reader.SetFilter(toLPFilter(readDefinition.ChainSpecificName, pf, subkeys.subKeys[:], eventDef))
 
+	s.lggr.Debugw("Add reader", "contract", namespace, "readName", genericName)
 	s.bdRegistry.AddReader(namespace, genericName, reader)
+	s.lggr.Debugw("Add read name for contract", "contract", namespace, "readName", genericName)
 	s.lookup.addReadNameForContract(namespace, genericName, []read{{readName: genericName, useParams: false}})
 
 	return nil
