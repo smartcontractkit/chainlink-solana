@@ -3,6 +3,7 @@ package chainreader
 import (
 	"sync"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
@@ -31,12 +32,15 @@ type lookup struct {
 	// readIdentifiers maps from a complete readIdentifier string to finite read data
 	// a readIdentifier is a combination of address, contract, and chainSpecificName as a concatenated string
 	readIdentifiers map[string]readValues
+	lggr logger.Logger
 }
 
 func newLookup() *lookup {
+	lggr, _ := logger.New()
 	return &lookup{
 		contractReadNames: make(map[string]map[string][]read),
 		readIdentifiers:   make(map[string]readValues),
+		lggr: lggr,
 	}
 }
 
@@ -87,12 +91,15 @@ func (l *lookup) hasAddress(contract, address string) bool {
 				Name:    contract,
 			}.ReadIdentifier(reads[0].readName)
 		}
+		l.lggr.Debugw("Lookup: has address", "address", address, "readIdentifier", readIdentifier)
 
 		if val, ok := l.readIdentifiers[readIdentifier]; ok && val.address == address {
+			l.lggr.Debug("Lookup: found address")
 			return true
 		}
 	}
 
+	l.lggr.Debug("Lookup: did not find address")
 	return false
 }
 

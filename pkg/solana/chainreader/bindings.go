@@ -169,6 +169,7 @@ func (r *bindingsRegistry) GetReaders(namespace string) ([]readBinding, error) {
 //
 // DO NOT CHANGE binding from pointer type.
 func (r *bindingsRegistry) Bind(ctx context.Context, reg filterRegistrar, binding *types.BoundContract) error {
+	r.lggr.Debug("Binding registry: nil check")
 	if binding == nil {
 		return fmt.Errorf("%w: bound contract is nil", types.ErrInvalidType)
 	}
