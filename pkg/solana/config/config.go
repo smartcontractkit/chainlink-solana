@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 )
 
 // Global solana defaults.
@@ -76,6 +77,8 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+	// wt
+	WT() *writetarget.Config
 }
 
 type Chain struct {
