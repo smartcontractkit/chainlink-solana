@@ -245,7 +245,7 @@ func TestLogDataParse_NestedCCIPSend(t *testing.T) {
 	require.Equal(t, event.Program, "Ccip8888888888888888888888888888888888888888")
 }
 
-func TestLogDataParse_SuccessComplex2(t *testing.T) {
+func TestLogDataParse_LogTruncated(t *testing.T) {
 	logs := []string{
 		"Program ComputeBudget111111111111111111111111111111 invoke [1]",
 		"Program ComputeBudget111111111111111111111111111111 success",
@@ -395,5 +395,11 @@ func TestLogDataParse_SuccessComplex2(t *testing.T) {
 		"Program 11111111111111111111111111111111 success",
 	}
 
-	_ = ParseProgramLogs(logs)
+	output := ParseProgramLogs(logs)
+	require.Len(t, output, 5)
+	require.Len(t, output[0].Events, 0)
+	require.Len(t, output[1].Events, 0)
+	require.Len(t, output[2].Events, 0)
+	require.Len(t, output[3].Events, 0)
+	require.Len(t, output[4].Events, 3)
 }
