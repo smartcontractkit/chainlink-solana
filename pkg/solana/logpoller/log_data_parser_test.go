@@ -398,8 +398,13 @@ func TestLogDataParse_LogTruncated(t *testing.T) {
 	output := ParseProgramLogs(logs)
 	require.Len(t, output, 5)
 	require.Len(t, output[0].Events, 0)
+	require.Equal(t, "ComputeBudget111111111111111111111111111111", output[0].Program)
 	require.Len(t, output[1].Events, 0)
+	require.Equal(t, "ComputeBudget111111111111111111111111111111", output[1].Program)
 	require.Len(t, output[2].Events, 0)
+	require.Equal(t, "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH", output[2].Program)
 	require.Len(t, output[3].Events, 0)
+	require.Equal(t, "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH", output[3].Program)
 	require.Len(t, output[4].Events, 3)
+	require.Equal(t, "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH", output[4].Program)
 }
