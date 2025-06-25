@@ -9,6 +9,18 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
+func TestDataParse_Panic(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		`"Program logged: "🤑"`,
+		"Program consumed: 37445 of 288000 compute units",
+		"Program returned success",
+	}
+
+	_ = ParseProgramLogs(logs)
+}
+
 func TestLogDataParse_Error(t *testing.T) {
 	t.Parallel()
 
