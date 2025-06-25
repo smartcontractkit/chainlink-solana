@@ -52,6 +52,9 @@ func ParseProgramLogs(logs []string) []types.ProgramOutput {
 			if output == nil {
 				continue
 			}
+			if len(programs) == 0 {
+				continue
+			}
 
 			logData := log[len(programData):]
 
