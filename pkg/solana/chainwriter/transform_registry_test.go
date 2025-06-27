@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"strconv"
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
@@ -612,7 +613,7 @@ func mockRetrieveLUTStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr
 	}
 	askAgain := []ccip_offramp.CcipAccountMeta{{Pubkey: GetRandomPubKey(t)}}
 	// Lookup table stage does not return accounts or lookup tables to save. Just processes accounts to ask again with.
-	log := buildEncodedResponse(t, offrampStr, []ccip_offramp.CcipAccountMeta{}, askAgain, nil, "RetrieveTokenLookupTables", "TokenTransferAccounts")
+	log := buildEncodedResponse(t, offrampStr, []ccip_offramp.CcipAccountMeta{}, askAgain, nil, "RetrieveTokenLookupTables", "TokenTransferStaticAccounts/0/0")
 	rw.On("SimulateTx", mock.Anything, mock.Anything, (*rpc.SimulateTransactionOpts)(nil)).Return(&rpc.SimulateTransactionResult{Logs: []string{log}}, nil).Once()
 }
 
@@ -643,10 +644,10 @@ func mockTokenTransferStages(t *testing.T, rw *clientmocks.ReaderWriter, offramp
 		var askAgain []ccip_offramp.CcipAccountMeta
 		nextStage := ""
 		if i < len(ttAccounts)-1 {
-			nextStage = "TokenTransferAccounts"
+			nextStage = "TokenTransferStaticAccounts/" + strconv.Itoa(i+1) + "/0" 
 			askAgain = []ccip_offramp.CcipAccountMeta{{Pubkey: ttAccounts[i+1].mint}}
 		}
-		log := buildEncodedResponse(t, offrampStr, toSave, askAgain, []solana.PublicKey{lookupTables[i]}, "TokenTransferAccounts", nextStage)
+		log := buildEncodedResponse(t, offrampStr, toSave, askAgain, []solana.PublicKey{lookupTables[i]}, "TokenTransferStaticAccounts/" + strconv.Itoa(i) + "/0", nextStage)
 		rw.On("SimulateTx", mock.Anything, mock.Anything, (*rpc.SimulateTransactionOpts)(nil)).Return(&rpc.SimulateTransactionResult{Logs: []string{log}}, nil).Once()
 	}
 }

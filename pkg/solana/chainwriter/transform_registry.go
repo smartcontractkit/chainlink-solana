@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"regexp"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/go-viper/mapstructure/v2"
@@ -184,6 +185,10 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 	tokenIndexes := []uint8{}
 	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 	stage := "start"
+	matcher, err := regexp.Compile(`^TokenTransferStaticAccounts/\d+/0$`)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to compile token transfer stage matcher: %w", err)
+	}
 	for {
 		deriveAccountsIxRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(params, stage, config)
 		deriveAccountsIxRaw.AccountMetaSlice = append(deriveAccountsIxRaw.AccountMetaSlice, accountsToAskWith...)
@@ -210,9 +215,9 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to exract accounts from simulated transaction log: %w", err)
 		}
 
-		// TokenTransferAccounts stages derive the accounts needed for each token transfer
-		// Track the index at which the set of accounts for a token transfer are appended relative to the remaining accounts
-		if derivation.CurrentStage == "TokenTransferAccounts" {
+		// TokenTransferStaticAccounts stages derive the accounts needed for each token transfer
+		// Track the index at which the first set of accounts for a token transfer are appended relative to the remaining accounts
+		if matcher.MatchString(derivation.CurrentStage) {
 			tokenIndexes = append(tokenIndexes, uint8(len(derivedAccounts)-mandatoryAccountsLen)) //nolint:gosec // Limit on the number of token transfers prevents token index from exceeding uint8 max
 		}
 
