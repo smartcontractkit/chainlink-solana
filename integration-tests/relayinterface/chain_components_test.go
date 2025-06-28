@@ -23,7 +23,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc/ws"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -34,11 +34,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontestutils "github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
 	contractprimary "github.com/smartcontractkit/chainlink-solana/contracts/generated/contract_reader_interface"
@@ -1344,24 +1346,24 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
-		PDADefinition: codec.PDATypeDef{
+		PDADefinition: soltypes.PDATypeDef{
 			Prefix: pdaDataPrefix,
 		},
 		OutputModifications: commoncodec.ModifiersConfig{
 			&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
 		},
 	}
-	basicContractDef := config.ChainContractReader{
+	basicContractDef := soltypes.ChainContractReader{
 		IDL: mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t))),
-		Reads: map[string]config.ReadDefinition{
+		Reads: map[string]soltypes.ReadDefinition{
 			MethodReturningUint64: uint64ReadDef,
 		},
 	}
 
-	readWithAddressHardCodedIntoResponseDef := config.ReadDefinition{
+	readWithAddressHardCodedIntoResponseDef := soltypes.ReadDefinition{
 		ChainSpecificName: "MultiRead1",
-		ReadType:          config.Account,
-		PDADefinition: codec.PDATypeDef{
+		ReadType:          soltypes.Account,
+		PDADefinition: soltypes.PDATypeDef{
 			Prefix: []byte("multi_read1"),
 		},
 		ResponseAddressHardCoder: &commoncodec.HardCodeModifierConfig{
@@ -1380,38 +1382,38 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			OffChainValues: map[string]any{"U": "", "V": false},
 		},
 	}
-	multiReadDef.MultiReader = &config.MultiReader{
-		Reads: []config.ReadDefinition{{
+	multiReadDef.MultiReader = &soltypes.MultiReader{
+		Reads: []soltypes.ReadDefinition{{
 			ChainSpecificName: "MultiRead2",
-			PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
-			ReadType:          config.Account,
+			PDADefinition:     soltypes.PDATypeDef{Prefix: []byte("multi_read2")},
+			ReadType:          soltypes.Account,
 		}},
 	}
 
 	idl := mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t)))
-	idl.Accounts = append(idl.Accounts, codec.IdlTypeDef{
+	idl.Accounts = append(idl.Accounts, soltypes.IdlTypeDef{
 		Name: "USDPerToken",
-		Type: codec.IdlTypeDefTy{
-			Kind: codec.IdlTypeDefTyKindStruct,
-			Fields: &codec.IdlTypeDefStruct{
+		Type: soltypes.IdlTypeDefTy{
+			Kind: soltypes.IdlTypeDefTyKindStruct,
+			Fields: &soltypes.IdlTypeDefStruct{
 				{
 					Name: "tokenPrices",
-					Type: codec.IdlType{
-						AsIdlTypeVec: &codec.IdlTypeVec{Vec: codec.IdlType{AsIdlTypeDefined: &codec.IdlTypeDefined{Defined: "TimestampedPackedU224"}}},
+					Type: soltypes.IdlType{
+						AsIdlTypeVec: &soltypes.IdlTypeVec{Vec: soltypes.IdlType{AsIdlTypeDefined: &soltypes.IdlTypeDefined{Defined: "TimestampedPackedU224"}}},
 					},
 				},
 			},
 		},
 	})
 
-	cfg := config.ContractReader{
-		Namespaces: map[string]config.ChainContractReader{
+	cfg := soltypes.ContractReader{
+		Namespaces: map[string]soltypes.ChainContractReader{
 			AnyContractName: {
 				IDL: idl,
-				Reads: map[string]config.ReadDefinition{
+				Reads: map[string]soltypes.ReadDefinition{
 					ReadUninitializedPDA: {
 						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
+						ReadType:          soltypes.Account,
 						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("AAAAAAAAAA"),
 						},
@@ -1419,15 +1421,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					ReadWithAddressHardCodedIntoResponse: readWithAddressHardCodedIntoResponseDef,
 					GetTokenPrices: {
 						ChainSpecificName: "USDPerToken",
-						ReadType:          config.Account,
-						PDADefinition: codec.PDATypeDef{
+						ReadType:          soltypes.Account,
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: []byte("fee_billing_token_config"),
-							Seeds: []codec.PDASeed{
+							Seeds: []soltypes.PDASeed{
 								{
 									Name: "Tokens",
-									Type: codec.IdlType{
-										AsIdlTypeVec: &codec.IdlTypeVec{
-											Vec: codec.IdlType{AsString: codec.IdlTypePublicKey},
+									Type: soltypes.IdlType{
+										AsIdlTypeVec: &soltypes.IdlTypeVec{
+											Vec: soltypes.IdlType{AsString: soltypes.IdlTypePublicKey},
 										},
 									},
 								},
@@ -1440,34 +1442,34 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MultiRead: multiReadDef,
 					MultiReadWithParamsReuse: {
 						ChainSpecificName: "MultiRead3",
-						PDADefinition: codec.PDATypeDef{
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: []byte("multi_read_with_params3"),
-							Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
+							Seeds:  []soltypes.PDASeed{{Name: "ID", Type: soltypes.IdlType{AsString: soltypes.IdlTypeU64}}},
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
 								OffChainValues: map[string]any{"U": "", "V": false},
 							},
 						},
-						MultiReader: &config.MultiReader{
+						MultiReader: &soltypes.MultiReader{
 							ReuseParams: true,
-							Reads: []config.ReadDefinition{
+							Reads: []soltypes.ReadDefinition{
 								{
 									ChainSpecificName: "MultiRead4",
-									PDADefinition: codec.PDATypeDef{
+									PDADefinition: soltypes.PDATypeDef{
 										Prefix: []byte("multi_read_with_params4"),
-										Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
+										Seeds:  []soltypes.PDASeed{{Name: "ID", Type: soltypes.IdlType{AsString: soltypes.IdlTypeU64}}},
 									},
-									ReadType: config.Account,
+									ReadType: soltypes.Account,
 								},
 							}},
-						ReadType: config.Account,
+						ReadType: soltypes.Account,
 					},
 					MethodReturningUint64: uint64ReadDef,
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
-						PDADefinition: codec.PDATypeDef{
+						ReadType:          soltypes.Account,
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1476,8 +1478,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodSettingUint64: {
 						ChainSpecificName: "DataAccount",
-						ReadType:          config.Account,
-						PDADefinition: codec.PDATypeDef{
+						ReadType:          soltypes.Account,
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1486,8 +1488,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodReturningSeenStruct: {
 						ChainSpecificName: "TestStruct",
-						ReadType:          config.Account,
-						PDADefinition: codec.PDATypeDef{
+						ReadType:          soltypes.Account,
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1503,14 +1505,14 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodTakingLatestParamsReturningTestStruct: {
 						ChainSpecificName:       "TestStruct",
-						ReadType:                config.Account,
+						ReadType:                soltypes.Account,
 						ErrOnMissingAccountData: true,
-						PDADefinition: codec.PDATypeDef{
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
-							Seeds: []codec.PDASeed{
+							Seeds: []soltypes.PDASeed{
 								{
 									Name: "I", // this is read from params passed in while reading the account, its analogous to ListIdx which is used while writing to chain
-									Type: codec.IdlType{AsString: codec.IdlTypeU64},
+									Type: soltypes.IdlType{AsString: soltypes.IdlTypeU64},
 								},
 							},
 						},
@@ -1522,21 +1524,21 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					StateChangedEventName: {
 						ChainSpecificName: "StateChangedEvent",
-						ReadType:          config.Event,
-						EventDefinitions: &config.EventDefinitions{
-							PollingFilter: &config.PollingFilter{
+						ReadType:          soltypes.Event,
+						EventDefinitions: &soltypes.EventDefinitions{
+							PollingFilter: &soltypes.PollingFilter{
 								IncludeReverted: &trueVal,
 							},
 						},
 					},
 					EventName: {
 						ChainSpecificName: "SomeEvent",
-						ReadType:          config.Event,
-						EventDefinitions: &config.EventDefinitions{
-							PollingFilter: &config.PollingFilter{
+						ReadType:          soltypes.Event,
+						EventDefinitions: &soltypes.EventDefinitions{
+							PollingFilter: &soltypes.PollingFilter{
 								IncludeReverted: &trueVal,
 							},
-							IndexedField0: &config.IndexedField{
+							IndexedField0: &soltypes.IndexedField{
 								OffChainPath: "Field",
 								OnChainPath:  "Field",
 							},
@@ -1556,10 +1558,10 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 			},
 			AnySecondContractName: {
 				IDL: mustUnmarshalIDL(t, string(it.Helper.GetSecondaryIDL(t))),
-				Reads: map[string]config.ReadDefinition{
+				Reads: map[string]soltypes.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "Data",
-						PDADefinition: codec.PDATypeDef{
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1568,14 +1570,14 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					},
 					MethodTakingLatestParamsReturningTestStruct: {
 						ChainSpecificName:       "TestStruct",
-						ReadType:                config.Account,
+						ReadType:                soltypes.Account,
 						ErrOnMissingAccountData: true,
-						PDADefinition: codec.PDATypeDef{
+						PDADefinition: soltypes.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
-							Seeds: []codec.PDASeed{
+							Seeds: []soltypes.PDASeed{
 								{
 									Name: "I",
-									Type: codec.IdlType{AsString: codec.IdlTypeU64},
+									Type: soltypes.IdlType{AsString: soltypes.IdlTypeU64},
 								},
 							},
 						},
@@ -1604,7 +1606,7 @@ const (
 	GetTokenPricesPubKey2 = "47XyyAALxH7WeNT1DGWsPeA8veSVJaF8MHFMqBM5DkP6"
 )
 
-func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) chainwriter.ChainWriterConfig {
+func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T) soltypes.ContractWriterConfig {
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
@@ -1613,36 +1615,36 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
 	require.NoError(t, err)
 
-	return chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+	return soltypes.ContractWriterConfig{
+		Programs: map[string]soltypes.ProgramConfig{
 			AnyContractName: {
 				IDL: string(it.Helper.GetPrimaryIDL(t)),
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					"initialize": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initialize",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1655,39 +1657,39 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initializemultiread",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "MultiRead1",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("multi_read1")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "MultiRead2",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("multi_read2")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1700,41 +1702,41 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initializemultireadwithparams",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "MultiRead3",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("multi_read_with_params3")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "MultiRead4",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("multi_read_with_params4")},
 									{Static: binary.LittleEndian.AppendUint64([]byte{}, 1)},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1747,41 +1749,41 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initializetokenprices",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "BillingTokenConfigWrapper1",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey1.Bytes()},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "BillingTokenConfigWrapper2",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("fee_billing_token_config")},
 									{Static: pubKey2.Bytes()},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1794,26 +1796,26 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initializelookuptable",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("lookup")},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1826,19 +1828,19 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "storeval",
-						LookupTables: chainwriter.LookupTables{
-							DerivedLookupTables: []chainwriter.DerivedLookupTable{
+						LookupTables: soltypes.LookupTables{
+							DerivedLookupTables: []soltypes.DerivedLookupTable{
 								{
 									Name: "LookupTable",
-									Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+									Accounts: soltypes.Lookup{PDALookups: &soltypes.PDALookups{
 										Name: "LookupTableAccount",
-										PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+										PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 											Address: primaryProgramPubKey,
 										}},
-										Seeds: []chainwriter.Seed{
+										Seeds: []soltypes.Seed{
 											{Static: []byte("lookup")},
 										},
-										InternalField: chainwriter.InternalField{
+										InternalField: soltypes.InternalField{
 											TypeName: "LookupTableDataAccount",
 											Location: "LookupTable",
 											IDL:      string(it.Helper.GetPrimaryIDL(t)),
@@ -1847,26 +1849,26 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								},
 							},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1878,39 +1880,39 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					"storeTokenAccount": {
 						FromAddress:       fromAddress,
 						ChainSpecificName: "storeTokenAccount",
-						ATAs: []chainwriter.ATALookup{
+						ATAs: []soltypes.ATALookup{
 							{
 								Location:      "ATAInfo.Receiver",
-								WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Wallet"}},
-								TokenProgram:  chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.TokenProgram"}},
-								MintAddress:   chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: "ATAInfo.Mint"}},
+								WalletAddress: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: "ATAInfo.Wallet"}},
+								TokenProgram:  soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: "ATAInfo.TokenProgram"}},
+								MintAddress:   soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: "ATAInfo.Mint"}},
 							},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{AccountLookup: &chainwriter.AccountLookup{
+							{AccountLookup: &soltypes.AccountLookup{
 								Location:   "TokenAccount",
-								IsWritable: chainwriter.MetaBool{Value: true},
-								IsSigner:   chainwriter.MetaBool{Value: false},
+								IsWritable: soltypes.MetaBool{Value: true},
+								IsSigner:   soltypes.MetaBool{Value: false},
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("token_account")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1932,25 +1934,25 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 							},
 						},
 						ChainSpecificName: "store",
-						LookupTables:      chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:      soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: primaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
-									{Dynamic: chainwriter.Lookup{
-										AccountLookup: &chainwriter.AccountLookup{
+									{Dynamic: soltypes.Lookup{
+										AccountLookup: &soltypes.AccountLookup{
 											Location: "ListIdx", // this will be sent as input params while writing to chain, see StoreTestStruct
 										},
 									}},
@@ -1958,7 +1960,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1970,15 +1972,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					MethodTriggeringEventBeforeFailing: {
 						FromAddress:       fromAddress,
 						ChainSpecificName: "createEventAndFail",
-						LookupTables:      chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:      soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -1995,15 +1997,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								Fields: []string{"Data.AccountStruct.AccountStr"},
 							},
 						},
-						LookupTables: chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables: soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -2016,35 +2018,35 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 			},
 			AnySecondContractName: {
 				IDL: string(it.Helper.GetSecondaryIDL(t)),
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					"initialize": {
 						FromAddress:        fromAddress,
 						InputModifications: nil,
 						ChainSpecificName:  "initialize",
-						LookupTables:       chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:       soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{
-									AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{
+									AccountConstant: &soltypes.AccountConstant{
 										Name:    "ProgramID",
 										Address: secondaryProgramPubKey, // line ~1338
 									}, // line ~1339 closes AccountConstant
-								}, // line ~1340 closes chainwriter.Lookup
-								Seeds: []chainwriter.Seed{
+								}, // line ~1340 closes soltypes.Lookup
+								Seeds: []soltypes.Seed{
 									{Static: []byte("data")},
 									{Static: testIdx},
 								},
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemAccount",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,
@@ -2066,25 +2068,25 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 							},
 						},
 						ChainSpecificName: "store",
-						LookupTables:      chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:      soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Signer",
 								Address:    fromAddress,
 								IsSigner:   true,
 								IsWritable: true,
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name: "Account",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 									Name:    "ProgramID",
 									Address: secondaryProgramPubKey,
 								}},
-								Seeds: []chainwriter.Seed{
+								Seeds: []soltypes.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
-									{Dynamic: chainwriter.Lookup{
-										AccountLookup: &chainwriter.AccountLookup{
+									{Dynamic: soltypes.Lookup{
+										AccountLookup: &soltypes.AccountLookup{
 											Location: "ListIdx",
 										},
 									}},
@@ -2092,7 +2094,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								IsWritable: true,
 								IsSigner:   false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "SystemProgram",
 								Address:    solana.SystemProgramID.String(),
 								IsWritable: false,

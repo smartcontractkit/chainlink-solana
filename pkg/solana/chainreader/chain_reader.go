@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -586,7 +587,7 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 }
 
 func (s *ContractReaderService) addEventRead(
-	common *config.PollingFilter,
+	common *soltypes.PollingFilter,
 	namespace, genericName string,
 	idl codec.IDL,
 	readDefinition config.ReadDefinition,
@@ -928,10 +929,14 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 	return pdaAddresses, nil
 }
 
-func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*config.PollingFilter) (config.PollingFilter, error) {
-	final := reflect.New(reflect.TypeOf(common).Elem())
-	valOfF := final.Elem()
-	allOverrides := append([]*config.PollingFilter{common}, overrides...)
+func setPollingFilterOverrides(common *soltypes.PollingFilter, overrides ...*soltypes.PollingFilter) (config.PollingFilter, error) {
+	allOverrides := make([]*config.PollingFilter, len(overrides)+1)
+	allOverrides[0] = (*config.PollingFilter)(common)
+	for i, o := range overrides {
+		allOverrides[i+1] = (*config.PollingFilter)(o)
+	}
+
+	valOfF := reflect.New(reflect.TypeOf(allOverrides[0]).Elem()).Elem()
 
 	for _, override := range allOverrides {
 		if override == nil {
@@ -956,9 +961,9 @@ func setPollingFilterOverrides(common *config.PollingFilter, overrides ...*confi
 		}
 	}
 
-	filter, ok := final.Elem().Interface().(config.PollingFilter)
+	filter, ok := valOfF.Interface().(config.PollingFilter)
 	if !ok {
-		return config.PollingFilter{}, fmt.Errorf("encountered unexpected type: %T, expected: %T", final.Elem().Interface(), config.PollingFilter{})
+		return config.PollingFilter{}, fmt.Errorf("encountered unexpected type: %T, expected: %T", valOfF.Interface(), config.PollingFilter{})
 	}
 
 	return filter, nil

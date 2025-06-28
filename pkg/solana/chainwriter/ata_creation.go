@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -39,7 +40,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				return nil, fmt.Errorf("error getting values at location: %w", err)
 			}
 		}
-		walletAddresses, err := GetAddresses(ctx, args, []Lookup{lookup.WalletAddress}, derivedTableMap, client)
+		walletAddresses, err := GetAddresses(ctx, args, []soltypes.Lookup{lookup.WalletAddress}, derivedTableMap, client)
 		if lookup.Optional && isIgnorableError(err) {
 			continue
 		} else if err != nil {
@@ -50,7 +51,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 		}
 		wallet := walletAddresses[0].PublicKey
 
-		mints, err := GetAddresses(ctx, args, []Lookup{lookup.MintAddress}, derivedTableMap, client)
+		mints, err := GetAddresses(ctx, args, []soltypes.Lookup{lookup.MintAddress}, derivedTableMap, client)
 		if lookup.Optional && isIgnorableError(err) {
 			continue
 		} else if err != nil {

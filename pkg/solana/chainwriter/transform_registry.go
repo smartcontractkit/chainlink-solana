@@ -19,7 +19,6 @@ import (
 	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -105,7 +104,7 @@ func CCIPExecuteArgsTransformV2(
 			IsWritable: MetaBool{BitmapLocation: "ExtraData.ExtraArgsDecoded.accountIsWritableBitmap"},
 			IsSigner:   MetaBool{Value: false},
 		}
-		userAccounts, resolveErr := userAccountsLookup.Resolve(args)
+		userAccounts, resolveErr := ResolveAccountLookup(&userAccountsLookup, args)
 		// If err is ErrLookupNotFoundAtLocation, allow process to continue in case accounts are not needed
 		if resolveErr != nil && !errors.Is(resolveErr, ErrLookupNotFoundAtLocation) {
 			return nil, nil, nil, nil, fmt.Errorf("failed to resolve user accounts: %w", resolveErr)
@@ -152,7 +151,7 @@ func CCIPExecuteArgsTransformV2(
 			})
 		}
 		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
-		tokenReceivers, resolveErr := tokenReceiverLookup.Resolve(args)
+		tokenReceivers, resolveErr := ResolveAccountLookup(&tokenReceiverLookup, args)
 		if resolveErr != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to find token receiver, required for token transfers: %w", resolveErr)
 		}

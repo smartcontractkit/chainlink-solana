@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
@@ -65,7 +66,7 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, soltypes.ContractWriterConfig{})
 	require.NoError(t, err)
 
 	// expected account meta for constant account
@@ -105,20 +106,20 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		IsWritable: true,
 	}
 
-	lookupTableConfig := chainwriter.LookupTables{
-		DerivedLookupTables: []chainwriter.DerivedLookupTable{
+	lookupTableConfig := soltypes.LookupTables{
+		DerivedLookupTables: []soltypes.DerivedLookupTable{
 			{
 				Name: "DerivedTable",
-				Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+				Accounts: soltypes.Lookup{PDALookups: &soltypes.PDALookups{
 					Name:      "DataAccountPDA",
-					PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
-					Seeds: []chainwriter.Seed{
+					PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+					Seeds: []soltypes.Seed{
 						// extract seed2 for PDA lookup
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
 					},
 					IsSigner:   derivedTablePdaLookupMeta.IsSigner,
 					IsWritable: derivedTablePdaLookupMeta.IsWritable,
-					InternalField: chainwriter.InternalField{
+					InternalField: soltypes.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 						IDL:      testContractIDL,
@@ -141,32 +142,32 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			Seed2:       seed2,
 		}
 
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountConstant: &chainwriter.AccountConstant{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountConstant: &soltypes.AccountConstant{
 				Name:       "Constant",
 				Address:    constantAccountMeta.PublicKey.String(),
 				IsSigner:   constantAccountMeta.IsSigner,
 				IsWritable: constantAccountMeta.IsWritable,
 			}},
-			{AccountLookup: &chainwriter.AccountLookup{
+			{AccountLookup: &soltypes.AccountLookup{
 				Name:       "LookupTable",
 				Location:   "LookupTable",
-				IsSigner:   chainwriter.MetaBool{Value: accountLookupMeta.IsSigner},
-				IsWritable: chainwriter.MetaBool{Value: accountLookupMeta.IsWritable},
+				IsSigner:   soltypes.MetaBool{Value: accountLookupMeta.IsSigner},
+				IsWritable: soltypes.MetaBool{Value: accountLookupMeta.IsWritable},
 			}},
-			{PDALookups: &chainwriter.PDALookups{
+			{PDALookups: &soltypes.PDALookups{
 				Name:      "DataAccountPDA",
-				PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
-				Seeds: []chainwriter.Seed{
+				PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
+				Seeds: []soltypes.Seed{
 					// extract seed1 for PDA lookup
-					{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
+					{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
 				},
 				IsSigner:   pdaLookupMeta.IsSigner,
 				IsWritable: pdaLookupMeta.IsWritable,
 				// Just get the address of the account, nothing internal.
-				InternalField: chainwriter.InternalField{},
+				InternalField: soltypes.InternalField{},
 			}},
-			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0},
 			}},
@@ -209,8 +210,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			Seed2: seed2,
 		}
 
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0, 2},
 			}},
@@ -234,8 +235,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 			Seed2: seed2,
 		}
 
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 			}},
 		}
@@ -258,13 +259,13 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		const invalidLocation = "Invalid.Path"
 
 		t.Run("AccountLookup error is skipped when Lookup is optional", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
+			accountLookupConfig := []soltypes.Lookup{
 				{
-					AccountLookup: &chainwriter.AccountLookup{
+					AccountLookup: &soltypes.AccountLookup{
 						Name:       "OptionalAccountLookup",
 						Location:   invalidLocation,
-						IsSigner:   chainwriter.MetaBool{Value: false},
-						IsWritable: chainwriter.MetaBool{Value: false},
+						IsSigner:   soltypes.MetaBool{Value: false},
+						IsWritable: soltypes.MetaBool{Value: false},
 					},
 					Optional: true,
 				},
@@ -278,12 +279,12 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("AccountLookup error is returned when Lookup is required", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
-				{AccountLookup: &chainwriter.AccountLookup{
+			accountLookupConfig := []soltypes.Lookup{
+				{AccountLookup: &soltypes.AccountLookup{
 					Name:       "NonOptionalAccountLookup",
 					Location:   invalidLocation,
-					IsSigner:   chainwriter.MetaBool{Value: false},
-					IsWritable: chainwriter.MetaBool{Value: false},
+					IsSigner:   soltypes.MetaBool{Value: false},
+					IsWritable: soltypes.MetaBool{Value: false},
 				}},
 			}
 
@@ -294,13 +295,13 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("PDALookups error is skipped when Lookup is optional", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
+			accountLookupConfig := []soltypes.Lookup{
 				{
-					PDALookups: &chainwriter.PDALookups{
+					PDALookups: &soltypes.PDALookups{
 						Name:      "OptionalPDA",
-						PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
-						Seeds: []chainwriter.Seed{
-							{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: invalidLocation}}},
+						PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
+						Seeds: []soltypes.Seed{
+							{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: invalidLocation}}},
 						},
 					},
 					Optional: true,
@@ -314,12 +315,12 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("PDALookups error is returned when Lookup is required", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
-				{PDALookups: &chainwriter.PDALookups{
+			accountLookupConfig := []soltypes.Lookup{
+				{PDALookups: &soltypes.PDALookups{
 					Name:      "NonOptionalPDA",
-					PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
-					Seeds: []chainwriter.Seed{
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: invalidLocation}}},
+					PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "ProgramID", Address: solana.SystemProgramID.String()}},
+					Seeds: []soltypes.Seed{
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Location: invalidLocation}}},
 					},
 				}},
 			}
@@ -331,12 +332,12 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("DerivedLookupTable error is skipped when Lookup is optional", func(t *testing.T) {
-			lookupTables := chainwriter.LookupTables{
-				DerivedLookupTables: []chainwriter.DerivedLookupTable{
+			lookupTables := soltypes.LookupTables{
+				DerivedLookupTables: []soltypes.DerivedLookupTable{
 					{
 						Name:     "OptionalDerivedTable",
 						Optional: true,
-						Accounts: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+						Accounts: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{
 							Location: invalidLocation,
 						}},
 					},
@@ -351,11 +352,11 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("DerivedLookupTable error is returned when Lookup is required", func(t *testing.T) {
-			lookupTables := chainwriter.LookupTables{
-				DerivedLookupTables: []chainwriter.DerivedLookupTable{
+			lookupTables := soltypes.LookupTables{
+				DerivedLookupTables: []soltypes.DerivedLookupTable{
 					{
 						Name: "NonOptionalDerivedTable",
-						Accounts: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{
+						Accounts: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{
 							Location: invalidLocation,
 						}},
 						Optional: false,
@@ -369,9 +370,9 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("AccountsFromLookupTable error is skipped when Lookup is optional", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
+			accountLookupConfig := []soltypes.Lookup{
 				{
-					AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+					AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 						LookupTableName: "NonExistent",
 					},
 					Optional: true,
@@ -386,8 +387,8 @@ func TestChainWriter_GetAddresses(t *testing.T) {
 		})
 
 		t.Run("AccountsFromLookupTable error is returned when Lookup is required", func(t *testing.T) {
-			accountLookupConfig := []chainwriter.Lookup{
-				{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+			accountLookupConfig := []soltypes.Lookup{
+				{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 					LookupTableName: "NonExistent",
 				}},
 			}
@@ -413,7 +414,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, soltypes.ContractWriterConfig{})
 	require.NoError(t, err)
 
 	programID := GetRandomPubKey(t)
@@ -441,20 +442,20 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	staticLookupTablePubkey2 := GetRandomPubKey(t)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey2, CreateTestPubKeys(t, 2))
 
-	lookupTableConfig := chainwriter.LookupTables{
-		DerivedLookupTables: []chainwriter.DerivedLookupTable{
+	lookupTableConfig := soltypes.LookupTables{
+		DerivedLookupTables: []soltypes.DerivedLookupTable{
 			{
 				Name: "DerivedTable",
-				Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+				Accounts: soltypes.Lookup{PDALookups: &soltypes.PDALookups{
 					Name:      "DataAccountPDA",
-					PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
-					Seeds: []chainwriter.Seed{
+					PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+					Seeds: []soltypes.Seed{
 						// extract seed1 for PDA lookup
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
-					InternalField: chainwriter.InternalField{
+					InternalField: soltypes.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 						IDL:      testContractIDL,
@@ -463,16 +464,16 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 			},
 			{
 				Name: "MiscDerivedTable",
-				Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+				Accounts: soltypes.Lookup{PDALookups: &soltypes.PDALookups{
 					Name:      "MiscPDA",
-					PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "UnusedAccount", Address: unusedProgramID.String()}},
-					Seeds: []chainwriter.Seed{
+					PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "UnusedAccount", Address: unusedProgramID.String()}},
+					Seeds: []soltypes.Seed{
 						// extract seed2 for PDA lookup
-						{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
+						{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
 					},
 					IsSigner:   true,
 					IsWritable: true,
-					InternalField: chainwriter.InternalField{
+					InternalField: soltypes.InternalField{
 						TypeName: "LookupTableDataAccount",
 						Location: "LookupTable",
 						IDL:      testContractIDL,
@@ -480,7 +481,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 				}},
 			},
 		},
-		StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey1, staticLookupTablePubkey2},
+		StaticLookupTables: [][32]byte{staticLookupTablePubkey1, staticLookupTablePubkey2},
 	}
 
 	args := Arguments{
@@ -489,8 +490,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	}
 
 	t.Run("returns filtered map with only relevant lookup tables required by account lookup config", func(t *testing.T) {
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0},
 			}},
@@ -516,8 +517,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	})
 
 	t.Run("returns filtered map and ignores nil account meta and nil entry in lookup table", func(t *testing.T) {
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 				LookupTableName: "DerivedTable",
 				IncludeIndexes:  []int{0},
 			}},
@@ -548,7 +549,7 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	})
 
 	t.Run("returns empty map if empty account lookup config provided", func(t *testing.T) {
-		accountLookupConfig := []chainwriter.Lookup{}
+		accountLookupConfig := []soltypes.Lookup{}
 
 		// Fetch derived table map
 		derivedTableMap, staticTableMap, err := cw.ResolveLookupTables(ctx, args, lookupTableConfig)
@@ -564,8 +565,8 @@ func TestChainWriter_FilterLookupTableAddresses(t *testing.T) {
 	})
 
 	t.Run("returns empty map if only constant account lookup required", func(t *testing.T) {
-		accountLookupConfig := []chainwriter.Lookup{
-			{AccountConstant: &chainwriter.AccountConstant{
+		accountLookupConfig := []soltypes.Lookup{
+			{AccountConstant: &soltypes.AccountConstant{
 				Name:       "Constant",
 				Address:    GetRandomPubKey(t).String(),
 				IsSigner:   false,
@@ -628,27 +629,27 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	staticLookupKeys := CreateTestPubKeys(t, 2)
 	mockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
 
-	cwConfig := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+	cwConfig := soltypes.ContractWriterConfig{
+		Programs: map[string]soltypes.ProgramConfig{
 			"contract_reader_interface": {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					"initializeLookupTable": {
 						FromAddress:       admin.String(),
 						ChainSpecificName: "initializeLookupTable",
-						LookupTables: chainwriter.LookupTables{
-							DerivedLookupTables: []chainwriter.DerivedLookupTable{
+						LookupTables: soltypes.LookupTables{
+							DerivedLookupTables: []soltypes.DerivedLookupTable{
 								{
 									Name: "DerivedTable",
-									Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
+									Accounts: soltypes.Lookup{PDALookups: &soltypes.PDALookups{
 										Name:      "DataAccountPDA",
-										PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
-										Seeds: []chainwriter.Seed{
+										PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+										Seeds: []soltypes.Seed{
 											// extract seed2 for PDA lookup
-											{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
+											{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
 										},
 										IsSigner:   false,
 										IsWritable: false,
-										InternalField: chainwriter.InternalField{
+										InternalField: soltypes.InternalField{
 											TypeName: "LookupTableDataAccount",
 											Location: "LookupTable",
 											IDL:      testContractIDL,
@@ -656,44 +657,44 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 									}},
 								},
 							},
-							StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey},
+							StaticLookupTables: [][32]byte{staticLookupTablePubkey},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "feepayer",
 								Address:    admin.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "Constant",
 								Address:    account1.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							}},
-							{AccountLookup: &chainwriter.AccountLookup{
+							{AccountLookup: &soltypes.AccountLookup{
 								Name:       "LookupTable",
 								Location:   "LookupTable",
-								IsSigner:   chainwriter.MetaBool{Value: false},
-								IsWritable: chainwriter.MetaBool{Value: false},
+								IsSigner:   soltypes.MetaBool{Value: false},
+								IsWritable: soltypes.MetaBool{Value: false},
 							}},
-							{PDALookups: &chainwriter.PDALookups{
+							{PDALookups: &soltypes.PDALookups{
 								Name:      "DataAccountPDA",
-								PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
-								Seeds: []chainwriter.Seed{
+								PublicKey: soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
+								Seeds: []soltypes.Seed{
 									// extract seed1 for PDA lookup
-									{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
+									{Dynamic: soltypes.Lookup{AccountLookup: &soltypes.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
 								},
 								IsSigner:   false,
 								IsWritable: false,
 								// Just get the address of the account, nothing internal.
-								InternalField: chainwriter.InternalField{},
+								InternalField: soltypes.InternalField{},
 							}},
-							{AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
+							{AccountsFromLookupTable: &soltypes.AccountsFromLookupTable{
 								LookupTableName: "DerivedTable",
 								IncludeIndexes:  []int{0},
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "systemprogram",
 								Address:    solana.SystemProgramID.String(),
 								IsSigner:   false,
@@ -706,7 +707,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 				IDL: testContractIDL,
 			},
 			"buffer_payload": {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					"execute": {
 						FromAddress:         admin.String(),
 						ChainSpecificName:   "execute",
@@ -714,14 +715,14 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 						InputModifications: codec.ModifiersConfig{
 							&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
 						},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "feepayer",
 								Address:    admin.String(),
 								IsSigner:   false,
 								IsWritable: false,
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:       "system",
 								Address:    solana.SystemProgramID.String(),
 								IsSigner:   false,
@@ -740,10 +741,10 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("fails with invalid ABI", func(t *testing.T) {
-		invalidCWConfig := chainwriter.ChainWriterConfig{
-			Programs: map[string]chainwriter.ProgramConfig{
+		invalidCWConfig := soltypes.ContractWriterConfig{
+			Programs: map[string]soltypes.ProgramConfig{
 				"invalid_program": {
-					Methods: map[string]chainwriter.MethodConfig{
+					Methods: map[string]soltypes.MethodConfig{
 						"invalid": {
 							ChainSpecificName: "invalid",
 						},
@@ -815,17 +816,17 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	t.Run("invalid buffer methods", func(t *testing.T) {
 		recentBlockHash := solana.Hash{}
 
-		customConfig := chainwriter.ChainWriterConfig{
-			Programs: map[string]chainwriter.ProgramConfig{
+		customConfig := soltypes.ContractWriterConfig{
+			Programs: map[string]soltypes.ProgramConfig{
 				"buffer_payload": {
-					Methods: map[string]chainwriter.MethodConfig{
+					Methods: map[string]soltypes.MethodConfig{
 						"execute": {
 							FromAddress:       admin.String(),
 							ChainSpecificName: "execute",
 							InputModifications: codec.ModifiersConfig{
 								&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
 							},
-							Accounts: []chainwriter.Lookup{},
+							Accounts: []soltypes.Lookup{},
 						},
 					},
 					IDL: testBufferContractIDL,
@@ -932,10 +933,10 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Twice()
 			txID := uuid.NewString()
 
-			customConfig := chainwriter.ChainWriterConfig{
-				Programs: map[string]chainwriter.ProgramConfig{
+			customConfig := soltypes.ContractWriterConfig{
+				Programs: map[string]soltypes.ProgramConfig{
 					"buffer_payload": {
-						Methods: map[string]chainwriter.MethodConfig{
+						Methods: map[string]soltypes.MethodConfig{
 							"execute": {
 								FromAddress:         admin.String(),
 								ChainSpecificName:   "execute",
@@ -943,7 +944,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 								InputModifications: codec.ModifiersConfig{
 									&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
 								},
-								Accounts: []chainwriter.Lookup{},
+								Accounts: []soltypes.Lookup{},
 							},
 						},
 						IDL: testBufferContractIDL,
@@ -953,7 +954,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 			methodConfig := customConfig.Programs["buffer_payload"].Methods["execute"]
 			for i := range 40 {
-				methodConfig.Accounts = append(methodConfig.Accounts, chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+				methodConfig.Accounts = append(methodConfig.Accounts, soltypes.Lookup{AccountConstant: &soltypes.AccountConstant{
 					Name:       fmt.Sprintf("randomAccount%d", i),
 					Address:    GetRandomPubKey(t).String(),
 					IsSigner:   false,
@@ -995,10 +996,10 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 	staticCUOverhead := uint32(150_000)
 
 	// simplified CCIP Config - does not contain full account list
-	ccipCWConfig := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+	ccipCWConfig := soltypes.ContractWriterConfig{
+		Programs: map[string]soltypes.ProgramConfig{
 			ccipconsts.ContractNameOffRamp: {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					ccipconsts.MethodExecute: {
 						FromAddress: admin.String(),
 						InputModifications: []codec.ModifierConfig{
@@ -1025,17 +1026,17 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 						},
 						ChainSpecificName: "commit",
 						ArgsTransform:     "CCIPCommit",
-						LookupTables:      chainwriter.LookupTables{},
-						Accounts: []chainwriter.Lookup{
-							{AccountConstant: &chainwriter.AccountConstant{
+						LookupTables:      soltypes.LookupTables{},
+						Accounts: []soltypes.Lookup{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:    "testAcc1",
 								Address: GetRandomPubKey(t).String(),
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:    "testAcc2",
 								Address: GetRandomPubKey(t).String(),
 							}},
-							{AccountConstant: &chainwriter.AccountConstant{
+							{AccountConstant: &soltypes.AccountConstant{
 								Name:    "testAcc3",
 								Address: GetRandomPubKey(t).String(),
 							}},
@@ -1235,7 +1236,7 @@ func TestChainWriter_GetTransactionStatus(t *testing.T) {
 	txm := txmMocks.NewTxManager(t)
 
 	// initialize chain writer
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, soltypes.ContractWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns unknown with error if ID not found", func(t *testing.T) {
@@ -1301,7 +1302,7 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
-	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, chainwriter.ChainWriterConfig{})
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, soltypes.ContractWriterConfig{})
 	require.NoError(t, err)
 
 	t.Run("returns valid compute unit price and non-nil data availability fee", func(t *testing.T) {
@@ -1312,7 +1313,7 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 	})
 
 	t.Run("fails if gas estimator not set", func(t *testing.T) {
-		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, nil, chainwriter.ChainWriterConfig{})
+		cwNoEstimator, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, nil, soltypes.ContractWriterConfig{})
 		require.NoError(t, err)
 		_, err = cwNoEstimator.GetFeeComponents(ctx)
 		require.Error(t, err)

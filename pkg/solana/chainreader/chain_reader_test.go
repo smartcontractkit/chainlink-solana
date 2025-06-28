@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
@@ -122,7 +123,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 				OffChainPath: "A.B",
 				OnChainPath:  "A.B",
 			},
-			PollingFilter: &config.PollingFilter{},
+			PollingFilter: &soltypes.PollingFilter{},
 		},
 	}
 

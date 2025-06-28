@@ -11,10 +11,10 @@ import (
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
@@ -47,31 +47,15 @@ var (
 	_ types.ContractWriter = &SolanaChainWriterService{}
 )
 
+// Deprecated
 // nolint // ignoring naming suggestion
-type ChainWriterConfig struct {
-	Programs map[string]ProgramConfig `json:"programs"`
-}
+type ChainWriterConfig = soltypes.ContractWriterConfig
 
-type ProgramConfig struct {
-	Methods map[string]MethodConfig `json:"methods"`
-	IDL     string                  `json:"idl"`
-}
+// Deprecated
+type ProgramConfig = soltypes.ProgramConfig
 
-type MethodConfig struct {
-	FromAddress        string                      `json:"fromAddress"`
-	InputModifications commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
-	ChainSpecificName  string                      `json:"chainSpecificName"`
-	LookupTables       LookupTables                `json:"lookupTables,omitempty"`
-	Accounts           []Lookup                    `json:"accounts"`
-	ATAs               []ATALookup                 `json:"atas,omitempty"`
-	// Location in the args where the debug ID is stored
-	DebugIDLocation string `json:"debugIDLocation,omitempty"`
-	ArgsTransform   string `json:"argsTransform,omitempty"`
-	// Overhead added to calculated compute units in the args transform
-	ComputeUnitLimitOverhead uint32 `json:"ComputeUnitLimitOverhead,omitempty"`
-	// Configs for buffering payloads to support larger transaction sizes for this method
-	BufferPayloadMethod string `json:"bufferPayloadMethod,omitempty"`
-}
+// Deprecated
+type MethodConfig = soltypes.MethodConfig
 
 func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient, txm txm.TxManager, ge fees.Estimator, config ChainWriterConfig) (*SolanaChainWriterService, error) {
 	w := SolanaChainWriterService{
@@ -157,10 +141,10 @@ for Solana transactions. It handles constant addresses, dynamic lookups, program
 ### Error Handling:
 - Errors are wrapped with the `debugID` for easier tracing.
 */
-func GetAddresses(ctx context.Context, args any, accounts []Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) ([]*solana.AccountMeta, error) {
+func GetAddresses(ctx context.Context, args any, accounts []soltypes.Lookup, derivedTableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) ([]*solana.AccountMeta, error) {
 	var addresses []*solana.AccountMeta
 	for _, accountConfig := range accounts {
-		meta, err := accountConfig.Resolve(ctx, args, derivedTableMap, client)
+		meta, err := Lookup(accountConfig).Resolve(ctx, args, derivedTableMap, client)
 		if accountConfig.Optional && err != nil && isIgnorableError(err) {
 			// skip optional accounts if they are not found
 			continue
@@ -465,7 +449,7 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 
 func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt DerivedLookupTable) (map[string]map[string][]*solana.AccountMeta, error) {
 	// Resolve all addresses specified by the identifier
-	lookupTableAddresses, err := GetAddresses(ctx, args, []Lookup{rlt.Accounts}, nil, s.client)
+	lookupTableAddresses, err := GetAddresses(ctx, args, []soltypes.Lookup{rlt.Accounts}, nil, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving addresses for lookup table: %w", err)
 	}

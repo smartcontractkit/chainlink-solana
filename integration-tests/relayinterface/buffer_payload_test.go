@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	soltypes "github.com/smartcontractkit/chainlink-common/pkg/types/solana"
 
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/buffer_payload"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
@@ -77,25 +78,25 @@ func Test_BufferPayload(t *testing.T) {
 	contractName := "buffer"
 	methodName := "execute"
 
-	cwConfig := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+	cwConfig := soltypes.ContractWriterConfig{
+		Programs: map[string]soltypes.ProgramConfig{
 			contractName: {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]soltypes.MethodConfig{
 					methodName: {
 						FromAddress:              sender.PublicKey().String(),
 						ChainSpecificName:        "execute",
 						ComputeUnitLimitOverhead: 150_000,
 						BufferPayloadMethod:      "CCIPExecutionReportBuffer",
-						Accounts: []chainwriter.Lookup{
+						Accounts: []soltypes.Lookup{
 							{
-								AccountConstant: &chainwriter.AccountConstant{
+								AccountConstant: &soltypes.AccountConstant{
 									Address:    sender.PublicKey().String(),
 									IsSigner:   true,
 									IsWritable: true,
 								},
 							},
 							{
-								AccountConstant: &chainwriter.AccountConstant{
+								AccountConstant: &soltypes.AccountConstant{
 									Address:    solana.SystemProgramID.String(),
 									IsSigner:   false,
 									IsWritable: false,
@@ -177,7 +178,7 @@ func Test_BufferPayload(t *testing.T) {
 	})
 }
 
-func initializeAndRunCW(t *testing.T, lggr logger.Logger, multiClient client.MultiClient, txm *txm.Txm, config chainwriter.ChainWriterConfig) *chainwriter.SolanaChainWriterService {
+func initializeAndRunCW(t *testing.T, lggr logger.Logger, multiClient client.MultiClient, txm *txm.Txm, config soltypes.ContractWriterConfig) *chainwriter.SolanaChainWriterService {
 	cw, err := chainwriter.NewSolanaChainWriterService(lggr, multiClient, txm, nil, config)
 	require.NoError(t, err)
 	servicetest.Run(t, cw)
