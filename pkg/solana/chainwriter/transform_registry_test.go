@@ -644,10 +644,10 @@ func mockTokenTransferStages(t *testing.T, rw *clientmocks.ReaderWriter, offramp
 		var askAgain []ccip_offramp.CcipAccountMeta
 		nextStage := ""
 		if i < len(ttAccounts)-1 {
-			nextStage = "TokenTransferStaticAccounts/" + strconv.Itoa(i+1) + "/0" 
+			nextStage = "TokenTransferStaticAccounts/" + strconv.Itoa(i+1) + "/0"
 			askAgain = []ccip_offramp.CcipAccountMeta{{Pubkey: ttAccounts[i+1].mint}}
 		}
-		log := buildEncodedResponse(t, offrampStr, toSave, askAgain, []solana.PublicKey{lookupTables[i]}, "TokenTransferStaticAccounts/" + strconv.Itoa(i) + "/0", nextStage)
+		log := buildEncodedResponse(t, offrampStr, toSave, askAgain, []solana.PublicKey{lookupTables[i]}, "TokenTransferStaticAccounts/"+strconv.Itoa(i)+"/0", nextStage)
 		rw.On("SimulateTx", mock.Anything, mock.Anything, (*rpc.SimulateTransactionOpts)(nil)).Return(&rpc.SimulateTransactionResult{Logs: []string{log}}, nil).Once()
 	}
 }
