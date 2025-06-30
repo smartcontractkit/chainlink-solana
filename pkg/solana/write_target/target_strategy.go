@@ -285,7 +285,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash
 	for _, acc := range r.Inputs.RemainingAccounts {
 		key, err := solana.PublicKeyFromBase58(acc.Address)
 		if err != nil {
-
+			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
 		}
 
 		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &solana.AccountMeta{
