@@ -1302,8 +1302,8 @@ github.com/smartcontractkit/chainlink/deployment v0.0.0-20250625173516-9f25766a5
 github.com/smartcontractkit/chainlink/deployment v0.0.0-20250625173516-9f25766a5545/go.mod h1:Hg8ffbfqKuv18wN1mK9f8hEw3QVLWETzDMAEBUAtbfc=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250625173516-9f25766a5545 h1:vQ5RmmQWqN21KFD9Wl0c1ulMh6M6NUKar5muL3FpNPk=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250625173516-9f25766a5545/go.mod h1:HgAt/qJQ4y/winC2AdyhcoA+5N/mOjXyU2YAVOOe4tw=
-github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630204622-121851bfca1b h1:sv2d7OfgHkhcDjTHTjO3FFBuPCJJ57abGrtZ/U1FU+c=
-github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630204622-121851bfca1b/go.mod h1:ci8Igr3AYpvGd4gZU/QWk7QqtNfbXZs1S7DvP7zTRQM=
+github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630211129-a92be2e373bd h1:t+6sMSLQfTVobZ7h4S+24mPoQCfHnv0btanph2ckt28=
+github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630211129-a92be2e373bd/go.mod h1:2oFDY+VtI+tVppsQ9d7JE73JiATy0qc5ZD68/1AkUeM=
 github.com/smartcontractkit/freeport v0.1.1 h1:B5fhEtmgomdIhw03uPVbVTP6oPv27fBhZsoZZMSIS8I=
 github.com/smartcontractkit/freeport v0.1.1/go.mod h1:T4zH9R8R8lVWKfU7tUvYz2o2jMv1OpGCdpY2j2QZXzU=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
