@@ -23,9 +23,9 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250630213649-73888c355ce5
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250630213649-73888c355ce5
-	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630213649-73888c355ce5
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250630215700-ff9c751d37ca
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250630215700-ff9c751d37ca
+	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630215700-ff9c751d37ca
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
@@ -396,7 +396,7 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/umbracle/ethgo v0.1.3 // indirect
 	github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 // indirect
-	github.com/urfave/cli/v2 v2.27.5 // indirect
+	github.com/urfave/cli/v2 v2.27.6 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.14 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
