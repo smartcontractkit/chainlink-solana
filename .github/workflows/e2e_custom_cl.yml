@@ -11,7 +11,7 @@ on:
       team:
         description: Team to run the tests for (e.g. BIX, CCIP)
         required: true
-        type: string        
+        type: string
 
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
       - name: Setup go
         uses: actions/setup-go@v5
         with:
@@ -46,7 +46,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -76,16 +76,15 @@ jobs:
     name: Check If Solana Test Image Exists
     runs-on: ubuntu-latest
     outputs:
-      exists: ${{ steps.check-image.outputs.exists }}
+      exists: ${{ steps.check-image-exists.outputs.exists }}
     steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
+      - name: Check if image exists in ECR
+        id: check-image-exists
+        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
         with:
           repository: chainlink-solana-tests
           tag: ${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
@@ -97,7 +96,7 @@ jobs:
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -116,7 +115,7 @@ jobs:
     if: needs.contract-changes.outputs.changed == 'true'
     steps:
       - name: Checkout previous release
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
         with:
           ref: v1.0.2 # set to v1.1.0 after v1.1.0 is deployed to mainnet
       - name: build contracts
@@ -126,7 +125,7 @@ jobs:
           docker run -d -v "$(pwd)":/repo --name build-container projectserum/build:v0.25.0 tail -f /dev/null
           # for use with 1.1.0 release and onward
           # docker run -d -v "$(pwd)":/repo --name build-container backpackapp/build:${{ needs.get_projectserum_version.outputs.projectserum_version }} tail -f /dev/null
-          
+
           # build with keys
           docker exec build-container bash -c "\
             export RUSTUP_HOME=\"/root/.rustup\" &&\
@@ -259,18 +258,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [e2e_custom_build_artifacts]
     steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@v1
-        with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: Build Test Image
-        continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+
       - name: Build Image
         uses: ./.github/actions/build-test-image
         with:
@@ -296,23 +288,15 @@ jobs:
       TEST_LOG_LEVEL: debug
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
-        with:
-          id: solana-e2e-smoke
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: E2E Custom Run Smoke Tests
-          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
-        continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
+
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
+
       - name: Install gauntlet
         uses: ./.github/actions/build-gauntlet
+
       - name: Generate config overrides
         run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
           cat << EOF > config.toml
@@ -329,13 +313,14 @@ jobs:
           echo ::add-mask::$BASE64_CONFIG_OVERRIDE
           # shellcheck disable=SC2086
           echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
+
       - name: Run Tests
         uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
         with:
           test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2Smoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
           cl_image_tag: solana.${{ github.sha }}
@@ -349,7 +334,7 @@ jobs:
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
         env:
-          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
           CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
 
@@ -370,19 +355,8 @@ jobs:
       TEST_LOG_LEVEL: debug
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Collect Metrics
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
-        with:
-          id: solana-e2e-program-upgrade
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: E2E Program Upgrade Tests
-          test-results-file: '{"testType":"go","filePath":"/tmp/gotest.log"}'
-        continue-on-error: true
       - name: Checkout the repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+        uses: actions/checkout@v4
       - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
       - name: Install gauntlet
@@ -410,7 +384,7 @@ jobs:
           test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2UpgradeSmoke -json $(args) ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }} 
+          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}
           cl_image_tag: solana.${{ github.sha }}
@@ -424,7 +398,7 @@ jobs:
           cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "false"
         env:
-          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}          
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
           E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
           CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
-          
+
