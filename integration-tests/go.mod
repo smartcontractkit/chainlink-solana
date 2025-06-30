@@ -23,8 +23,8 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.0
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250625173516-9f25766a5545
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250625173516-9f25766a5545
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250630211129-a92be2e373bd
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250630211129-a92be2e373bd
 	github.com/smartcontractkit/chainlink/v2 v2.23.2-por-beta.1.0.20250630211129-a92be2e373bd
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
 	github.com/stretchr/testify v1.10.0
@@ -356,7 +356,7 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae // indirect
-	github.com/smartcontractkit/chainlink-deployments-framework v0.14.0 // indirect
+	github.com/smartcontractkit/chainlink-deployments-framework v0.15.1 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250630192401-d6330473ec6e // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250623155929-df514c92ffe1 // indirect
