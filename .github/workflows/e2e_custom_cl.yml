@@ -232,7 +232,8 @@ jobs:
 
       - name: Build Image
         if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
-        uses: smartcontractkit/.github/actions/ctf-build-image@ctf-build-image/v1
+        # TODO: Pin to tag once https://github.com/smartcontractkit/.github/pull/1127 is merged and released
+        uses: smartcontractkit/.github/actions/ctf-build-image@fix/ctf-build-image-overrides
         with:
           dockerfile: core/chainlink.Dockerfile
           image-tag: solana.${{ github.sha }}
