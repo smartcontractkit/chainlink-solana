@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 )
 
@@ -79,6 +80,19 @@ type Config interface {
 	LogPollerStartingLookback() time.Duration
 	// wt
 	WT() *writetarget.Config
+	Workflow() Workflow
+}
+
+type Workflow interface {
+	AcceptanceTimeout() time.Duration
+	ForwarderAddress() string
+	FromAddress() string
+	ForwarderState() string
+	OracleID() string
+	RemainingAccs() []string
+	GasLimitDefault() *uint64
+	PollPeriod() time.Duration
+	TxAcceptanceState() *commontypes.TransactionStatus
 }
 
 type Chain struct {

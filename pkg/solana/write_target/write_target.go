@@ -1,10 +1,12 @@
 package writetarget
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"regexp"
+	"strings"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
@@ -14,38 +16,17 @@ import (
 	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder"
 	df "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/monitoring/pb/data-feeds/on-chain/registry"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
-	"github.com/smartcontractkit/chainlink-solana/contracts/target/idl"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+
+	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 )
 
 func New(ctx context.Context, relayer types.Relayer, chain solana.Chain, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	chainID := chain.ID()
 
 	id := generateWriteTargetName(chainID)
-	cfg := chain.Config().WT()
-
-	contractWriterCfgEncoded, err := getContractWriterCfg(cfg.NodeAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal contract writer config %w", err)
-	}
-
-	cw, err := relayer.NewContractWriter(ctx, contractWriterCfgEncoded)
-	if err != nil {
-		return nil, err
-	}
-
-	contractReaderEncoded, err := getContractReaderCfg()
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal contract reader config %w", err)
-	}
-
-	cr, err := relayer.NewContractReader(ctx, contractReaderEncoded)
-	if err != nil {
-		return nil, err
-	}
+	wtCfg := chain.Config().WT()
+	cfg := chain.Config().Workflow()
 
 	chainInfo, err := getChainInfo(chainID)
 	if err != nil {
@@ -84,71 +65,71 @@ func New(ctx context.Context, relayer types.Relayer, chain solana.Chain, lggr lo
 		ID:     id,
 		Logger: lggr,
 		Config: writetarget.Config{
-			PollPeriod:        cfg.PollPeriod,
-			AcceptanceTimeout: cfg.AcceptanceTimeout,
+			PollPeriod:        wtCfg.PollPeriod,
+			AcceptanceTimeout: wtCfg.AcceptanceTimeout,
 		},
 		ChainInfo:            chainInfo,
 		Beholder:             beholder,
 		ChainService:         chain,
 		ConfigValidateFn:     evaluate,
-		NodeAddress:          cfg.NodeAddress,
-		ForwarderAddress:     cfg.ForwarderAddress,
-		TargetStrategy:       newTargetStrategy(cw, cr, cfg.ForwarderAddress, lggr),
-		WriteAcceptanceState: cfg.AcceptanceState,
+		NodeAddress:          cfg.FromAddress(),
+		ForwarderAddress:     cfg.ForwarderAddress(),
+		TargetStrategy:       newTargetStrategy(chain.MultiClient(), chain.TxManager(), cfg, lggr),
+		WriteAcceptanceState: *cfg.TxAcceptanceState(),
 	}
 
 	return writetarget.NewWriteTarget(opts), nil
 }
 
-func evaluate(request capabilities.CapabilityRequest) (string, error) {
-	// TODO evaluate request
-	return "", nil
+func evaluate(rawRequest capabilities.CapabilityRequest) (string, error) {
+	r, err := getRequest(rawRequest)
+	if err != nil {
+		return "", err
+	}
+
+	// don't need tail in this case
+	reportMetadata, _, err := ocr3types.Decode(r.Inputs.SignedReport.Report)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode report metadata: %w", err)
+	}
+
+	if reportMetadata.Version != 1 {
+		return "", fmt.Errorf("unsupported report version: %d", reportMetadata.Version)
+	}
+
+	if reportMetadata.ExecutionID != rawRequest.Metadata.WorkflowExecutionID {
+		return "", fmt.Errorf("WorkflowExecutionID in the report does not match WorkflowExecutionID in the request metadata. Report WorkflowExecutionID: %+v, request WorkflowExecutionID: %+v", hex.EncodeToString([]byte(reportMetadata.ExecutionID)), rawRequest.Metadata.WorkflowExecutionID)
+	}
+
+	// case-insensitive verification of the owner address (so that a check-summed address matches its non-checksummed version).
+	if !strings.EqualFold(reportMetadata.WorkflowOwner, rawRequest.Metadata.WorkflowOwner) {
+		return "", fmt.Errorf("WorkflowOwner in the report does not match WorkflowOwner in the request metadata. Report WorkflowOwner: %+v, request WorkflowOwner: %+v", reportMetadata.WorkflowOwner, rawRequest.Metadata.WorkflowOwner)
+	}
+
+	if !strings.EqualFold(reportMetadata.WorkflowName, rawRequest.Metadata.WorkflowName) {
+		return "", fmt.Errorf("WorkflowName in the report does not match WorkflowName in the request metadata. Report WorkflowName: %+v, request WorkflowName: %+v", reportMetadata.WorkflowName, rawRequest.Metadata.WorkflowName)
+	}
+
+	if reportMetadata.WorkflowID != rawRequest.Metadata.WorkflowID {
+		return "", fmt.Errorf("WorkflowID in the report does not match WorkflowID in the request metadata. Report WorkflowID: %+v, request WorkflowID: %+v", reportMetadata.WorkflowID, rawRequest.Metadata.WorkflowID)
+	}
+
+	byteID, err := hex.DecodeString(reportMetadata.ReportID)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode report ID: %w", err)
+	}
+
+	if !bytes.Equal(byteID, r.Inputs.SignedReport.ID) {
+		return "", fmt.Errorf("ReportID in the report does not match ReportID in the inputs. reportMetadata.ReportID: %x, Inputs.SignedReport.ID: %x", reportMetadata.ReportID, r.Inputs.SignedReport.ID)
+	}
+
+	return r.Config.Address, nil
 }
 
 const (
 	forwarderProgram = "forwarder"
 	reportMethod     = "report"
 )
-
-// TODO
-func getContractReaderCfg() ([]byte, error) {
-	cfg := config.ContractReader{
-		//TODO
-	}
-
-	return json.Marshal(cfg)
-}
-
-func getContractWriterCfg(fromAddress string) ([]byte, error) {
-	idl := idl.FetchForwarderIDL()
-
-	var forwarderIDL codec.IDL
-	err := json.Unmarshal([]byte(idl), &forwarderIDL)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
-			forwarderProgram: chainwriter.ProgramConfig{
-				IDL: idl,
-				Methods: map[string]chainwriter.MethodConfig{
-					reportMethod: getReportMethodConfig(fromAddress),
-				},
-			},
-		},
-	}
-
-	return json.Marshal(cfg)
-}
-
-func getReportMethodConfig(fromAddress string) chainwriter.MethodConfig {
-	return chainwriter.MethodConfig{
-		FromAddress:       fromAddress,
-		ChainSpecificName: reportMethod,
-		//TODO
-	}
-}
 
 func generateWriteTargetName(chainID string) string {
 	id := fmt.Sprintf("write_%v@1.0.0", chainID)
@@ -165,7 +146,10 @@ func generateWriteTargetName(chainID string) string {
 }
 
 func getChainInfo(chainID string) (monitor.ChainInfo, error) {
-	chainSelector := chainselectors.SolanaChainIdToChainSelector()[chainID]
+	chainSelector, ok := chainselectors.SolanaChainIdToChainSelector()[chainID]
+	if !ok {
+		return monitor.ChainInfo{}, fmt.Errorf("failed to get chain selector for chainID %v", chainID)
+	}
 	chainFamily, err := chainselectors.GetSelectorFamily(chainSelector)
 	if err != nil {
 		return monitor.ChainInfo{}, fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)

@@ -23,7 +23,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250618162808-a5a42ee8701b
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
-	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250618164021-9b34289a9502
+	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250623155929-df514c92ffe1
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/freeport v0.1.1
@@ -171,5 +171,3 @@ require (
 )
 
 retract v1.1.0 // tag moved - checksum mismatch
-
-replace github.com/smartcontractkit/chainlink-framework/capabilities => ../chainlink-framework/capabilities

@@ -358,7 +358,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.5.0 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250522161404-27a8f7e1cc6c // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
-	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250618164021-9b34289a9502 // indirect
+	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250623155929-df514c92ffe1 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250522110034-65c54665034a // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250522110034-65c54665034a // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a // indirect
