@@ -416,21 +416,21 @@ func (c *chain) GetChainStatus(ctx context.Context) (types.ChainStatus, error) {
 }
 
 func (c *chain) GetChainInfo(_ context.Context) (types.ChainInfo, error) {
-	chainIDHash := c.cfg.ChainID
-	if chainIDHash == nil {
+	chainIDHash := c.id
+	chainEnvName := c.cfg.ChainID
+	if chainEnvName == nil {
 		return types.ChainInfo{}, fmt.Errorf("chain ID is missing")
 	}
 
-	chainEnvName := c.id
-	networkName, err := chainselectors.SolanaNameFromChainId(*chainIDHash)
+	networkName, err := chainselectors.SolanaNameFromChainId(chainIDHash)
 	if err != nil {
 		return types.ChainInfo{}, fmt.Errorf("failed to get network name from chain ID: %s, err: %w", c.id, err)
 	}
 
 	return types.ChainInfo{
 		FamilyName:      "solana",
-		ChainID:         *chainIDHash,
-		NetworkName:     chainEnvName,
+		ChainID:         chainIDHash,
+		NetworkName:     *chainEnvName,
 		NetworkNameFull: networkName,
 	}, nil
 }

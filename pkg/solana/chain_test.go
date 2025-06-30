@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
@@ -637,4 +638,27 @@ loop:
 	receiverBal, err = selectedClient.Balance(t.Context(), pubKeyReceiver)
 	assert.NoError(t, err)
 	require.Equal(t, 2*solana.LAMPORTS_PER_SOL, receiverBal)
+}
+
+func TestGetChainInfo(t *testing.T) {
+	familyName := "solana"
+	chainIDHash := client.DevnetGenesisHash
+	chainEnvName := "devnet"
+
+	cfg := solcfg.NewDefault()
+	cfg.ChainID = &chainEnvName
+
+	c, err := NewChain(cfg, ChainOpts{Logger: logger.Test(t)})
+	require.NoError(t, err)
+
+	chainInfo, err := c.GetChainInfo(t.Context())
+	require.NoError(t, err)
+
+	cf := types.ChainInfo{
+		FamilyName:      familyName,
+		ChainID:         chainIDHash,
+		NetworkName:     chainEnvName,
+		NetworkNameFull: familyName + "-" + chainEnvName,
+	}
+	require.Equal(t, cf, chainInfo)
 }
