@@ -195,7 +195,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      core-ref: ${{ steps.get-core-ref.outputs.core_ref || github.event.inputs.cl_branch_ref }}
+      core-ref: ${{ steps.get-core-ref.outputs.core-ref || github.event.inputs.cl_branch_ref }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
