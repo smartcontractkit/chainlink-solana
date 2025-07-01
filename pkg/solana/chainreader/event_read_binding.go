@@ -149,6 +149,7 @@ func (b *eventReadBinding) deriveName() string {
 	data := b.filter.filter.EventSig[:]
 	data = append(data, []byte(b.readDefinition.ChainSpecificName)...)
 	data = append(data, b.filter.filter.Address.ToSolana().Bytes()...)
+	data = append(data, []byte(b.filter.filter.EventName)...)
 	for _, sub := range b.filter.filter.SubkeyPaths {
 		for _, key := range sub {
 			data = append(data, []byte(key)...)
