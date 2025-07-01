@@ -161,7 +161,12 @@ func (b *eventReadBinding) deriveName() string {
 		}
 	}
 
-	hash := sha3.New256().Sum(data)
+	h := sha3.New256()
+
+	// sha write never returns err
+	_, _ = h.Write(data)
+
+	hash := sha3.New256().Sum(nil)
 
 	ret := fmt.Sprintf("%s.%s.%x", b.namespace, b.genericName, hash[:])
 
