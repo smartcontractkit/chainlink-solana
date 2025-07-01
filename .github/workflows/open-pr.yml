@@ -17,7 +17,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b # v4.1.5
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
@@ -31,7 +31,7 @@ jobs:
         run: ${{ inputs.run }}
       - run: |
           echo "must have branch name output set"
-          exit 1 
+          exit 1
         if: '!steps.run.outputs.name'
       - name: Check if changes + PR exists
         id: check
@@ -53,21 +53,21 @@ jobs:
           SHA: ${{ github.head_ref || github.ref_name }}
         run: |
           echo "original=$SHA" >> "$GITHUB_OUTPUT"
-          git branch "${{ steps.run.outputs.name }}" 
-          git push origin "${{ steps.run.outputs.name }}" 
+          git branch "${{ steps.run.outputs.name }}"
+          git push origin "${{ steps.run.outputs.name }}"
       - uses: planetscale/ghcommit-action@21a8cda29f55e5cc2cdae0cdbdd08e38dd148c25 # v0.1.37
         if: '!steps.check.outputs.skip'
         with:
           commit_message: ${{ steps.run.outputs.commitString }}
           repo: ${{ github.repository }}
-          branch: "${{ steps.run.outputs.name }}" 
+          branch: "${{ steps.run.outputs.name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: "Cleanup branch"
         if: '!steps.check.outputs.skip'
         run: |
           git reset --hard
-          git branch --set-upstream-to=origin/${{ steps.run.outputs.name }} 
+          git branch --set-upstream-to=origin/${{ steps.run.outputs.name }}
           git pull
       - name: Setup GitHub Token
         if: '!steps.check.outputs.skip'
@@ -83,7 +83,7 @@ jobs:
         with:
           title: ${{ steps.run.outputs.prTitle }}
           base: ${{ steps.branch.outputs.original }}
-          branch: ${{ steps.run.outputs.name }} 
+          branch: ${{ steps.run.outputs.name }}
           reviewers: ${{ inputs.reviewers }}
           body: ${{ steps.run.outputs.prBody }}
           labels: "AUTO: Upstream Updates"
