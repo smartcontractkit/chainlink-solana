@@ -2,12 +2,14 @@ package chainreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -52,13 +54,11 @@ func (r *syncedFilter) Register(ctx context.Context, registrar filterRegistrar) 
 }
 
 func (r *syncedFilter) register(ctx context.Context, registrar filterRegistrar) error {
-	if !registrar.HasFilter(ctx, r.filter.Name) {
-		if err := registrar.RegisterFilter(ctx, r.filter); err != nil {
-			return FilterError{
-				Err:    fmt.Errorf("%w: %s", types.ErrInternal, err.Error()),
-				Action: "register",
-				Filter: r.filter,
-			}
+	if err := registrar.RegisterFilter(ctx, r.filter); err != nil && !errors.Is(err, logpoller.ErrFilterNameConflict) {
+		return FilterError{
+			Err:    fmt.Errorf("%w: %s", types.ErrInternal, err.Error()),
+			Action: "register",
+			Filter: r.filter,
 		}
 	}
 

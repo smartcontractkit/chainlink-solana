@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -29,6 +30,10 @@ func TestBind(t *testing.T) {
 	subkeys.addForIndex("C", "Y", 2)
 	subkeys.addForIndex("D", "Z", 3)
 
+	subkeys2 := newIndexedSubkeys()
+	subkeys.addForIndex("A", "W", 0)
+	subkeys.addForIndex("B", "X", 1)
+
 	readDef := config.ReadDefinition{}
 	pollerConf := config.PollingFilter{}
 
@@ -49,6 +54,43 @@ func TestBind(t *testing.T) {
 		require.NoError(t, reader.Bind(ctx, address1))
 
 		require.NoError(t, reader.Bind(ctx, address2))
+		lpSource.AssertExpectations(t)
+	})
+
+	t.Run("Bind derives name based on filter", func(t *testing.T) {
+		t.Parallel()
+
+		lpSource := new(mocks.EventsReader)
+
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false)
+		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Twice() // 1 per address 1 and 1 per address2
+
+		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
+		reader2 := newEventReadBinding(namespace, genericName, subkeys2, lpSource, readDef, pollerConf)
+		name0 := reader.deriveName()
+		name_0 := reader2.deriveName()
+
+		require.NotEqual(t, name0, name_0)
+		ctx := t.Context()
+
+		require.NoError(t, reader.Register(ctx))
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		// name should have changed
+		name1 := reader.deriveName()
+		assert.NotEqual(t, name0, name1)
+
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		// name shoudln't have changed (address the same)
+		name2 := reader.deriveName()
+		require.Equal(t, name1, name2)
+
+		require.NoError(t, reader.Bind(ctx, address2))
+
+		// name should have changed
+		name3 := reader.deriveName()
+		require.NotEqual(t, name2, name3)
 		lpSource.AssertExpectations(t)
 	})
 
