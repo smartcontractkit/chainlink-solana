@@ -165,7 +165,8 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 }
 
 type Config struct {
-	Address string
+	Address           string
+	RemainingAccounts []Acc
 }
 
 type Acc struct {
@@ -174,8 +175,7 @@ type Acc struct {
 }
 
 type Inputs struct {
-	SignedReport      ocr3types.SignedReport
-	RemainingAccounts []Acc
+	SignedReport ocr3types.SignedReport
 }
 
 type targetRequest struct {
@@ -229,6 +229,13 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 	r.Receiver = receiver
 
+	for _, acc := range r.Config.RemainingAccounts {
+		_, err := solana.PublicKeyFromBase58(acc.Address)
+		if err != nil {
+			return r, fmt.Errorf("failed parse public key from remaining account %v err:%w", acc, err)
+		}
+	}
+
 	if rawRequest.Inputs == nil {
 		return r, errors.New("missing inputs field")
 	}
@@ -241,22 +248,6 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 
 	if err := signedReport.UnwrapTo(&r.Inputs.SignedReport); err != nil {
 		return r, err
-	}
-
-	remainingAccs, ok := rawRequest.Inputs.Underlying[remainingAccounts]
-	if !ok {
-		return r, fmt.Errorf("missing required field %s", remainingAccounts)
-	}
-
-	if err := remainingAccs.UnwrapTo(r.Inputs.RemainingAccounts); err != nil {
-		return r, err
-	}
-
-	for _, acc := range r.Inputs.RemainingAccounts {
-		_, err := solana.PublicKeyFromBase58(acc.Address)
-		if err != nil {
-			return r, fmt.Errorf("failed parse public key from remaining account %v err:%w", acc, err)
-		}
 	}
 
 	return r, nil
@@ -282,7 +273,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash
 	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 	maps.Copy(lookup, ts.lookupTable)
 
-	for _, acc := range r.Inputs.RemainingAccounts {
+	for _, acc := range r.Config.RemainingAccounts {
 		key, err := solana.PublicKeyFromBase58(acc.Address)
 		if err != nil {
 			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
