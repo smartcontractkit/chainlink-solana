@@ -68,9 +68,9 @@ func TestBind(t *testing.T) {
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
 		reader2 := newEventReadBinding(namespace, genericName, subkeys2, lpSource, readDef, pollerConf)
 		name0 := reader.deriveName()
-		name_0 := reader2.deriveName()
+		name := reader2.deriveName()
 
-		require.NotEqual(t, name0, name_0)
+		require.NotEqual(t, name0, name)
 		ctx := t.Context()
 
 		require.NoError(t, reader.Register(ctx))
