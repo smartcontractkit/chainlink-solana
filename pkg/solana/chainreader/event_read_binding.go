@@ -148,6 +148,7 @@ func (b *eventReadBinding) deriveName() string {
 	// include eventSig, readDef, address, subkeyPaths, indexedSubkeys
 	data := b.filter.filter.EventSig[:]
 	data = append(data, []byte(b.readDefinition.ChainSpecificName)...)
+	data = append(data, []byte(b.filter.filter.Name)...)
 	data = append(data, b.filter.filter.Address.ToSolana().Bytes()...)
 	for _, sub := range b.filter.filter.SubkeyPaths {
 		for _, key := range sub {
@@ -159,11 +160,6 @@ func (b *eventReadBinding) deriveName() string {
 			data = append(data, key...)
 		}
 	}
-
-	// include retention, starting block, max logs kept
-	tail := fmt.Sprint(b.filter.filter.Retention, b.filter.filter.StartingBlock, b.filter.filter.MaxLogsKept)
-
-	data = append(data, []byte(tail)...)
 
 	hash := sha3.New256().Sum(data)
 
