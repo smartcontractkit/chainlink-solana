@@ -150,17 +150,18 @@ func (b *eventReadBinding) deriveName() string {
 	data = append(data, []byte(b.readDefinition.ChainSpecificName)...)
 	data = append(data, b.filter.filter.Address.ToSolana().Bytes()...)
 	data = append(data, []byte(b.filter.filter.EventName)...)
+
 	for _, sub := range b.filter.filter.SubkeyPaths {
 		for _, key := range sub {
 			data = append(data, []byte(key)...)
 		}
 	}
+
 	for _, sub := range b.indexedSubKeys.subKeys {
 		for _, key := range sub {
 			data = append(data, key...)
 		}
 	}
-
 	hash := sha3.Sum256(data)
 
 	ret := fmt.Sprintf("%s.%s.%x", b.namespace, b.genericName, hash[:])
