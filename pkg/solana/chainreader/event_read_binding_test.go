@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -20,14 +21,18 @@ import (
 )
 
 func TestBind(t *testing.T) {
-	address1 := solana.NewWallet().PublicKey()
-	address2 := solana.NewWallet().PublicKey()
+	address1 := solana.PublicKey{1, 2, 3}
+	address2 := solana.PublicKey{6, 5, 4}
 
 	subkeys := newIndexedSubkeys()
 	subkeys.addForIndex("A", "W", 0)
 	subkeys.addForIndex("B", "X", 1)
 	subkeys.addForIndex("C", "Y", 2)
 	subkeys.addForIndex("D", "Z", 3)
+
+	subkeys2 := newIndexedSubkeys()
+	subkeys2.addForIndex("A", "W", 0)
+	subkeys2.addForIndex("B", "X", 1)
 
 	readDef := config.ReadDefinition{}
 	pollerConf := config.PollingFilter{}
@@ -49,6 +54,47 @@ func TestBind(t *testing.T) {
 		require.NoError(t, reader.Bind(ctx, address1))
 
 		require.NoError(t, reader.Bind(ctx, address2))
+		lpSource.AssertExpectations(t)
+	})
+
+	t.Run("Bind derives name based on filter", func(t *testing.T) {
+		t.Parallel()
+
+		lpSource := new(mocks.EventsReader)
+
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false)
+		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Twice() // 1 per address 1 and 1 per address2
+
+		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
+		reader2 := newEventReadBinding(namespace, genericName, subkeys2, lpSource, readDef, pollerConf)
+		name0 := reader.deriveName()
+		assert.Equal(t, "TestNamespace.GenericName.64534094550029c2338585738a654173ff263d471b8728e30f147ce68451cd0b", name0)
+		name := reader2.deriveName()
+		assert.Equal(t, "TestNamespace.GenericName.9a5cc2ed54afdbd1136f222be651c4ad12afbc95f6438e7dddc7c92e4532156f", name)
+		require.NotEqual(t, name0, name)
+		ctx := t.Context()
+
+		require.NoError(t, reader.Register(ctx))
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		// name should have changed
+		name1 := reader.deriveName()
+		assert.Equal(t, name1, reader.deriveName())
+		assert.Equal(t, "TestNamespace.GenericName.aa5a667222c55daaa0c5872453847c6eda5b0e07abacd3333b25425ad7ebd0b9", name1)
+		assert.NotEqual(t, name0, name1)
+
+		require.NoError(t, reader.Bind(ctx, address1))
+
+		// name shoudln't have changed (address the same)
+		name2 := reader.deriveName()
+		require.Equal(t, name1, name2)
+
+		require.NoError(t, reader.Bind(ctx, address2))
+
+		// name should have changed
+		name3 := reader.deriveName()
+		require.NotEqual(t, name2, name3)
+		assert.Equal(t, "TestNamespace.GenericName.f73ac95d7b8ff5aa315e8c035ced1fce78b9e15d1c09c75c9a636eca6add63f4", name3)
 		lpSource.AssertExpectations(t)
 	})
 
