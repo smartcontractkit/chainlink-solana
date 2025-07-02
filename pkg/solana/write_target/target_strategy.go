@@ -213,7 +213,6 @@ func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.
 	if t.Config.CacheDetails != nil {
 		// assume that the receiver is the cache program
 		cacheProgram := t.Receiver
-		remainingAccounts = make([]solana.AccountMeta, 2*len(t.Config.CacheDetails.FeedIds))
 
 		cacheStateKey, err := solana.PublicKeyFromBase58(t.Config.CacheDetails.State)
 		if err != nil {
@@ -228,6 +227,30 @@ func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.
 		if cacheStateAccount.Value == nil {
 			return nil, fmt.Errorf("cache state account does not exist %v", cacheStateKey)
 		}
+
+		remainingAccounts = []solana.AccountMeta{
+			solana.AccountMeta{
+				PublicKey:  cacheStateKey,
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy store omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy feed config omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy writer omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  solana.SystemProgramID,
+				IsWritable: false,
+			},
+		}
+		derivedAccounts := make([]solana.AccountMeta, 2*len(t.Config.CacheDetails.FeedIds))
 
 		// derive pdas and check existence on-chain
 		for i, feedId := range t.Config.CacheDetails.FeedIds {
@@ -256,7 +279,7 @@ func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.
 				return nil, fmt.Errorf("decimal report account %v does not exist for data id %v", decimalReportKey, feedId)
 			}
 
-			remainingAccounts[i] = solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
+			derivedAccounts[i] = solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
 
 			// add to remaining accounts
 
@@ -288,8 +311,10 @@ func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.
 			}
 
 			// write flag accounts go after all the decimal report accounts
-			remainingAccounts[len(t.Config.CacheDetails.FeedIds)+i] = solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
+			derivedAccounts[len(t.Config.CacheDetails.FeedIds)+i] = solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
 		}
+
+		remainingAccounts = append(remainingAccounts, derivedAccounts...)
 
 	}
 
