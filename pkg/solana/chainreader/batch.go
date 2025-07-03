@@ -176,6 +176,7 @@ func doMethodBatchCall(ctx context.Context, lggr logger.Logger, client MultipleA
 
 		// HACK: workaround for OffRampLatestConfigDetails: we need to use an input param to filter an array in the return values, not for seeds
 		if batchCall.ReadName == ccipconsts.MethodNameOffRampLatestConfigDetails {
+			lggr.Debugw("OffRampLatestConfigDetails check", "readName", batchCall.ReadName, "params", batchCall.Params, "paramsType", reflect.TypeOf(batchCall.Params))
 			params, ok := batchCall.Params.(map[string]any)
 			if !ok {
 				results[idx].err = fmt.Errorf("batch call params is unexpected type: %T, expected %T", batchCall.Params, map[string]any{})
