@@ -689,6 +689,12 @@ pub mod data_feeds_cache {
             delete_permission_accounts.append(&mut temp_candidates_deletion)
         }
 
+        require_eq!(
+            delete_permission_account_infos.len(),
+            delete_permission_account_infos.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
         for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
             let curr_permission_account_info = &delete_permission_account_infos[i];
 
@@ -1047,6 +1053,12 @@ pub mod data_feeds_cache {
         ctx: Context<'_, '_, 'info, 'info, QueryValues<'info>>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<Vec<DecimalReport>> {
+        require_eq!(
+            data_ids.len(),
+            ctx.remaining_accounts.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
         let mut reports = Vec::new();
 
         for (i, data_id) in data_ids.iter().enumerate() {

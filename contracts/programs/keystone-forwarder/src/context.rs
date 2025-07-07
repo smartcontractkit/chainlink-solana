@@ -1,7 +1,10 @@
-use crate::common::ANCHOR_DISCRIMINATOR;
+use crate::common::{ANCHOR_DISCRIMINATOR, METADATA_LENGTH, REPORT_CONTEXT_LEN};
 use crate::error::AuthError;
 use crate::state::{ExecutionState, ForwarderState, OraclesConfig};
-use crate::utils::{extract_config_id, extract_raw_report, extract_transmission_id, get_config_id};
+use crate::utils::{
+    extract_config_id, extract_raw_report, extract_transmission_id, get_config_id, report_size_ok,
+};
+use crate::ForwarderError;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -99,6 +102,7 @@ pub struct Report<'info> {
 
     #[account(
         mut,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
@@ -114,6 +118,7 @@ pub struct Report<'info> {
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
     #[account(
         init_if_needed,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         payer = transmitter,
         space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [

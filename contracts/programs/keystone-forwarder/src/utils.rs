@@ -1,10 +1,15 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::hash;
 
-use crate::common::{REPORT_CONTEXT_LEN, SIGNATURE_LEN};
+use crate::common::{METADATA_LENGTH, REPORT_CONTEXT_LEN, SIGNATURE_LEN};
 
 pub fn get_config_id(don_id: u32, config_version: u32) -> u64 {
     ((don_id as u64) << 32) | (config_version as u64)
+}
+
+pub fn report_size_ok(data: &[u8]) -> bool {
+    let num_signatures = data[0] as usize;
+    data.len() > 1 + num_signatures * SIGNATURE_LEN + METADATA_LENGTH + REPORT_CONTEXT_LEN
 }
 
 // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)

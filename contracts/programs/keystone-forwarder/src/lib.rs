@@ -115,7 +115,8 @@ pub mod keystone_forwarder {
         data: Vec<u8>,
     ) -> Result<()> {
         let num_signatures = data[0] as usize;
-        let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
+        let min_data_size =
+            1 + num_signatures * SIGNATURE_LEN + METADATA_LENGTH + REPORT_CONTEXT_LEN;
 
         require_gt!(data.len(), min_data_size, ForwarderError::InvalidReport);
 
