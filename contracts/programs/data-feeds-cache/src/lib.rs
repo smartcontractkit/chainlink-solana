@@ -34,7 +34,9 @@ pub mod data_feeds_cache {
     };
 
     use crate::event::{
-        CacheInitialized, DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdate, FeedAdminUpdated, InvalidUpdatePermission, LegacyFeedsConfigInitialized, LegacyFeedsConfigUpdated, OwnershipAcceptance, OwnershipTransfer, StaleDecimalReport
+        CacheInitialized, DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdate,
+        FeedAdminUpdated, InvalidUpdatePermission, LegacyFeedsConfigInitialized,
+        LegacyFeedsConfigUpdated, OwnershipAcceptance, OwnershipTransfer, StaleDecimalReport,
     };
 
     use super::*;
@@ -60,8 +62,8 @@ pub mod data_feeds_cache {
         state.legacy_writer_nonce = authority_nonce;
 
         emit!({
-            CacheInitialized{
-                state: ctx.accounts.state.key()
+            CacheInitialized {
+                state: ctx.accounts.state.key(),
             }
         });
 
@@ -236,8 +238,7 @@ pub mod data_feeds_cache {
         ctx: Context<InitLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
-
-        emit!(LegacyFeedsConfigInitialized { 
+        emit!(LegacyFeedsConfigInitialized {
             config: ctx.accounts.legacy_feeds_config.key()
         });
 
@@ -256,7 +257,6 @@ pub mod data_feeds_cache {
         data_ids: Vec<[u8; 16]>,
         write_disabled: Vec<bool>,
     ) -> Result<()> {
-        
         emit!(LegacyFeedsConfigUpdated {
             config: ctx.accounts.legacy_feeds_config.key()
         });

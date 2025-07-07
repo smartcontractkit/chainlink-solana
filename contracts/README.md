@@ -52,6 +52,7 @@ anchor test
 ### Using nix shell to test locally
 
 Make sure you have run this in the contracts/ folder
+
 ```
 solana-keygen new -o id.json
 ```
