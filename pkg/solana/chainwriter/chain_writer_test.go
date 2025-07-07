@@ -1138,9 +1138,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSel},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
-							DestTokenAddress: destTokenAddr.Bytes(),
+							DestTokenAddress:  destTokenAddr.Bytes(),
 							SourcePoolAddress: sourcePoolAddr.Bytes(),
-							Amount: ccipocr3.NewBigInt(big.NewInt(1)),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
 						},
 					},
 				},
