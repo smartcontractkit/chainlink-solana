@@ -109,10 +109,10 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 			tokenTransfers = append(tokenTransfers, ccip_offramp.TokenTransferAndOffchainData{
 				Transfer: ccip_offramp.Any2SVMTokenTransfer{
 					SourcePoolAddress: tokenAmount.SourcePoolAddress,
-					DestTokenAddress: destTokenAddress,
-					Amount: ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
-					ExtraData: tokenAmount.ExtraData,
-					DestGasAmount: destGasAmount,
+					DestTokenAddress:  destTokenAddress,
+					Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
+					ExtraData:         tokenAmount.ExtraData,
+					DestGasAmount:     destGasAmount,
 				},
 				Data: tokenAmount.DestExecData,
 			})
@@ -129,13 +129,13 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 	}
 
 	params := ccip_offramp.DeriveAccountsExecuteParams{
-		ExecuteCaller:            transmitter,
-		MessageAccounts:          messageAccounts,
-		SourceChainSelector:      uint64(sourceChainSel),
-		TokenTransfers:           tokenTransfers,
-		MerkleRoot:               merkleRoot,
-		TokenReceiver:            tokenReceiver,
-		OriginalSender:           message.Sender,
+		ExecuteCaller:       transmitter,
+		MessageAccounts:     messageAccounts,
+		SourceChainSelector: uint64(sourceChainSel),
+		TokenTransfers:      tokenTransfers,
+		MerkleRoot:          merkleRoot,
+		TokenReceiver:       tokenReceiver,
+		OriginalSender:      message.Sender,
 	}
 	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress)
 	if err != nil {

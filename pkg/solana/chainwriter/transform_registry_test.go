@@ -129,13 +129,13 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
-							DestTokenAddress: destTokenAddr1.Bytes(),
-							Amount: ccipocr3.NewBigInt(big.NewInt(1)),
+							DestTokenAddress:  destTokenAddr1.Bytes(),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
 							SourcePoolAddress: sourcePoolAddr1.Bytes(),
 						},
 						{
-							DestTokenAddress: destTokenAddr2.Bytes(),
-							Amount: ccipocr3.NewBigInt(big.NewInt(2)),
+							DestTokenAddress:  destTokenAddr2.Bytes(),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(2)),
 							SourcePoolAddress: sourcePoolAddr2.Bytes(),
 						},
 					}},
@@ -228,9 +228,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 						Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
 						TokenAmounts: []ccipocr3.RampTokenAmount{
 							{
-								DestTokenAddress: destTokenAddr1.Bytes(),
+								DestTokenAddress:  destTokenAddr1.Bytes(),
 								SourcePoolAddress: sourcePoolAddr1.Bytes(),
-								Amount: ccipocr3.NewBigInt(big.NewInt(1)),
+								Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
 							},
 						}},
 					},
