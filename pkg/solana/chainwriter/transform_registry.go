@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math/big"
 	"regexp"
 
 	"github.com/gagliardetto/solana-go"
@@ -85,13 +86,36 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		messageAccounts = append(messageAccounts, ConvertToCCIPAccountMetas(userAccounts)...)
 	}
 
-	// Extract token transfer mints
-	var transferredMints []solana.PublicKey
+	// Extract token transfers
+	var tokenTransfers []ccip_offramp.TokenTransferAndOffchainData
 	var tokenReceiver solana.PublicKey
 	if len(message.TokenAmounts) > 0 {
-		transferredMints = make([]solana.PublicKey, 0, len(message.TokenAmounts))
-		for _, tokenAmount := range message.TokenAmounts {
-			transferredMints = append(transferredMints, solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress))
+		tokenTransfers = make([]ccip_offramp.TokenTransferAndOffchainData, 0, len(message.TokenAmounts))
+		if len(argsTransformed.ExtraData.DestExecDataDecoded) != len(message.TokenAmounts) {
+			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
+		}
+		for i, tokenAmount := range message.TokenAmounts {
+			destTokenAddress := solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress)
+			destGasAmount, ok := argsTransformed.ExtraData.DestExecDataDecoded[i]["destGasAmount"].(uint32)
+			if !ok {
+				return nil, nil, nil, nil, fmt.Errorf("dest gas amount not found in ExtraData for token transfer: %s", destTokenAddress.String())
+			}
+			if tokenAmount.Amount.IsEmpty() {
+				return nil, nil, nil, nil, fmt.Errorf("token amount is empty for token transfer: %s", destTokenAddress.String())
+			}
+			if tokenAmount.Amount.Int.Sign() < 0 {
+				return nil, nil, nil, nil, fmt.Errorf("negative amount for token: %s", destTokenAddress.String())
+			}
+			tokenTransfers = append(tokenTransfers, ccip_offramp.TokenTransferAndOffchainData{
+				Transfer: ccip_offramp.Any2SVMTokenTransfer{
+					SourcePoolAddress: tokenAmount.SourcePoolAddress,
+					DestTokenAddress: destTokenAddress,
+					Amount: ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
+					ExtraData: tokenAmount.ExtraData,
+					DestGasAmount: destGasAmount,
+				},
+				Data: tokenAmount.DestExecData,
+			})
 		}
 		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
 		tokenReceivers, resolveErr := tokenReceiverLookup.Resolve(args)
@@ -108,9 +132,10 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		ExecuteCaller:            transmitter,
 		MessageAccounts:          messageAccounts,
 		SourceChainSelector:      uint64(sourceChainSel),
-		MintsOfTransferredTokens: transferredMints,
+		TokenTransfers:           tokenTransfers,
 		MerkleRoot:               merkleRoot,
 		TokenReceiver:            tokenReceiver,
+		OriginalSender:           message.Sender,
 	}
 	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress)
 	if err != nil {
@@ -286,4 +311,19 @@ func ConvertToSolanaAccountMetas(metas []ccip_offramp.CcipAccountMeta) solana.Ac
 		})
 	}
 	return solanaMetas
+}
+
+func encodeBigIntToFixedLengthLE(bi *big.Int, length int) []byte {
+	// Create a fixed-length byte array
+	paddedBytes := make([]byte, length)
+
+	// Use FillBytes to fill the array with big-endian data, zero-padded
+	bi.FillBytes(paddedBytes)
+
+	// Reverse the array for little-endian encoding
+	for i, j := 0, len(paddedBytes)-1; i < j; i, j = i+1, j-1 {
+		paddedBytes[i], paddedBytes[j] = paddedBytes[j], paddedBytes[i]
+	}
+
+	return paddedBytes
 }

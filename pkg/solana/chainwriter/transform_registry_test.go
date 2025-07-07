@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"math/big"
 	"strconv"
 	"testing"
 
@@ -54,7 +55,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	tokenReceiver := GetRandomPubKey(t)
 	offrampAddress := GetRandomPubKey(t)
 	destTokenAddr1 := GetRandomPubKey(t)
+	sourcePoolAddr1 := GetRandomPubKey(t)
 	destTokenAddr2 := GetRandomPubKey(t)
+	sourcePoolAddr2 := GetRandomPubKey(t)
 
 	poolKeys1 := CreateTestPubKeys(t, 7)
 	poolProgram1 := poolKeys1[2]
@@ -127,9 +130,13 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr1.Bytes(),
+							Amount: ccipocr3.NewBigInt(big.NewInt(1)),
+							SourcePoolAddress: sourcePoolAddr1.Bytes(),
 						},
 						{
 							DestTokenAddress: destTokenAddr2.Bytes(),
+							Amount: ccipocr3.NewBigInt(big.NewInt(2)),
+							SourcePoolAddress: sourcePoolAddr2.Bytes(),
 						},
 					}},
 				},
@@ -144,6 +151,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				"tokenReceiver":           tokenReceiver,
 			},
 			DestExecDataDecoded: []map[string]any{
+				{"destGasAmount": destGasAmount},
 				{"destGasAmount": destGasAmount},
 			},
 		},
@@ -161,7 +169,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, args, nil, staticLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{})
 		require.NoError(t, err)
 		require.Len(t, lookupTableMap, 2) // contains pool lookup table for the both token transfers
-		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount*2)
 
 		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
 		require.True(t, ok)
@@ -221,6 +229,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 						TokenAmounts: []ccipocr3.RampTokenAmount{
 							{
 								DestTokenAddress: destTokenAddr1.Bytes(),
+								SourcePoolAddress: sourcePoolAddr1.Bytes(),
+								Amount: ccipocr3.NewBigInt(big.NewInt(1)),
 							},
 						}},
 					},
@@ -529,7 +539,7 @@ func Test_CCIPCommitAccountTransform(t *testing.T) {
 	})
 }
 
-func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overhead, userCU, destGasAmount uint32) {
+func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overhead, userCU, destGasAmounts uint32) {
 	expectedLen := 1
 	if exec {
 		expectedLen = 2
@@ -542,7 +552,7 @@ func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overh
 
 	if exec {
 		options[1](txConfig)
-		require.Equal(t, overhead+userCU+destGasAmount, txConfig.ComputeUnitLimit)
+		require.Equal(t, overhead+userCU+destGasAmounts, txConfig.ComputeUnitLimit)
 	}
 }
 
