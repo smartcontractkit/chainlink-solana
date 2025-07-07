@@ -105,7 +105,7 @@ pub mod data_feeds_cache {
 
         emit!(OwnershipTransfer {
             current_owner: state.owner,
-            proposed_owner: proposed_owner
+            proposed_owner
         });
 
         Ok(())
