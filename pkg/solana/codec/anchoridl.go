@@ -484,30 +484,22 @@ func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
 		if _, ok := firstItem.(map[string]any)["name"]; ok {
 			// TODO:
 			// If has `name` field, then it's most likely a IdlEnumFieldsNamed.
-			if err := utilz.TranscodeJSON(temp, &env.IdlEnumFieldsNamed); err != nil {
-				return err
-			}
+			return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsNamed)
 		} else {
-			if err := utilz.TranscodeJSON(temp, &env.IdlEnumFieldsTuple); err != nil {
-				return err
-			}
+			return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsTuple)
 		}
 	case map[string]any:
+		// Only one or the other field is set. Returning early is safe
 		if named, ok := v["IdlEnumFieldsNamed"]; ok {
-			if err := utilz.TranscodeJSON(named, &env.IdlEnumFieldsNamed); err != nil {
-				return err
-			}
+			return utilz.TranscodeJSON(named, &env.IdlEnumFieldsNamed)
 		}
 		if tuple, ok := v["IdlEnumFieldsTuple"]; ok {
-			if err := utilz.TranscodeJSON(tuple, &env.IdlEnumFieldsTuple); err != nil {
-				return err
-			}
+			return utilz.TranscodeJSON(tuple, &env.IdlEnumFieldsTuple)
 		}
+		return fmt.Errorf("Unknown type: %s", spew.Sdump(v))
 	default:
 		return fmt.Errorf("Unknown kind: %s", spew.Sdump(temp))
 	}
-
-	return nil
 }
 
 type IdlErrorCode struct {
