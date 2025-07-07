@@ -2,13 +2,13 @@ package chainreader
 
 import (
 	"context"
+	"crypto/sha3"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/google/uuid"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -116,7 +116,8 @@ func (b *eventReadBinding) Register(ctx context.Context) error {
 		return nil
 	}
 
-	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	newName := b.deriveName()
+
 	b.filter.SetName(newName)
 
 	return b.filter.Register(ctx, b.reader)
@@ -138,9 +139,34 @@ func (b *eventReadBinding) update(ctx context.Context) error {
 		return nil
 	}
 
-	newName := fmt.Sprintf("%s.%s.%s", b.namespace, b.genericName, uuid.NewString())
+	newName := b.deriveName()
 
 	return b.filter.Update(ctx, b.reader, newName)
+}
+
+func (b *eventReadBinding) deriveName() string {
+	// include eventSig, readDef, address, subkeyPaths, indexedSubkeys
+	data := b.filter.filter.EventSig[:]
+	data = append(data, []byte(b.readDefinition.ChainSpecificName)...)
+	data = append(data, b.filter.filter.Address.ToSolana().Bytes()...)
+	data = append(data, []byte(b.filter.filter.EventName)...)
+
+	for _, sub := range b.filter.filter.SubkeyPaths {
+		for _, key := range sub {
+			data = append(data, []byte(key)...)
+		}
+	}
+
+	for _, sub := range b.indexedSubKeys.subKeys {
+		for _, key := range sub {
+			data = append(data, key...)
+		}
+	}
+	hash := sha3.Sum256(data)
+
+	ret := fmt.Sprintf("%s.%s.%x", b.namespace, b.genericName, hash[:])
+
+	return ret
 }
 
 func (b *eventReadBinding) Unregister(ctx context.Context) error {
