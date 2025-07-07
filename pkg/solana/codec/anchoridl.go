@@ -464,7 +464,7 @@ type IdlEnumFieldsTuple []IdlType
 
 // TODO: verify with examples
 func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
-	var temp interface{}
+	var temp any
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
@@ -474,14 +474,14 @@ func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
 	}
 
 	switch v := temp.(type) {
-	case []interface{}:
+	case []any:
 		if len(v) == 0 {
 			return nil
 		}
 
 		firstItem := v[0]
 
-		if _, ok := firstItem.(map[string]interface{})["name"]; ok {
+		if _, ok := firstItem.(map[string]any)["name"]; ok {
 			// TODO:
 			// If has `name` field, then it's most likely a IdlEnumFieldsNamed.
 			if err := utilz.TranscodeJSON(temp, &env.IdlEnumFieldsNamed); err != nil {
@@ -489,6 +489,17 @@ func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
 			}
 		} else {
 			if err := utilz.TranscodeJSON(temp, &env.IdlEnumFieldsTuple); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		if named, ok := v["IdlEnumFieldsNamed"]; ok {
+			if err := utilz.TranscodeJSON(named, &env.IdlEnumFieldsNamed); err != nil {
+				return err
+			}
+		}
+		if tuple, ok := v["IdlEnumFieldsTuple"]; ok {
+			if err := utilz.TranscodeJSON(tuple, &env.IdlEnumFieldsTuple); err != nil {
 				return err
 			}
 		}

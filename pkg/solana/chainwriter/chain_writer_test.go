@@ -987,6 +987,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 
 	offrampAddr := GetRandomPubKey(t)
 	destTokenAddr := GetRandomPubKey(t)
+	sourcePoolAddr := GetRandomPubKey(t)
 
 	poolKeys := []solana.PublicKey{destTokenAddr}
 	poolKeys = append(poolKeys, CreateTestPubKeys(t, 6)...)
@@ -1138,6 +1139,8 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					TokenAmounts: []ccipocr3.RampTokenAmount{
 						{
 							DestTokenAddress: destTokenAddr.Bytes(),
+							SourcePoolAddress: sourcePoolAddr.Bytes(),
+							Amount: ccipocr3.NewBigInt(big.NewInt(1)),
 						},
 					},
 				},
