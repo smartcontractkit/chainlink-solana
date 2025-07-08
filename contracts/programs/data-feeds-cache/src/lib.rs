@@ -696,7 +696,7 @@ pub mod data_feeds_cache {
         }
 
         require_eq!(
-            delete_permission_account_infos.len(),
+            delete_permission_accounts.len(),
             delete_permission_account_infos.len(),
             DataCacheError::ArrayLengthMismatch
         );
