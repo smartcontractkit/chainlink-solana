@@ -71,7 +71,7 @@ pub mod data_feeds_cache {
     }
 
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
-        require_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
+        require_keys_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
 
         let mut state = ctx.accounts.state.load_mut()?;
         let mut changed = false;
@@ -103,8 +103,12 @@ pub mod data_feeds_cache {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
-        state.proposed_owner = proposed_owner;
+        require!(
+            proposed_owner != Pubkey::default() && proposed_owner != state.owner,
+            DataCacheError::InvalidAddress
+        );
 
+        state.proposed_owner = proposed_owner;
         emit!(OwnershipTransfer {
             current_owner: state.owner,
             proposed_owner
