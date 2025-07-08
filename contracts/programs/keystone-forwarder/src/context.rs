@@ -1,4 +1,4 @@
-use crate::common::{ANCHOR_DISCRIMINATOR, METADATA_LENGTH, REPORT_CONTEXT_LEN};
+use crate::common::{ANCHOR_DISCRIMINATOR};
 use crate::error::AuthError;
 use crate::state::{ExecutionState, ForwarderState, OraclesConfig};
 use crate::utils::{
