@@ -25,6 +25,8 @@ declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
+    use crate::utils::report_size_ok;
+
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
@@ -114,11 +116,9 @@ pub mod keystone_forwarder {
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
-        let num_signatures = data[0] as usize;
-        let min_data_size =
-            1 + num_signatures * SIGNATURE_LEN + METADATA_LENGTH + REPORT_CONTEXT_LEN;
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
-        require_gt!(data.len(), min_data_size, ForwarderError::InvalidReport);
+        let num_signatures = data[0] as usize;
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
