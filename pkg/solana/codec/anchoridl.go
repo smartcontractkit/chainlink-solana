@@ -485,9 +485,8 @@ func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
 			// TODO:
 			// If has `name` field, then it's most likely a IdlEnumFieldsNamed.
 			return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsNamed)
-		} else {
-			return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsTuple)
 		}
+		return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsTuple)
 	case map[string]any:
 		// Only one or the other field is set. Returning early is safe
 		if named, ok := v["IdlEnumFieldsNamed"]; ok {

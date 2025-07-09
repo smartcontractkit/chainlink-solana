@@ -4,23 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"math/big"
 	"regexp"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/go-viper/mapstructure/v2"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
-func FindTransform(id string) (func(context.Context, client.MultiClient, any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, solana.PublicKey, string, uint32, []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error), error) {
+func FindTransform(id string) (func(context.Context, client.MultiClient, logger.Logger, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, solana.PublicKey, string, uint32, []txmutils.SetTxConfig, string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -33,7 +34,7 @@ func FindTransform(id string) (func(context.Context, client.MultiClient, any, so
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, args any, accounts solana.AccountMetaSlice, lookupTables map[solana.PublicKey]solana.PublicKeySlice, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, lookupTables map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -137,13 +138,27 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 		TokenReceiver:       tokenReceiver,
 		OriginalSender:      message.Sender,
 	}
+
+	lggr.Debugw("Deriving accounts", "params", params, "debugID", debugID)
 	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to derived execute accounts: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to derive execute accounts: %w", err)
 	}
+	lggr.Debugw("Completed account derivation", "derivedAccounts", derivedAccounts, "lookupTables", derivedLookupTables, "tokenIndexes", tokenIndexes, "debugID", debugID)
 
 	// Merge the derived lookup tables with the existing lookup table map
-	maps.Copy(lookupTables, derivedLookupTables)
+	// NOTE: We assume the only lookup tables returned by account derivation are the pool lookup tables for token transfers
+	for lutAddr, addrList := range derivedLookupTables {
+		if _, ok := lookupTables["PoolLookupTable"]; !ok {
+			lookupTables["PoolLookupTable"] = map[string][]*solana.AccountMeta{}
+		}
+		if _, ok := lookupTables["PoolLookupTable"][lutAddr.String()]; !ok {
+			lookupTables["PoolLookupTable"][lutAddr.String()] = []*solana.AccountMeta{}
+		}
+		for _, addr := range addrList {
+			lookupTables["PoolLookupTable"][lutAddr.String()] = append(lookupTables["PoolLookupTable"][lutAddr.String()], &solana.AccountMeta{PublicKey: addr})
+		}
+	}
 
 	// Append derived accounts to the accounts list
 	accounts = append(accounts, derivedAccounts...)
@@ -153,7 +168,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, ar
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, args any, accounts solana.AccountMetaSlice, _ map[solana.PublicKey]solana.PublicKeySlice, _ solana.PublicKey, _ string, _ uint32, options []txmutils.SetTxConfig) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ logger.Logger, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ solana.PublicKey, _ string, _ uint32, options []txmutils.SetTxConfig, _ string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -209,7 +224,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 	lookupTablesAddrs := []solana.PublicKey{}
 	tokenIndexes := []uint8{}
 	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
-	stage := "start"
+	stage := "Start"
 	matcher, err := regexp.Compile(`^TokenTransferStaticAccounts/\d+/0$`)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to compile token transfer stage matcher: %w", err)
@@ -231,9 +246,13 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts transaction: %w", err)
 		}
 
-		res, err := client.SimulateTx(ctx, tx, nil)
+		tx.Signatures = append(tx.Signatures, solana.Signature{}) // Append empty signature since tx fails without any sigs even if SigVerify is false
+		res, err := client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true})
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %w", err)
+		}
+		if res.Err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %s", res.Err)
 		}
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
 		if err != nil {
@@ -254,14 +273,9 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		lookupTablesAddrs = append(lookupTablesAddrs, derivation.LookUpTablesToSave...)
 
 		stage = derivation.NextStage
-		if stage == "" && len(accountsToAskWith) > 0 {
-			return nil, nil, nil, fmt.Errorf("account derivation returned %d accounts for next stage but next stage string is empty", len(accountsToAskWith))
-		}
-
-		if len(accountsToAskWith) == 0 {
-			if stage != "" {
-				return nil, nil, nil, fmt.Errorf("account derivation returned 0 accounts for next stage but next stage string is %s", stage)
-			}
+		if stage == "" {
+			// NOTE: We assume the only lookup tables returned are the relevant pool lookup tables for each token transfer
+			// This assumption is required to extract the token programs for each transfer
 			lookupTableMap, err := fetchLookupTables(ctx, client, lookupTablesAddrs)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to fetch lookup tables: %w", err)
@@ -274,11 +288,11 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 func fetchLookupTables(ctx context.Context, client client.MultiClient, lookupTablesAddrs []solana.PublicKey) (map[solana.PublicKey]solana.PublicKeySlice, error) {
 	lookupTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 	for _, addr := range lookupTablesAddrs {
-		lookupTableContent, err := getLookupTableAddresses(ctx, client, addr)
+		lookupTableContents, err := getLookupTableAddresses(ctx, client, addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch lookup table contents for address %s: %w", addr.String(), err)
 		}
-		lookupTableMap[addr] = lookupTableContent
+		lookupTableMap[addr] = lookupTableContents
 	}
 	return lookupTableMap, nil
 }
