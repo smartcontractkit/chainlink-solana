@@ -30,7 +30,11 @@ pub mod data_feeds_cache {
 
     use anchor_lang::{
         prelude::borsh::BorshSerialize,
-        solana_program::{instruction::Instruction, program::{invoke, invoke_signed}, system_instruction},
+        solana_program::{
+            instruction::Instruction,
+            program::{invoke, invoke_signed},
+            system_instruction,
+        },
         Discriminator,
     };
 
@@ -212,57 +216,14 @@ pub mod data_feeds_cache {
                 let space = ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE;
                 let seeds: &[&[u8]] = &[b"decimal_report", state_key.as_ref(), data_id, &[bump]];
                 let payer = ctx.accounts.feed_admin.clone();
-                create_account(space, seeds, payer, curr_report_account_info.clone(), crate::ID, ctx.accounts.system_program.to_account_info())?;
-              
-                // let rent =
-                //     Rent::get()?.minimum_balance(space);
-
-                
-
-                // let current_lamports = curr_report_account_info.lamports();
-                // if current_lamports == 0 {
-                //         invoke_signed(
-                //             &system_instruction::create_account(
-                //                 ctx.accounts.feed_admin.key,
-                //                 &decimal_report,
-                //                 rent,
-                //                 space as u64,
-                //                 ctx.program_id,
-                //             ),
-                //             &[
-                //                 ctx.accounts.feed_admin.to_account_info(),
-                //                 curr_report_account_info.clone(),
-                //                 ctx.accounts.system_program.to_account_info(),
-                //             ],
-                //             &[seeds],
-                //         )?;
-                // } else {
-                //     // do extra stuff
-                //     let required_lamports = rent.saturating_sub(current_lamports);
-                //     // transfer remaining lamports
-                //     if required_lamports > 0 {
-                //         let cpi_accounts = anchor_lang::system_program::Transfer {
-                //             from: ctx.accounts.feed_admin.to_account_info(),
-                //             to: curr_report_account_info.clone(),
-                //         };
-                //         let cpi_context = anchor_lang::context::CpiContext::new(ctx.accounts.system_program.to_account_info(), cpi_accounts);
-                //         anchor_lang::system_program::transfer(cpi_context, required_lamports)?;
-                //     }
-                //     // allocate space
-                //     let cpi_accounts = anchor_lang::system_program::Allocate {
-                //         account_to_allocate: curr_report_account_info.clone()
-                //     };
-                //      let cpi_context = anchor_lang::context::CpiContext::new(ctx.accounts.system_program.to_account_info(), cpi_accounts);
-                //      anchor_lang::system_program::allocate(cpi_context.with_signer(&[seeds]), space as u64)?;
-
-                //      // Assign ownership to program
-                //     let cpi_accounts = anchor_lang::system_program::Assign {
-                //         account_to_assign: curr_report_account_info.clone()
-                //     };
-                //     let cpi_context = anchor_lang::context::CpiContext::new(ctx.accounts.system_program.to_account_info(), cpi_accounts);
-                //     anchor_lang::system_program::assign(cpi_context.with_signer(&[seeds]), &crate::ID)?;
-                // }
-           
+                create_account(
+                    space,
+                    seeds,
+                    payer,
+                    curr_report_account_info.clone(),
+                    crate::ID,
+                    ctx.accounts.system_program.to_account_info(),
+                )?;
 
                 let mut dst = curr_report_account_info.try_borrow_mut_data()?;
                 dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&DecimalReport::discriminator());
@@ -568,8 +529,7 @@ pub mod data_feeds_cache {
             let feed_config_loader = if feed_config_exists {
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
             } else {
-                let rent =
-                    Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE);
+                let space = ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE;
                 // initialize it
                 let seeds: &[&[u8]] = &[
                     b"feed_config",
@@ -578,20 +538,13 @@ pub mod data_feeds_cache {
                     &[feed_config_bump],
                 ];
 
-                invoke_signed(
-                    &system_instruction::create_account(
-                        ctx.accounts.feed_admin.key,
-                        &curr_feed_config,
-                        rent,
-                        (ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE) as u64,
-                        ctx.program_id,
-                    ),
-                    &[
-                        ctx.accounts.feed_admin.to_account_info(),
-                        feed_config_account_infos[i].clone(),
-                        ctx.accounts.system_program.to_account_info(),
-                    ],
-                    &[seeds],
+                create_account(
+                    space,
+                    seeds,
+                    ctx.accounts.feed_admin.clone(),
+                    feed_config_account_infos[i].clone(),
+                    crate::ID,
+                    ctx.accounts.system_program.to_account_info(),
                 )?;
 
                 // avoid double borrow to write discriminator
@@ -677,7 +630,8 @@ pub mod data_feeds_cache {
 
                 // create permission_flag if needed
                 if permission_flag_account_info.data_is_empty() {
-                    let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR);
+                    // let space = ANCHOR_DISCRIMINATOR;
+                    // let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR);
 
                     let seeds: &[&[u8]] = &[
                         b"permission_flag",
@@ -686,20 +640,13 @@ pub mod data_feeds_cache {
                         &[bump],
                     ];
 
-                    invoke_signed(
-                        &system_instruction::create_account(
-                            ctx.accounts.feed_admin.key,
-                            &curr_permission_flag,
-                            rent,
-                            ANCHOR_DISCRIMINATOR as u64,
-                            ctx.program_id,
-                        ),
-                        &[
-                            ctx.accounts.feed_admin.to_account_info(),
-                            permission_flag_account_info.clone(),
-                            ctx.accounts.system_program.to_account_info(),
-                        ],
-                        &[seeds],
+                    create_account(
+                        ANCHOR_DISCRIMINATOR,
+                        seeds,
+                        ctx.accounts.feed_admin.clone(),
+                        permission_flag_account_info.clone(),
+                        crate::ID,
+                        ctx.accounts.system_program.to_account_info(),
                     )?;
 
                     let mut dst = permission_flag_account_info.try_borrow_mut_data()?;
@@ -1135,28 +1082,34 @@ pub mod data_feeds_cache {
 }
 
 // already checked it's empty
-fn create_account<'info>(space: usize, seeds: &[&[u8]], payer: Signer<'info>, to_account: AccountInfo<'info>, program_id: Pubkey, system_program: AccountInfo<'info>) -> Result<()> {
+fn create_account<'info>(
+    space: usize,
+    seeds: &[&[u8]],
+    payer: Signer<'info>,
+    to_account: AccountInfo<'info>,
+    program_id: Pubkey,
+    system_program: AccountInfo<'info>,
+) -> Result<()> {
     let rent = Rent::get()?.minimum_balance(space);
 
     let current_lamports = to_account.lamports();
     if current_lamports == 0 {
-            invoke_signed(
-                &system_instruction::create_account(
-                    payer.key,
-                    to_account.key,
-                    rent,
-                    space as u64,
-                    &program_id,
-                ),
-                &[
-                    payer.to_account_info(),
-                    to_account.clone(),
-                    system_program.clone(),
-                ],
-                &[seeds],
-            )?;
+        invoke_signed(
+            &system_instruction::create_account(
+                payer.key,
+                to_account.key,
+                rent,
+                space as u64,
+                &program_id,
+            ),
+            &[
+                payer.to_account_info(),
+                to_account.clone(),
+                system_program.clone(),
+            ],
+            &[seeds],
+        )?;
     } else {
-
         // do extra stuff
         let required_lamports = rent.saturating_sub(current_lamports);
         // transfer remaining lamports
@@ -1165,23 +1118,25 @@ fn create_account<'info>(space: usize, seeds: &[&[u8]], payer: Signer<'info>, to
                 from: payer.to_account_info(),
                 to: to_account.clone(),
             };
-            let cpi_context = anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
+            let cpi_context =
+                anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
             anchor_lang::system_program::transfer(cpi_context, required_lamports)?;
         }
         // allocate space
         let cpi_accounts = anchor_lang::system_program::Allocate {
-            account_to_allocate: to_account.clone()
+            account_to_allocate: to_account.clone(),
         };
-            let cpi_context = anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
-            anchor_lang::system_program::allocate(cpi_context.with_signer(&[seeds]), space as u64)?;
+        let cpi_context =
+            anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
+        anchor_lang::system_program::allocate(cpi_context.with_signer(&[seeds]), space as u64)?;
 
-            // Assign ownership to program
+        // Assign ownership to program
         let cpi_accounts = anchor_lang::system_program::Assign {
-            account_to_assign: to_account.clone()
+            account_to_assign: to_account.clone(),
         };
-        let cpi_context = anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
+        let cpi_context =
+            anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
         anchor_lang::system_program::assign(cpi_context.with_signer(&[seeds]), &program_id)?;
-
     }
     Ok(())
 }

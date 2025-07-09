@@ -19,6 +19,21 @@ export type Signer = {
   keypair: Keypair;
 };
 
+export const sendLamports = async (
+  conn: anchor.web3.Connection,
+  receiver: anchor.web3.PublicKey,
+  lamports: number
+) => {
+  const signature = await conn.requestAirdrop(receiver, lamports);
+
+  const latestBlockhash = await conn.getLatestBlockhash();
+
+  return await conn.confirmTransaction({
+    signature,
+    ...latestBlockhash,
+  });
+};
+
 export const newSigner = async (
   conn: anchor.web3.Connection
 ): Promise<Signer> => {
@@ -29,18 +44,7 @@ export const newSigner = async (
   const wallet = new Wallet(keypair);
   const provider = new AnchorProvider(conn, wallet, {});
 
-  // fund account
-  const signature = await conn.requestAirdrop(
-    keypair.publicKey,
-    100 * LAMPORTS_PER_SOL // 100 SOL
-  );
-
-  const latestBlockhash = await conn.getLatestBlockhash();
-
-  await conn.confirmTransaction({
-    signature,
-    ...latestBlockhash,
-  });
+  await sendLamports(conn, keypair.publicKey, 100 * LAMPORTS_PER_SOL);
 
   return { provider, keypair };
 };

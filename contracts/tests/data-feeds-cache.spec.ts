@@ -4,7 +4,12 @@ import { Program, getProvider, BN, BorshCoder } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
-import { AccountMeta, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import {
+  AccountMeta,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
 // import chaiAsPromised from "chai-as-promised";
 import { assert, expect } from "chai";
 import {
@@ -19,6 +24,7 @@ import {
   newWorkflows,
   randomDescription,
   randomWorkflowMetadata,
+  sendLamports,
   Signer,
   waitForEvent,
   WorkflowMetadata,
@@ -403,8 +409,7 @@ describe("data feeds cache", function () {
         .rpc();
     });
 
-    it.only("Initialize data feed reports", async () => {
-      
+    it("Initialize data feed reports", async () => {
       const feedAReportPDA = decimalReportPDA(
         cacheStateAccount.publicKey,
         feedA.dataId
@@ -418,21 +423,11 @@ describe("data feeds cache", function () {
         feedC.dataId
       );
 
-      const signature = await defaultConnection.requestAirdrop(
-          feedAReportPDA,
-          3 * LAMPORTS_PER_SOL // 3 SOL
+      await sendLamports(
+        defaultConnection,
+        feedAReportPDA,
+        3 * LAMPORTS_PER_SOL
       );
-      
-        const latestBlockhash = await defaultConnection.getLatestBlockhash();
-      
-        await defaultConnection.confirmTransaction({
-          signature,
-          ...latestBlockhash,
-        });
-
-        const lamports = await defaultConnection.getBalance(feedAReportPDA);
-
-        console.log('decimal report A has ', lamports)
 
       // test initialization
       await cacheProgram.methods
@@ -839,6 +834,29 @@ describe("data feeds cache", function () {
           }))
         );
 
+      const rentExemptLamports =
+        await defaultConnection.getMinimumBalanceForRentExemption(4016);
+      const sentAmountLamports = rentExemptLamports - 100;
+
+      // send under rent exemption amount to check if remaining rent is covered by signer
+      await sendLamports(
+        defaultConnection,
+        initialFeedConfigAccounts[0],
+        sentAmountLamports
+      );
+
+      assert.equal(
+        await defaultConnection.getBalance(initialFeedConfigAccounts[0]),
+        sentAmountLamports,
+        "expected airdropped amount"
+      );
+
+      await sendLamports(
+        defaultConnection,
+        initialPermissionFlagAccounts[0],
+        1 * LAMPORTS_PER_SOL
+      );
+
       await cacheProgram.methods
         .setDecimalFeedConfigs(
           initialDataIds as any,
@@ -853,6 +871,13 @@ describe("data feeds cache", function () {
         .remainingAccounts(initialRemainingAccounts)
         .signers([feedAdminA.keypair])
         .rpc();
+
+      // check remaining rent has been paid
+      assert.equal(
+        await defaultConnection.getBalance(initialFeedConfigAccounts[0]),
+        rentExemptLamports,
+        "rent exempt amount"
+      );
 
       // 2. preview changes
       const dataIds2 = [feedA.dataId, feedB.dataId];
