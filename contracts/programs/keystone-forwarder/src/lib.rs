@@ -25,7 +25,7 @@ declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::utils::report_size_ok;
+    use crate::{program::KeystoneForwarder, utils::report_size_ok};
 
     use super::*;
 
@@ -54,11 +54,17 @@ pub mod keystone_forwarder {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
-        let state_current_owner = state.owner;
+        require!(
+            proposed_owner != Pubkey::default()
+                && proposed_owner != state.owner
+                && proposed_owner != state.proposed_owner,
+            ForwarderError::InvalidProposedOwner
+        );
+
         state.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransfer {
-            current_owner: state_current_owner,
+            current_owner: state.owner,
             proposed_owner: state.proposed_owner
         });
 

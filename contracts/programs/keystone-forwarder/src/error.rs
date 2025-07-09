@@ -22,6 +22,9 @@ pub enum AuthError {
 
 #[error_code]
 pub enum ForwarderError {
+    #[msg("Invalid proposed owner")]
+    InvalidProposedOwner,
+
     #[msg("Signers exceed max limit")]
     ExcessSigners,
 

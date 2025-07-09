@@ -72,4 +72,7 @@ pub enum DataCacheError {
 
     #[msg("failed legacy write")]
     FailedLegacyWrite,
+
+    #[msg("Invalid proposed owner")]
+    InvalidProposedOwner,
 }

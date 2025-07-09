@@ -104,8 +104,10 @@ pub mod data_feeds_cache {
     ) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
         require!(
-            proposed_owner != Pubkey::default() && proposed_owner != state.owner,
-            DataCacheError::InvalidAddress
+            proposed_owner != Pubkey::default()
+                && proposed_owner != state.owner
+                && proposed_owner != state.proposed_owner,
+            DataCacheError::InvalidProposedOwner
         );
 
         state.proposed_owner = proposed_owner;
