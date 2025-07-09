@@ -4,7 +4,7 @@ import { Program, getProvider, BN, BorshCoder } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
-import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
+import { AccountMeta, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 // import chaiAsPromised from "chai-as-promised";
 import { assert, expect } from "chai";
 import {
@@ -403,7 +403,8 @@ describe("data feeds cache", function () {
         .rpc();
     });
 
-    it("Initialize data feed reports", async () => {
+    it.only("Initialize data feed reports", async () => {
+      
       const feedAReportPDA = decimalReportPDA(
         cacheStateAccount.publicKey,
         feedA.dataId
@@ -416,6 +417,22 @@ describe("data feeds cache", function () {
         cacheStateAccount.publicKey,
         feedC.dataId
       );
+
+      const signature = await defaultConnection.requestAirdrop(
+          feedAReportPDA,
+          3 * LAMPORTS_PER_SOL // 3 SOL
+      );
+      
+        const latestBlockhash = await defaultConnection.getLatestBlockhash();
+      
+        await defaultConnection.confirmTransaction({
+          signature,
+          ...latestBlockhash,
+        });
+
+        const lamports = await defaultConnection.getBalance(feedAReportPDA);
+
+        console.log('decimal report A has ', lamports)
 
       // test initialization
       await cacheProgram.methods
