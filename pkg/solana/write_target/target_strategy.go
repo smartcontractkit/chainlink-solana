@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
@@ -142,7 +143,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return "", fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
 
-	tx, err := ts.newTransaction(r, blockhash.Value.Blockhash)
+	tx, err := ts.newTransaction(ctx, r, blockhash.Value.Blockhash)
 	if err != nil {
 		return "", fmt.Errorf("failed to create solana tx: %w", err)
 	}
@@ -167,11 +168,17 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 type Config struct {
 	Address           string
 	RemainingAccounts []Acc
+	CacheDetails      *CacheDetails
 }
 
 type Acc struct {
 	Address    string
 	IsWritable bool
+}
+
+type CacheDetails struct {
+	State   string
+	FeedIds []string
 }
 
 type Inputs struct {
@@ -183,6 +190,136 @@ type targetRequest struct {
 	Config   Config
 	Receiver solana.PublicKey
 	Inputs   Inputs
+}
+
+func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.Reader, forwarderAuthority solana.PublicKey) ([]solana.AccountMeta, error) {
+	if len(t.Config.RemainingAccounts) > 0 && t.Config.CacheDetails != nil {
+		return nil, fmt.Errorf("only one of 'remaining_accounts' or 'cache_details' should be specified")
+	}
+
+	var remainingAccounts []solana.AccountMeta
+	for _, acc := range t.Config.RemainingAccounts {
+		key, err := solana.PublicKeyFromBase58(acc.Address)
+		if err != nil {
+			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
+		}
+
+		remainingAccounts = append(remainingAccounts, solana.AccountMeta{
+			PublicKey:  key,
+			IsWritable: acc.IsWritable,
+		})
+	}
+
+	if t.Config.CacheDetails != nil {
+		// assume that the receiver is the cache program
+		cacheProgram := t.Receiver
+
+		cacheStateKey, err := solana.PublicKeyFromBase58(t.Config.CacheDetails.State)
+		if err != nil {
+			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
+		}
+
+		cacheStateAccount, err := client.GetAccountInfoWithOpts(ctx, cacheStateKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+		if err != nil {
+			return nil, fmt.Errorf("error fetching cache state account %v", cacheStateKey)
+		}
+
+		if cacheStateAccount.Value == nil {
+			return nil, fmt.Errorf("cache state account does not exist %v", cacheStateKey)
+		}
+
+		remainingAccounts = []solana.AccountMeta{
+			solana.AccountMeta{
+				PublicKey:  cacheStateKey,
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy store omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy feed config omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  cacheProgram, // legacy writer omitted
+				IsWritable: false,
+			},
+			solana.AccountMeta{
+				PublicKey:  solana.SystemProgramID,
+				IsWritable: false,
+			},
+		}
+		derivedAccounts := make([]solana.AccountMeta, 2*len(t.Config.CacheDetails.FeedIds))
+
+		// derive pdas and check existence on-chain
+		for i, feedId := range t.Config.CacheDetails.FeedIds {
+			validBytes := validateBytes16(feedId)
+			if !validBytes {
+				return nil, fmt.Errorf("invalid feed id %v err:%w", feedId)
+			}
+			dataId, _ := new(big.Int).SetString(feedId, 0)
+			decimalReportSeeds := [][]byte{
+				[]byte("decimal_report"),
+				cacheStateKey.Bytes(),
+				dataId.Bytes(),
+			}
+
+			decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
+			if err != nil {
+				return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
+			}
+
+			decimalReportAccount, err := client.GetAccountInfoWithOpts(ctx, decimalReportKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+			if err != nil {
+				return nil, fmt.Errorf("error fetching decimal report account %v for data id %v", decimalReportKey, feedId)
+			}
+
+			if decimalReportAccount.Value == nil {
+				return nil, fmt.Errorf("decimal report account %v does not exist for data id %v", decimalReportKey, feedId)
+			}
+
+			derivedAccounts[i] = solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
+
+			// add to remaining accounts
+
+			reportHash := createReportHash(
+				dataId.Bytes(),
+				forwarderAuthority.Bytes(),
+				[]byte(t.Metadata.WorkflowOwner),
+				[]byte(t.Metadata.WorkflowID),
+			)
+
+			writeFlagSeeds := [][]byte{
+				[]byte("permission_flag"),
+				cacheStateKey.Bytes(),
+				reportHash[:],
+			}
+
+			writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
+			if err != nil {
+				return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
+			}
+
+			writeFlagAccount, err := client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+			if err != nil {
+				return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedId)
+			}
+
+			if writeFlagAccount.Value == nil {
+				return nil, fmt.Errorf("write flag account %v does not exist for data id %v", writeFlagKey, feedId)
+			}
+
+			// write flag accounts go after all the decimal report accounts
+			derivedAccounts[len(t.Config.CacheDetails.FeedIds)+i] = solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
+		}
+
+		remainingAccounts = append(remainingAccounts, derivedAccounts...)
+
+	}
+
+	return remainingAccounts, nil
+
 }
 
 func (ts *targetRequest) toPayload() []byte {
@@ -209,6 +346,7 @@ func (ts *targetRequest) toPayload() []byte {
 
 var (
 	remainingAccounts = "remaining_accounts"
+	cacheDetailsKey   = "cache_details"
 )
 
 func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, error) {
@@ -229,10 +367,25 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 	r.Receiver = receiver
 
+	if len(r.Config.RemainingAccounts) > 0 && r.Config.CacheDetails != nil {
+		return r, fmt.Errorf("only one of 'remaining_accounts' or 'cache_details' should be specified")
+	}
+
 	for _, acc := range r.Config.RemainingAccounts {
 		_, err := solana.PublicKeyFromBase58(acc.Address)
 		if err != nil {
 			return r, fmt.Errorf("failed parse public key from remaining account %v err:%w", acc, err)
+		}
+	}
+
+	if err = validatePublicKeys(r.Config.CacheDetails.State); err != nil {
+		return r, err
+	}
+
+	for _, feedId := range r.Config.CacheDetails.FeedIds {
+		validBytes := validateBytes16(feedId)
+		if !validBytes {
+			return r, fmt.Errorf("invalid feed id %v err:%w", feedId)
 		}
 	}
 
@@ -253,7 +406,26 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	return r, nil
 }
 
-func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash) (*solana.Transaction, error) {
+func validatePublicKeys(keys ...string) error {
+	for _, key := range keys {
+		_, err := solana.PublicKeyFromBase58(key)
+		if err != nil {
+			return fmt.Errorf("failed parse cache details account %v err:%w", key, err)
+		}
+	}
+	return nil
+}
+
+// auto-detects base-10, base-8, and base-16 only
+func validateBytes16(s string) bool {
+	n, ok := new(big.Int).SetString(s, 0)
+	if !ok {
+		return false
+	}
+	return n.BitLen() <= 128
+}
+
+func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, blockHash solana.Hash) (*solana.Transaction, error) {
 	executionState, err := ts.deriveExecutionState(r)
 	if err != nil {
 		return nil, err
@@ -273,20 +445,17 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash
 	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 	maps.Copy(lookup, ts.lookupTable)
 
-	for _, acc := range r.Config.RemainingAccounts {
-		key, err := solana.PublicKeyFromBase58(acc.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
-		}
-
-		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &solana.AccountMeta{
-			PublicKey:  key,
-			IsWritable: acc.IsWritable,
-		})
-
-		lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], key)
-
+	remainingAccounts, err := r.GetRemainingAccounts(ctx, ts.client, ts.accounts.forwarderAuthority)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remaining accounts: %w", err)
 	}
+
+	for _, acc := range remainingAccounts {
+		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
+
+		lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
+	}
+
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {
 		return nil, fmt.Errorf("failed build and validate report instruction: %w", err)
@@ -346,4 +515,15 @@ func extractTransmissionID(receiver solana.PublicKey, rawReport []byte) ([32]byt
 	data = append(data, reportID...)
 
 	return sha3.Sum256(data), nil
+}
+
+func createReportHash(dataId []byte, forwarderAuthority []byte, workflowOwner []byte, workflowId []byte) [32]byte {
+	var data []byte
+	data = append(data, dataId...)
+	data = append(data, forwarderAuthority...)
+	data = append(data, workflowOwner...)
+	data = append(data, workflowId...)
+
+	return sha3.Sum256(data)
+
 }
