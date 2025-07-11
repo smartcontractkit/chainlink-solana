@@ -45,6 +45,7 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
+	relaytypes.UnimplementedRelayer
 	services.StateMachine
 	lggr   logger.Logger
 	chain  Chain
@@ -62,10 +63,6 @@ func NewRelayer(lggr logger.Logger, chain Chain, _ core.CapabilitiesRegistry) *R
 
 func (r *Relayer) Name() string {
 	return r.lggr.Name()
-}
-
-func (r *Relayer) EVM() (relaytypes.EVMService, error) {
-	return nil, errors.New("unimplemented")
 }
 
 // Start starts the relayer respecting the given context.

@@ -21,6 +21,11 @@
   },
   "scripts": {
     "format": "pnpm prettier --write .",
-    "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/*.spec.ts"
+    "test": "pnpm up @chainlink/solana-sdk && ts-mocha -t 1000000 tests/**.spec.ts"
+  },
+  "devDependencies": {
+    "@types/chai-as-promised": "^8.0.2",
+    "chai-as-promised": "^8.0.1",
+    "@coral-xyz/borsh": "^0.29.0"
   }
 }

@@ -1,0 +1,24 @@
+[package]
+name = "data-feeds-cache"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "data_feeds_cache"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+static_assertions = "1.1.0"
+keystone-forwarder = { version = "0.1.0", path = "../keystone-forwarder", default-features = false, features = ["cpi"] }
+store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }
+bytemuck = { version = "1.20.0", features = ["min_const_generics"] }
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }

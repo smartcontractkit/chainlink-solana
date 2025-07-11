@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
 
 use common::{
-    FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, REPORT_CONTEXT_LEN, SIGNATURE_LEN,
-    STATE_VERSION,
+    FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR,
+    REPORT_CONTEXT_LEN, SIGNATURE_LEN, STATE_VERSION,
 };
 
 use events::{ConfigSet, InitializeEmit, OwnershipAcceptance, OwnershipTransfer, ReportProcessed};
@@ -84,7 +84,7 @@ pub mod keystone_forwarder {
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.oracles_config;
+        let config = &mut ctx.accounts.oracles_config.load_init()?;
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -96,7 +96,7 @@ pub mod keystone_forwarder {
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.oracles_config;
+        let config = &mut ctx.accounts.oracles_config.load_mut()?;
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -117,15 +117,16 @@ pub mod keystone_forwarder {
         let num_signatures = data[0] as usize;
         let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
 
-        require!(data.len() > min_data_size, ForwarderError::InvalidReport);
+        require_gt!(data.len(), min_data_size, ForwarderError::InvalidReport);
 
         // get config
-        let oracles_config = &ctx.accounts.oracles_config;
+        let oracles_config = ctx.accounts.oracles_config.load()?;
         let f = oracles_config.f;
-        require!(f != 0, ForwarderError::InvalidConfig);
+        require_neq!(f, 0, ForwarderError::InvalidConfig);
 
-        require!(
-            num_signatures >= (f + 1).into(),
+        require_gte!(
+            num_signatures,
+            (f + 1) as usize,
             ForwarderError::InvalidSignatureCount
         );
 
@@ -138,7 +139,7 @@ pub mod keystone_forwarder {
         let data = &data[total_signature_len..];
         let hashed_report = hash::hash(data).to_bytes();
 
-        verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
+        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
         let raw_report_end = data.len() - REPORT_CONTEXT_LEN;
@@ -184,7 +185,7 @@ pub mod keystone_forwarder {
             .collect();
 
         // payload begins with the Anchor discriminator
-        let mut payload = hash::hash("global:on_report".as_bytes()).to_bytes()[..8].to_vec();
+        let mut payload = ON_REPORT_DISCRIMINATOR.to_vec();
         // borsh serialization of metadata vector and report vector
         // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
         let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
@@ -225,7 +226,7 @@ pub mod keystone_forwarder {
 fn verify_signatures(
     hashed_report: &[u8; 32],
     signatures: &[u8],
-    oracles_config: &Account<OraclesConfig>,
+    oracles_config: &OraclesConfig,
     num_signers: usize,
 ) -> Result<()> {
     // ensure MAX_SIGNERS fit in the bits of uniques
@@ -245,14 +246,16 @@ fn verify_signatures(
 
         let index = oracles_config
             .signer_addresses
+            .as_slice()
             .binary_search_by(|addr| addr.cmp(&signer_eth_address))
             .map_err(|_| ForwarderError::UnauthorizedSigner)?;
 
         uniques |= 1 << index;
     }
 
-    require!(
-        uniques.count_ones() as usize == num_signers,
+    require_eq!(
+        uniques.count_ones() as usize,
+        num_signers,
         ForwarderError::DuplicateSignatures
     );
 
@@ -260,19 +263,21 @@ fn verify_signatures(
 }
 
 fn set_oracles_config(
-    oracles_config: &mut Account<OraclesConfig>,
+    oracles_config: &mut OraclesConfig,
     don_id: u32,
     config_version: u32,
     f: u8,
     signer_addresses: Vec<[u8; 20]>,
 ) -> Result<()> {
-    require!(f > 0, ForwarderError::FaultToleranceMustBePositive);
-    require!(
-        signer_addresses.len() <= MAX_ORACLES,
+    require_gt!(f, 0, ForwarderError::FaultToleranceMustBePositive);
+    require_gte!(
+        MAX_ORACLES,
+        signer_addresses.len(),
         ForwarderError::ExcessSigners
     );
-    require!(
-        signer_addresses.len() > (3 * f).into(),
+    require_gt!(
+        signer_addresses.len(),
+        (3 * f) as usize,
         ForwarderError::InsufficientSigners
     );
 
@@ -290,7 +295,9 @@ fn set_oracles_config(
 
     oracles_config.config_id = get_config_id(don_id, config_version);
     oracles_config.f = f;
-    oracles_config.signer_addresses = signer_addresses.clone();
+    oracles_config.signer_addresses.clear();
+
+    oracles_config.signer_addresses.extend(&signer_addresses);
 
     emit!(ConfigSet {
         don_id,

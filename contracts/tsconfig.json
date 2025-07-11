@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "typeRoots": ["./node_modules/@types"],
+    "module": "commonjs",
     "lib": ["es2020"],
     "target": "es2020",
     "moduleResolution": "node",

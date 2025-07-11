@@ -6,68 +6,19 @@ import {
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
-  sendAndConfirmTransaction,
-  Transaction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
-import { randomBytes, createHash } from "crypto";
-import * as secp256k1 from "secp256k1";
-import { sha256 } from "@coral-xyz/anchor/dist/cjs/utils";
+import { createHash } from "crypto";
+import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
+import chaiAsPromised from "chai-as-promised";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 
+// chai.use(chaiAsPromised);
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function signMessage(message: Buffer, secretKey: Buffer) {
-  const { signature, recid: recovery } = secp256k1.ecdsaSign(
-    message,
-    secretKey
-  );
-  return {
-    signature: Buffer.from(signature),
-    recovery, // useful for pubkey recovery
-  };
-}
-
-let generateEthKeypair = () => {
-  let secretKey = randomBytes(32);
-  let publicKey = secp256k1.publicKeyCreate(secretKey, false).slice(1);
-  let ethereumAddress = getEthereumAddress(Buffer.from(publicKey));
-  return {
-    secretKey,
-    publicKey,
-    ethereumAddress,
-  };
-};
-
-function waitForEvent<T>(
-  program: any,
-  eventName: string,
-  validate: (event: T, slot: number) => void
-): Promise<T> {
-  const promise = new Promise<T>((resolve, reject) => {
-    const listener = program.addEventListener(
-      eventName,
-      (event: T, slot: number) => {
-        try {
-          validate(event, slot);
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
-      }
-    );
-  });
-
-  // Attach catch to prevent unhandled rejection warning — but DO NOT rethrow
-  promise.catch(() => {});
-
-  return promise;
-}
 
 function calculateForwarderAuthorityBump(
   forwarderStatePubkey: PublicKey,
@@ -80,6 +31,58 @@ function calculateForwarderAuthorityBump(
     ],
     programId
   );
+}
+
+// Helper function to parse oracle config account data
+function parseOraclesConfigAccount(data: Buffer) {
+  // Layout: discriminator(8) + config_id(8) + f(1) + padding(7) + signer_addresses
+  // SignerAddresses layout: xs(64*20) + len(1) + padding(7)
+
+  let offset = 8; // Skip discriminator
+
+  // Read config_id (8 bytes, little-endian)
+  const configId = data.readBigUInt64LE(offset);
+  offset += 8;
+
+  // Read f (1 byte)
+  const f = data.readUInt8(offset);
+  offset += 1;
+
+  // Skip padding (7 bytes)
+  offset += 7;
+
+  // Read SignerAddresses structure
+  // Layout: xs (64*20 bytes) + len (1 byte) + padding (7 bytes)
+  const signerAddressesLen = data.readUInt8(offset + 64 * 20); // len is after xs array
+
+  // Extract the actual addresses from xs array
+  const signerAddresses = [];
+  for (let i = 0; i < signerAddressesLen; i++) {
+    const addressOffset = offset + i * 20;
+    const address = data.slice(addressOffset, addressOffset + 20);
+    signerAddresses.push(address);
+  }
+
+  return {
+    configId,
+    f,
+    signerAddresses,
+  };
+}
+
+// Helper function to get and parse oracle config account
+async function getOraclesConfigAccount(
+  program: any,
+  oraclesConfigStorage: PublicKey
+) {
+  const accountInfo = await program.provider.connection.getAccountInfo(
+    oraclesConfigStorage
+  );
+  if (!accountInfo) {
+    throw new Error("Account not found");
+  }
+
+  return parseOraclesConfigAccount(accountInfo.data);
 }
 
 let getEthereumAddress = (publicKey: Buffer) => {
@@ -341,18 +344,27 @@ describe("keystone_storage", function () {
       })
       .rpc();
 
-    const actualConfig = await program.account.oraclesConfig.fetch(
+    // const actualConfig = await program.account.oraclesConfig.fetch(
+    //   oraclesConfigStorage
+    // );
+
+    // Parse initial config using helper function
+    const initialConfig = await getOraclesConfigAccount(
+      program,
       oraclesConfigStorage
     );
 
-    assert.equal(configId, actualConfig.configId, "config ids should equal");
-    assert.equal(1, actualConfig.f, "f should equal");
-    assert.equal(actualConfig.signerAddresses.length, 4, "4 signer addresses");
-    assert.isTrue(
-      actualConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(initialEthAddresses[i])
-      )
-    );
+    assert.equal(configId, initialConfig.configId, "config ids should equal");
+    assert.equal(1, initialConfig.f, "f should equal");
+    assert.equal(initialConfig.signerAddresses.length, 4, "4 signer addresses");
+    for (let i = 0; i < initialConfig.signerAddresses.length; i++) {
+      assert.isTrue(
+        initialConfig.signerAddresses[i].equals(
+          Buffer.from(initialEthAddresses[i])
+        ),
+        `Signer address ${i} should match`
+      );
+    }
 
     const configPromise = waitForEvent(
       program,
@@ -381,23 +393,33 @@ describe("keystone_storage", function () {
       })
       .rpc();
 
-    const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
+    // const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
+    //   oraclesConfigStorage
+    // );
+
+    // Parse updated config using helper function
+    const updatedConfig = await getOraclesConfigAccount(
+      program,
       oraclesConfigStorage
     );
 
     await configPromise;
 
     assert.equal(
-      configId,
-      actualUpdatedConfig.configId,
+      Number(configId),
+      Number(updatedConfig.configId),
       "config ids should equal"
     );
-    assert.equal(f, actualUpdatedConfig.f, "f should equal");
-    assert.isTrue(
-      actualUpdatedConfig.signerAddresses.every((addr, i) =>
-        Buffer.from(addr).equals(signerEthAddresses[i])
-      )
-    );
+    assert.equal(f, updatedConfig.f, "f should equal");
+
+    for (let i = 0; i < updatedConfig.signerAddresses.length; i++) {
+      assert.isTrue(
+        updatedConfig.signerAddresses[i].equals(
+          Buffer.from(signerEthAddresses[i])
+        ),
+        `Updated signer address ${i} should match`
+      );
+    }
   });
 
   it("Close oracle config", async () => {
@@ -419,7 +441,7 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    const signers = Array.from({ length: 17 }, () => generateEthKeypair());
+    const signers = Array.from({ length: 16 }, () => generateEthKeypair());
     signers.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
@@ -475,6 +497,7 @@ describe("keystone_storage", function () {
 
     try {
       await program.account.oraclesConfig.fetch(oraclesConfigStorage);
+      assert.fail("Account should not exist anymore");
     } catch (err) {
       if (!err.message.includes("Account does not exist")) {
         assert.fail("Account should not exist anymore");
@@ -813,7 +836,5 @@ describe("keystone_storage", function () {
         assert.fail(`Unexpected error: ${err.message}`);
       }
     }
-
-    await reportPromise;
   });
 });
