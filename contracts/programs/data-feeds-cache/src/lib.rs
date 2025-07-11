@@ -630,9 +630,6 @@ pub mod data_feeds_cache {
 
                 // create permission_flag if needed
                 if permission_flag_account_info.data_is_empty() {
-                    // let space = ANCHOR_DISCRIMINATOR;
-                    // let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR);
-
                     let seeds: &[&[u8]] = &[
                         b"permission_flag",
                         cache_state_key.as_ref(),

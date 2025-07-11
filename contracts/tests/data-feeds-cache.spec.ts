@@ -834,8 +834,9 @@ describe("data feeds cache", function () {
           }))
         );
 
+      // anchor discriminator size + feed config size
       const rentExemptLamports =
-        await defaultConnection.getMinimumBalanceForRentExemption(4016);
+        await defaultConnection.getMinimumBalanceForRentExemption(8 + 1032);
       const sentAmountLamports = rentExemptLamports - 100;
 
       // send under rent exemption amount to check if remaining rent is covered by signer
