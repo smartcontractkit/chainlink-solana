@@ -112,7 +112,7 @@ pub struct Report<'info> {
     pub transmitter: Signer<'info>,
 
     /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id

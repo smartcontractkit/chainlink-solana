@@ -15,6 +15,7 @@ import { assert, expect } from "chai";
 import {
   ArrayVec,
   arrayVecEquals,
+  calculateForwarderAuthorityBump,
   Feed,
   Forwarder,
   getReportHash,
@@ -1020,6 +1021,7 @@ describe("data feeds cache", function () {
     let cacheStateAccount: Keypair;
 
     let forwarder: Forwarder;
+    let forwarderAuthority: anchor.web3.PublicKey;
 
     let legacyFeeds: Feed[];
 
@@ -1045,6 +1047,13 @@ describe("data feeds cache", function () {
       await forwarder.initialize();
       await forwarder.initOraclesConfig();
 
+      let [authority, _] = calculateForwarderAuthorityBump(
+        forwarder.state.publicKey,
+        cacheProgram.programId,
+        forwarder.forwarderProgram.programId
+      );
+      forwarderAuthority = authority;
+
       cacheStateAccount = Keypair.generate();
       legacyFeedConfigAccount = legacyFeedsConfigPDA(
         cacheStateAccount.publicKey
@@ -1058,10 +1067,7 @@ describe("data feeds cache", function () {
         isWritable: true,
       }));
       legacyFeeds = [feedA, feedB].sort((a, b) => a.dataId.compare(b.dataId));
-      legacyWorkflowMetadatas = newWorkflows(
-        1,
-        forwarder.forwarderAuthority[0]
-      );
+      legacyWorkflowMetadatas = newWorkflows(1, forwarderAuthority);
       legacyReportHashes = legacyFeeds.map((f) => {
         return getReportHash(
           f.dataId,
@@ -1281,8 +1287,6 @@ describe("data feeds cache", function () {
 
     it("Update feed A without legacy write + check query method", async () => {
       // first we must update the workflow metadata to work with the desired receiver
-
-      // const legacyWorkflowMetadatas = newWorkflows(1, forwarder.forwarderAuthority[0])
 
       const reportHash = getReportHash(
         feedA.dataId,
@@ -1566,10 +1570,7 @@ describe("data feeds cache", function () {
     });
 
     it("Attempt feed A without correct permissions", async () => {
-      const unauthorizedWorkflow = newWorkflows(
-        1,
-        forwarder.forwarderAuthority[0]
-      );
+      const unauthorizedWorkflow = newWorkflows(1, forwarderAuthority);
 
       const reportHash = getReportHash(
         feedA.dataId,

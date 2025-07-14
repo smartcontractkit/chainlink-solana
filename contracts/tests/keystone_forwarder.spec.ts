@@ -12,26 +12,18 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
 import { createHash } from "crypto";
-import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
+import {
+  calculateForwarderAuthorityBump,
+  generateEthKeypair,
+  signMessage,
+  waitForEvent,
+} from "./utils";
 import chaiAsPromised from "chai-as-promised";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 
 // chai.use(chaiAsPromised);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function calculateForwarderAuthorityBump(
-  forwarderStatePubkey: PublicKey,
-  programId: PublicKey
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-      forwarderStatePubkey.toBuffer(),
-    ],
-    programId
-  );
-}
 
 // Helper function to parse oracle config account data
 function parseOraclesConfigAccount(data: Buffer) {
@@ -528,21 +520,21 @@ describe("keystone_storage", function () {
       )
       .digest();
 
-    const [forwarderAuthorityStorage, forwarderAuthorityBump] =
-      calculateForwarderAuthorityBump(
-        forwarderState.publicKey,
-        program.programId
-      );
-
-    const actualState = await program.account.forwarderState.fetch(
-      forwarderState.publicKey
+    const [forwarderAuthorityStorage, _] = calculateForwarderAuthorityBump(
+      forwarderState.publicKey,
+      receiver,
+      program.programId
     );
 
-    assert.equal(
-      actualState.authorityNonce,
-      forwarderAuthorityBump,
-      "forwarder authority PDA bumps should be equal"
-    );
+    // const actualState = await program.account.forwarderState.fetch(
+    //   forwarderState.publicKey
+    // );
+
+    // DELETE ME assert.equal(
+    //   actualState.authorityNonce,
+    //   forwarderAuthorityBump,
+    //   "forwarder authority PDA bumps should be equal"
+    // );
 
     // begin initializing the receiver program
 

@@ -18,7 +18,7 @@ pub struct ConfigSet {
 #[event]
 pub struct InitializeEmit {
     pub owner: Pubkey,
-    pub authority_nonce: u8,
+    // pub authority_nonce: u8,
 }
 
 #[event]

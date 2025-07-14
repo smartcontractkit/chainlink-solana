@@ -207,6 +207,21 @@ export const getEthereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12);
 };
 
+export function calculateForwarderAuthorityBump(
+  forwarderStatePubkey: PublicKey,
+  receiverProgram: PublicKey,
+  programId: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+      forwarderStatePubkey.toBuffer(),
+      receiverProgram.toBuffer(),
+    ],
+    programId
+  );
+}
+
 // to be used by other program tests for forwarding data
 export class Forwarder {
   public f: number;
@@ -273,13 +288,13 @@ export class Forwarder {
       : this.provider.wallet.publicKey;
     const signers = ownerKeypair ? [this.state, ownerKeypair] : [this.state];
 
-    this.forwarderAuthority = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-        this.state.publicKey.toBuffer(),
-      ],
-      this.forwarderProgram.programId
-    );
+    // DELETE ME: this.forwarderAuthority = PublicKey.findProgramAddressSync(
+    //   [
+    //     Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+    //     this.state.publicKey.toBuffer(),
+    //   ],
+    //   this.forwarderProgram.programId
+    // );
 
     return await this.forwarderProgram.methods
       .initialize()
@@ -457,6 +472,12 @@ export class Forwarder {
       workflowOwner
     );
 
+    const [forwarderAuthority, _] = calculateForwarderAuthorityBump(
+      this.state.publicKey,
+      receiverProgram,
+      this.forwarderProgram.programId
+    );
+
     // todo: add lookup table in future for more accurate results?
     const ix = await this.forwarderProgram.methods
       .report(dataBytes)
@@ -464,7 +485,7 @@ export class Forwarder {
         state: this.state.publicKey,
         oraclesConfig: this.oraclesConfig[0],
         transmitter: this.provider.wallet.publicKey, // not used for anything besides payment
-        forwarderAuthority: this.forwarderAuthority[0],
+        forwarderAuthority: forwarderAuthority,
         executionState: executionStateStorage,
         receiverProgram: receiverProgram,
         systemProgram: anchor.web3.SystemProgram.programId,

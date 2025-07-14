@@ -30,20 +30,12 @@ pub mod keystone_forwarder {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        // store forwarder PDA bump for later
-        let (_, authority_nonce) = Pubkey::find_program_address(
-            &[b"forwarder", ctx.accounts.state.key().as_ref()],
-            &crate::ID,
-        );
-
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
-        state.authority_nonce = authority_nonce;
         state.owner = ctx.accounts.owner.key();
 
         emit!(InitializeEmit {
             owner: ctx.accounts.owner.key(),
-            authority_nonce
         });
 
         Ok(())
@@ -205,10 +197,23 @@ pub mod keystone_forwarder {
 
         // used to derive the forwarder authority PDA
         let forwarder_state = ctx.accounts.state.key();
+        let receiver_program = ctx.accounts.receiver_program.key();
+
+        // calculate the bump on-the-fly
+        let (_, authority_nonce) = Pubkey::find_program_address(
+            &[
+                b"forwarder",
+                forwarder_state.as_ref(),
+                receiver_program.as_ref(),
+            ],
+            &crate::ID,
+        );
+
         let signers_seeds = &[
             b"forwarder",
             forwarder_state.as_ref(),
-            &[ctx.accounts.state.authority_nonce],
+            receiver_program.as_ref(),
+            &[authority_nonce],
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
