@@ -252,7 +252,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %w", err)
 		}
 		if res.Err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %s", res.Err)
+			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %v", res.Err)
 		}
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
 		if err != nil {
