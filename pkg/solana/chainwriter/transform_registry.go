@@ -140,7 +140,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 	}
 
 	lggr.Debugw("Deriving accounts", "params", params, "debugID", debugID)
-	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress)
+	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress, lggr)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to derive execute accounts: %w", err)
 	}
@@ -207,7 +207,7 @@ func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overh
 	return computeUnits, nil
 }
 
-func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp.DeriveAccountsExecuteParams, transmitter solana.PublicKey, offrampStr string) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
+func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp.DeriveAccountsExecuteParams, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
 	blockhash, err := client.LatestBlockhash(ctx)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error fetching latest blockhash: %w", err)
@@ -245,6 +245,8 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts transaction: %w", err)
 		}
+
+		lggr.Debugw("account derivation simulate instruction", "currentStage", stage, "ix", deriveAccountsSolIx)
 
 		tx.Signatures = append(tx.Signatures, solana.Signature{}) // Append empty signature since tx fails without any sigs even if SigVerify is false
 		res, err := client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true})
