@@ -258,7 +258,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		}
 
 		tx.Signatures = append(tx.Signatures, solana.Signature{}) // Append empty signature since tx fails without any sigs even if SigVerify is false
-		lggr.Debugw("account derivation simulate instruction", "currentStage", stage, "tx", tx)
+		lggr.Debugw("account derivation simulate tx", "currentStage", stage, "tx", tx)
 		res, err := client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true})
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %w", err)
@@ -281,6 +281,8 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		derivedAccounts = append(derivedAccounts, ConvertToSolanaAccountMetas(derivation.AccountsToSave)...)
 		// Convert CCIP metas to Solana metas and override previous list. Past ask again accounts are irrelevant.
 		accountsToAskWith = ConvertToSolanaAccountMetas(derivation.AskAgainWith)
+
+		lggr.Debugw("account derivation result", "stage", stage, "nextStage", derivation.NextStage, "save", derivation.AccountsToSave, "askAgain", derivation.AskAgainWith)
 
 		lookupTablesAddrs = append(lookupTablesAddrs, derivation.LookUpTablesToSave...)
 
