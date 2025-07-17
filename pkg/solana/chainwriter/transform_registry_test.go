@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"math"
 	"math/big"
 	"strconv"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -58,10 +60,9 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	tokenReceiver := GetRandomPubKey(t)
 	offrampAddress := GetRandomPubKey(t)
 	destTokenAddr1 := GetRandomPubKey(t)
-	sourcePoolAddr1 := GetRandomPubKey(t)
 	destTokenAddr2 := GetRandomPubKey(t)
+	sourcePoolAddr1 := GetRandomPubKey(t)
 	sourcePoolAddr2 := GetRandomPubKey(t)
-
 	poolKeys1 := CreateTestPubKeys(t, 7)
 	poolProgram1 := poolKeys1[2]
 	tokenProgram1 := poolKeys1[6]
@@ -69,7 +70,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	poolKeys2 := CreateTestPubKeys(t, 7)
 	poolProgram2 := poolKeys2[2]
 	tokenProgram2 := poolKeys2[6]
-
+	tokenAdminRegistryAddr := poolKeys1[1]
 	sourceChainSelector := ccipocr3.ChainSelector(1)
 	feeQuoterAddr := GetRandomPubKey(t)
 
@@ -80,253 +81,44 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	require.NoError(t, err)
 	userTokenAccount1, _, err := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram1.Bytes(), destTokenAddr1.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
 	require.NoError(t, err)
-	perChainTokenConfig1, _, err := state.FindFqPerChainPerTokenConfigPDA(uint64(sourceChainSelector), destTokenAddr1, feeQuoterAddr)
+	perChainTokenConfig1, _, err := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr1.Bytes()}, feeQuoterAddr)
 	require.NoError(t, err)
 	poolChainConfig1, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr1.Bytes()}, poolProgram1)
 	require.NoError(t, err)
-	ttAccount1 := tokenTransferAccounts{
-		offrampPoolSigner:   offrampPoolsSigner1,
-		userTokenAccount:    userTokenAccount1,
-		perChainTokenConfig: perChainTokenConfig1,
-		poolChainConfig:     poolChainConfig1,
-		poolKeys:            poolKeys1,
-		mint:                destTokenAddr1,
-	}
 
 	offrampPoolsSigner2, _, err := state.FindExternalTokenPoolsSignerPDA(poolProgram2, offrampAddress)
 	require.NoError(t, err)
 	userTokenAccount2, _, err := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram2.Bytes(), destTokenAddr2.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
 	require.NoError(t, err)
-	perChainTokenConfig2, _, err := state.FindFqPerChainPerTokenConfigPDA(uint64(sourceChainSelector), destTokenAddr2, feeQuoterAddr)
+	perChainTokenConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr2.Bytes()}, feeQuoterAddr)
 	require.NoError(t, err)
 	poolChainConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram2)
 	require.NoError(t, err)
-	ttAccount2 := tokenTransferAccounts{
-		offrampPoolSigner:   offrampPoolsSigner2,
-		userTokenAccount:    userTokenAccount2,
-		perChainTokenConfig: perChainTokenConfig2,
-		poolChainConfig:     poolChainConfig2,
-		poolKeys:            poolKeys2,
-		mint:                destTokenAddr2,
-	}
 
-	lookupTablePubkey1 := GetRandomPubKey(t)
-	lookupTablePubkey2 := GetRandomPubKey(t)
-	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey1, poolKeys1)
-	mockFetchLookupTableAddresses(t, rw, lookupTablePubkey2, poolKeys2)
-
-	externalExecutionConfig, _, err := state.FindExternalExecutionConfigPDA(logicReceiver, offrampAddress)
+	externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, offrampAddress)
 	require.NoError(t, err)
 	userMessagingAccounts := CreateTestPubKeys(t, 3) // arbitrary number of user accounts
 
 	staticCUOverhead := uint32(150_000)
 	userCU := uint32(500)
 	destGasAmount := uint32(500)
-	var merkleRoot ccipocr3.Bytes32
-
-	args := ccipsolana.SVMExecCallArgs{
-		Info: ccipocr3.ExecuteReportInfo{
-			AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-				Messages: []ccipocr3.Message{{
-					Receiver: logicReceiver.Bytes(),
-					Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
-					TokenAmounts: []ccipocr3.RampTokenAmount{
-						{
-							DestTokenAddress:  destTokenAddr1.Bytes(),
-							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
-							SourcePoolAddress: sourcePoolAddr1.Bytes(),
-						},
-						{
-							DestTokenAddress:  destTokenAddr2.Bytes(),
-							Amount:            ccipocr3.NewBigInt(big.NewInt(2)),
-							SourcePoolAddress: sourcePoolAddr2.Bytes(),
-						},
-					}},
-				},
-			}},
-			MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
-		},
-		ExtraData: ccipsolana.ExtraDataDecoded{
-			ExtraArgsDecoded: map[string]any{
-				"computeUnits":            userCU,
-				"accounts":                userMessagingAccounts,
-				"accountIsWritableBitmap": uint64(1),
-				"tokenReceiver":           tokenReceiver,
-			},
-			DestExecDataDecoded: []map[string]any{
-				{"destGasAmount": destGasAmount},
-				{"destGasAmount": destGasAmount},
-			},
-		},
-	}
 
 	requiredMessagingAccountsLen := 2
 	nonPoolTTAccountsLen := 4
-	mandatoryExecuteAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 
-	t.Run("CCIPExecute ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
-		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1, ttAccount2}, logicReceiver, []solana.PublicKey{lookupTablePubkey1, lookupTablePubkey2})
+	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 
-		derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
-		transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-		require.NoError(t, err)
-		require.Contains(t, lookupTableMap, "PoolLookupTable")
-		require.Len(t, lookupTableMap["PoolLookupTable"], 2) // contains pool lookup table for the both token transfers
-		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount*2)
-
-		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-		require.True(t, ok)
-		require.NotNil(t, typedArgs.TokenIndexes)
-		require.Len(t, typedArgs.TokenIndexes, 2)
-		// mandatory accounts + required messaging accounts + arbitrary user messaging accounts + nonPoolTTAccountsLen for TokenAmounts[0]+ pool keys + nonPoolTTAccountsLen for TokenAmounts[1] + pool keys
-		require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)+nonPoolTTAccountsLen+len(poolKeys2))
-		// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
-		remainingAccounts := newAccounts[mandatoryExecuteAccountsLen:]
-		require.Len(t, remainingAccounts, requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)+nonPoolTTAccountsLen+len(poolKeys2))
-		// logic receiver is the first account in remaining accounts
-		require.Equal(t, logicReceiver, remainingAccounts[0].PublicKey)
-		// external execution signer is the second account in remaining accounts
-		require.Equal(t, externalExecutionConfig, remainingAccounts[1].PublicKey)
-		for i, tokenIdx := range typedArgs.TokenIndexes {
-			startIdx := tokenIdx
-			var endIdx uint8
-			if i < len(typedArgs.TokenIndexes)-1 {
-				endIdx = typedArgs.TokenIndexes[i+1]
-			} else {
-				endIdx = uint8(len(remainingAccounts))
-			}
-			tokenAccounts := remainingAccounts[startIdx:endIdx]
-			if i == 0 {
-				require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys1)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
-				require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner1, IsWritable: false, IsSigner: false}, tokenAccounts[0])
-				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[1])
-				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[2])
-				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig1, IsWritable: true}, tokenAccounts[3])
-			} else {
-				require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys2)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
-				require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner2, IsWritable: false, IsSigner: false}, tokenAccounts[0])
-				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount2, IsWritable: true}, tokenAccounts[1])
-				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig2}, tokenAccounts[2])
-				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig2, IsWritable: true}, tokenAccounts[3])
-			}
-			// Pool lookup accounts should have the proper write flags set for token accounts
-			for j := 3; j < len(tokenAccounts); j++ {
-				require.True(t, tokenAccounts[j].IsWritable)
-			}
+	t.Run("CCIPExecute", func(t *testing.T) {
+		tableMap := make(map[string]map[string][]*solana.AccountMeta)
+		tableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
+		lookupTablePubkey := GetRandomPubKey(t)
+		poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys1))
+		for _, poolKey := range poolKeys1 {
+			poolKeysMeta = append(poolKeysMeta, &solana.AccountMeta{PublicKey: poolKey})
 		}
-		// Token addresses shifted by logic receiver + external execution signer + user messaging accounts since token index is relative to remaining accounts
-		require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)), typedArgs.TokenIndexes[0])
-		// Token addresses shifted by logic receiver + external execution signer + user messaging accounts + the previous token accounts
-		require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)), typedArgs.TokenIndexes[1])
-	})
-
-	t.Run("CCIPExecute ArgsTransform ignores user messaging accounts if logic receiver is empty", func(t *testing.T) {
-		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{lookupTablePubkey1})
-
-		missingLogicReceiverArgs := ccipsolana.SVMExecCallArgs{
-			Info: ccipocr3.ExecuteReportInfo{
-				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-					Messages: []ccipocr3.Message{{
-						Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
-						TokenAmounts: []ccipocr3.RampTokenAmount{
-							{
-								DestTokenAddress:  destTokenAddr1.Bytes(),
-								SourcePoolAddress: sourcePoolAddr1.Bytes(),
-								Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
-							},
-						}},
-					},
-				}},
-				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
-			},
-			ExtraData: ccipsolana.ExtraDataDecoded{
-				ExtraArgsDecoded: map[string]any{
-					"computeUnits":            uint32(500),
-					"accounts":                userMessagingAccounts,
-					"accountIsWritableBitmap": uint64(1),
-					"tokenReceiver":           tokenReceiver,
-				},
-				DestExecDataDecoded: []map[string]any{
-					{"destGasAmount": uint32(500)},
-				},
-			},
-		}
-
-		derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
-		transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingLogicReceiverArgs, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-		require.NoError(t, err)
-		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
-
-		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-		require.True(t, ok)
-		require.NotNil(t, typedArgs.TokenIndexes)
-		require.Len(t, typedArgs.TokenIndexes, 1)
-		require.Equal(t, uint8(0), typedArgs.TokenIndexes[0]) // Token index is 0 because no user messaging accounts precede token transfer accounts
-		// mandatory accounts + 4 token accounts for TokenAmounts[0] + 7 pool keys
-		require.Len(t, newAccounts, mandatoryExecuteAccountsLen+nonPoolTTAccountsLen+len(poolKeys1))
-		require.Len(t, lookupTableMap, 1) // contains pool lookup table for the single token transfer
-	})
-
-	t.Run("CCIPExecute ArgsTransform ignores token transfer related errors if accounts not required", func(t *testing.T) {
-		messagingOnlyArgs := ccipsolana.SVMExecCallArgs{
-			Info: ccipocr3.ExecuteReportInfo{
-				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-					Messages: []ccipocr3.Message{
-						{
-							Receiver: logicReceiver.Bytes(),
-							Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
-						},
-					},
-				}},
-				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
-			},
-			ExtraData: ccipsolana.ExtraDataDecoded{
-				ExtraArgsDecoded: map[string]any{
-					"computeUnits":            uint32(500),
-					"accounts":                userMessagingAccounts,
-					"accountIsWritableBitmap": uint64(1),
-				},
-				DestExecDataDecoded: []map[string]any{
-					{"destGasAmount": uint32(500)},
-				},
-			},
-		}
-		t.Run("CCIPExecute ArgsTransform ignores missing pool lookup table error", func(t *testing.T) {
-			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
-			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-			require.NoError(t, err)
-			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
-
-			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-			require.True(t, ok)
-			require.NotNil(t, typedArgs.TokenIndexes)
-			require.Len(t, typedArgs.TokenIndexes, 0)
-			// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
-			require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts))
-			require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
-		})
-		t.Run("CCIPExecute ArgsTransform ignores missing token receiver error", func(t *testing.T) {
-			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
-			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-			require.NoError(t, err)
-			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
-
-			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-			require.True(t, ok)
-			require.NotNil(t, typedArgs.TokenIndexes)
-			require.Len(t, typedArgs.TokenIndexes, 0)
-			// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
-			require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts))
-			require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
-		})
-	})
-
-	t.Run("CCIPExecute ArgsTransform failed if token transfer accounts are required and the token receiver is empty", func(t *testing.T) {
-		missingTokenReceiverArgs := ccipsolana.SVMExecCallArgs{
+		tableMap["PoolLookupTable"][lookupTablePubkey.String()] = poolKeysMeta
+		
+		args := ccipsolana.SVMExecCallArgs{
 			Info: ccipocr3.ExecuteReportInfo{
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
 					Messages: []ccipocr3.Message{{
@@ -339,153 +131,744 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 						}},
 					},
 				}},
-				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 			},
 			ExtraData: ccipsolana.ExtraDataDecoded{
 				ExtraArgsDecoded: map[string]any{
-					"computeUnits":            uint32(500),
+					"computeUnits":            userCU,
 					"accounts":                userMessagingAccounts,
 					"accountIsWritableBitmap": uint64(1),
+					"tokenReceiver":           tokenReceiver,
 				},
 				DestExecDataDecoded: []map[string]any{
-					{"destGasAmount": uint32(500)},
+					{"destGasAmount": destGasAmount},
 				},
 			},
 		}
+		t.Run("ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
+			mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
+			// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
+			mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts)+len(userMessagingAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
 
-		_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingTokenReceiverArgs, nil, nil, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Error(t, err)
+			transformedArgs, newAccounts, lookupTables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, accounts, tableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			require.Len(t, lookupTables, len(tableMap))
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 1)
+			// mandatory accounts + required messaging accounts + arbitrary user messaging accounts + nonPoolTTAccountsLen for TokenAmounts[0]+ pool keys + nonPoolTTAccountsLen for TokenAmounts[1] + pool keys
+			require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1))
+			// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
+			remainingAccounts := newAccounts[mandatoryAccountsLen:]
+			require.Len(t, remainingAccounts, requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1))
+			// logic receiver is the first account in remaining accounts
+			require.Equal(t, logicReceiver, remainingAccounts[0].PublicKey)
+			// external execution signer is the second account in remaining accounts
+			require.Equal(t, externalExecutionSigner, remainingAccounts[1].PublicKey)
+			for i, tokenIdx := range typedArgs.TokenIndexes {
+				startIdx := tokenIdx
+				var endIdx uint8
+				if i < len(typedArgs.TokenIndexes)-1 {
+					endIdx = typedArgs.TokenIndexes[i+1]
+				} else {
+					endIdx = uint8(len(remainingAccounts))
+				}
+				tokenAccounts := remainingAccounts[startIdx:endIdx]
+				require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys1)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
+				require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner1, IsWritable: false, IsSigner: false}, tokenAccounts[0])
+				require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[1])
+				require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[2])
+				require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig1, IsWritable: true}, tokenAccounts[3])
+				
+				// Pool lookup accounts should have the proper write flags set for token accounts
+				for j := 3; j < len(tokenAccounts); j++ {
+					require.True(t, tokenAccounts[j].IsWritable)
+				}
+			}
+			// Token addresses shifted by logic receiver + external execution signer + user messaging accounts since token index is relative to remaining accounts
+			require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)), typedArgs.TokenIndexes[0])
+		})
+
+		t.Run("ArgsTransform ignores user messaging accounts if logic receiver is empty", func(t *testing.T) {
+			mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
+			// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
+			mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
+			missingLogicReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{
+							Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							TokenAmounts: []ccipocr3.RampTokenAmount{
+								{
+									DestTokenAddress: destTokenAddr1.Bytes(),
+								},
+							}},
+						},
+					}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+						"tokenReceiver":           tokenReceiver,
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+
+			transformedArgs, newAccounts, lookupTables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingLogicReceiverArgs, accounts, tableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			require.Len(t, lookupTables, len(tableMap))
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 1)
+			require.Equal(t, uint8(0), typedArgs.TokenIndexes[0]) // Token index is 0 because no user messaging accounts precede token transfer accounts
+			// mandatory accounts + 4 token accounts for TokenAmounts[0] + 7 pool keys
+			require.Len(t, newAccounts, len(mandatoryAccounts)+nonPoolTTAccountsLen+len(poolKeys1))
+		})
+
+		t.Run("ArgsTransform ignores token transfer related errors if accounts not required", func(t *testing.T) {
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+			messagingOnlyArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{
+							{
+								Receiver: logicReceiver.Bytes(),
+								Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							},
+						},
+					}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+			t.Run("ArgsTransform ignores missing pool lookup table error", func(t *testing.T) {
+				transformedArgs, newAccounts, lookuptables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, messagingOnlyArgs, accounts, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+				require.NoError(t, err)
+				require.Empty(t, lookuptables)
+				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+
+				typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+				require.True(t, ok)
+				require.NotNil(t, typedArgs.TokenIndexes)
+				require.Len(t, typedArgs.TokenIndexes, 0)
+				// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+				require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts))
+			})
+			t.Run("ArgsTransform ignores missing token receiver error", func(t *testing.T) {
+				transformedArgs, newAccounts, lookupTables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, messagingOnlyArgs, accounts, tableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+				require.NoError(t, err)
+				require.Len(t, lookupTables, len(tableMap))
+				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+
+				typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+				require.True(t, ok)
+				require.NotNil(t, typedArgs.TokenIndexes)
+				require.Len(t, typedArgs.TokenIndexes, 0)
+				// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+				require.Len(t, newAccounts, len(mandatoryAccounts)+requiredMessagingAccountsLen+len(userMessagingAccounts))
+			})
+		})
+
+		t.Run("ArgsTransform failed if token transfer accounts are required and the token receiver is empty", func(t *testing.T) {
+			mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
+			// second address in pool lookup table is expected to be the token admin registry address needed to fetch the WritableIndexes
+			mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
+			missingTokenReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{
+							Receiver: logicReceiver.Bytes(),
+							Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							TokenAmounts: []ccipocr3.RampTokenAmount{
+								{
+									DestTokenAddress: destTokenAddr1.Bytes(),
+								},
+							}},
+						},
+					}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+
+			_, _, _, _,err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingTokenReceiverArgs, accounts, tableMap, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Error(t, err)
+		})
+
+		t.Run("ArgsTransform does not include any remaining accounts if both logic and token receivers are missing", func(t *testing.T) {
+			missingBothReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{
+							{
+								Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							},
+						},
+					}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+
+			transformedArgs, newAccounts, lookupTables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingBothReceiverArgs, accounts, tableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			require.Len(t, lookupTables, len(tableMap))
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 0)
+			// no extra accounts are added so new accounts should equal mandatory accounts
+			require.Len(t, newAccounts, len(mandatoryAccounts))
+		})
+
+		t.Run("ArgsTransform fails if token transfer accounts is required and lookup table not found", func(t *testing.T) {
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, accounts, nil, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.ErrorContains(t, err, "failed to find PoolLookupTable in table map")
+		})
+
+		t.Run("ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+			args := struct {
+				ReportContext [2][32]uint8
+				Info          ccipocr3.ExecuteReportInfo
+				ExtraData     ccipsolana.ExtraDataDecoded
+			}{
+				ReportContext: [2][32]uint8{},
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{}},
+					}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits": uint32(500),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+			transformedArgs, newAccounts, lookupTables, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, accounts, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			require.Empty(t, lookupTables)
+
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+			_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.Len(t, newAccounts, len(accounts))
+		})
+
+		t.Run("ArgsTransform fails with empty Info", func(t *testing.T) {
+			accounts := []*solana.AccountMeta{{PublicKey: GetRandomPubKey(t)}}
+
+			args := struct {
+				ReportContext [2][32]uint8
+				Report        []uint8
+				Info          ccipocr3.ExecuteReportInfo
+			}{
+				ReportContext: [2][32]uint8{},
+				Report:        []uint8{},
+				Info:          ccipocr3.ExecuteReportInfo{},
+			}
+			_, _, _, _,err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, accounts, nil, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
+		})
+
+		t.Run("ArgsTransform ignores nil accounts in pool lookup table", func(t *testing.T) {
+			mockFetchFeeQuoterAddress(t, rw, feeQuoterAddr, offrampAddress)
+			mockWritableIndexes(t, rw, tokenAdminRegistryAddr)
+			mandatoryAccounts := CreateTestPubKeys(t, mandatoryAccountsLen)
+			// Accounts list contains other accounts before token addresses
+			accounts := make([]*solana.AccountMeta, 0, len(mandatoryAccounts)+len(userMessagingAccounts))
+			for _, acc := range mandatoryAccounts {
+				accounts = append(accounts, &solana.AccountMeta{PublicKey: acc})
+			}
+
+			corruptTableMap := make(map[string]map[string][]*solana.AccountMeta)
+			corruptTableMap["PoolLookupTable"] = make(map[string][]*solana.AccountMeta)
+			corruptLookupTablePubkey := GetRandomPubKey(t)
+
+			poolKeysMeta := make([]*solana.AccountMeta, 0, len(poolKeys1))
+			for _, poolKey := range poolKeys1 {
+				poolKeysMeta = append(poolKeysMeta, &solana.AccountMeta{PublicKey: poolKey})
+			}
+			// add nil account meta
+			poolKeysMeta = append(poolKeysMeta, nil)
+			corruptTableMap["PoolLookupTable"][corruptLookupTablePubkey.String()] = poolKeysMeta
+
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, accounts, corruptTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+		})
 	})
 
-	t.Run("CCIPExecute ArgsTransform does not include any remaining accounts if both logic and token receivers are missing", func(t *testing.T) {
-		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
-		missingBothReceiverArgs := ccipsolana.SVMExecCallArgs{
+	t.Run("CCIPExecuteV2", func(t *testing.T) {
+		ttAccount1 := tokenTransferAccounts{
+			offrampPoolSigner:   offrampPoolsSigner1,
+			userTokenAccount:    userTokenAccount1,
+			perChainTokenConfig: perChainTokenConfig1,
+			poolChainConfig:     poolChainConfig1,
+			poolKeys:            poolKeys1,
+			mint:                destTokenAddr1,
+		}
+		ttAccount2 := tokenTransferAccounts{
+			offrampPoolSigner:   offrampPoolsSigner2,
+			userTokenAccount:    userTokenAccount2,
+			perChainTokenConfig: perChainTokenConfig2,
+			poolChainConfig:     poolChainConfig2,
+			poolKeys:            poolKeys2,
+			mint:                destTokenAddr2,
+		}
+
+		lookupTablePubkey1 := GetRandomPubKey(t)
+		lookupTablePubkey2 := GetRandomPubKey(t)
+		mockFetchLookupTableAddresses(t, rw, lookupTablePubkey1, poolKeys1)
+		mockFetchLookupTableAddresses(t, rw, lookupTablePubkey2, poolKeys2)
+
+		externalExecutionConfig, _, err := state.FindExternalExecutionConfigPDA(logicReceiver, offrampAddress)
+		require.NoError(t, err)
+
+		var merkleRoot ccipocr3.Bytes32
+
+		args := ccipsolana.SVMExecCallArgs{
 			Info: ccipocr3.ExecuteReportInfo{
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-					Messages: []ccipocr3.Message{
-						{
-							Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
-						},
+					Messages: []ccipocr3.Message{{
+						Receiver: logicReceiver.Bytes(),
+						Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+						TokenAmounts: []ccipocr3.RampTokenAmount{
+							{
+								DestTokenAddress:  destTokenAddr1.Bytes(),
+								Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+								SourcePoolAddress: sourcePoolAddr1.Bytes(),
+							},
+							{
+								DestTokenAddress:  destTokenAddr2.Bytes(),
+								Amount:            ccipocr3.NewBigInt(big.NewInt(2)),
+								SourcePoolAddress: sourcePoolAddr2.Bytes(),
+							},
+						}},
 					},
 				}},
 				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 			},
 			ExtraData: ccipsolana.ExtraDataDecoded{
 				ExtraArgsDecoded: map[string]any{
-					"computeUnits":            uint32(500),
+					"computeUnits":            userCU,
 					"accounts":                userMessagingAccounts,
 					"accountIsWritableBitmap": uint64(1),
+					"tokenReceiver":           tokenReceiver,
 				},
 				DestExecDataDecoded: []map[string]any{
-					{"destGasAmount": uint32(500)},
+					{"destGasAmount": destGasAmount},
+					{"destGasAmount": destGasAmount},
 				},
 			},
 		}
 
-		transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, missingBothReceiverArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-		require.NoError(t, err)
-		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
-		typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-		require.True(t, ok)
-		require.NotNil(t, typedArgs.TokenIndexes)
-		require.Len(t, typedArgs.TokenIndexes, 0)
-		// no extra accounts are added so new accounts should equal mandatory accounts
-		require.Len(t, newAccounts, mandatoryExecuteAccountsLen)
-		require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
-	})
+		requiredMessagingAccountsLen := 2
+		nonPoolTTAccountsLen := 4
+		mandatoryExecuteAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 
-	t.Run("CCIPExecute ArgsTransform fails if token transfer accounts is required and lookup table not found", func(t *testing.T) {
-		badLookupTable := GetRandomPubKey(t)
-		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{badLookupTable})
-		rw.On("GetAccountInfoWithOpts", mock.Anything, badLookupTable, mock.Anything).Return(nil, errors.New("failed to fetch lookup table")).Once()
-		derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
-		_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.ErrorContains(t, err, "failed to fetch lookup table")
-	})
+		t.Run("ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
+			// Mock the account derivation simulations
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1, ttAccount2}, logicReceiver, []solana.PublicKey{lookupTablePubkey1, lookupTablePubkey2})
 
-	t.Run("CCIPExecute ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
-		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
-		args := struct {
-			ReportContext [2][32]uint8
-			Info          ccipocr3.ExecuteReportInfo
-			ExtraData     ccipsolana.ExtraDataDecoded
-		}{
-			ReportContext: [2][32]uint8{},
-			Info: ccipocr3.ExecuteReportInfo{
-				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
-					Messages: []ccipocr3.Message{{}},
-				}},
-				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
-			},
-			ExtraData: ccipsolana.ExtraDataDecoded{
-				ExtraArgsDecoded: map[string]any{
-					"computeUnits": uint32(500),
+			derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
+			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			require.Contains(t, lookupTableMap, "PoolLookupTable")
+			require.Len(t, lookupTableMap["PoolLookupTable"], 2) // contains pool lookup table for the both token transfers
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount*2)
+
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 2)
+			// mandatory accounts + required messaging accounts + arbitrary user messaging accounts + nonPoolTTAccountsLen for TokenAmounts[0]+ pool keys + nonPoolTTAccountsLen for TokenAmounts[1] + pool keys
+			require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)+nonPoolTTAccountsLen+len(poolKeys2))
+			// Token indexes are relative to the remaining accounts which exclude the mandatory accounts at the beginning
+			remainingAccounts := newAccounts[mandatoryExecuteAccountsLen:]
+			require.Len(t, remainingAccounts, requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)+nonPoolTTAccountsLen+len(poolKeys2))
+			// logic receiver is the first account in remaining accounts
+			require.Equal(t, logicReceiver, remainingAccounts[0].PublicKey)
+			// external execution signer is the second account in remaining accounts
+			require.Equal(t, externalExecutionConfig, remainingAccounts[1].PublicKey)
+			for i, tokenIdx := range typedArgs.TokenIndexes {
+				startIdx := tokenIdx
+				var endIdx uint8
+				if i < len(typedArgs.TokenIndexes)-1 {
+					endIdx = typedArgs.TokenIndexes[i+1]
+				} else {
+					endIdx = uint8(len(remainingAccounts))
+				}
+				tokenAccounts := remainingAccounts[startIdx:endIdx]
+				if i == 0 {
+					require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys1)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
+					require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner1, IsWritable: false, IsSigner: false}, tokenAccounts[0])
+					require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount1, IsWritable: true}, tokenAccounts[1])
+					require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig1}, tokenAccounts[2])
+					require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig1, IsWritable: true}, tokenAccounts[3])
+				} else {
+					require.Len(t, tokenAccounts, nonPoolTTAccountsLen+len(poolKeys2)) // offramp pools signer + user token account + per chain token config + pool chain config + 7 pool keys
+					require.Equal(t, &solana.AccountMeta{PublicKey: offrampPoolsSigner2, IsWritable: false, IsSigner: false}, tokenAccounts[0])
+					require.Equal(t, &solana.AccountMeta{PublicKey: userTokenAccount2, IsWritable: true}, tokenAccounts[1])
+					require.Equal(t, &solana.AccountMeta{PublicKey: perChainTokenConfig2}, tokenAccounts[2])
+					require.Equal(t, &solana.AccountMeta{PublicKey: poolChainConfig2, IsWritable: true}, tokenAccounts[3])
+				}
+				// Pool lookup accounts should have the proper write flags set for token accounts
+				for j := 3; j < len(tokenAccounts); j++ {
+					require.True(t, tokenAccounts[j].IsWritable)
+				}
+			}
+			// Token addresses shifted by logic receiver + external execution signer + user messaging accounts since token index is relative to remaining accounts
+			require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)), typedArgs.TokenIndexes[0])
+			// Token addresses shifted by logic receiver + external execution signer + user messaging accounts + the previous token accounts
+			require.Equal(t, uint8(requiredMessagingAccountsLen+len(userMessagingAccounts)+nonPoolTTAccountsLen+len(poolKeys1)), typedArgs.TokenIndexes[1])
+		})
+
+		t.Run("ArgsTransform ignores user messaging accounts if logic receiver is empty", func(t *testing.T) {
+			// Mock the account derivation simulations
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{lookupTablePubkey1})
+
+			missingLogicReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{
+							Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							TokenAmounts: []ccipocr3.RampTokenAmount{
+								{
+									DestTokenAddress:  destTokenAddr1.Bytes(),
+									SourcePoolAddress: sourcePoolAddr1.Bytes(),
+									Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+								},
+							}},
+						},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 				},
-				DestExecDataDecoded: []map[string]any{
-					{"destGasAmount": uint32(500)},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+						"tokenReceiver":           tokenReceiver,
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
 				},
-			},
-		}
-		transformedArgs, newAccounts, _, options, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
-		require.NoError(t, err)
+			}
 
-		verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
-		_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
-		require.True(t, ok)
-		require.Len(t, newAccounts, mandatoryExecuteAccountsLen)
-	})
+			derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
+			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, missingLogicReceiverArgs, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
-	t.Run("CCIPExecute ArgsTransform fails with empty Info", func(t *testing.T) {
-		args := struct {
-			ReportContext [2][32]uint8
-			Report        []uint8
-			Info          ccipocr3.ExecuteReportInfo
-		}{
-			ReportContext: [2][32]uint8{},
-			Report:        []uint8{},
-			Info:          ccipocr3.ExecuteReportInfo{},
-		}
-		_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, args, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
-	})
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 1)
+			require.Equal(t, uint8(0), typedArgs.TokenIndexes[0]) // Token index is 0 because no user messaging accounts precede token transfer accounts
+			// mandatory accounts + 4 token accounts for TokenAmounts[0] + 7 pool keys
+			require.Len(t, newAccounts, mandatoryExecuteAccountsLen+nonPoolTTAccountsLen+len(poolKeys1))
+			require.Len(t, lookupTableMap, 1) // contains pool lookup table for the single token transfer
+		})
 
-	t.Run("CCIPExecute ArgsTransform fails with unexpected number of reports, messages, or merkle roots", func(t *testing.T) {
-		emptyArgs := ccipsolana.SVMExecCallArgs{
-			Info: ccipocr3.ExecuteReportInfo{
-				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{},
-				MerkleRoots:     []ccipocr3.MerkleRootChain{},
-			},
-			ExtraData: ccipsolana.ExtraDataDecoded{
-				ExtraArgsDecoded: map[string]any{
-					"computeUnits": uint32(500),
+		t.Run("ArgsTransform ignores token transfer related errors if accounts not required", func(t *testing.T) {
+			messagingOnlyArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{
+							{
+								Receiver: logicReceiver.Bytes(),
+								Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							},
+						},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 				},
-			},
-		}
-		multiReport := emptyArgs
-		report := ccipocr3.ExecutePluginReportSingleChain{
-			Messages: []ccipocr3.Message{{Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector}}},
-		}
-		multiReport.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report, report}
-		_, _, _, _, err := chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, multiReport, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Contains(t, err.Error(), "encountered unexpected number of reports")
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+			t.Run("ArgsTransform ignores missing pool lookup table error", func(t *testing.T) {
+				// Mock the account derivation simulations
+				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
+				transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+				require.NoError(t, err)
+				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
-		multiMessage := emptyArgs
-		message := ccipocr3.Message{Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector}}
-		multiMessage.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report}
-		multiMessage.Info.AbstractReports[0].Messages = []ccipocr3.Message{message, message}
-		_, _, _, _, err = chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, multiMessage, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Contains(t, err.Error(), "encountered unexpected number of messages")
+				typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+				require.True(t, ok)
+				require.NotNil(t, typedArgs.TokenIndexes)
+				require.Len(t, typedArgs.TokenIndexes, 0)
+				// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+				require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts))
+				require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
+			})
+			t.Run("ArgsTransform ignores missing token receiver error", func(t *testing.T) {
+				// Mock the account derivation simulations
+				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
+				transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+				require.NoError(t, err)
+				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
 
-		multiMerkleRoots := emptyArgs
-		merkleRoot := ccipocr3.MerkleRootChain{MerkleRoot: [32]byte{}}
-		multiMerkleRoots.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report}
-		multiMerkleRoots.Info.AbstractReports[0].Messages = []ccipocr3.Message{message}
-		multiMerkleRoots.Info.MerkleRoots = []ccipocr3.MerkleRootChain{merkleRoot, merkleRoot}
-		_, _, _, _, err = chainwriter.CCIPExecuteArgsTransform(ctx, mc, lggr, multiMerkleRoots, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Contains(t, err.Error(), "encountered unexpected number of merkle roots")
+				typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+				require.True(t, ok)
+				require.NotNil(t, typedArgs.TokenIndexes)
+				require.Len(t, typedArgs.TokenIndexes, 0)
+				// mandatory accounts + 2 requiredMessagingAccountsLen + 3 for user messaging accounts
+				require.Len(t, newAccounts, mandatoryExecuteAccountsLen+requiredMessagingAccountsLen+len(userMessagingAccounts))
+				require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
+			})
+		})
+
+		t.Run("ArgsTransform failed if token transfer accounts are required and the token receiver is empty", func(t *testing.T) {
+			missingTokenReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{
+							Receiver: logicReceiver.Bytes(),
+							Header:   ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							TokenAmounts: []ccipocr3.RampTokenAmount{
+								{
+									DestTokenAddress: destTokenAddr1.Bytes(),
+								},
+							}},
+						},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, missingTokenReceiverArgs, nil, nil, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Error(t, err)
+		})
+
+		t.Run("ArgsTransform does not include any remaining accounts if both logic and token receivers are missing", func(t *testing.T) {
+			// Mock the account derivation simulations
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
+			missingBothReceiverArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{
+							{
+								Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							},
+						},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits":            uint32(500),
+						"accounts":                userMessagingAccounts,
+						"accountIsWritableBitmap": uint64(1),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+
+			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, missingBothReceiverArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+			typedArgs, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.NotNil(t, typedArgs.TokenIndexes)
+			require.Len(t, typedArgs.TokenIndexes, 0)
+			// no extra accounts are added so new accounts should equal mandatory accounts
+			require.Len(t, newAccounts, mandatoryExecuteAccountsLen)
+			require.Len(t, lookupTableMap, 0) // no lookup tables returned if there are no token transfers
+		})
+
+		t.Run("ArgsTransform fails if token transfer accounts is required and lookup table not found", func(t *testing.T) {
+			badLookupTable := GetRandomPubKey(t)
+			// Mock the account derivation simulations
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{badLookupTable})
+			rw.On("GetAccountInfoWithOpts", mock.Anything, badLookupTable, mock.Anything).Return(nil, errors.New("failed to fetch lookup table")).Once()
+			derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.ErrorContains(t, err, "failed to fetch lookup table")
+		})
+
+		t.Run("ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
+			// Mock the account derivation simulations
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
+			args := struct {
+				ReportContext [2][32]uint8
+				Info          ccipocr3.ExecuteReportInfo
+				ExtraData     ccipsolana.ExtraDataDecoded
+			}{
+				ReportContext: [2][32]uint8{},
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{}},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits": uint32(500),
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": uint32(500)},
+					},
+				},
+			}
+			transformedArgs, newAccounts, _, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
+			require.NoError(t, err)
+
+			verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
+			_, ok := transformedArgs.(ccipsolana.SVMExecCallArgs)
+			require.True(t, ok)
+			require.Len(t, newAccounts, mandatoryExecuteAccountsLen)
+		})
+
+		t.Run("ArgsTransform fails with empty Info", func(t *testing.T) {
+			args := struct {
+				ReportContext [2][32]uint8
+				Report        []uint8
+				Info          ccipocr3.ExecuteReportInfo
+			}{
+				ReportContext: [2][32]uint8{},
+				Report:        []uint8{},
+				Info:          ccipocr3.ExecuteReportInfo{},
+			}
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
+		})
+
+		t.Run("ArgsTransform fails with unexpected number of reports, messages, or merkle roots", func(t *testing.T) {
+			emptyArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{},
+					MerkleRoots:     []ccipocr3.MerkleRootChain{},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"computeUnits": uint32(500),
+					},
+				},
+			}
+			multiReport := emptyArgs
+			report := ccipocr3.ExecutePluginReportSingleChain{
+				Messages: []ccipocr3.Message{{Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector}}},
+			}
+			multiReport.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report, report}
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, multiReport, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Contains(t, err.Error(), "encountered unexpected number of reports")
+
+			multiMessage := emptyArgs
+			message := ccipocr3.Message{Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector}}
+			multiMessage.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report}
+			multiMessage.Info.AbstractReports[0].Messages = []ccipocr3.Message{message, message}
+			_, _, _, _, err = chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, multiMessage, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Contains(t, err.Error(), "encountered unexpected number of messages")
+
+			multiMerkleRoots := emptyArgs
+			merkleRoot := ccipocr3.MerkleRootChain{MerkleRoot: [32]byte{}}
+			multiMerkleRoots.Info.AbstractReports = []ccipocr3.ExecutePluginReportSingleChain{report}
+			multiMerkleRoots.Info.AbstractReports[0].Messages = []ccipocr3.Message{message}
+			multiMerkleRoots.Info.MerkleRoots = []ccipocr3.MerkleRootChain{merkleRoot, merkleRoot}
+			_, _, _, _, err = chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, multiMerkleRoots, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.Contains(t, err.Error(), "encountered unexpected number of merkle roots")
+		})
 	})
 }
 
@@ -681,4 +1064,37 @@ func buildEncodedResponse(t *testing.T, offramp string, toSave, askAgainWith []c
 	encodedRes := base64.StdEncoding.EncodeToString(buf.Bytes())
 
 	return "Program return: " + offramp + " " + encodedRes
+}
+
+func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminRegistryAddr solana.PublicKey) {
+	lookupTablePubkey := GetRandomPubKey(t)
+	tokenAdminRegistry := ccip_common.TokenAdminRegistry{
+		Version:              1,
+		Administrator:        GetRandomPubKey(t),
+		PendingAdministrator: GetRandomPubKey(t),
+		LookupTable:          lookupTablePubkey,
+		// set all accounts as writable
+		WritableIndexes: [2]bin.Uint128{{Endianness: bin.LE, Lo: math.MaxUint64, Hi: math.MaxUint64}},
+	}
+	registryBytes := mustBorshEncodeStruct(t, tokenAdminRegistry)
+	rw.On("GetAccountInfoWithOpts", mock.Anything, tokenAdminRegistryAddr, mock.Anything).Return(&rpc.GetAccountInfoResult{
+		RPCContext: rpc.RPCContext{},
+		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(registryBytes)},
+	}, nil).Once()
+}
+
+func mockFetchFeeQuoterAddress(t *testing.T, rw *clientmocks.ReaderWriter, feeQuoterAddr, offrampAddr solana.PublicKey) {
+	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("reference_addresses")}, offrampAddr)
+	require.NoError(t, err)
+	referenceAddresses := ccip_offramp.ReferenceAddresses{
+		Version:            1,
+		Router:             solana.PublicKey{},
+		FeeQuoter:          feeQuoterAddr,
+		OfframpLookupTable: solana.PublicKey{},
+	}
+	referenceAddressesBytes := mustBorshEncodeStruct(t, referenceAddresses)
+	rw.On("GetAccountInfoWithOpts", mock.Anything, pda, mock.Anything).Return(&rpc.GetAccountInfoResult{
+		RPCContext: rpc.RPCContext{},
+		Value:      &rpc.Account{Data: rpc.DataBytesOrJSONFromBytes(referenceAddressesBytes)},
+	}, nil).Once()
 }
