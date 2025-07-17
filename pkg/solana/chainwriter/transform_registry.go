@@ -95,6 +95,12 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 		if len(argsTransformed.ExtraData.DestExecDataDecoded) != len(message.TokenAmounts) {
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
 		}
+		// If message contains token transfers, extract offchain token data for the message if any exists
+		lggr.Debugw("report OffchainTokenData", "data", report.OffchainTokenData)
+		var messageTokenData [][]byte
+		if len(report.OffchainTokenData) > 0 {
+			messageTokenData = report.OffchainTokenData[0]
+		}
 		for i, tokenAmount := range message.TokenAmounts {
 			destTokenAddress := solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress)
 			destGasAmount, ok := argsTransformed.ExtraData.DestExecDataDecoded[i]["destGasAmount"].(uint32)
@@ -107,6 +113,11 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 			if tokenAmount.Amount.Int.Sign() < 0 {
 				return nil, nil, nil, nil, fmt.Errorf("negative amount for token: %s", destTokenAddress.String())
 			}
+			// Extract the token data for the particular token transfer if it exists
+			var tokenTransferTokenData []byte
+			if len(messageTokenData) > i {
+				tokenTransferTokenData = messageTokenData[i]
+			}
 			tokenTransfers = append(tokenTransfers, ccip_offramp.TokenTransferAndOffchainData{
 				Transfer: ccip_offramp.Any2SVMTokenTransfer{
 					SourcePoolAddress: tokenAmount.SourcePoolAddress,
@@ -115,7 +126,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 					ExtraData:         tokenAmount.ExtraData,
 					DestGasAmount:     destGasAmount,
 				},
-				Data: tokenAmount.DestExecData,
+				Data: tokenTransferTokenData,
 			})
 		}
 		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
@@ -246,15 +257,14 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts transaction: %w", err)
 		}
 
-		lggr.Debugw("account derivation simulate instruction", "currentStage", stage, "ix", deriveAccountsSolIx)
-
 		tx.Signatures = append(tx.Signatures, solana.Signature{}) // Append empty signature since tx fails without any sigs even if SigVerify is false
+		lggr.Debugw("account derivation simulate instruction", "currentStage", stage, "tx", tx)
 		res, err := client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true})
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %w", err)
 		}
 		if res.Err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %v", res.Err)
+			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction. Err: %v, Logs: %v", res.Err, res.Logs)
 		}
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
 		if err != nil {
