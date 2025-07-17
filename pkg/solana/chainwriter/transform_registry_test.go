@@ -548,7 +548,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		t.Run("ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
 			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1, ttAccount2}, logicReceiver, []solana.PublicKey{lookupTablePubkey1, lookupTablePubkey2})
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, []tokenTransferAccounts{ttAccount1, ttAccount2}, logicReceiver, []solana.PublicKey{lookupTablePubkey1, lookupTablePubkey2})
 
 			derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
 			transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
@@ -605,7 +605,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		t.Run("ArgsTransform ignores user messaging accounts if logic receiver is empty", func(t *testing.T) {
 			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{lookupTablePubkey1})
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{lookupTablePubkey1})
 
 			missingLogicReceiverArgs := ccipsolana.SVMExecCallArgs{
 				Info: ccipocr3.ExecuteReportInfo{
@@ -677,7 +677,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			}
 			t.Run("ArgsTransform ignores missing pool lookup table error", func(t *testing.T) {
 				// Mock the account derivation simulations
-				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
+				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, nil, logicReceiver, nil)
 				transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
 				require.NoError(t, err)
 				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
@@ -692,7 +692,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			})
 			t.Run("ArgsTransform ignores missing token receiver error", func(t *testing.T) {
 				// Mock the account derivation simulations
-				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, logicReceiver, nil)
+				mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, nil, logicReceiver, nil)
 				transformedArgs, newAccounts, lookupTableMap, options, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, messagingOnlyArgs, nil, nil, fromAddress, offrampAddress.String(), staticCUOverhead, []txmutils.SetTxConfig{}, "")
 				require.NoError(t, err)
 				verifyTxOpts(t, options, true, staticCUOverhead, userCU, destGasAmount)
@@ -741,7 +741,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		t.Run("ArgsTransform does not include any remaining accounts if both logic and token receivers are missing", func(t *testing.T) {
 			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, nil, solana.PublicKey{}, nil)
 			missingBothReceiverArgs := ccipsolana.SVMExecCallArgs{
 				Info: ccipocr3.ExecuteReportInfo{
 					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
@@ -780,7 +780,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		t.Run("ArgsTransform fails if token transfer accounts is required and lookup table not found", func(t *testing.T) {
 			badLookupTable := GetRandomPubKey(t)
 			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{badLookupTable})
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, []tokenTransferAccounts{ttAccount1}, solana.PublicKey{}, []solana.PublicKey{badLookupTable})
 			rw.On("GetAccountInfoWithOpts", mock.Anything, badLookupTable, mock.Anything).Return(nil, errors.New("failed to fetch lookup table")).Once()
 			derivedLookUpTableMap := make(map[string]map[string][]*solana.AccountMeta)
 			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, derivedLookUpTableMap, fromAddress, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
@@ -789,7 +789,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		t.Run("ArgsTransform does not get args that conform to ReportPreTransform", func(t *testing.T) {
 			// Mock the account derivation simulations
-			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), uint64(sourceChainSelector), userMessagingAccounts, nil, solana.PublicKey{}, nil)
+			mockExecuteAccountDerivation(t, rw, offrampAddress.String(), userMessagingAccounts, nil, solana.PublicKey{}, nil)
 			args := struct {
 				ReportContext [2][32]uint8
 				Info          ccipocr3.ExecuteReportInfo
@@ -944,16 +944,18 @@ func verifyTxOpts(t *testing.T, options []txmutils.SetTxConfig, exec bool, overh
 	}
 }
 
-func mockExecuteAccountDerivation(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string, sourceChainSel uint64, userMessagingAccounts []solana.PublicKey, ttAccounts []tokenTransferAccounts, logicReceiver solana.PublicKey, lookupTables []solana.PublicKey) {
+// Note: Other than the static token transfer stage required for token indices, these stages are implementation details on-chain
+// It's ok if they drift from the on-chain version if any steps are added/removed. This is just to mock out an example of different stages for account derivation
+func mockExecuteAccountDerivation(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string, userMessagingAccounts []solana.PublicKey, ttAccounts []tokenTransferAccounts, logicReceiver solana.PublicKey, lookupTables []solana.PublicKey) {
 	recentBlockHash := solana.Hash{}
 	rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
-	mockGatherBasicInfoStage(t, rw, offrampStr, sourceChainSel)
+	mockGatherBasicInfoStage(t, rw, offrampStr)
 	mockMainAccountListStage(t, rw, offrampStr, userMessagingAccounts, logicReceiver, ttAccounts)
 	mockRetrieveLUTStage(t, rw, offrampStr, ttAccounts)
 	mockTokenTransferStages(t, rw, offrampStr, ttAccounts, lookupTables)
 }
 
-func mockGatherBasicInfoStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string, sourceChainSel uint64) {
+func mockGatherBasicInfoStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string) {
 	basicAccountsLen := 3
 	toSave := make([]ccip_offramp.CcipAccountMeta, 0, basicAccountsLen)
 	basicAccounts := CreateTestPubKeys(t, basicAccountsLen)

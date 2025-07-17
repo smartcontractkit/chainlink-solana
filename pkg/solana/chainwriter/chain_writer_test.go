@@ -1099,7 +1099,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 		mockFetchLookupTableAddresses(t, rw, lookupTablePubkey, poolKeys)
 
 		// Mock the account derivation simulations
-		mockExecuteAccountDerivation(t, rw, offrampAddr.String(), uint64(sourceChainSel), []solana.PublicKey{userMessagingAccount}, []tokenTransferAccounts{ttAccount}, logicReceiver, []solana.PublicKey{lookupTablePubkey})
+		mockExecuteAccountDerivation(t, rw, offrampAddr.String(), []solana.PublicKey{userMessagingAccount}, []tokenTransferAccounts{ttAccount}, logicReceiver, []solana.PublicKey{lookupTablePubkey})
 
 		txID := uuid.NewString()
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
