@@ -1010,7 +1010,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 							},
 						},
 						ChainSpecificName:        "execute",
-						ArgsTransform:            "CCIPExecute",
+						ArgsTransform:            "CCIPExecuteV2",
 						ComputeUnitLimitOverhead: staticCUOverhead,
 					},
 					ccipconsts.MethodCommit: {
