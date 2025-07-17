@@ -308,7 +308,7 @@ func (b *eventReadBinding) QueryKey(
 		logpoller.NewEventSigFilter(b.eventSig),
 	}, filter.Expressions...)
 
-	itemType := strings.Join([]string{b.namespace, b.genericName}, ".")
+	itemType := strings.Join([]string{b.namespace, b.genericName}, "-")
 
 	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, itemType)
 	if err != nil {
