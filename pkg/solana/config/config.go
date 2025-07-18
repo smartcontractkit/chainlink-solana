@@ -205,6 +205,10 @@ func (n *Node) ValidateConfig() (err error) {
 		z := int32(100)
 		n.Order = &z
 	}
+	if n.IsRPCProxy == nil {
+		z := false
+		n.IsRPCProxy = &z
+	}
 	return err
 }
 
