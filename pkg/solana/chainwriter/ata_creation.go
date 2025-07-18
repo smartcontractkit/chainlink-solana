@@ -50,28 +50,26 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 		}
 		wallet := walletAddresses[0].PublicKey
 
-		tokenPrograms, err := GetAddresses(ctx, args, []Lookup{lookup.TokenProgram}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("error resolving token program address: %w", err)
-		}
-
 		mints, err := GetAddresses(ctx, args, []Lookup{lookup.MintAddress}, derivedTableMap, client)
 		if lookup.Optional && isIgnorableError(err) {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("error resolving mint address: %w", err)
 		}
-		if len(tokenPrograms) != len(mints) {
-			return nil, fmt.Errorf("expected equal number of token programs and mints, got %d tokenPrograms and %d mints", len(tokenPrograms), len(mints))
-		}
 
-		for i := range tokenPrograms {
-			tokenProgram := tokenPrograms[i].PublicKey
-			mint := mints[i].PublicKey
+		for _, mint := range mints {
+			accountInfo, err := client.GetAccountInfoWithOpts(ctx, mint.PublicKey, &rpc.GetAccountInfoOpts{
+				Commitment: rpc.CommitmentFinalized,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch account info for token mint %s: %w", mint.PublicKey.String(), err)
+			}
+			if accountInfo == nil || accountInfo.Value == nil {
+				return nil, fmt.Errorf("failed to fetch account info for token mint %s", mint.PublicKey.String())
+			}
+			tokenProgram := accountInfo.Value.Owner
 
-			ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint, wallet)
+			ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint.PublicKey, wallet)
 			if err != nil {
 				return nil, fmt.Errorf("error deriving ATA: %w", err)
 			}
@@ -88,7 +86,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 				return nil, fmt.Errorf("error reading account info for ATA: %w", err)
 			}
 
-			ins, _, err := tokens.CreateAssociatedTokenAccount(tokenProgram, mint, wallet, feePayer)
+			ins, _, err := tokens.CreateAssociatedTokenAccount(tokenProgram, mint.PublicKey, wallet, feePayer)
 			if err != nil {
 				return nil, fmt.Errorf("error creating associated token account: %w", err)
 			}

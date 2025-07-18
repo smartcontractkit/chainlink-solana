@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"regexp"
 
@@ -27,7 +28,7 @@ import (
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
-func FindTransform(id string) (func(context.Context, client.MultiClient, logger.Logger, any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, solana.PublicKey, string, uint32, []txmutils.SetTxConfig, string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error), error) {
+func FindTransform(id string) (func(context.Context, client.MultiClient, logger.Logger, any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, map[string]map[string][]*solana.AccountMeta, solana.PublicKey, string, uint32, []txmutils.SetTxConfig, string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error), error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
@@ -51,7 +52,7 @@ type commonTokenTransferAccounts struct {
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, lookupTables map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, derivedLUTs map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -87,7 +88,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 	}
 
 	tokenIndexes := []uint8{}
-	commonTTAccounts, err := resolveCommonTokenTransferAccounts(ctx, tokenAccountsRequired, client, toAddress, args, lookupTables)
+	commonTTAccounts, err := resolveCommonTokenTransferAccounts(ctx, tokenAccountsRequired, client, toAddress, args, derivedLUTs)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to resolve accounts required for token transfer: %w", err)
 	}
@@ -107,12 +108,12 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 	}
 
 	argsTransformed.TokenIndexes = tokenIndexes
-	return argsTransformed, accounts, lookupTables, options, nil
+	return argsTransformed, accounts, staticLUTs, options, nil
 }
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
-func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, lookupTables map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -236,28 +237,17 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 	lggr.Debugw("Completed account derivation", "derivedAccounts", derivedAccounts, "lookupTables", derivedLookupTables, "tokenIndexes", tokenIndexes, "debugID", debugID)
 
 	// Merge the derived lookup tables with the existing lookup table map
-	// NOTE: We assume the only lookup tables returned by account derivation are the pool lookup tables for token transfers
-	for lutAddr, addrList := range derivedLookupTables {
-		if _, ok := lookupTables["PoolLookupTable"]; !ok {
-			lookupTables["PoolLookupTable"] = map[string][]*solana.AccountMeta{}
-		}
-		if _, ok := lookupTables["PoolLookupTable"][lutAddr.String()]; !ok {
-			lookupTables["PoolLookupTable"][lutAddr.String()] = []*solana.AccountMeta{}
-		}
-		for _, addr := range addrList {
-			lookupTables["PoolLookupTable"][lutAddr.String()] = append(lookupTables["PoolLookupTable"][lutAddr.String()], &solana.AccountMeta{PublicKey: addr})
-		}
-	}
+	maps.Copy(staticLUTs, derivedLookupTables)
 
 	// Append derived accounts to the accounts list
 	accounts = append(accounts, derivedAccounts...)
 
 	argsTransformed.TokenIndexes = tokenIndexes
-	return argsTransformed, accounts, lookupTables, options, nil
+	return argsTransformed, accounts, staticLUTs, options, nil
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ logger.Logger, args any, accounts solana.AccountMetaSlice, _ map[string]map[string][]*solana.AccountMeta, _ solana.PublicKey, _ string, _ uint32, options []txmutils.SetTxConfig, _ string) (any, solana.AccountMetaSlice, map[string]map[string][]*solana.AccountMeta, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, _ solana.PublicKey, _ string, _ uint32, options []txmutils.SetTxConfig, _ string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -275,7 +265,7 @@ func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ log
 
 	options = append(options, txmutils.SetEstimateComputeUnitLimit(true))
 
-	return args, transformedAccounts, nil, options, nil
+	return args, transformedAccounts, staticLUTs, options, nil
 }
 
 func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
@@ -321,7 +311,7 @@ func resolveCommonTokenTransferAccounts(ctx context.Context, tokenAccountsRequir
 	poolProgram := poolLookupAccounts[2]
 	tokenProgram := poolLookupAccounts[6]
 
-	feeQuoterAddress, err := getFeeQuoterAddress(ctx, toAddress, args, tableMap, client)
+	feeQuoterAddress, err := getFeeQuoterAddress(ctx, toAddress, args, client)
 	if err != nil {
 		return commonTokenTransferAccounts{}, fmt.Errorf("failed to fetch fee quoter address, required for token transfer: %w", err)
 	}
@@ -499,8 +489,6 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 
 		stage = derivation.NextStage
 		if stage == "" {
-			// NOTE: We assume the only lookup tables returned are the relevant pool lookup tables for each token transfer
-			// This assumption is required to extract the token programs for each transfer
 			lookupTableMap, err := fetchLookupTables(ctx, client, lookupTablesAddrs)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to fetch lookup tables: %w", err)
@@ -562,7 +550,7 @@ func fetchLookupTables(ctx context.Context, client client.MultiClient, lookupTab
 	return lookupTableMap, nil
 }
 
-func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, tableMap map[string]map[string][]*solana.AccountMeta, client client.MultiClient) (solana.PublicKey, error) {
+func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, client client.MultiClient) (solana.PublicKey, error) {
 	lookup := Lookup{
 		PDALookups: &PDALookups{
 			Name:      ccipconsts.ContractNameFeeQuoter,
@@ -578,7 +566,7 @@ func getFeeQuoterAddress(ctx context.Context, toAddress string, args any, tableM
 			},
 		},
 	}
-	feeQuoters, err := lookup.Resolve(ctx, args, tableMap, client)
+	feeQuoters, err := lookup.Resolve(ctx, args, nil, client)
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("failed to fetch the fee quoter address: %w", err)
 	}
