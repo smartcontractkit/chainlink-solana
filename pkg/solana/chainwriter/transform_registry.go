@@ -433,7 +433,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		return nil, nil, nil, fmt.Errorf("failed to calculate offramp config address: %w", err)
 	}
 	var derivedAccounts, accountsToAskWith solana.AccountMetaSlice
-	lookupTablesAddrs := []solana.PublicKey{}
+	lookupTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 	tokenIndexes := []uint8{}
 	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 	stage := "Start"
@@ -453,7 +453,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to encode account derivation instruction data: %w", err)
 		}
 		deriveAccountsSolIx := solana.NewInstruction(offramp, deriveAccountsIx.Accounts(), deriveAccountsIxData)
-		tx, err := solana.NewTransaction([]solana.Instruction{deriveAccountsSolIx}, blockhash.Value.Blockhash, solana.TransactionPayer(transmitter))
+		tx, err := solana.NewTransaction([]solana.Instruction{deriveAccountsSolIx}, blockhash.Value.Blockhash, solana.TransactionPayer(transmitter), solana.TransactionAddressTables(lookupTableMap))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to build derive execute accounts transaction: %w", err)
 		}
@@ -485,14 +485,17 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 
 		lggr.Debugw("account derivation result", "stage", stage, "nextStage", derivation.NextStage, "save", derivation.AccountsToSave, "askAgain", derivation.AskAgainWith)
 
-		lookupTablesAddrs = append(lookupTablesAddrs, derivation.LookUpTablesToSave...)
-
-		stage = derivation.NextStage
-		if stage == "" {
-			lookupTableMap, err := fetchLookupTables(ctx, client, lookupTablesAddrs)
+		// Fetch lookup tables on the fly so they can be used to lower future derivation tx sizes
+		if len(derivation.LookUpTablesToSave) > 0 {
+			currentStageLUTs, err := fetchLookupTables(ctx, client,  derivation.LookUpTablesToSave)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to fetch lookup tables: %w", err)
 			}
+			maps.Copy(lookupTableMap, currentStageLUTs)
+		}
+
+		stage = derivation.NextStage
+		if stage == "" {
 			return derivedAccounts, lookupTableMap, tokenIndexes, nil
 		}
 	}
