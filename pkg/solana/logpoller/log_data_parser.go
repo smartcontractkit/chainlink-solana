@@ -86,9 +86,10 @@ func ParseProgramLogs(logs []string) []types.ProgramOutput {
 
 				programs = append(programs, matches[1])
 			} else if strings.Contains(log, "success") {
-				if len(programs) == 0 {
-					continue
-				}
+				// if len(programs) == 0 {
+				// 	fmt.Println(i, log)
+				// 	continue
+				// }
 				programs = programs[:len(programs)-1]
 			} else if strings.Contains(log, "failed") {
 				if output == nil {
@@ -102,9 +103,9 @@ func ParseProgramLogs(logs []string) []types.ProgramOutput {
 				// failed to verify log of previous program so reset depth and print full log
 				output.ErrorText = log[idx:]
 
-				if len(programs) == 0 {
-					continue
-				}
+				// if len(programs) == 0 {
+				// 	continue
+				// }
 				programs = programs[:len(programs)-1]
 			} else {
 				depth := len(programs)
