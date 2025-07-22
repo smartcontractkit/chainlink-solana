@@ -181,11 +181,11 @@ func (c *Chain) SetDefaults() {
 }
 
 type Node struct {
-	Name       *string
-	URL        *config.URL
-	SendOnly   bool
-	Order      *int32
-	IsRPCProxy *bool
+	Name              *string
+	URL               *config.URL
+	SendOnly          bool
+	Order             *int32
+	IsLoadBalancedRPC *bool
 }
 
 func (n *Node) ValidateConfig() (err error) {
@@ -205,9 +205,9 @@ func (n *Node) ValidateConfig() (err error) {
 		z := int32(100)
 		n.Order = &z
 	}
-	if n.IsRPCProxy == nil {
+	if n.IsLoadBalancedRPC == nil {
 		z := false
-		n.IsRPCProxy = &z
+		n.IsLoadBalancedRPC = &z
 	}
 	return err
 }

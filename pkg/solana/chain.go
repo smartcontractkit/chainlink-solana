@@ -315,7 +315,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
 					mnCfg, mnCfg, lggr, multiNodeMetrics, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily, *nodeInfo.IsRPCProxy)
+					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily, *nodeInfo.IsLoadBalancedRPC)
 				nodes = append(nodes, newNode)
 			}
 		}
