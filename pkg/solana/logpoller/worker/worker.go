@@ -39,12 +39,12 @@ type worker struct {
 
 func (w *worker) Do(ctx context.Context, job Job) {
 	defer func() {
-		// put itself back on the queue when done
 		// Recover from panics and treat them as job failures
 		if rec := recover(); rec != nil {
 			panicErr := fmt.Errorf("job panicked: %v", rec)
 			w.Lggr.Errorw("job panicked during execution", "job", job.String(), "panic", rec, "error", panicErr)
 		}
+		// put itself back on the queue when done
 		select {
 		case w.Queue <- w:
 		default:
