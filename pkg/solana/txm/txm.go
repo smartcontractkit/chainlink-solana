@@ -977,6 +977,10 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 		return 0, err
 	}
 
+	accountMetaList, err := txCopy.AccountMetaList()
+	if err != nil {
+		txm.lggr.Errorw("failed to get account meta list from tx copy", "error", err)
+	}
 	// Return error if response err is non-nil to avoid broadcasting a tx destined to fail
 	if res.Err != nil {
 		sig := solanaGo.Signature{}
@@ -986,6 +990,9 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 		// Process error to determine the corresponding state and type.
 		// Certain errors can be considered not to be failures during simulation to allow the process to continue
 		if txState, errType := txm.ProcessError(ctx, sig, res.Err, true, id); errType != NoFailure {
+			txm.lggr.Errorw("load-test simulated transaction error", "id", id, "signature", sig,
+				"error", res.Err, "txCopy.Message.AccountKeys", txCopy.Message.AccountKeys,
+				"txCopy.", accountMetaList, "unitsConsumed", res.UnitsConsumed)
 			if len(res.Logs) > 0 {
 				txm.lggr.Debugw("simulated transaction error logs", "logs", res.Logs)
 			}
