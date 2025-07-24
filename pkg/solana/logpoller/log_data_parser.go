@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,6 +24,8 @@ func prefixBuilder(depth int) string {
 func ParseProgramLogs(logs []string) []types.ProgramOutput {
 	programs := []string{}
 	instLogs := []types.ProgramOutput{}
+	p := programs[len(programs)-1]
+	fmt.Println(p)
 
 	// split ': ', use first part
 	// split ' '
