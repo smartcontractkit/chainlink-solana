@@ -43,6 +43,10 @@ func (w *worker) Do(ctx context.Context, job Job) {
 		if rec := recover(); rec != nil {
 			panicErr := fmt.Errorf("job panicked: %v", rec)
 			w.Lggr.Errorw("job panicked during execution", "job", job.String(), "panic", rec, "error", panicErr)
+
+			// Send panic as failed job to retry mechanism
+			w.FailedJobs <- failedJob{Job: job, Err: panicErr}
+			return
 		}
 		// put itself back on the queue when done
 		select {
