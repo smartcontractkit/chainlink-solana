@@ -20,8 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 

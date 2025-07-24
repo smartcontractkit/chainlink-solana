@@ -102,6 +102,7 @@ github.com/gagliardetto/gofuzz v1.2.2/go.mod h1:bkH/3hYLZrMLbfYWA0pWzXmi5TTRZnu4
 github.com/gagliardetto/hashsearch v0.0.0-20191005111333-09dd671e19f9/go.mod h1:513DXpQPzeRo7d4dsCP3xO3XI8hgvruMl9njxyQeraQ=
 github.com/gagliardetto/solana-go v1.12.0 h1:rzsbilDPj6p+/DOPXBMLhwMZeBgeRuXjm5zQFCoXgsg=
 github.com/gagliardetto/solana-go v1.12.0/go.mod h1:l/qqqIN6qJJPtxW/G1PF4JtcE3Zg2vD2EliZrr9Gn5k=
+github.com/gagliardetto/solana-go v1.13.0/go.mod h1:l/qqqIN6qJJPtxW/G1PF4JtcE3Zg2vD2EliZrr9Gn5k=
 github.com/gagliardetto/treeout v0.1.4 h1:ozeYerrLCmCubo1TcIjFiOWTTGteOOHND1twdFpgwaw=
 github.com/gagliardetto/treeout v0.1.4/go.mod h1:loUefvXTrlRG5rYmJmExNryyBRh8f89VZhmMOyCyqok=
 github.com/gagliardetto/utilz v0.1.1 h1:/etW4hl607emKg6R6Lj9jRJ9d6ue2AQOyjhuAwjzs1U=
@@ -408,6 +409,8 @@ github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097 h1
 github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097/go.mod h1:Yw7X+vtR7A9MBI+q5b0k/H2PlKy6cQOa7vAp4cshz2s=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed h1:rjtXQLTCLa/+AmMwMTP5WwJUdPBeBAF3Ivwc1GXetBw=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed/go.mod h1:k3/Z6AvwurPUlfuDFEonRbkkiTSgNSrtVNhJEWNlUZA=
+github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250724111126-4c1d3004ba63 h1:m/9yNsUyWGYW4ExIbR71+NXoIoZzV708yWfN52Yxir4=
+github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250724111126-4c1d3004ba63/go.mod h1:Ve1xD71bl193YIZQEoJMmBqLGQJdNs29bwbuObwvbhQ=
 github.com/smartcontractkit/chainlink-common v0.7.1-0.20250708173959-fbb435dd18c8 h1:z8Ecvu4rJHn7e1Zl4oXEciZWr/ZgUwMyGHzLnJex3Qw=
 github.com/smartcontractkit/chainlink-common v0.7.1-0.20250708173959-fbb435dd18c8/go.mod h1:SrzacsyKxhRg/U0fNJc1aMwiZJLq064dZ4Pk5dWCNrg=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7 h1:9wh1G+WbXwPVqf0cfSRSgwIcaXTQgvYezylEAfwmrbw=

@@ -12,7 +12,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
