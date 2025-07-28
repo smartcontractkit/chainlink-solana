@@ -437,7 +437,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 	tokenIndexes := []uint8{}
 	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
 	stage := "Start"
-	matcher, err := regexp.Compile(`^TokenTransferStaticAccounts/\d+/0$`)
+	ttAccountsMatcher, err := regexp.Compile(`^TokenTransferStaticAccounts/\d+/0$`)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to compile token transfer stage matcher: %w", err)
 	}
@@ -472,9 +472,15 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 			return nil, nil, nil, fmt.Errorf("failed to exract accounts from simulated transaction log: %w", err)
 		}
 
+		// If the next stage is TokenTransferStaticAccounts, ensure messaging accounts are not included in the params to avoid tx too large errors during derivation
+		// Messaging accounts are not needed if token transfer derivation is beginning
+		if ttAccountsMatcher.MatchString(derivation.NextStage) {
+			params.MessageAccounts = nil
+		}
+
 		// TokenTransferStaticAccounts stages derive the accounts needed for each token transfer
 		// Track the index at which the first set of accounts for a token transfer are appended relative to the remaining accounts
-		if matcher.MatchString(derivation.CurrentStage) {
+		if ttAccountsMatcher.MatchString(derivation.CurrentStage) {
 			tokenIndexes = append(tokenIndexes, uint8(len(derivedAccounts)-mandatoryAccountsLen)) //nolint:gosec // Limit on the number of token transfers prevents token index from exceeding uint8 max
 		}
 
