@@ -17,6 +17,12 @@ import (
 	"github.com/smartcontractkit/freeport"
 )
 
+const (
+	fundingTimeout    = 30 * time.Second
+	fundingTimestep   = 500 * time.Millisecond
+	fundingMaxRetries = 5
+)
+
 func SetupLocalSolNode(t *testing.T) string {
 	t.Helper()
 
@@ -29,12 +35,13 @@ func SetupLocalSolNode(t *testing.T) string {
 func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) {
 	t.Helper()
 
-	port := freeport.GetN(t, 2)
-	portStr := strconv.Itoa(port[0])
+	ports, err := TwoConsecutiveFreeports(t)
+	require.NoError(t, err)
+	portStr := strconv.Itoa(ports[0])
 
 	faucetPort := freeport.GetOne(t)
 	url := "http://127.0.0.1:" + portStr
-	wsURL := "ws://127.0.0.1:" + strconv.Itoa(port[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
+	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	args := append([]string{
 		"--reset",
@@ -118,6 +125,24 @@ func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string
 
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	err := FundTestAccountsWithRetry(t, keys, url, 5)
+	err := FundTestAccountsWithRetry(t, keys, url, fundingMaxRetries)
 	require.NoError(t, err)
+}
+
+func TwoConsecutiveFreeports(t *testing.T) ([]int, error) {
+	t.Helper()
+	// track unused ports until consecutive ones are found or max retries is reached
+	// ports are not immediately returned to avoid re-fetching the same ones again
+	var unusedPorts []int
+	// try a maximum of 5 times
+	for range 5 {
+		ports := freeport.GetN(t, 2)
+		if ports[0]+1 == ports[1] {
+			freeport.Return(unusedPorts)
+			return ports, nil
+		}
+		unusedPorts = append(unusedPorts, ports...)
+	}
+	freeport.Return(unusedPorts)
+	return nil, errors.New("failed to fetch 2 consecutive ports")
 }

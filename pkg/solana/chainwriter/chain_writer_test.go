@@ -3,8 +3,6 @@ package chainwriter_test
 import (
 	"bytes"
 	"context"
-	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -27,6 +25,7 @@ import (
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-solana/contracts/generated/buffer_payload"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -42,9 +41,15 @@ type Arguments struct {
 	Seed2       []byte
 }
 
+type BufferArgs struct {
+	Report []byte
+	Fail   bool
+}
+
 var ccipOfframpIDL = ccipsolana.FetchCCIPOfframpIDL()
 var ccipCommonIDL = ccipsolana.FetchCommonIDL()
 var testContractIDL = chainwriter.FetchTestContractIDL()
+var testBufferContractIDL = chainwriter.FetchTestBufferContractIDL()
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := t.Context()
@@ -610,6 +615,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 	// create lookup table addresses
 	seed2 := []byte("seed2")
 	programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
+	bufferProgramID := solana.MustPublicKeyFromBase58("85bivLENWAX36kyWC9zemZu9H3D88J79wXdHgR6ZmZHX")
 	derivedTablePda := mustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
 	// mock data account response from program
 	derivedLookupTablePubkey := mockDataAccountLookupTable(t, rw, derivedTablePda)
@@ -699,6 +705,33 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 				},
 				IDL: testContractIDL,
 			},
+			"buffer_payload": {
+				Methods: map[string]chainwriter.MethodConfig{
+					"execute": {
+						FromAddress:         admin.String(),
+						ChainSpecificName:   "execute",
+						BufferPayloadMethod: "CCIPExecutionReportBuffer",
+						InputModifications: codec.ModifiersConfig{
+							&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
+						},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "feepayer",
+								Address:    admin.String(),
+								IsSigner:   false,
+								IsWritable: false,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "system",
+								Address:    solana.SystemProgramID.String(),
+								IsSigner:   false,
+								IsWritable: false,
+							}},
+						},
+					},
+				},
+				IDL: testBufferContractIDL,
+			},
 		},
 	}
 
@@ -777,6 +810,170 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
+	})
+
+	t.Run("invalid buffer methods", func(t *testing.T) {
+		recentBlockHash := solana.Hash{}
+
+		customConfig := chainwriter.ChainWriterConfig{
+			Programs: map[string]chainwriter.ProgramConfig{
+				"buffer_payload": {
+					Methods: map[string]chainwriter.MethodConfig{
+						"execute": {
+							FromAddress:       admin.String(),
+							ChainSpecificName: "execute",
+							InputModifications: codec.ModifiersConfig{
+								&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
+							},
+							Accounts: []chainwriter.Lookup{},
+						},
+					},
+					IDL: testBufferContractIDL,
+				},
+			},
+		}
+
+		args := BufferArgs{
+			Report: make([]byte, 2000),
+			Fail:   false,
+		}
+
+		t.Run("fails to submit transaction if size too large without buffer method set", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+			txID := uuid.NewString()
+
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, programID.String(), nil, nil)
+			require.Error(t, submitErr)
+		})
+
+		t.Run("fails to submit transaction if unknown buffer payload method configured", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+			txID := uuid.NewString()
+
+			methodConfig := customConfig.Programs["buffer_payload"].Methods["execute"]
+			methodConfig.BufferPayloadMethod = "BadBufferPayloadMethod"
+			customConfig.Programs["buffer_payload"].Methods["execute"] = methodConfig
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, programID.String(), nil, nil)
+			require.Error(t, submitErr)
+		})
+	})
+
+	t.Run("buffer enabled method", func(t *testing.T) {
+		recentBlockHash := solana.Hash{}
+		// mock txm
+		bufferTXM := txmMocks.NewTxManager(t)
+		// initialize chain writer
+		bufferCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, bufferTXM, ge, cwConfig)
+		require.NoError(t, err)
+		buffer_payload.ProgramID = bufferProgramID
+
+		t.Run("submits as single transaction if tx small enough", func(t *testing.T) {
+			args := BufferArgs{
+				Report: make([]byte, 963),
+				Fail:   false,
+			}
+
+			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+
+			tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(admin))
+			require.NoError(t, err)
+			txSize, err := chainwriter.CalculateTxSize(tx)
+			require.NoError(t, err)
+			require.Equal(t, chainwriter.MaxSolanaTxSize, txSize)
+
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
+			txID := uuid.NewString()
+
+			bufferTXM.On("Enqueue", mock.Anything, admin.String(), mock.Anything, &txID, mock.Anything).Return(nil).Once()
+
+			submitErr := bufferCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, bufferProgramID.String(), nil, nil)
+			require.NoError(t, submitErr)
+		})
+
+		t.Run("submits buffer transactions, main transaction, and conditional close buffer transaction if tx too large", func(t *testing.T) {
+			args := BufferArgs{
+				Report: make([]byte, 964),
+				Fail:   false,
+			}
+
+			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
+			require.NoError(t, err)
+
+			tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(admin))
+			require.NoError(t, err)
+			txSize, err := chainwriter.CalculateTxSize(tx)
+			require.NoError(t, err)
+			require.Equal(t, chainwriter.MaxSolanaTxSize+1, txSize)
+
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Twice()
+			txID := uuid.NewString()
+
+			// Buffer tx with estimate limit opt
+			bufferTXM.On("Enqueue", mock.Anything, admin.String(), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
+			// Buffer tx with dependency IDs opt
+			bufferTXM.On("Enqueue", mock.Anything, admin.String(), mock.Anything, &txID, mock.Anything, mock.Anything).Return(nil).Once()
+			// Close buffer with estimate limit, dependency ID, and ignore dependency error opts
+			bufferTXM.On("Enqueue", mock.Anything, admin.String(), mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+			submitErr := bufferCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, bufferProgramID.String(), nil, nil)
+			require.NoError(t, submitErr)
+		})
+
+		t.Run("fails if transaction is still too large after buffering", func(t *testing.T) {
+			rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Twice()
+			txID := uuid.NewString()
+
+			customConfig := chainwriter.ChainWriterConfig{
+				Programs: map[string]chainwriter.ProgramConfig{
+					"buffer_payload": {
+						Methods: map[string]chainwriter.MethodConfig{
+							"execute": {
+								FromAddress:         admin.String(),
+								ChainSpecificName:   "execute",
+								BufferPayloadMethod: "CCIPExecutionReportBuffer",
+								InputModifications: codec.ModifiersConfig{
+									&codec.HardCodeModifierConfig{OnChainValues: map[string]any{"Fail": false}},
+								},
+								Accounts: []chainwriter.Lookup{},
+							},
+						},
+						IDL: testBufferContractIDL,
+					},
+				},
+			}
+
+			methodConfig := customConfig.Programs["buffer_payload"].Methods["execute"]
+			for i := range 40 {
+				methodConfig.Accounts = append(methodConfig.Accounts, chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
+					Name:       fmt.Sprintf("randomAccount%d", i),
+					Address:    GetRandomPubKey(t).String(),
+					IsSigner:   false,
+					IsWritable: false,
+				}})
+			}
+			customConfig.Programs["buffer_payload"].Methods["execute"] = methodConfig
+
+			args := BufferArgs{
+				Report: make([]byte, 2000),
+				Fail:   false,
+			}
+
+			// initialize chain writer
+			customCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, customConfig)
+			require.NoError(t, err)
+
+			submitErr := customCW.SubmitTransaction(ctx, "buffer_payload", "execute", args, txID, bufferProgramID.String(), nil, nil)
+			require.Error(t, submitErr)
+		})
 	})
 }
 
@@ -967,13 +1164,9 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 			},
 		}
 
-		// Marshal the abstract report to json just for testing purposes.
-		encodedReport, err := json.Marshal(abstractReport)
-		require.NoError(t, err)
-
 		args := ccipsolana.SVMExecCallArgs{
 			ReportContext: [2][32]byte{{0x01}, {0x02}},
-			Report:        encodedReport,
+			Report:        make([]byte, 200), // Set report to arbitrary bytes for test. Ensure it doesn't cause tx to exceed the max solana tx size.
 			Info: ccipocr3.ExecuteReportInfo{
 				MerkleRoots:     []ccipocr3.MerkleRootChain{},
 				AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{abstractReport},

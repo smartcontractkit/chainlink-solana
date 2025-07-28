@@ -5,6 +5,9 @@ export GO111MODULE ?= on
 export PROJECT_SERUM_VERSION ?=v0.29.0
 export PROJECT_SERUM_IMAGE ?= backpackapp/build:$(PROJECT_SERUM_VERSION)
 
+export ANCHOR_VERSION ?=v0.29.0
+TARGET_DIR ?= $(PWD)/contracts/target
+
 LINUX=LINUX
 OSX=OSX
 WINDOWS=WIN32
@@ -68,13 +71,21 @@ build_js:
 	cd gauntlet && yarn install --frozen-lockfile && yarn bundle
 
 build_contracts:
-	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
+	docker run --rm -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
 
 build_contracts_local:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-local.sh
 
 build_contracts_staging:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-staging.sh
+
+docker_update_contracts:
+	docker run --rm \
+		-v $(shell pwd)/contracts:/workdir \
+		-v $(TARGET_DIR):/workdir/target \
+		-e CARGO_TARGET_DIR=/workdir/target \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		${PROJECT_SERUM_IMAGE} anchor keys sync
 
 cp_gauntlet_idl:
 	cp ./contracts/target/idl/*.json ./gauntlet/packages/gauntlet-solana-contracts/artifacts/schemas

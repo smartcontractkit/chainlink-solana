@@ -103,13 +103,9 @@ func empty(t *testing.T, txm *Txm, prom soltxmProm) bool {
 
 // waits for the provided function to evaluate to true within the provided duration amount of time
 func waitFor(t *testing.T, waitDuration time.Duration, txm *Txm, prom soltxmProm, f func(*testing.T, *Txm, soltxmProm) bool) {
-	for i := 0; i < int(waitDuration.Seconds()*1.5); i++ {
-		if f(t, txm, prom) {
-			return
-		}
-		time.Sleep(time.Second)
-	}
-	assert.NoError(t, errors.New("unable to confirm inflight txs is empty"))
+	require.Eventually(t, func() bool {
+		return f(t, txm, prom)
+	}, 2*waitDuration, time.Second, "unable to confirm inflight txs is empty")
 }
 
 func TestTxm(t *testing.T) {
@@ -1217,7 +1213,7 @@ func TestTxm_Enqueue(t *testing.T) {
 }
 
 func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
-	txCopy := deepCopyTx(tx)
+	txCopy := utils.DeepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)
@@ -1897,6 +1893,7 @@ func TestTxm_DependencyTx(t *testing.T) {
 
 	mc := mocks.NewReaderWriter(t)
 	mc.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil).Maybe()
+	mc.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{}}, nil).Maybe()
 
 	mkey := keyMocks.NewSimpleKeystore(t)
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{1}, nil)
@@ -1936,7 +1933,7 @@ func TestTxm_DependencyTx(t *testing.T) {
 
 		mainTxID := uuid.NewString()
 		lastValidBlockHeight := uint64(100)
-		err = txm.Enqueue(ctx, "test-dep-success", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		err = txm.Enqueue(ctx, "test-dep-success", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depID, DesiredStatus: types.Finalized}})}...)
 		require.NoError(t, err)
 
 		status, err := txm.GetTransactionStatus(ctx, mainTxID)
@@ -1954,12 +1951,11 @@ func TestTxm_DependencyTx(t *testing.T) {
 		mainTx, _ := getTx(t, 200, mkey)
 		mainTxID := uuid.NewString()
 		lastValidBlockHeight := uint64(100)
-		err := txm.Enqueue(ctx, "test-dep-failure", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.SetDependencyTxID(depID)}...)
+		err := txm.Enqueue(ctx, "test-dep-failure", mainTx, &mainTxID, lastValidBlockHeight, []txmutils.SetTxConfig{txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: depID, DesiredStatus: types.Finalized}})}...)
 		require.NoError(t, err)
 
-		status, err := txm.waitForTxStatus(ctx, mainTxID, types.Finalized)
+		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: mainTxID, DesiredStatus: types.Finalized}}}
+		err = txm.waitForDependencyTxs(ctx, mainTxMeta)
 		require.Error(t, err)
-
-		require.Equal(t, types.Failed, status)
 	})
 }

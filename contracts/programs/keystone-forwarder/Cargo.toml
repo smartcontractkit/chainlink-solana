@@ -1,0 +1,23 @@
+[package]
+name = "keystone-forwarder"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "keystone_forwarder"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+solana-program = { version = "1.17.25" }
+static_assertions = "1.1.0"
+bytemuck = { version = "1.0", features = ["derive"] }
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }

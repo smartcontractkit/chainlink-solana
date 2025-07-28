@@ -131,6 +131,30 @@ func TestWorkerGroup_CriticalErrorOnFailingJob(t *testing.T) {
 	tests.AssertLogEventually(t, observed, "job testJob failed 3 times in a row, next retry in 800ms. Resolution most likely requires manual intervention. Errors: RPC error 1\nRPC error 2\nRPC error 3")
 }
 
+func TestWorkerGroup_PanicRecovery(t *testing.T) {
+	ctx := t.Context()
+	lggr, observed := logger.TestObservedSugared(t, zapcore.DPanicLevel)
+	group := NewGroup(1, lggr)
+	group.maxRetryCount = 2
+	require.NoError(t, group.Start(ctx))
+	t.Cleanup(func() {
+		require.NoError(t, group.Close())
+	})
+
+	var counter atomic.Int64
+	panicJob := testJob{
+		job: func(ctx context.Context) error {
+			attempt := counter.Add(1)
+			panic(fmt.Sprintf("RPC error %d", attempt))
+		},
+	}
+
+	err := group.Do(t.Context(), panicJob)
+	require.NoError(t, err)
+
+	tests.AssertLogEventually(t, observed, "job testJob failed 3 times in a row, next retry in 800ms. Resolution most likely requires manual intervention. Errors: job panicked: RPC error 1\njob panicked: RPC error 2\njob panicked: RPC error 3\njob panicked: RPC error 4")
+}
+
 func TestWorkerGroup_Close(t *testing.T) {
 	ctx := t.Context()
 	group := NewGroup(5, logger.Sugared(logger.Nop()))

@@ -104,7 +104,7 @@ func (bhe *blockHistoryEstimator) BaseComputeUnitPrice() uint64 {
 		return bhe.cfg.ComputeUnitPriceMin()
 	}
 
-	bhe.lgr.Warnw("BlockHistoryEstimator: estimation above maximum consider increasing ComputeUnitPriceMax", "min", bhe.cfg.ComputeUnitPriceMax(), "calculated", price)
+	bhe.lgr.Warnw("BlockHistoryEstimator: estimation above maximum consider increasing ComputeUnitPriceMax", "max", bhe.cfg.ComputeUnitPriceMax(), "calculated", price)
 	return bhe.cfg.ComputeUnitPriceMax()
 }
 
