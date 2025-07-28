@@ -494,7 +494,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 
 		// Fetch lookup tables on the fly so they can be used to lower future derivation tx sizes
 		if len(derivation.LookUpTablesToSave) > 0 {
-			currentStageLUTs, err := fetchLookupTables(ctx, client,  derivation.LookUpTablesToSave)
+			currentStageLUTs, err := fetchLookupTables(ctx, client, derivation.LookUpTablesToSave)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to fetch lookup tables: %w", err)
 			}
