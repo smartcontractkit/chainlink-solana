@@ -51,7 +51,7 @@ type commonTokenTransferAccounts struct {
 }
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
-// It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
+// It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, unchanged static lookup tables map, and cu tx configs.
 func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, derivedLUTs map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
@@ -111,8 +111,8 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 	return argsTransformed, accounts, staticLUTs, options, nil
 }
 
-// CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
-// It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, and cu tx configs.
+// CCIPExecuteArgsTransformV2 calculates required compute units and uses on-chain account derivation to determine the accounts required for the execute transaction
+// It tracks the token indexes for each token transfer and returns the transformed arguments, extended accounts slice, extended static lookup tables map, and cu tx configs.
 func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
@@ -169,14 +169,13 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 	// Extract token transfers
 	var tokenTransfers []ccip_offramp.TokenTransferAndOffchainData
 	var tokenReceiver solana.PublicKey
+	var messageTokenData [][]byte
 	if len(message.TokenAmounts) > 0 {
 		tokenTransfers = make([]ccip_offramp.TokenTransferAndOffchainData, 0, len(message.TokenAmounts))
 		if len(argsTransformed.ExtraData.DestExecDataDecoded) != len(message.TokenAmounts) {
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
 		}
 		// If message contains token transfers, extract offchain token data for the message if any exists
-		lggr.Debugw("report OffchainTokenData", "data", report.OffchainTokenData)
-		var messageTokenData [][]byte
 		if len(report.OffchainTokenData) > 0 {
 			messageTokenData = report.OffchainTokenData[0]
 		}
@@ -192,11 +191,6 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 			if tokenAmount.Amount.Int.Sign() < 0 {
 				return nil, nil, nil, nil, fmt.Errorf("negative amount for token: %s", destTokenAddress.String())
 			}
-			// Extract the token data for the particular token transfer if it exists
-			var tokenTransferTokenData []byte
-			if len(messageTokenData) > i {
-				tokenTransferTokenData = messageTokenData[i]
-			}
 			tokenTransfers = append(tokenTransfers, ccip_offramp.TokenTransferAndOffchainData{
 				Transfer: ccip_offramp.Any2SVMTokenTransfer{
 					SourcePoolAddress: tokenAmount.SourcePoolAddress,
@@ -205,7 +199,7 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 					ExtraData:         tokenAmount.ExtraData,
 					DestGasAmount:     destGasAmount,
 				},
-				Data: tokenTransferTokenData,
+				Data: nil, // Set to nil to optimize tx size during user messaging account derivation. Field set after user message account derivation is complete.
 			})
 		}
 		tokenReceiverLookup := AccountLookup{Name: "TokenReceiver", Location: "ExtraData.ExtraArgsDecoded.tokenReceiver"}
@@ -230,7 +224,7 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 	}
 
 	lggr.Debugw("Deriving accounts", "params", params, "debugID", debugID)
-	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, transmitter, toAddress, lggr)
+	derivedAccounts, derivedLookupTables, tokenIndexes, err := deriveExecuteAccounts(ctx, client, params, messageTokenData, transmitter, toAddress, lggr)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to derive execute accounts: %w", err)
 	}
@@ -419,7 +413,7 @@ func appendTokenTransferAccounts(tokenAccountsRequired bool, accounts solana.Acc
 	return accounts, tokenIndexes, nil
 }
 
-func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp.DeriveAccountsExecuteParams, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
+func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp.DeriveAccountsExecuteParams, messageTokenData [][]byte, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
 	blockhash, err := client.LatestBlockhash(ctx)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error fetching latest blockhash: %w", err)
@@ -459,23 +453,30 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		}
 
 		tx.Signatures = append(tx.Signatures, solana.Signature{}) // Append empty signature since tx fails without any sigs even if SigVerify is false
-		lggr.Debugw("account derivation simulate tx", "currentStage", stage, "tx", tx)
 		res, err := client.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true})
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction at stage %s: %w", stage, err)
 		}
 		if res.Err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction. Err: %v, Logs: %v", res.Err, res.Logs)
+			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction at stage %s. Err: %v, Logs: %v", stage, res.Err, res.Logs)
 		}
 		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to exract accounts from simulated transaction log: %w", err)
 		}
 
-		// If the next stage is TokenTransferStaticAccounts, ensure messaging accounts are not included in the params to avoid tx too large errors during derivation
-		// Messaging accounts are not needed if token transfer derivation is beginning
 		if ttAccountsMatcher.MatchString(derivation.NextStage) {
+			// Remove messaging accounts from the params to optimize token transfer account derivation tx sizes
 			params.MessageAccounts = nil
+			// Set the relevant offchain token data for each token transfer
+			// This data is intentionally omitted from earlier stages to optimize user messaging account derivation tx sizes
+			for i := range params.TokenTransfers {
+				var tokenTransferTokenData []byte
+				if len(messageTokenData) > i {
+					tokenTransferTokenData = messageTokenData[i]
+				}
+				params.TokenTransfers[i].Data = tokenTransferTokenData
+			}
 		}
 
 		// TokenTransferStaticAccounts stages derive the accounts needed for each token transfer
