@@ -195,7 +195,7 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sql
 			if numRows != int64(len(logs)) {
 				// This probably just means we're trying to insert the same log twice, but could also be an indication
 				// of other constraint violations
-				o.lggr.Debugf("attempted to insert %d logs, but could only insert %d", end-start, numRows)
+				o.lggr.Debugf("attempted to insert %d logs, but could only insert %d", len(logs), numRows)
 			}
 		}
 	}
