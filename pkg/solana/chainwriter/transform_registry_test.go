@@ -77,26 +77,26 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	sourceChainSelBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(sourceChainSelBytes, uint64(sourceChainSelector))
 
-	offrampPoolsSigner1, _, err := state.FindExternalTokenPoolsSignerPDA(poolProgram1, offrampAddress)
-	require.NoError(t, err)
-	userTokenAccount1, _, err := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram1.Bytes(), destTokenAddr1.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
-	require.NoError(t, err)
-	perChainTokenConfig1, _, err := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr1.Bytes()}, feeQuoterAddr)
-	require.NoError(t, err)
-	poolChainConfig1, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr1.Bytes()}, poolProgram1)
-	require.NoError(t, err)
+	offrampPoolsSigner1, _, pdaErr := state.FindExternalTokenPoolsSignerPDA(poolProgram1, offrampAddress)
+	require.NoError(t, pdaErr)
+	userTokenAccount1, _, pdaErr := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram1.Bytes(), destTokenAddr1.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
+	require.NoError(t, pdaErr)
+	perChainTokenConfig1, _, pdaErr := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr1.Bytes()}, feeQuoterAddr)
+	require.NoError(t, pdaErr)
+	poolChainConfig1, _, pdaErr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr1.Bytes()}, poolProgram1)
+	require.NoError(t, pdaErr)
 
-	offrampPoolsSigner2, _, err := state.FindExternalTokenPoolsSignerPDA(poolProgram2, offrampAddress)
-	require.NoError(t, err)
-	userTokenAccount2, _, err := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram2.Bytes(), destTokenAddr2.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
-	require.NoError(t, err)
-	perChainTokenConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr2.Bytes()}, feeQuoterAddr)
-	require.NoError(t, err)
-	poolChainConfig2, _, err := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram2)
-	require.NoError(t, err)
+	offrampPoolsSigner2, _, pdaErr := state.FindExternalTokenPoolsSignerPDA(poolProgram2, offrampAddress)
+	require.NoError(t, pdaErr)
+	userTokenAccount2, _, pdaErr := solana.FindProgramAddress([][]byte{tokenReceiver.Bytes(), tokenProgram2.Bytes(), destTokenAddr2.Bytes()}, solana.SPLAssociatedTokenAccountProgramID)
+	require.NoError(t, pdaErr)
+	perChainTokenConfig2, _, pdaErr := solana.FindProgramAddress([][]byte{[]byte("per_chain_per_token_config"), sourceChainSelBytes, destTokenAddr2.Bytes()}, feeQuoterAddr)
+	require.NoError(t, pdaErr)
+	poolChainConfig2, _, pdaErr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_chainconfig"), sourceChainSelBytes, destTokenAddr2.Bytes()}, poolProgram2)
+	require.NoError(t, pdaErr)
 
-	externalExecutionSigner, _, err := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, offrampAddress)
-	require.NoError(t, err)
+	externalExecutionSigner, _, pdaErr := solana.FindProgramAddress([][]byte{[]byte("external_execution_config"), logicReceiver.Bytes()}, offrampAddress)
+	require.NoError(t, pdaErr)
 	userMessagingAccounts := CreateTestPubKeys(t, 3) // arbitrary number of user accounts
 
 	staticCUOverhead := uint32(150_000)
@@ -501,8 +501,8 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 		mockFetchLookupTableAddresses(t, rw, lookupTablePubkey1, poolKeys1)
 		mockFetchLookupTableAddresses(t, rw, lookupTablePubkey2, poolKeys2)
 
-		externalExecutionConfig, _, err := state.FindExternalExecutionConfigPDA(logicReceiver, offrampAddress)
-		require.NoError(t, err)
+		externalExecutionConfig, _, pdaErr := state.FindExternalExecutionConfigPDA(logicReceiver, offrampAddress)
+		require.NoError(t, pdaErr)
 
 		var merkleRoot ccipocr3.Bytes32
 
@@ -851,6 +851,41 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			multiMerkleRoots.Info.MerkleRoots = []ccipocr3.MerkleRootChain{merkleRoot, merkleRoot}
 			_, _, _, _, err = chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, multiMerkleRoots, nil, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
 			require.Contains(t, err.Error(), "encountered unexpected number of merkle roots")
+		})
+
+		t.Run("ArgsTransform fails if accounts exist at start", func(t *testing.T) {
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, nil, solana.AccountMetaSlice{&solana.AccountMeta{PublicKey: solana.PublicKey{}}}, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.ErrorContains(t, err, "expect accounts to be empty at start of CCIPExecuteArgsTransformV2")
+		})
+
+		t.Run("ArgsTransform fails if unexpected number of OffchainTokenData encountered", func(t *testing.T) {
+			missingTokenDataArgs := ccipsolana.SVMExecCallArgs{
+				Info: ccipocr3.ExecuteReportInfo{
+					AbstractReports: []ccipocr3.ExecutePluginReportSingleChain{{
+						Messages: []ccipocr3.Message{{
+							Header: ccipocr3.RampMessageHeader{SourceChainSelector: sourceChainSelector},
+							TokenAmounts: []ccipocr3.RampTokenAmount{
+								{
+									DestTokenAddress:  destTokenAddr1.Bytes(),
+									Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+									SourcePoolAddress: sourcePoolAddr1.Bytes(),
+								},
+							}},
+						},
+					}},
+					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
+				},
+				ExtraData: ccipsolana.ExtraDataDecoded{
+					ExtraArgsDecoded: map[string]any{
+						"tokenReceiver": tokenReceiver,
+					},
+					DestExecDataDecoded: []map[string]any{
+						{"destGasAmount": destGasAmount},
+					},
+				},
+			}
+			_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, missingTokenDataArgs, nil, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
+			require.ErrorContains(t, err, "unexpected number of OffchainTokenData encountered. expect the same number as messages")
 		})
 	})
 }

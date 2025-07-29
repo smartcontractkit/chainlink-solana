@@ -116,6 +116,10 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 // CCIPExecuteArgsTransformV2 calculates required compute units and uses on-chain account derivation to determine the accounts required for the execute transaction
 // It tracks the token indexes for each token transfer and returns the transformed arguments, extended accounts slice, extended static lookup tables map, and cu tx configs.
 func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+	if len(accounts) != 0 {
+		return nil, nil, nil, nil, fmt.Errorf("expect accounts to be empty at start of CCIPExecuteArgsTransformV2, got %d", len(accounts))
+	}
+
 	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
@@ -178,9 +182,10 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
 		}
 		// If message contains token transfers, extract offchain token data for the message if any exists
-		if len(report.OffchainTokenData) > 0 {
-			messageTokenData = report.OffchainTokenData[0]
+		if len(report.OffchainTokenData) != len(report.Messages) {
+			return nil, nil, nil, nil, fmt.Errorf("unexpected number of OffchainTokenData encountered. expect the same number as messages %d, got %d", len(report.Messages), len(report.OffchainTokenData))
 		}
+		messageTokenData = report.OffchainTokenData[0]
 		for i, tokenAmount := range message.TokenAmounts {
 			destTokenAddress := solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress)
 			destGasAmount, ok := argsTransformed.ExtraData.DestExecDataDecoded[i]["destGasAmount"].(uint32)
