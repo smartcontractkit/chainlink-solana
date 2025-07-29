@@ -176,11 +176,6 @@ type Acc struct {
 	IsWritable bool
 }
 
-type CacheDetails struct {
-	State   string
-	FeedIds []string
-}
-
 type Inputs struct {
 	SignedReport ocr3types.SignedReport
 }
