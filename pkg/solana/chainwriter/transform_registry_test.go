@@ -525,6 +525,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 							},
 						}},
 					},
+					OffchainTokenData: [][][]byte{{}},
 				}},
 				MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 			},
@@ -619,6 +620,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 								},
 							}},
 						},
+						OffchainTokenData: [][][]byte{{}},
 					}},
 					MerkleRoots: []ccipocr3.MerkleRootChain{{MerkleRoot: merkleRoot}},
 				},
@@ -878,6 +880,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				ExtraData: ccipsolana.ExtraDataDecoded{
 					ExtraArgsDecoded: map[string]any{
 						"tokenReceiver": tokenReceiver,
+						"computeUnits": uint32(0),
 					},
 					DestExecDataDecoded: []map[string]any{
 						{"destGasAmount": destGasAmount},

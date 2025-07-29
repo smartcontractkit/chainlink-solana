@@ -181,8 +181,9 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 		if len(argsTransformed.ExtraData.DestExecDataDecoded) != len(message.TokenAmounts) {
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
 		}
-		// If message contains token transfers, extract offchain token data for the message if any exists
-		if len(report.OffchainTokenData) != len(report.Messages) {
+		// If message contains token transfers, extract offchain token data for the message
+		// Note: OffchainTokenData length equals the Messages length. If multiple messages are supported in the future, this restriction needs to be lifted as well.
+		if len(report.OffchainTokenData) != 1 {
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of OffchainTokenData encountered. expect the same number as messages %d, got %d", len(report.Messages), len(report.OffchainTokenData))
 		}
 		messageTokenData = report.OffchainTokenData[0]
