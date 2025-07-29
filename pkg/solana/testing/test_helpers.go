@@ -43,6 +43,18 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	url := "http://127.0.0.1:" + portStr
 	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
+	args1 := []string{"--version"}
+	cmd1 := exec.Command("solana-test-validator", args1...)
+	var stdErr1 bytes.Buffer
+	cmd1.Stderr = &stdErr1
+	var stdOut1 bytes.Buffer
+	cmd1.Stdout = &stdOut1
+	require.NoError(t, cmd1.Start())
+	t.Cleanup(func() {
+		assert.NoError(t, cmd1.Process.Kill())
+		t.Logf("solana-test-validator version\n stdout: %s\n stderr: %s", stdOut1.String(), stdErr1.String())
+	})
+
 	args := append([]string{
 		"--reset",
 		"--rpc-port", portStr,
