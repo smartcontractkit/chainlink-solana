@@ -28,7 +28,9 @@ import (
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
-func FindTransform(id string) (func(context.Context, client.MultiClient, logger.Logger, any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, map[string]map[string][]*solana.AccountMeta, solana.PublicKey, string, uint32, []txmutils.SetTxConfig, string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error), error) {
+type ArgsTransformHandler func(context.Context, client.MultiClient, logger.Logger, any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, map[string]map[string][]*solana.AccountMeta, solana.PublicKey, string, uint32, []txmutils.SetTxConfig, string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error)
+
+func FindTransform(id string) (ArgsTransformHandler, error) {
 	switch id {
 	case "CCIPExecute":
 		return CCIPExecuteArgsTransform, nil
