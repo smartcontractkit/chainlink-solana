@@ -1145,6 +1145,7 @@ func TestChainWriter_CCIPOfframp(t *testing.T) {
 					},
 				},
 			},
+			OffchainTokenData: [][][]byte{{}},
 		}
 
 		args := ccipsolana.SVMExecCallArgs{
