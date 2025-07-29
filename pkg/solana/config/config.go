@@ -205,6 +205,10 @@ func (n *Node) ValidateConfig() (err error) {
 		z := int32(100)
 		n.Order = &z
 	}
+	if n.IsLoadBalancedRPC == nil {
+		z := false
+		n.IsLoadBalancedRPC = &z
+	}
 	return err
 }
 
