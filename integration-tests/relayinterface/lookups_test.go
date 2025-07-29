@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
@@ -368,10 +368,10 @@ func TestPDALookups(t *testing.T) {
 		seed2 := uint64(4)
 		bufSeed2 := make([]byte, 8)
 		binary.LittleEndian.PutUint64(bufSeed2, seed2)
-		seed3 := ccipocr3.ChainSelector(4)
+		seed3 := ccipocr3common.ChainSelector(4)
 		bufSeed3 := make([]byte, 8)
 		binary.LittleEndian.PutUint64(bufSeed3, uint64(seed3))
-		seed4 := ccipocr3.Bytes32(GetRandomPubKey(t).Bytes())
+		seed4 := ccipocr3common.Bytes32(GetRandomPubKey(t).Bytes())
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed1, bufSeed2, bufSeed3, seed4[:]}, programID)
 		require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestPDALookups(t *testing.T) {
 		seed1 := GetRandomPubKey(t)
 		seed2 := GetRandomPubKey(t)
 		addr3 := GetRandomPubKey(t)
-		seed3 := ccipocr3.UnknownEncodedAddress(addr3.String())
+		seed3 := ccipocr3common.UnknownEncodedAddress(addr3.String())
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed1.Bytes(), seed2.Bytes(), addr3.Bytes()}, programID)
 		require.NoError(t, err)
