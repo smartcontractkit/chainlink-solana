@@ -880,7 +880,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 				ExtraData: ccipsolana.ExtraDataDecoded{
 					ExtraArgsDecoded: map[string]any{
 						"tokenReceiver": tokenReceiver,
-						"computeUnits": uint32(0),
+						"computeUnits":  uint32(0),
 					},
 					DestExecDataDecoded: []map[string]any{
 						{"destGasAmount": destGasAmount},
