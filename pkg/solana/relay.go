@@ -80,6 +80,11 @@ func (r *Relayer) Start(ctx context.Context) error {
 			return err
 		}
 		if r.chain.Config().Workflow() != nil {
+			if r.capabilitiesRegistry == nil {
+				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
+				return nil
+			}
+
 			info, err := r.GetChainInfo(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to get chainInfo: %w", err)

@@ -77,6 +77,8 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+
+	// workflow
 	Workflow() Workflow
 }
 
@@ -89,9 +91,21 @@ type Workflow interface {
 	ForwarderState() string
 	OraclesConfigPDA() string
 	LookupTable() string
-	OracleID() string
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
+}
+
+type WorkflowConfig struct {
+	AcceptanceTimeout *config.Duration
+	PollPeriod        *config.Duration
+
+	ForwarderAddress  *string
+	FromAddress       *string
+	ForwarderState    *string
+	OraclesConfigPDA  *string
+	LookupTable       *string
+	GasLimitDefault   *uint64
+	TxAcceptanceState *commontypes.TransactionStatus
 }
 
 type Chain struct {

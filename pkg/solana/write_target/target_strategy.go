@@ -337,7 +337,7 @@ func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, 
 
 	// TODO remaining accounts from input
 	//for _, acc := range remainingAccounts {
-	//	inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
+	//		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
 
 	//	lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
 	//}

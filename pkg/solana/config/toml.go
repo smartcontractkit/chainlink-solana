@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
@@ -118,8 +119,9 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	MultiNode mnCfg.MultiNodeConfig
-	Nodes     Nodes
+	*WorkflowConfig `toml:"workflow,omitempty"`
+	MultiNode       mnCfg.MultiNodeConfig
+	Nodes           Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -240,12 +242,51 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 
 var _ Config = &TOMLConfig{}
 
-func (c *TOMLConfig) BlockTime() time.Duration {
-	return c.Chain.BlockTime.Duration()
+func (c *TOMLConfig) Workflow() Workflow {
+	if c.WorkflowConfig == nil {
+		return nil
+	}
+
+	return c
 }
 
-func (c *TOMLConfig) Workflow() Workflow {
-	return nil
+func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
+	return c.WorkflowConfig.AcceptanceTimeout.Duration()
+}
+
+func (c *TOMLConfig) PollPeriod() time.Duration {
+	return c.WorkflowConfig.PollPeriod.Duration()
+}
+
+func (c *TOMLConfig) ForwarderAddress() string {
+	return *c.WorkflowConfig.ForwarderAddress
+}
+
+func (c *TOMLConfig) FromAddress() string {
+	return *c.WorkflowConfig.FromAddress
+}
+
+func (c *TOMLConfig) ForwarderState() string {
+	return *c.WorkflowConfig.ForwarderState
+}
+
+func (c *TOMLConfig) OraclesConfigPDA() string {
+	return *c.WorkflowConfig.OraclesConfigPDA
+}
+
+func (c *TOMLConfig) LookupTable() string {
+	return *c.WorkflowConfig.LookupTable
+}
+
+func (c *TOMLConfig) GasLimitDefault() *uint64 {
+	return c.WorkflowConfig.GasLimitDefault
+}
+func (c *TOMLConfig) TxAcceptanceState() *commontypes.TransactionStatus {
+	return c.WorkflowConfig.TxAcceptanceState
+}
+
+func (c *TOMLConfig) BlockTime() time.Duration {
+	return c.Chain.BlockTime.Duration()
 }
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
