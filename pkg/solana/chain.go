@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 	"github.com/smartcontractkit/chainlink-framework/metrics"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
@@ -56,7 +55,6 @@ type Chain interface {
 	LogPoller() LogPoller
 	TxManager() TxManager
 	FeeEstimator() fees.Estimator
-	WT() writetarget.Config
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
 	MultiClient() *client.MultiClient

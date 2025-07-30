@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
@@ -46,17 +47,19 @@ var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
 	services.StateMachine
-	lggr   logger.Logger
-	chain  Chain
-	stopCh services.StopChan
+	lggr                 logger.Logger
+	chain                Chain
+	stopCh               services.StopChan
+	capabilitiesRegistry core.CapabilitiesRegistry
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain, _ core.CapabilitiesRegistry) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain, capReg core.CapabilitiesRegistry) *Relayer {
 	return &Relayer{
-		lggr:   logger.Named(lggr, "Relayer"),
-		chain:  chain,
-		stopCh: make(services.StopChan),
+		lggr:                 logger.Named(lggr, "Relayer"),
+		chain:                chain,
+		stopCh:               make(services.StopChan),
+		capabilitiesRegistry: capReg,
 	}
 }
 
@@ -75,7 +78,31 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if r.chain == nil {
 			return errors.New("Solana unavailable")
 		}
-		return r.chain.Start(ctx)
+		err := r.chain.Start(ctx)
+		if err != nil {
+			return err
+		}
+		if r.chain.Config().Workflow() != nil {
+			wt, err := writetarget.New(ctx, r.chain, r.chain.MultiClient(), r.chain.TxManager(), r.lggr)
+			if err != nil {
+				return fmt.Errorf("failed to initialise write target capability: %w", err)
+			}
+
+			dr, err := writetarget.NewDeriveRemaining(r.chain.MultiClient(), r.chain.Config().Workflow(), r.lggr)
+			if err != nil {
+				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
+			}
+
+			if err := r.capabilitiesRegistry.Add(ctx, wt); err != nil {
+				return fmt.Errorf("failed to register capability: %w", err)
+			}
+
+			if err := r.capabilitiesRegistry.Add(ctx, dr); err != nil {
+				return fmt.Errorf("failed to register capability: %w", err)
+			}
+		}
+
+		return nil
 	})
 }
 

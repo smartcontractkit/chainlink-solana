@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 )
 
 // Global solana defaults.
@@ -78,20 +77,20 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
-	// wt
-	WT() *writetarget.Config
 	Workflow() Workflow
 }
 
 type Workflow interface {
 	AcceptanceTimeout() time.Duration
+	PollPeriod() time.Duration
+
 	ForwarderAddress() string
 	FromAddress() string
 	ForwarderState() string
+	OraclesConfigPDA() string
+	LookupTable() string
 	OracleID() string
-	RemainingAccs() []string
 	GasLimitDefault() *uint64
-	PollPeriod() time.Duration
 	TxAcceptanceState() *commontypes.TransactionStatus
 }
 
@@ -120,6 +119,7 @@ type Chain struct {
 	ComputeUnitLimitDefault   *uint32
 	EstimateComputeUnitLimit  *bool
 	LogPollerStartingLookback *config.Duration
+	Workflow                  Workflow
 }
 
 func (c *Chain) SetDefaults() {

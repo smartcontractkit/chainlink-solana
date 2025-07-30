@@ -244,6 +244,10 @@ func (c *TOMLConfig) BlockTime() time.Duration {
 	return c.Chain.BlockTime.Duration()
 }
 
+func (c *TOMLConfig) Workflow() Workflow {
+	return nil
+}
+
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
 	return c.Chain.BalancePollPeriod.Duration()
 }

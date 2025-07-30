@@ -11,21 +11,28 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder"
 	df "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/monitoring/pb/data-feeds/on-chain/registry"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 )
 
-func New(ctx context.Context, relayer types.Relayer, chain solana.Chain, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
+type Chain interface {
+	LatestHead(ctx context.Context) (commontypes.Head, error)
+	//MultiClient() *client.MultiClient
+	ID() string
+	Config() config.Config
+}
+
+func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	chainID := chain.ID()
 
 	id := generateWriteTargetName(chainID)
-	wtCfg := chain.Config().WT()
 	cfg := chain.Config().Workflow()
 
 	chainInfo, err := getChainInfo(chainID)
@@ -61,12 +68,17 @@ func New(ctx context.Context, relayer types.Relayer, chain solana.Chain, lggr lo
 		return nil, fmt.Errorf("failed to create solana WT monitor client: %+w", err)
 	}
 
+	ts, err := newTargetStrategy(reader, txm, cfg, lggr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create target strategy: %+w", err)
+	}
+
 	opts := writetarget.WriteTargetOpts{
 		ID:     id,
 		Logger: lggr,
 		Config: writetarget.Config{
-			PollPeriod:        wtCfg.PollPeriod,
-			AcceptanceTimeout: wtCfg.AcceptanceTimeout,
+			PollPeriod:        cfg.PollPeriod(),
+			AcceptanceTimeout: cfg.AcceptanceTimeout(),
 		},
 		ChainInfo:            chainInfo,
 		Beholder:             beholder,
@@ -74,7 +86,7 @@ func New(ctx context.Context, relayer types.Relayer, chain solana.Chain, lggr lo
 		ConfigValidateFn:     evaluate,
 		NodeAddress:          cfg.FromAddress(),
 		ForwarderAddress:     cfg.ForwarderAddress(),
-		TargetStrategy:       newTargetStrategy(chain.MultiClient(), chain.TxManager(), cfg, lggr),
+		TargetStrategy:       ts,
 		WriteAcceptanceState: *cfg.TxAcceptanceState(),
 	}
 

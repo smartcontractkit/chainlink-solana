@@ -19,10 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 
 	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go/rpc"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 var (
@@ -31,7 +31,7 @@ var (
 
 type targetStrategy struct {
 	client client.Reader
-	txm    txm.TxManager
+	txm    Txm
 
 	forwarder   string
 	accounts    accounts
@@ -39,27 +39,37 @@ type targetStrategy struct {
 	lggr        logger.Logger
 }
 
+// All known in advance accounts
 type accounts struct {
-	state              solana.PublicKey
-	forwarderID        solana.PublicKey
+	forwarderState     solana.PublicKey
+	forwarderProgramID solana.PublicKey
 	oraclesConfig      solana.PublicKey
 	transmitter        solana.PublicKey
-	forwarderAuthority solana.PublicKey
-	remainings         solana.AccountMetaSlice
 	lookupTable        solana.PublicKey
 }
 
-func newTargetStrategy(client client.Reader, txm txm.TxManager, cfg config.Workflow, lggr logger.Logger) wt.TargetStrategy {
+type Txm interface {
+	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
+	GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error)
+}
+
+func newTargetStrategy(client client.Reader, txm Txm, cfg config.Workflow, lggr logger.Logger) (wt.TargetStrategy, error) {
 	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 
-	var accs accounts
-	//TODO extract accs from config
+	accs, err := accountsFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	lookup[accs.lookupTable] = solana.PublicKeySlice{
 		accs.oraclesConfig,
-		accs.state,
+		accs.forwarderState,
+		accs.forwarderProgramID,
 		accs.transmitter,
 		solana.SystemProgramID,
 	}
+
+	ks_forwarder.SetProgramID(accs.forwarderProgramID)
 
 	return &targetStrategy{
 		client:      client,
@@ -68,7 +78,7 @@ func newTargetStrategy(client client.Reader, txm txm.TxManager, cfg config.Workf
 		forwarder:   cfg.ForwarderAddress(),
 		lggr:        lggr,
 		lookupTable: lookup,
-	}
+	}, nil
 }
 
 func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID uint16, request capabilities.CapabilityRequest) (*wt.TransmissionState, error) {
@@ -187,136 +197,6 @@ type targetRequest struct {
 	Inputs   Inputs
 }
 
-func (t *targetRequest) GetRemainingAccounts(ctx context.Context, client client.Reader, forwarderAuthority solana.PublicKey) ([]solana.AccountMeta, error) {
-	if len(t.Config.RemainingAccounts) > 0 && t.Config.CacheDetails != nil {
-		return nil, fmt.Errorf("only one of 'remaining_accounts' or 'cache_details' should be specified")
-	}
-
-	var remainingAccounts []solana.AccountMeta
-	for _, acc := range t.Config.RemainingAccounts {
-		key, err := solana.PublicKeyFromBase58(acc.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
-		}
-
-		remainingAccounts = append(remainingAccounts, solana.AccountMeta{
-			PublicKey:  key,
-			IsWritable: acc.IsWritable,
-		})
-	}
-
-	if t.Config.CacheDetails != nil {
-		// assume that the receiver is the cache program
-		cacheProgram := t.Receiver
-
-		cacheStateKey, err := solana.PublicKeyFromBase58(t.Config.CacheDetails.State)
-		if err != nil {
-			return nil, fmt.Errorf("failed parse remaining account key: %w", err)
-		}
-
-		cacheStateAccount, err := client.GetAccountInfoWithOpts(ctx, cacheStateKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-		if err != nil {
-			return nil, fmt.Errorf("error fetching cache state account %v", cacheStateKey)
-		}
-
-		if cacheStateAccount.Value == nil {
-			return nil, fmt.Errorf("cache state account does not exist %v", cacheStateKey)
-		}
-
-		remainingAccounts = []solana.AccountMeta{
-			solana.AccountMeta{
-				PublicKey:  cacheStateKey,
-				IsWritable: false,
-			},
-			solana.AccountMeta{
-				PublicKey:  cacheProgram, // legacy store omitted
-				IsWritable: false,
-			},
-			solana.AccountMeta{
-				PublicKey:  cacheProgram, // legacy feed config omitted
-				IsWritable: false,
-			},
-			solana.AccountMeta{
-				PublicKey:  cacheProgram, // legacy writer omitted
-				IsWritable: false,
-			},
-			solana.AccountMeta{
-				PublicKey:  solana.SystemProgramID,
-				IsWritable: false,
-			},
-		}
-		derivedAccounts := make([]solana.AccountMeta, 2*len(t.Config.CacheDetails.FeedIds))
-
-		// derive pdas and check existence on-chain
-		for i, feedId := range t.Config.CacheDetails.FeedIds {
-			validBytes := validateBytes16(feedId)
-			if !validBytes {
-				return nil, fmt.Errorf("invalid feed id %v err:%w", feedId)
-			}
-			dataId, _ := new(big.Int).SetString(feedId, 0)
-			decimalReportSeeds := [][]byte{
-				[]byte("decimal_report"),
-				cacheStateKey.Bytes(),
-				dataId.Bytes(),
-			}
-
-			decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
-			if err != nil {
-				return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
-			}
-
-			decimalReportAccount, err := client.GetAccountInfoWithOpts(ctx, decimalReportKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-			if err != nil {
-				return nil, fmt.Errorf("error fetching decimal report account %v for data id %v", decimalReportKey, feedId)
-			}
-
-			if decimalReportAccount.Value == nil {
-				return nil, fmt.Errorf("decimal report account %v does not exist for data id %v", decimalReportKey, feedId)
-			}
-
-			derivedAccounts[i] = solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
-
-			// add to remaining accounts
-
-			reportHash := createReportHash(
-				dataId.Bytes(),
-				forwarderAuthority.Bytes(),
-				[]byte(t.Metadata.WorkflowOwner),
-				[]byte(t.Metadata.WorkflowID),
-			)
-
-			writeFlagSeeds := [][]byte{
-				[]byte("permission_flag"),
-				cacheStateKey.Bytes(),
-				reportHash[:],
-			}
-
-			writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
-			if err != nil {
-				return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
-			}
-
-			writeFlagAccount, err := client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-			if err != nil {
-				return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedId)
-			}
-
-			if writeFlagAccount.Value == nil {
-				return nil, fmt.Errorf("write flag account %v does not exist for data id %v", writeFlagKey, feedId)
-			}
-
-			// write flag accounts go after all the decimal report accounts
-			derivedAccounts[len(t.Config.CacheDetails.FeedIds)+i] = solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
-		}
-
-		remainingAccounts = append(remainingAccounts, derivedAccounts...)
-
-	}
-
-	return remainingAccounts, nil
-
-}
-
 func (ts *targetRequest) toPayload() []byte {
 	var ret []byte
 
@@ -340,8 +220,7 @@ func (ts *targetRequest) toPayload() []byte {
 }
 
 var (
-	remainingAccounts = "remaining_accounts"
-	cacheDetailsKey   = "cache_details"
+	remainingAccountsKey = "remaining_accounts"
 )
 
 func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, error) {
@@ -426,12 +305,16 @@ func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, 
 		return nil, err
 	}
 
+	authority, err := deriveForwarderAuthority(ts.accounts.forwarderState, r.Receiver, ts.accounts.forwarderProgramID)
+	if err != nil {
+		return nil, err
+	}
 	inst := ks_forwarder.NewReportInstruction(
 		r.toPayload(),
-		ts.accounts.state,
+		ts.accounts.forwarderState,
 		ts.accounts.oraclesConfig,
 		ts.accounts.transmitter,
-		ts.accounts.forwarderAuthority,
+		authority,
 		executionState,
 		r.Receiver,
 		solana.SystemProgramID,
@@ -440,16 +323,12 @@ func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, 
 	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 	maps.Copy(lookup, ts.lookupTable)
 
-	remainingAccounts, err := r.GetRemainingAccounts(ctx, ts.client, ts.accounts.forwarderAuthority)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get remaining accounts: %w", err)
-	}
+	// TODO remaining accounts from input
+	//for _, acc := range remainingAccounts {
+	//	inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
 
-	for _, acc := range remainingAccounts {
-		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
-
-		lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
-	}
+	//	lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
+	//}
 
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {
@@ -475,11 +354,11 @@ func (ts *targetStrategy) deriveExecutionState(r *targetRequest) (solana.PublicK
 
 	seeds := [][]byte{
 		[]byte("execution_state"),
-		ts.accounts.state.Bytes(),
+		ts.accounts.forwarderState.Bytes(),
 		transmissionID[:],
 	}
 
-	ret, _, err := solana.FindProgramAddress(seeds, ts.accounts.forwarderID)
+	ret, _, err := solana.FindProgramAddress(seeds, ts.accounts.forwarderProgramID)
 
 	return ret, err
 }
@@ -512,6 +391,17 @@ func extractTransmissionID(receiver solana.PublicKey, rawReport []byte) ([32]byt
 	return sha3.Sum256(data), nil
 }
 
+func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram solana.PublicKey, forwarderProgram solana.PublicKey) (solana.PublicKey, error) {
+	seeds := [][]byte{
+		[]byte("forwarder"),
+		forwarderState[:],
+		receiverProgram[:],
+	}
+	ret, _, err := solana.FindProgramAddress(seeds, forwarderProgram)
+
+	return ret, err
+}
+
 func createReportHash(dataId []byte, forwarderAuthority []byte, workflowOwner []byte, workflowId []byte) [32]byte {
 	var data []byte
 	data = append(data, dataId...)
@@ -521,4 +411,35 @@ func createReportHash(dataId []byte, forwarderAuthority []byte, workflowOwner []
 
 	return sha3.Sum256(data)
 
+}
+
+func accountsFromConfig(cfg config.Workflow) (accounts, error) {
+	var ret accounts
+	var err error
+	ret.forwarderProgramID, err = solana.PublicKeyFromBase58(cfg.ForwarderAddress())
+	if err != nil {
+		return ret, err
+	}
+
+	ret.forwarderState, err = solana.PublicKeyFromBase58(cfg.ForwarderState())
+	if err != nil {
+		return ret, err
+	}
+
+	ret.oraclesConfig, err = solana.PublicKeyFromBase58(cfg.OraclesConfigPDA())
+	if err != nil {
+		return ret, err
+	}
+
+	ret.transmitter, err = solana.PublicKeyFromBase58(cfg.FromAddress())
+	if err != nil {
+		return ret, err
+	}
+
+	ret.lookupTable, err = solana.PublicKeyFromBase58(cfg.LookupTable())
+	if err != nil {
+		return ret, err
+	}
+
+	return ret, nil
 }

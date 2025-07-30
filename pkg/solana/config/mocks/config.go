@@ -3,8 +3,10 @@
 package mocks
 
 import (
-	rpc "github.com/gagliardetto/solana-go/rpc"
+	config "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	mock "github.com/stretchr/testify/mock"
+
+	rpc "github.com/gagliardetto/solana-go/rpc"
 
 	time "time"
 )
@@ -1100,6 +1102,53 @@ func (_c *Config_TxTimeout_Call) Return(_a0 time.Duration) *Config_TxTimeout_Cal
 }
 
 func (_c *Config_TxTimeout_Call) RunAndReturn(run func() time.Duration) *Config_TxTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Workflow provides a mock function with no fields
+func (_m *Config) Workflow() config.Workflow {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Workflow")
+	}
+
+	var r0 config.Workflow
+	if rf, ok := ret.Get(0).(func() config.Workflow); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(config.Workflow)
+		}
+	}
+
+	return r0
+}
+
+// Config_Workflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Workflow'
+type Config_Workflow_Call struct {
+	*mock.Call
+}
+
+// Workflow is a helper method to define mock.On call
+func (_e *Config_Expecter) Workflow() *Config_Workflow_Call {
+	return &Config_Workflow_Call{Call: _e.mock.On("Workflow")}
+}
+
+func (_c *Config_Workflow_Call) Run(run func()) *Config_Workflow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_Workflow_Call) Return(_a0 config.Workflow) *Config_Workflow_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_Workflow_Call) RunAndReturn(run func() config.Workflow) *Config_Workflow_Call {
 	_c.Call.Return(run)
 	return _c
 }
