@@ -24,8 +24,14 @@ func TestIDLTypes_JSONMarshalUnmarshal(t *testing.T) {
 		idl := `{ "name": "OracleIds", "type": { "array": ["u8", 32] } }`
 		ensureUnmarshal[IdlField](t, idl)
 	})
-	t.Run("CCIP IDL", func(t *testing.T) {
+	t.Run("CCIP Offramp IDL", func(t *testing.T) {
 		ensureUnmarshal[IDL](t, solana.FetchCCIPOfframpIDL())
+	})
+	t.Run("CCIP FeeQuoter IDL", func(t *testing.T) {
+		ensureUnmarshal[IDL](t, solana.FetchFeeQuoterIDL())
+	})
+	t.Run("CCIP RMNRemote IDL", func(t *testing.T) {
+		ensureUnmarshal[IDL](t, solana.FetchRMNRemoteIDL())
 	})
 	t.Run("Invalid JSON: multiple IDLTypes provided", func(t *testing.T) {
 		idl := `{ "array": ["u8", 32], "vec": {"string": "test"}}`
