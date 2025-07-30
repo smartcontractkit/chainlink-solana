@@ -278,16 +278,6 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	return r, nil
 }
 
-func validatePublicKeys(keys ...string) error {
-	for _, key := range keys {
-		_, err := solana.PublicKeyFromBase58(key)
-		if err != nil {
-			return fmt.Errorf("failed parse cache details account %v err:%w", key, err)
-		}
-	}
-	return nil
-}
-
 // auto-detects base-10, base-8, and base-16 only
 func validateBytes16(s string) bool {
 	n, ok := new(big.Int).SetString(s, 0)
@@ -399,15 +389,14 @@ func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram s
 	return ret, err
 }
 
-func createReportHash(dataId []byte, forwarderAuthority []byte, workflowOwner []byte, workflowId []byte) [32]byte {
+func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) [32]byte {
 	var data []byte
-	data = append(data, dataId...)
+	data = append(data, dataID...)
 	data = append(data, forwarderAuthority...)
 	data = append(data, workflowOwner...)
-	data = append(data, workflowId...)
+	data = append(data, workflowID...)
 
 	return sha3.Sum256(data)
-
 }
 
 func accountsFromConfig(cfg config.Workflow) (accounts, error) {

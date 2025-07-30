@@ -37,12 +37,10 @@ type deriver struct {
 type CacheDetails struct {
 	State    string // State pubkey of df cache
 	Receiver string // df cache programID
-	FeedIds  []string
+	FeedIDs  []string
 }
 
 func (dr *deriver) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
-	// execute derive remaining accounts logic
-	// put into remainig_accounts field in
 	var res capabilities.CapabilityResponse
 
 	if request.Config == nil {
@@ -100,19 +98,19 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		IsWritable: false,
 	})
 
-	derivedAccounts := make([]*solana.AccountMeta, 2*len(cd.FeedIds))
+	derivedAccounts := make([]*solana.AccountMeta, 2*len(cd.FeedIDs))
 
 	authority, err := deriveForwarderAuthority(dr.accounts.forwarderState, cacheProgram, dr.accounts.forwarderProgramID)
 	if err != nil {
 		return nil, err
 	}
 	// derive pdas and check existence on-chain
-	for i, feedId := range cd.FeedIds {
-		validBytes := validateBytes16(feedId)
+	for i, feedID := range cd.FeedIDs {
+		validBytes := validateBytes16(feedID)
 		if !validBytes {
-			return nil, fmt.Errorf("invalid feed id %v", feedId)
+			return nil, fmt.Errorf("invalid feed id %v", feedID)
 		}
-		dataId, _ := new(big.Int).SetString(feedId, 0)
+		dataId, _ := new(big.Int).SetString(feedID, 0)
 		decimalReportSeeds := [][]byte{
 			[]byte("decimal_report"),
 			cacheStateKey.Bytes(),
@@ -121,16 +119,16 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
 		if err != nil {
-			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
+			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedID)
 		}
 
 		decimalReportAccount, err := dr.client.GetAccountInfoWithOpts(ctx, decimalReportKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching decimal report account %v for data id %v", decimalReportKey, feedId)
+			return nil, fmt.Errorf("error fetching decimal report account %v for data id %v", decimalReportKey, feedID)
 		}
 
 		if decimalReportAccount.Value == nil {
-			return nil, fmt.Errorf("decimal report account %v does not exist for data id %v", decimalReportKey, feedId)
+			return nil, fmt.Errorf("decimal report account %v does not exist for data id %v", decimalReportKey, feedID)
 		}
 
 		derivedAccounts[i] = &solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
@@ -151,20 +149,20 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
 		if err != nil {
-			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedId)
+			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedID)
 		}
 
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedId)
+			return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedID)
 		}
 
 		if writeFlagAccount.Value == nil {
-			return nil, fmt.Errorf("write flag account %v does not exist for data id %v", writeFlagKey, feedId)
+			return nil, fmt.Errorf("write flag account %v does not exist for data id %v", writeFlagKey, feedID)
 		}
 
 		// write flag accounts go after all the decimal report accounts
-		derivedAccounts[len(cd.FeedIds)+i] = &solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
+		derivedAccounts[len(cd.FeedIDs)+i] = &solana.AccountMeta{PublicKey: writeFlagKey, IsWritable: false}
 	}
 
 	ret = append(ret, derivedAccounts...)

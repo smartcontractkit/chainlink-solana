@@ -131,11 +131,6 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (string, error) {
 	return r.Config.Address, nil
 }
 
-const (
-	forwarderProgram = "forwarder"
-	reportMethod     = "report"
-)
-
 func generateWriteTargetName(chainID string) string {
 	id := fmt.Sprintf("write_%v@1.0.0", chainID)
 
