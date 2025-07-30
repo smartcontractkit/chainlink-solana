@@ -154,7 +154,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return "", fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
 
-	tx, err := ts.newTransaction(ctx, r, blockhash.Value.Blockhash)
+	tx, err := ts.newTransaction(r, blockhash.Value.Blockhash)
 	if err != nil {
 		return "", fmt.Errorf("failed to create solana tx: %w", err)
 	}
@@ -188,9 +188,7 @@ func (ts *targetStrategy) GetTransactionFee(ctx context.Context, transactionID s
 }
 
 type Config struct {
-	Address           string
-	RemainingAccounts []Acc
-	CacheDetails      *CacheDetails
+	Address string
 }
 
 type Acc struct {
@@ -199,7 +197,8 @@ type Acc struct {
 }
 
 type Inputs struct {
-	SignedReport ocr3types.SignedReport
+	SignedReport      ocr3types.SignedReport
+	RemainingAccounts solana.AccountMetaSlice
 }
 
 type targetRequest struct {
@@ -253,28 +252,6 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 	r.Receiver = receiver
 
-	if len(r.Config.RemainingAccounts) > 0 && r.Config.CacheDetails != nil {
-		return r, fmt.Errorf("only one of 'remaining_accounts' or 'cache_details' should be specified")
-	}
-
-	for _, acc := range r.Config.RemainingAccounts {
-		_, err := solana.PublicKeyFromBase58(acc.Address)
-		if err != nil {
-			return r, fmt.Errorf("failed parse public key from remaining account %v err:%w", acc, err)
-		}
-	}
-
-	if err = validatePublicKeys(r.Config.CacheDetails.State); err != nil {
-		return r, err
-	}
-
-	for _, feedId := range r.Config.CacheDetails.FeedIds {
-		validBytes := validateBytes16(feedId)
-		if !validBytes {
-			return r, fmt.Errorf("invalid feed id %v", feedId)
-		}
-	}
-
 	if rawRequest.Inputs == nil {
 		return r, errors.New("missing inputs field")
 	}
@@ -286,6 +263,15 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 
 	if err := signedReport.UnwrapTo(&r.Inputs.SignedReport); err != nil {
+		return r, err
+	}
+
+	remaings, ok := rawRequest.Inputs.Underlying[remainingAccountsKey]
+	if !ok {
+		return r, fmt.Errorf("missing required field %s", remainingAccountsKey)
+	}
+
+	if err := remaings.UnwrapTo(&r.Inputs.RemainingAccounts); err != nil {
 		return r, err
 	}
 
@@ -311,7 +297,7 @@ func validateBytes16(s string) bool {
 	return n.BitLen() <= 128
 }
 
-func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, blockHash solana.Hash) (*solana.Transaction, error) {
+func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash) (*solana.Transaction, error) {
 	executionState, err := ts.deriveExecutionState(r)
 	if err != nil {
 		return nil, err
@@ -335,12 +321,11 @@ func (ts *targetStrategy) newTransaction(ctx context.Context, r *targetRequest, 
 	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 	maps.Copy(lookup, ts.lookupTable)
 
-	// TODO remaining accounts from input
-	//for _, acc := range remainingAccounts {
-	//		inst.AccountMetaSlice = append(inst.AccountMetaSlice, &acc)
+	for _, acc := range r.Inputs.RemainingAccounts {
+		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
 
-	//	lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
-	//}
+		lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
+	}
 
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {

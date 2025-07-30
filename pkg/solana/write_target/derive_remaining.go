@@ -35,8 +35,8 @@ type deriver struct {
 }
 
 type CacheDetails struct {
-	Receiver string // programID of df cache program
 	State    string // State pubkey of df cache
+	Receiver string // df cache programID
 	FeedIds  []string
 }
 
