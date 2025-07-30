@@ -118,11 +118,29 @@ pub struct OnReport<'info> {
 }
 ```
 
+The anatomy of the metadata and report sent to the receiver is as follows:
+
+```
+metadata = workflow_cid (32) | workflow_name (10) | workflow_owner (20) | report_id (2)
+
+// workflow_cid           offset  0, size 32
+// workflow_name          offset  32, size 10
+// workflow_owner         offset  42, size 20
+// report_id              offset  62, size  2
+```
+
+```
+report = (X bytes)
+```
+
+where the report byte array is borsh-serialized
+
 As noted above, it is crucial that the receiver program verify the forwarder authority is a PDA derived from the forwarder state account.
 
 ## transaction size
 
-Solana places a hard 1232 byte limit on transaction sizes. For the report instruction, we want to make sure we have enough space left over for the receiver payload given that accounts and signatures will take up significant space in the transaction.
+
+Solana places a hard 1232 byte limit on transaction sizes. For the report instruction, we want to make sure we have enough space left over for the receiver payload given that accounts and signatures will take up significant space in the transaction. We place a maximum of 16 oracles in the DON so that the report signature will only have at max 5 signatures. All the tx size calculations are based off this scenario of f = 5 which yields the least left over space for the payload.
 
 The anchor tests simulate the transaction so we can get a good idea of the amount leftover. To make things simple, the test has a 1 byte payload and only passes 1 additional remaining account in the report instruction.
 

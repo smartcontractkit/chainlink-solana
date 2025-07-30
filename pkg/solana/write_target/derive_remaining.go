@@ -110,7 +110,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 	for i, feedId := range cd.FeedIds {
 		validBytes := validateBytes16(feedId)
 		if !validBytes {
-			return nil, fmt.Errorf("invalid feed id %v err:%w", feedId)
+			return nil, fmt.Errorf("invalid feed id %v", feedId)
 		}
 		dataId, _ := new(big.Int).SetString(feedId, 0)
 		decimalReportSeeds := [][]byte{

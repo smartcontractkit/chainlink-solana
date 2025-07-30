@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"strings"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -13,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
-	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder"
 	df "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/monitoring/pb/data-feeds/on-chain/registry"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -29,19 +27,14 @@ type Chain interface {
 	Config() config.Config
 }
 
-func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
+func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainInfo commontypes.ChainInfo, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	chainID := chain.ID()
 
 	id := generateWriteTargetName(chainID)
 	cfg := chain.Config().Workflow()
 
-	chainInfo, err := getChainInfo(chainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chain info: %w", err)
-	}
-
 	// TODO metrics used to initialize product processors
-	_, err = df.NewMetrics()
+	_, err := df.NewMetrics()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
 	}
@@ -155,41 +148,4 @@ func generateWriteTargetName(chainID string) string {
 	}
 
 	return id
-}
-
-func getChainInfo(chainID string) (monitor.ChainInfo, error) {
-	chainSelector, ok := chainselectors.SolanaChainIdToChainSelector()[chainID]
-	if !ok {
-		return monitor.ChainInfo{}, fmt.Errorf("failed to get chain selector for chainID %v", chainID)
-	}
-	chainFamily, err := chainselectors.GetSelectorFamily(chainSelector)
-	if err != nil {
-		return monitor.ChainInfo{}, fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)
-	}
-	chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainID, chainFamily)
-	if err != nil {
-		return monitor.ChainInfo{}, fmt.Errorf("failed to get chain details for chain %d and family %s: %w", chainID, chainFamily, err)
-	}
-
-	neworkName, err := extractNetwork(chainDetails.ChainName)
-	if err != nil {
-		return monitor.ChainInfo{}, fmt.Errorf("failed to get network name for chain %d: %w", chainID, err)
-	}
-
-	return monitor.ChainInfo{
-		FamilyName:      chainFamily,
-		ChainID:         chainID,
-		NetworkName:     neworkName,
-		NetworkNameFull: chainDetails.ChainName,
-	}, nil
-}
-
-func extractNetwork(selector string) (string, error) {
-	// Create a regexp pattern that matches any of the three.
-	re := regexp.MustCompile(`(mainnet|testnet|devnet)`)
-	name := re.FindString(selector)
-	if name == "" {
-		return "", fmt.Errorf("failed to extract network name from selector: %s", selector)
-	}
-	return name, nil
 }

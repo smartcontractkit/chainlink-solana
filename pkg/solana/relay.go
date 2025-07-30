@@ -46,6 +46,7 @@ type TxManager interface {
 var _ relaytypes.Relayer = &Relayer{}
 
 type Relayer struct {
+	relaytypes.UnimplementedRelayer
 	services.StateMachine
 	lggr                 logger.Logger
 	chain                Chain
@@ -67,10 +68,6 @@ func (r *Relayer) Name() string {
 	return r.lggr.Name()
 }
 
-func (r *Relayer) EVM() (relaytypes.EVMService, error) {
-	return nil, errors.New("unimplemented")
-}
-
 // Start starts the relayer respecting the given context.
 func (r *Relayer) Start(ctx context.Context) error {
 	return r.StartOnce("SolanaRelayer", func() error {
@@ -83,7 +80,12 @@ func (r *Relayer) Start(ctx context.Context) error {
 			return err
 		}
 		if r.chain.Config().Workflow() != nil {
-			wt, err := writetarget.New(ctx, r.chain, r.chain.MultiClient(), r.chain.TxManager(), r.lggr)
+			info, err := r.GetChainInfo(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get chainInfo: %w", err)
+			}
+
+			wt, err := writetarget.New(ctx, r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)
 			if err != nil {
 				return fmt.Errorf("failed to initialise write target capability: %w", err)
 			}
@@ -132,6 +134,10 @@ func (r *Relayer) LatestHead(ctx context.Context) (relaytypes.Head, error) {
 
 func (r *Relayer) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
 	return r.chain.GetChainStatus(ctx)
+}
+
+func (r *Relayer) GetChainInfo(ctx context.Context) (relaytypes.ChainInfo, error) {
+	return r.chain.GetChainInfo(ctx)
 }
 
 func (r *Relayer) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken string) (stats []relaytypes.NodeStatus, nextPageToken string, total int, err error) {

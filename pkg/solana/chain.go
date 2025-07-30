@@ -25,6 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink-framework/metrics"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
@@ -313,7 +315,7 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			} else {
 				newNode := mn.NewNode[mn.StringID, *client.Head, *client.MultiNodeClient](
 					mnCfg, mnCfg, lggr, multiNodeMetrics, nodeInfo.URL.URL(), nil, *nodeInfo.Name,
-					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily)
+					i, mn.StringID(id), *nodeInfo.Order, rpcClient, chainFamily, *nodeInfo.IsLoadBalancedRPC)
 				nodes = append(nodes, newNode)
 			}
 		}
@@ -410,6 +412,26 @@ func (c *chain) GetChainStatus(ctx context.Context) (types.ChainStatus, error) {
 		ID:      c.id,
 		Enabled: c.cfg.IsEnabled(),
 		Config:  toml,
+	}, nil
+}
+
+func (c *chain) GetChainInfo(_ context.Context) (types.ChainInfo, error) {
+	chainIDHash := c.id
+	chainEnvName := c.cfg.ChainID
+	if chainEnvName == nil {
+		return types.ChainInfo{}, fmt.Errorf("chain ID is missing")
+	}
+
+	networkName, err := chainselectors.SolanaNameFromChainId(chainIDHash)
+	if err != nil {
+		return types.ChainInfo{}, fmt.Errorf("failed to get network name from chain ID: %s, err: %w", c.id, err)
+	}
+
+	return types.ChainInfo{
+		FamilyName:      "solana",
+		ChainID:         chainIDHash,
+		NetworkName:     *chainEnvName,
+		NetworkNameFull: networkName,
 	}, nil
 }
 

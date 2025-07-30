@@ -10,6 +10,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -175,6 +176,17 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	return txID.String(), nil
 }
 
+// Wrapper around the ChainWriter to get the fee esimate
+func (ts *targetStrategy) GetEstimateFee(ctx context.Context, report []byte, reportContext []byte, signatures [][]byte, request capabilities.CapabilityRequest) (commontypes.EstimateFee, error) {
+	return commontypes.EstimateFee{}, errors.New("unimplemented")
+}
+
+// GetTransactionFee retrieves the actual transaction fee in native currency from the transaction receipt.
+// This method should be implemented by chain-specific services and handle the conversion of gas units to native currency.
+func (ts *targetStrategy) GetTransactionFee(ctx context.Context, transactionID string) (decimal.Decimal, error) {
+	return decimal.Decimal{}, errors.New("unimplemented")
+}
+
 type Config struct {
 	Address           string
 	RemainingAccounts []Acc
@@ -259,7 +271,7 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	for _, feedId := range r.Config.CacheDetails.FeedIds {
 		validBytes := validateBytes16(feedId)
 		if !validBytes {
-			return r, fmt.Errorf("invalid feed id %v err:%w", feedId)
+			return r, fmt.Errorf("invalid feed id %v", feedId)
 		}
 	}
 
