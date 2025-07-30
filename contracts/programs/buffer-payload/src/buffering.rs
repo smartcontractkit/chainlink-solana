@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{Buffer, Error, Report};
 
 /// Borrowed from chainlink-ccip's offramp program
-/// TODO: Add link to buffering.rs in chainlink-ccip repo once merged to develop
+/// https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/solana/contracts/programs/ccip-offramp/src/instructions/v1/buffering.rs
 pub trait Buffering {
     fn is_initialized(&self) -> bool;
     fn filled_chunks(&self) -> u8;
