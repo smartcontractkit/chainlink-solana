@@ -110,11 +110,11 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		if !validBytes {
 			return nil, fmt.Errorf("invalid feed id %v", feedID)
 		}
-		dataId, _ := new(big.Int).SetString(feedID, 0)
+		dataID, _ := new(big.Int).SetString(feedID, 0)
 		decimalReportSeeds := [][]byte{
 			[]byte("decimal_report"),
 			cacheStateKey.Bytes(),
-			dataId.Bytes(),
+			dataID.Bytes(),
 		}
 
 		decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
@@ -135,7 +135,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		// add to remaining accounts
 		reportHash := createReportHash(
-			dataId.Bytes(),
+			dataID.Bytes(),
 			authority.Bytes(),
 			[]byte(meta.WorkflowOwner),
 			[]byte(meta.WorkflowID),
