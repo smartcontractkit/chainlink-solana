@@ -107,6 +107,8 @@ func (r *Relayer) Start(ctx context.Context) error {
 			if err := r.capabilitiesRegistry.Add(ctx, dr); err != nil {
 				return fmt.Errorf("failed to register capability: %w", err)
 			}
+
+			r.lggr.Infow("Registered write target", "chain_id", r.chain.ID())
 		}
 
 		return nil
