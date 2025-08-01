@@ -8,23 +8,69 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
-func NewDeriveRemaining(client client.Reader, cfg config.Workflow, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
+var DeriveRemainingName = "derive_remaining"
+
+func NewDeriveRemaining(chain Chain, client client.Reader, cfg config.Workflow, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
+	id := GenerateDeriveRemainingName(chain.ID())
 	accs, err := accountsFromConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create derive remaining capability: %w", err)
 	}
+
+	capInfo := capabilities.MustNewCapabilityInfo(id, capabilities.CapabilityTypeAction, DeriveRemainingName)
+
 	return &deriver{
-		client:   client,
-		accounts: accs,
-		lggr:     lggr,
+		CapabilityInfo: capInfo,
+		client:         client,
+		accounts:       accs,
+		lggr:           lggr,
 	}, nil
+}
+
+func GenerateDeriveRemainingName(chainID string) string {
+	id := fmt.Sprintf("derive_%v@1.0.0", chainID)
+
+	chainName, err := chainselectors.SolanaNameFromChainId(chainID)
+	if err == nil {
+		wtID, err := writetarget.NewWriteTargetID("", chainName, chainID, "1.0.0")
+		if err == nil {
+			id = wtID
+		}
+	}
+
+	return id
+}
+
+func NewWriteTargetID(chainFamilyName, networkName, chainID, version string) (string, error) {
+	// Input args should not be empty
+	if version == "" {
+		return "", fmt.Errorf("version must not be empty")
+	}
+
+	// Network ID: network name is optional, if not provided, use the chain ID
+	networkID := networkName
+	if networkID == "" && chainID == "" {
+		return "", fmt.Errorf("invalid input: networkName or chainID must not be empty")
+	}
+	if networkID == "" || networkID == "unknown" {
+		networkID = chainID
+	}
+
+	// allow for chain family to be empty
+	if chainFamilyName == "" {
+		return fmt.Sprintf("%s_%s@%s", DeriveRemainingName, networkID, version), nil
+	}
+
+	return fmt.Sprintf("%s_%s-%s@%s", DeriveRemainingName, chainFamilyName, networkID, version), nil
 }
 
 type deriver struct {
