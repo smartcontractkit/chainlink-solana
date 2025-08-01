@@ -137,44 +137,22 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    pub fn close_decimal_reports(
-        ctx: Context<CloseDecimalReports>,
-        data_ids: Vec<[u8; 16]>,
-    ) -> Result<()> {
+    // closes the decimal report account and feed config account
+    // you must set the feed configs workflowmetadata to empty list beforehand
+    pub fn close_decimal_report(ctx: Context<CloseDecimalReport>, data_id: [u8; 16]) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-        let state_key = ctx.accounts.state.key();
+        let feed_config = ctx.accounts.feed_config.load()?;
 
-        let data_ids_account_infos = ctx.remaining_accounts;
-
-        require_eq!(
-            data_ids.len(),
-            data_ids_account_infos.len(),
-            DataCacheError::ArrayLengthMismatch
+        // if feed config workflow list is empty, then all permission accounts
+        // have also been closed as well
+        require!(
+            feed_config.workflow_metadata.is_empty(),
+            DataCacheError::FeedConfigListNotEmpty
         );
 
-        for (i, data_id) in data_ids.iter().enumerate() {
-            let curr_report_account_info = &data_ids_account_infos[i];
-
-            let (decimal_report, _) = Pubkey::find_program_address(
-                &[b"decimal_report", state_key.as_ref(), data_id],
-                &crate::ID,
-            );
-
-            require_keys_eq!(
-                decimal_report,
-                *curr_report_account_info.key,
-                DataCacheError::AccountMismatch
-            );
-
-            close_account(
-                curr_report_account_info.clone(),
-                ctx.accounts.feed_admin.to_account_info(),
-            )?;
-
-            emit!(DecimalReportClosed { data_id: *data_id });
-        }
+        emit!(DecimalReportClosed { data_id: data_id });
 
         Ok(())
     }
@@ -301,16 +279,24 @@ pub mod data_feeds_cache {
             DataCacheError::MaxWorkflowsExceeded
         );
 
-        require!(
-            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
-            DataCacheError::EmptyConfig
-        );
+        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
 
         require_eq!(
             data_ids.len(),
             descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
+
+        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
+        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
+        // are not allowed
+        for d in descriptions.iter() {
+            if workflow_metadatas.is_empty() {
+                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
+            } else {
+                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
+            }
+        }
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let expected_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
@@ -459,16 +445,24 @@ pub mod data_feeds_cache {
             DataCacheError::MaxWorkflowsExceeded
         );
 
-        require!(
-            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
-            DataCacheError::EmptyConfig
-        );
+        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
 
         require_eq!(
             data_ids.len(),
             descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
+
+        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
+        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
+        // are not allowed
+        for d in descriptions.iter() {
+            if workflow_metadatas.is_empty() {
+                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
+            } else {
+                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
+            }
+        }
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let minimum_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();

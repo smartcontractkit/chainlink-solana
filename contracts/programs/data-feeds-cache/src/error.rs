@@ -75,4 +75,13 @@ pub enum DataCacheError {
 
     #[msg("Invalid proposed owner")]
     InvalidProposedOwner,
+
+    #[msg("feed config workflow list not empty")]
+    FeedConfigListNotEmpty,
+
+    #[msg("empty description enforced")]
+    EmptyDescriptionEnforced,
+
+    #[msg("invalid description")]
+    InvalidDescrption,
 }

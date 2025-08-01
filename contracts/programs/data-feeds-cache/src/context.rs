@@ -5,6 +5,7 @@ use keystone_forwarder::ID as FORWARDER_ID;
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::error::AuthError;
 use crate::state::CacheState;
+use crate::state::DecimalReport;
 use crate::state::FeedConfig;
 use crate::state::LegacyFeedsConfig;
 #[derive(Accounts)]
@@ -140,22 +141,37 @@ pub struct InitDecimalReports<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CloseDecimalReports<'info> {
+#[instruction(data_id: [u8; 16])]
+pub struct CloseDecimalReport<'info> {
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
     pub state: AccountLoader<'info, CacheState>,
+
     // N data report accounts
-    // #[account(
-    //     init,
-    //     seeds = [
-    //         b"decimal_report",
-    //         cache_state.key().as_ref()
-    //         data_id,
-    //     ],
-    //     bump
-    // )]
-    // pub report: UncheckedAccount<'info>
+    #[account(
+        mut,
+        seeds = [
+            b"decimal_report",
+            state.key().as_ref(),
+            &data_id,
+        ],
+        bump,
+        close = feed_admin,
+    )]
+    pub decimal_report: Account<'info, DecimalReport>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"feed_config",
+            state.key().as_ref(),
+            &data_id,
+        ],
+        bump,
+        close = feed_admin,
+      )]
+    pub feed_config: AccountLoader<'info, FeedConfig>,
 }
 
 #[derive(Accounts)]
