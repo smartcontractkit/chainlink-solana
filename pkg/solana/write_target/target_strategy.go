@@ -34,7 +34,6 @@ type targetStrategy struct {
 	client client.Reader
 	txm    Txm
 
-	forwarder   string
 	accounts    accounts
 	lookupTable map[solana.PublicKey]solana.PublicKeySlice
 	lggr        logger.Logger
@@ -76,7 +75,6 @@ func newTargetStrategy(client client.Reader, txm Txm, cfg config.Workflow, lggr 
 		client:      client,
 		txm:         txm,
 		accounts:    accs,
-		forwarder:   cfg.ForwarderAddress(),
 		lggr:        lggr,
 		lookupTable: lookup,
 	}, nil
@@ -169,7 +167,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 
 	transactionID := txID.String()
-	if err := ts.txm.Enqueue(ctx, ts.forwarder, tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
+	if err := ts.txm.Enqueue(ctx, ts.accounts.forwarderProgramID.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
 		return "", fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
@@ -402,10 +400,7 @@ func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []
 func accountsFromConfig(cfg config.Workflow) (accounts, error) {
 	var ret accounts
 	var err error
-	ret.forwarderProgramID, err = solana.PublicKeyFromBase58(cfg.ForwarderAddress())
-	if err != nil {
-		return ret, err
-	}
+	ret.forwarderProgramID = cfg.ForwarderAddress()
 
 	ret.forwarderState, err = solana.PublicKeyFromBase58(cfg.ForwarderState())
 	if err != nil {

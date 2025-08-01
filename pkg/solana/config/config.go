@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -85,7 +86,7 @@ type Config interface {
 type Workflow interface {
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-	ForwarderAddress() string
+	ForwarderAddress() solana.PublicKey
 	FromAddress() string
 	ForwarderState() string
 	OraclesConfigPDA() string
@@ -99,7 +100,7 @@ type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
 	PollPeriod        *config.Duration
 
-	ForwarderAddress  *string
+	ForwarderAddress  *solana.PublicKey
 	FromAddress       *string
 	ForwarderState    *string
 	OraclesConfigPDA  *string
@@ -108,6 +109,14 @@ type WorkflowConfig struct {
 	TxAcceptanceState *commontypes.TransactionStatus
 	Enabled           bool
 	Local             bool
+}
+
+func (w *WorkflowConfig) Validate() error {
+	if !w.Enabled {
+		return nil
+	}
+
+	return nil
 }
 
 type Chain struct {
