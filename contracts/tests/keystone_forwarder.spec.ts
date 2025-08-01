@@ -14,6 +14,8 @@ import { assert } from "chai";
 import { createHash } from "crypto";
 import {
   calculateForwarderAuthorityBump,
+  encodeForwarderReport,
+  generateAccountHash,
   generateEthKeypair,
   signMessage,
   waitForEvent,
@@ -569,8 +571,20 @@ describe("keystone_storage", function () {
     const lenSignatureBytes = Buffer.alloc(1);
     lenSignatureBytes.writeUint8(signers.length);
 
-    // metadata length + actual report payload length
-    const rawReportBytes = Buffer.alloc(109 + 1);
+    // generate account hash
+    const accountHash = generateAccountHash([
+      forwarderState.publicKey.toBuffer(),
+      forwarderAuthorityStorage.toBuffer(),
+      latestReportState.publicKey.toBuffer(),
+    ]);
+
+    const forwarderReportBuffer = encodeForwarderReport(
+      accountHash,
+      Buffer.from([255])
+    );
+
+    // metadata length + actual report payload length (todo change)
+    const rawReportBytes = Buffer.alloc(109 + forwarderReportBuffer.length);
 
     // version                offset   0, size  1
     // workflow_execution_id  offset   1, size 32
@@ -600,8 +614,9 @@ describe("keystone_storage", function () {
     rawReportBytes.writeUint8(workflowOwner, 106);
     rawReportBytes.writeUint8(reportId, 108);
 
-    // payload
-    rawReportBytes.writeUint8(255, 109);
+    // payload todo (change to the wrapped forwarder report)
+    // rawReportBytes.writeUint8(255, 109);
+    forwarderReportBuffer.copy(rawReportBytes, 109);
 
     // just keep this zero-ed since we don't use it outside of the hash
     const reportContextBytes = Buffer.alloc(96);

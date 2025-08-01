@@ -568,7 +568,7 @@ describe("data feeds cache", function () {
 
       for (const reportAccount of [feedAReportPDA, feedBReportPDA]) {
         try {
-          await cacheProgram.account.writePermissionFlag.fetch(reportAccount);
+          await cacheProgram.account.decimalReport.fetch(reportAccount);
           assert.fail("Account should not exist anymore");
         } catch (err) {
           if (!err.message.includes("Account does not exist")) {

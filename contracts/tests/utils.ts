@@ -13,10 +13,36 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
+import { array, struct, u8, vec } from "@coral-xyz/borsh";
 
 export type Signer = {
   provider: AnchorProvider;
   keypair: Keypair;
+};
+
+const ForwarderReportLayout = struct([
+  array(u8(), 32, "account_hash"),
+  vec(u8(), "payload"),
+]);
+
+export const generateAccountHash = (accounts: Buffer[]) => {
+  return createHash("sha256").update(Buffer.concat(accounts)).digest();
+};
+
+export const encodeForwarderReport = (
+  accountHash: Buffer,
+  payload: Buffer
+): Buffer => {
+  const sizeForwarderReport = 32 + 4 + payload.length;
+  const forwarderReportBuffer = Buffer.alloc(sizeForwarderReport);
+  ForwarderReportLayout.encode(
+    {
+      account_hash: Uint8Array.from(accountHash),
+      payload: Uint8Array.from(payload),
+    },
+    forwarderReportBuffer
+  );
+  return forwarderReportBuffer;
 };
 
 export const sendLamports = async (
@@ -466,16 +492,27 @@ export class Forwarder {
 
     // increment this.nextReportInfo no matter what
 
-    const dataBytes = this.generateForwarderReport(
-      payload,
-      workflowName,
-      workflowOwner
-    );
-
     const [forwarderAuthority, _] = calculateForwarderAuthorityBump(
       this.state.publicKey,
       receiverProgram,
       this.forwarderProgram.programId
+    );
+
+    const accountHash = generateAccountHash([
+      this.state.publicKey.toBuffer(),
+      forwarderAuthority.toBuffer(),
+      ...remainingAccounts.map((r) => r.pubkey.toBuffer()),
+    ]);
+
+    const wrappedForwarderReportPayload = encodeForwarderReport(
+      accountHash,
+      payload
+    );
+
+    const dataBytes = this.generateForwarderReport(
+      wrappedForwarderReportPayload,
+      workflowName,
+      workflowOwner
     );
 
     // todo: add lookup table in future for more accurate results?

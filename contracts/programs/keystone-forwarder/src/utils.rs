@@ -1,7 +1,6 @@
-use anchor_lang::prelude::Pubkey;
-use anchor_lang::solana_program::hash;
-
 use crate::common::{METADATA_LENGTH, REPORT_CONTEXT_LEN, SIGNATURE_LEN};
+use anchor_lang::prelude::{borsh::BorshDeserialize, *};
+use anchor_lang::solana_program::hash;
 
 pub fn get_config_id(don_id: u32, config_version: u32) -> u64 {
     ((don_id as u64) << 32) | (config_version as u64)
@@ -49,4 +48,10 @@ pub fn extract_transmission_id(raw_report: &[u8], receiver: &Pubkey) -> [u8; 32]
 
     // use sha-256 bc it's much cheaper than keccak-256
     hash::hash(&[&receiver.to_bytes(), workflow_execution_id, report_id].concat()).to_bytes()
+}
+
+#[derive(BorshDeserialize)]
+pub struct ForwarderReport {
+    pub account_hash: [u8; 32],
+    pub payload: Vec<u8>,
 }

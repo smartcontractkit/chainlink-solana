@@ -60,4 +60,10 @@ pub enum ForwarderError {
 
     #[msg("Insufficient Signers")]
     InsufficientSigners,
+
+    #[msg("Forwarder Report Expected")]
+    ForwarderReportExpected,
+
+    #[msg("Invalid Account Hash")]
+    InvalidAccountHash,
 }

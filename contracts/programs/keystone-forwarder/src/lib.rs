@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
+use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
 
 use common::{
     FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR,
@@ -25,7 +25,10 @@ declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::{program::KeystoneForwarder, utils::report_size_ok};
+    use crate::{
+        program::KeystoneForwarder,
+        utils::{report_size_ok, ForwarderReport},
+    };
 
     use super::*;
 
@@ -183,12 +186,31 @@ pub mod keystone_forwarder {
             .chain(ctx.remaining_accounts.iter().cloned())
             .collect();
 
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
+        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...)
+        let account_key_bytes = account_infos.iter().fold(
+            Vec::with_capacity(account_infos.len() * 32),
+            |mut buf, x| {
+                buf.extend_from_slice(&x.key().to_bytes());
+                buf
+            },
+        );
+        let computed_account_hash = hash::hash(&account_key_bytes);
+
+        require_eq!(
+            computed_account_hash,
+            Hash::from(forwarder_report.account_hash),
+            ForwarderError::InvalidAccountHash
+        );
+
         // payload begins with the Anchor discriminator
         let mut payload = ON_REPORT_DISCRIMINATOR.to_vec();
         // borsh serialization of metadata vector and report vector
         // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
         let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
-        let report = &raw_report[METADATA_LENGTH..].to_vec();
+        let report = forwarder_report.payload.as_slice();
         // Borsh serialize each part separately
         payload.extend(&metadata.try_to_vec()?);
         payload.extend(&report.try_to_vec()?);
