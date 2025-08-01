@@ -254,6 +254,10 @@ func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
 	return c.Workflow.AcceptanceTimeout.Duration()
 }
 
+func (c *TOMLConfig) Local() bool {
+	return c.Workflow.Local
+}
+
 func (c *TOMLConfig) PollPeriod() time.Duration {
 	return c.Workflow.PollPeriod.Duration()
 }

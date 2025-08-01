@@ -85,9 +85,20 @@ func (r *Relayer) Start(ctx context.Context) error {
 				return nil
 			}
 
-			info, err := r.GetChainInfo(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get chainInfo: %w", err)
+			var info relaytypes.ChainInfo
+
+			if r.chain.Config().WF().Local() {
+				info = relaytypes.ChainInfo{
+					FamilyName:      "Solana",
+					ChainID:         r.chain.ID(),
+					NetworkName:     "testnet",
+					NetworkNameFull: "testnet",
+				}
+			} else {
+				info, err = r.GetChainInfo(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get chainInfo: %w", err)
+				}
 			}
 
 			wt, err := writetarget.New(ctx, r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)

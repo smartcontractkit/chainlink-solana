@@ -85,7 +85,6 @@ type Config interface {
 type Workflow interface {
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-
 	ForwarderAddress() string
 	FromAddress() string
 	ForwarderState() string
@@ -93,6 +92,7 @@ type Workflow interface {
 	LookupTable() string
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
+	Local() bool // shows if workflow is run against local network
 }
 
 type WorkflowConfig struct {
@@ -107,6 +107,7 @@ type WorkflowConfig struct {
 	GasLimitDefault   *uint64
 	TxAcceptanceState *commontypes.TransactionStatus
 	Enabled           bool
+	Local             bool
 }
 
 type Chain struct {
