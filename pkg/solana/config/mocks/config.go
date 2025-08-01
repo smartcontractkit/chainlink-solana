@@ -1106,12 +1106,12 @@ func (_c *Config_TxTimeout_Call) RunAndReturn(run func() time.Duration) *Config_
 	return _c
 }
 
-// Workflow provides a mock function with no fields
-func (_m *Config) Workflow() config.Workflow {
+// WF provides a mock function with no fields
+func (_m *Config) WF() config.Workflow {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Workflow")
+		panic("no return value specified for WF")
 	}
 
 	var r0 config.Workflow
@@ -1126,29 +1126,29 @@ func (_m *Config) Workflow() config.Workflow {
 	return r0
 }
 
-// Config_Workflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Workflow'
-type Config_Workflow_Call struct {
+// Config_WF_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WF'
+type Config_WF_Call struct {
 	*mock.Call
 }
 
-// Workflow is a helper method to define mock.On call
-func (_e *Config_Expecter) Workflow() *Config_Workflow_Call {
-	return &Config_Workflow_Call{Call: _e.mock.On("Workflow")}
+// WF is a helper method to define mock.On call
+func (_e *Config_Expecter) WF() *Config_WF_Call {
+	return &Config_WF_Call{Call: _e.mock.On("WF")}
 }
 
-func (_c *Config_Workflow_Call) Run(run func()) *Config_Workflow_Call {
+func (_c *Config_WF_Call) Run(run func()) *Config_WF_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *Config_Workflow_Call) Return(_a0 config.Workflow) *Config_Workflow_Call {
+func (_c *Config_WF_Call) Return(_a0 config.Workflow) *Config_WF_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *Config_Workflow_Call) RunAndReturn(run func() config.Workflow) *Config_Workflow_Call {
+func (_c *Config_WF_Call) RunAndReturn(run func() config.Workflow) *Config_WF_Call {
 	_c.Call.Return(run)
 	return _c
 }

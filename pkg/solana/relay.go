@@ -79,7 +79,7 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if r.chain.Config().Workflow() != nil {
+		if r.chain.Config().WF() != nil {
 			if r.capabilitiesRegistry == nil {
 				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
 				return nil
@@ -95,7 +95,7 @@ func (r *Relayer) Start(ctx context.Context) error {
 				return fmt.Errorf("failed to initialise write target capability: %w", err)
 			}
 
-			dr, err := writetarget.NewDeriveRemaining(r.chain.MultiClient(), r.chain.Config().Workflow(), r.lggr)
+			dr, err := writetarget.NewDeriveRemaining(r.chain.MultiClient(), r.chain.Config().WF(), r.lggr)
 			if err != nil {
 				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
 			}

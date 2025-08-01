@@ -79,7 +79,7 @@ type Config interface {
 	LogPollerStartingLookback() time.Duration
 
 	// workflow
-	Workflow() Workflow
+	WF() Workflow
 }
 
 type Workflow interface {

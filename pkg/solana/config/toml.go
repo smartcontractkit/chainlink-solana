@@ -119,9 +119,9 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	*WorkflowConfig `toml:"workflow,omitempty"`
-	MultiNode       mnCfg.MultiNodeConfig
-	Nodes           Nodes
+	Workflow  *WorkflowConfig
+	MultiNode mnCfg.MultiNodeConfig
+	Nodes     Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
@@ -242,8 +242,8 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 
 var _ Config = &TOMLConfig{}
 
-func (c *TOMLConfig) Workflow() Workflow {
-	if c.WorkflowConfig == nil {
+func (c *TOMLConfig) WF() Workflow {
+	if c.Workflow == nil {
 		return nil
 	}
 
@@ -251,38 +251,38 @@ func (c *TOMLConfig) Workflow() Workflow {
 }
 
 func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
-	return c.WorkflowConfig.AcceptanceTimeout.Duration()
+	return c.Workflow.AcceptanceTimeout.Duration()
 }
 
 func (c *TOMLConfig) PollPeriod() time.Duration {
-	return c.WorkflowConfig.PollPeriod.Duration()
+	return c.Workflow.PollPeriod.Duration()
 }
 
 func (c *TOMLConfig) ForwarderAddress() string {
-	return *c.WorkflowConfig.ForwarderAddress
+	return *c.Workflow.ForwarderAddress
 }
 
 func (c *TOMLConfig) FromAddress() string {
-	return *c.WorkflowConfig.FromAddress
+	return *c.Workflow.FromAddress
 }
 
 func (c *TOMLConfig) ForwarderState() string {
-	return *c.WorkflowConfig.ForwarderState
+	return *c.Workflow.ForwarderState
 }
 
 func (c *TOMLConfig) OraclesConfigPDA() string {
-	return *c.WorkflowConfig.OraclesConfigPDA
+	return *c.Workflow.OraclesConfigPDA
 }
 
 func (c *TOMLConfig) LookupTable() string {
-	return *c.WorkflowConfig.LookupTable
+	return *c.Workflow.LookupTable
 }
 
 func (c *TOMLConfig) GasLimitDefault() *uint64 {
-	return c.WorkflowConfig.GasLimitDefault
+	return c.Workflow.GasLimitDefault
 }
 func (c *TOMLConfig) TxAcceptanceState() *commontypes.TransactionStatus {
-	return c.WorkflowConfig.TxAcceptanceState
+	return c.Workflow.TxAcceptanceState
 }
 
 func (c *TOMLConfig) BlockTime() time.Duration {

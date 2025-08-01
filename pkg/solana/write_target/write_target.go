@@ -30,8 +30,8 @@ type Chain interface {
 func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainInfo commontypes.ChainInfo, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	chainID := chain.ID()
 
-	id := generateWriteTargetName(chainID)
-	cfg := chain.Config().Workflow()
+	id := GenerateWriteTargetName(chainID)
+	cfg := chain.Config().WF()
 
 	// TODO metrics used to initialize product processors
 	_, err := df.NewMetrics()
@@ -131,7 +131,7 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (string, error) {
 	return r.Config.Address, nil
 }
 
-func generateWriteTargetName(chainID string) string {
+func GenerateWriteTargetName(chainID string) string {
 	id := fmt.Sprintf("write_%v@1.0.0", chainID)
 
 	chainName, err := chainselectors.SolanaNameFromChainId(chainID)
