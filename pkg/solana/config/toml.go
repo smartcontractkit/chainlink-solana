@@ -119,7 +119,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	Workflow  *WorkflowConfig
+	Workflow  WorkflowConfig
 	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
@@ -243,7 +243,7 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 var _ Config = &TOMLConfig{}
 
 func (c *TOMLConfig) WF() Workflow {
-	if c.Workflow == nil {
+	if !c.Workflow.Enabled {
 		return nil
 	}
 

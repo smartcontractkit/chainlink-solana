@@ -106,6 +106,7 @@ type WorkflowConfig struct {
 	LookupTable       *string
 	GasLimitDefault   *uint64
 	TxAcceptanceState *commontypes.TransactionStatus
+	Enabled           bool
 }
 
 type Chain struct {
