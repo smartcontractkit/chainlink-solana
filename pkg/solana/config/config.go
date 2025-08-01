@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -86,7 +85,7 @@ type Config interface {
 type Workflow interface {
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-	ForwarderAddress() solana.PublicKey
+	ForwarderAddress() string
 	FromAddress() string
 	ForwarderState() string
 	OraclesConfigPDA() string
@@ -100,7 +99,7 @@ type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
 	PollPeriod        *config.Duration
 
-	ForwarderAddress  *solana.PublicKey
+	ForwarderAddress  *string
 	FromAddress       *string
 	ForwarderState    *string
 	OraclesConfigPDA  *string

@@ -78,7 +78,7 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 		ChainService:         chain,
 		ConfigValidateFn:     evaluate,
 		NodeAddress:          cfg.FromAddress(),
-		ForwarderAddress:     cfg.ForwarderAddress().String(),
+		ForwarderAddress:     cfg.ForwarderAddress(),
 		TargetStrategy:       ts,
 		WriteAcceptanceState: *cfg.TxAcceptanceState(),
 	}

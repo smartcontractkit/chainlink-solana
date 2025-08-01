@@ -400,7 +400,10 @@ func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []
 func accountsFromConfig(cfg config.Workflow) (accounts, error) {
 	var ret accounts
 	var err error
-	ret.forwarderProgramID = cfg.ForwarderAddress()
+	ret.forwarderProgramID, err = solana.PublicKeyFromBase58(cfg.ForwarderAddress())
+	if err != nil {
+		return ret, err
+	}
 
 	ret.forwarderState, err = solana.PublicKeyFromBase58(cfg.ForwarderState())
 	if err != nil {

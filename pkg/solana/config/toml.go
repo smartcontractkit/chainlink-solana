@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
@@ -268,7 +267,7 @@ func (c *TOMLConfig) PollPeriod() time.Duration {
 	return c.Workflow.PollPeriod.Duration()
 }
 
-func (c *TOMLConfig) ForwarderAddress() solana.PublicKey {
+func (c *TOMLConfig) ForwarderAddress() string {
 	return *c.Workflow.ForwarderAddress
 }
 
