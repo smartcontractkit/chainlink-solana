@@ -106,18 +106,18 @@ func (r *Relayer) Start(ctx context.Context) error {
 				return fmt.Errorf("failed to initialise write target capability: %w", err)
 			}
 
-			dr, err := writetarget.NewDeriveRemaining(r.chain.MultiClient(), r.chain.Config().WF(), r.lggr)
-			if err != nil {
-				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
-			}
+			//dr, err := writetarget.NewDeriveRemaining(r.chain.MultiClient(), r.chain.Config().WF(), r.lggr)
+			//if err != nil {
+			//	return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
+			//}
 
 			if err := r.capabilitiesRegistry.Add(ctx, wt); err != nil {
 				return fmt.Errorf("failed to register capability: %w", err)
 			}
 
-			if err := r.capabilitiesRegistry.Add(ctx, dr); err != nil {
-				return fmt.Errorf("failed to register capability: %w", err)
-			}
+			//if err := r.capabilitiesRegistry.Add(ctx, dr); err != nil {
+			//	return fmt.Errorf("failed to register capability: %w", err)
+			//}
 
 			r.lggr.Infow("Registered write target", "chain_id", r.chain.ID())
 		}
