@@ -43,6 +43,9 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	url := "http://127.0.0.1:" + portStr
 	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
+	// args1 := []string{"--version"}
+	t.Logf("test log")
+
 	args := append([]string{
 		"--reset",
 		"--rpc-port", portStr,

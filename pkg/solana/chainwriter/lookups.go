@@ -100,7 +100,7 @@ type ATALookup struct {
 	Location string
 	// If the field exists, initialize a ATA account using the Wallet, Token Program, and Mint addresses below
 	WalletAddress Lookup
-	TokenProgram  Lookup
+	TokenProgram  Lookup // Deprecated: The token program is now fetched from the mint account
 	MintAddress   Lookup
 	Optional      bool
 }
