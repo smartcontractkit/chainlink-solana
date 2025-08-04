@@ -14,7 +14,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/go-viper/mapstructure/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
