@@ -165,12 +165,12 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
 		if err != nil {
-			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedID)
+			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v: %w", feedID, err)
 		}
 
 		decimalReportAccount, err := dr.client.GetAccountInfoWithOpts(ctx, decimalReportKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching decimal report account %v for data id %v", decimalReportKey, feedID)
+			return nil, fmt.Errorf("error fetching decimal report account %v for data id %v: %w", decimalReportKey, feedID, err)
 		}
 
 		if decimalReportAccount.Value == nil {
