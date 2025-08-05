@@ -97,7 +97,11 @@ pub mod data_feeds_cache {
         }
 
         if changed {
-            emit!(FeedAdminUpdated { admin, is_admin });
+            emit!(FeedAdminUpdated {
+                state: ctx.accounts.state.key(),
+                admin,
+                is_admin
+            });
         }
 
         Ok(())
@@ -117,6 +121,7 @@ pub mod data_feeds_cache {
 
         state.proposed_owner = proposed_owner;
         emit!(OwnershipTransfer {
+            state: ctx.accounts.state.key(),
             current_owner: state.owner,
             proposed_owner
         });
@@ -128,6 +133,7 @@ pub mod data_feeds_cache {
         let state = &mut ctx.accounts.state.load_mut()?;
 
         emit!(OwnershipAcceptance {
+            state: ctx.accounts.state.key(),
             previous_owner: state.owner,
             new_owner: state.proposed_owner
         });
@@ -152,7 +158,10 @@ pub mod data_feeds_cache {
             DataCacheError::FeedConfigListNotEmpty
         );
 
-        emit!(DecimalReportClosed { data_id: data_id });
+        emit!(DecimalReportClosed {
+            state: ctx.accounts.state.key(),
+            data_id: data_id
+        });
 
         Ok(())
     }
@@ -206,7 +215,10 @@ pub mod data_feeds_cache {
                 let mut dst = curr_report_account_info.try_borrow_mut_data()?;
                 dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&DecimalReport::discriminator());
 
-                emit!(DecimalReportInitialized { data_id: *data_id });
+                emit!(DecimalReportInitialized {
+                    state: ctx.accounts.state.key(),
+                    data_id: *data_id
+                });
             }
 
             // todo: probably optional... just makes sure the account is the right type
@@ -221,6 +233,7 @@ pub mod data_feeds_cache {
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
         emit!(LegacyFeedsConfigInitialized {
+            state: ctx.accounts.state.key(),
             config: ctx.accounts.legacy_feeds_config.key()
         });
 
@@ -240,6 +253,7 @@ pub mod data_feeds_cache {
         write_disabled: Vec<bool>,
     ) -> Result<()> {
         emit!(LegacyFeedsConfigUpdated {
+            state: ctx.accounts.state.key(),
             config: ctx.accounts.legacy_feeds_config.key()
         });
 
@@ -661,6 +675,7 @@ pub mod data_feeds_cache {
             feed_config.description = descriptions[i];
 
             emit!(DecimalFeedConfigSet {
+                state: ctx.accounts.state.key(),
                 data_id: *curr_data_id,
                 decimals: get_decimals(curr_data_id),
                 description: descriptions[i],
@@ -798,6 +813,7 @@ pub mod data_feeds_cache {
             .is_err()
             {
                 emit!(InvalidUpdatePermission {
+                    state: ctx.accounts.cache_state.key(),
                     data_id: received_decimal_report.data_id,
                     sender: ctx.accounts.forwarder_authority.key(),
                     workflow_owner: workflow_owner
@@ -835,6 +851,7 @@ pub mod data_feeds_cache {
             // dont update if the received report is stale
             if received_decimal_report.timestamp <= latest_report.timestamp {
                 emit!(StaleDecimalReport {
+                    state: ctx.accounts.cache_state.key(),
                     data_id: received_decimal_report.data_id,
                     received_timestamp: received_decimal_report.timestamp,
                     latest_timestamp: latest_report.timestamp
@@ -853,6 +870,7 @@ pub mod data_feeds_cache {
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
 
             emit!(DecimalReportUpdate {
+                state: ctx.accounts.cache_state.key(),
                 answer: received_decimal_report.answer,
                 timestamp: received_decimal_report.timestamp,
                 data_id: received_decimal_report.data_id
@@ -988,6 +1006,7 @@ pub mod data_feeds_cache {
             };
 
             emit!(LegacyFeedsReported {
+                state: ctx.accounts.cache_state.key(),
                 feeds_skipped: feeds_skipped.iter().map(|e| e.0.data_id).collect(),
                 feeds_written: feeds_written.iter().map(|e| e.0.data_id).collect(),
             });

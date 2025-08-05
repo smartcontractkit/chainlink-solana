@@ -4,6 +4,7 @@ use crate::state::WorkflowMetadata;
 
 #[event]
 pub struct DecimalFeedConfigSet {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
     pub decimals: u8,
     pub description: [u8; 32],
@@ -13,12 +14,14 @@ pub struct DecimalFeedConfigSet {
 // todo: should be per
 #[event]
 pub struct LegacyFeedsReported {
+    pub state: Pubkey,
     pub feeds_skipped: Vec<[u8; 16]>,
     pub feeds_written: Vec<[u8; 16]>,
 }
 
 #[event]
 pub struct InvalidUpdatePermission {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
     pub sender: Pubkey,
     pub workflow_owner: [u8; 20],
@@ -27,6 +30,7 @@ pub struct InvalidUpdatePermission {
 
 #[event]
 pub struct StaleDecimalReport {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
     pub received_timestamp: u32,
     pub latest_timestamp: u32,
@@ -34,6 +38,7 @@ pub struct StaleDecimalReport {
 
 #[event]
 pub struct DecimalReportUpdate {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
     pub timestamp: u32,
     pub answer: u128,
@@ -41,39 +46,46 @@ pub struct DecimalReportUpdate {
 
 #[event]
 pub struct FeedAdminUpdated {
+    pub state: Pubkey,
     pub admin: Pubkey,
     pub is_admin: bool,
 }
 
 #[event]
 pub struct OwnershipTransfer {
+    pub state: Pubkey,
     pub current_owner: Pubkey,
     pub proposed_owner: Pubkey,
 }
 
 #[event]
 pub struct OwnershipAcceptance {
+    pub state: Pubkey,
     pub previous_owner: Pubkey,
     pub new_owner: Pubkey,
 }
 
 #[event]
 pub struct DecimalReportInitialized {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
 }
 
 #[event]
 pub struct DecimalReportClosed {
+    pub state: Pubkey,
     pub data_id: [u8; 16],
 }
 
 #[event]
 pub struct LegacyFeedsConfigInitialized {
+    pub state: Pubkey,
     pub config: Pubkey,
 }
 
 #[event]
 pub struct LegacyFeedsConfigUpdated {
+    pub state: Pubkey,
     pub config: Pubkey,
 }
 

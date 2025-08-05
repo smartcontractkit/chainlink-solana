@@ -38,6 +38,7 @@ pub mod keystone_forwarder {
         state.owner = ctx.accounts.owner.key();
 
         emit!(InitializeEmit {
+            state: state.key(),
             owner: ctx.accounts.owner.key(),
         });
 
@@ -59,6 +60,7 @@ pub mod keystone_forwarder {
         state.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransfer {
+            state: state.key(),
             current_owner: state.owner,
             proposed_owner: state.proposed_owner
         });
@@ -73,6 +75,7 @@ pub mod keystone_forwarder {
         state.proposed_owner = Pubkey::default();
 
         emit!(OwnershipAcceptance {
+            state: state.key(),
             previous_owner: state_previous_owner,
             new_owner: state.owner
         });
@@ -89,7 +92,16 @@ pub mod keystone_forwarder {
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_init()?;
 
-        set_oracles_config(config, don_id, config_version, f, signer_addresses)
+        emit!(ConfigSet {
+            state: ctx.accounts.state.key(),
+            oracles_config: ctx.accounts.oracles_config.key(),
+            don_id,
+            config_version,
+            f,
+            signers: signer_addresses.clone(),
+        });
+
+        set_oracles_config(config, don_id, config_version, f, signer_addresses.clone())
     }
 
     pub fn update_oracles_config(
@@ -100,6 +112,15 @@ pub mod keystone_forwarder {
         signer_addresses: Vec<[u8; 20]>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_mut()?;
+
+        emit!(ConfigSet {
+            state: ctx.accounts.state.key(),
+            oracles_config: ctx.accounts.oracles_config.key(),
+            don_id,
+            config_version,
+            f,
+            signers: signer_addresses.clone(),
+        });
 
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
@@ -247,6 +268,7 @@ pub mod keystone_forwarder {
         execution_state.success = true;
 
         emit!(ReportProcessed {
+            state: ctx.accounts.state.key(),
             receiver: ctx.accounts.receiver_program.key(),
             transmission_id,
             result: true,
@@ -332,13 +354,6 @@ fn set_oracles_config(
     oracles_config.signer_addresses.clear();
 
     oracles_config.signer_addresses.extend(&signer_addresses);
-
-    emit!(ConfigSet {
-        don_id,
-        config_version,
-        f,
-        signers: signer_addresses,
-    });
 
     Ok(())
 }
