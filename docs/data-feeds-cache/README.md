@@ -296,6 +296,26 @@ Similar to init_legacy_feeds_config however it enables you to disable legacy fee
 
 ### set_decimal_feed_configs
 
+Because this function takes in a variable number of data ids and workflows, the transaction limit
+may be met if those bounds are exceeded. 
+
+Below is a table of acceptable ranges where `N` (row) is the number of data ids and `M` (column) is the number of workflows. The table value is the estimated number of bytes. This is meant to be a guideline and does 
+not necessarily guarentee the success of the transaction.
+
+Note, the table below assumes 0 deleted write permission flag accounts. Please account for them by adding to the estimated transaction size.
+
+| (N, M) | 1   | 2   | 3     | 4    | 5    | 6    | 7    | 8    | 9 | 10   |
+|-----|-----|-----|-------|------|------|------|------|------|------|------|
+| 1   | 302 | 396 | 490   | 584  | 678  | 772  | 866  | 960  | 1054 | 1148 | 
+| 2   | 414 | 540 | 666   | 792  | 918  | 1044 |      |      |      |      |      
+| 3   | 526 | 684 | 842   | 1000 |      |      |      |      |      |      |      
+| 4   | 638 | 828 | 1018  | 1208 |      |      |      |      |      |      |      
+| 5   | 750 | 972 | 1194  |      |      |      |      |      |      |      |      
+| 6   | 862 | 1116|       |      |      |      |      |      |      |      |      
+| 7   | 974 |     |       |      |      |      |      |      |      |      |      
+| 8   | 1086|     |       |      |      |      |      |      |      |      |      
+| 9   | 1198|     |       |      |      |      |      |      |      |      |         
+
 Given N data ids, N descriptions, and M workflows, this instruction will
 1. create (if doesn't exist) and update the N decimal feed config accounts
 2. create (if doesn't exist) N x M permission flag accounts (M for each data id)
@@ -531,32 +551,32 @@ Note that if you supply legacy_feeds in remaining accounts that are not required
 
 So for internal data feeds use case we said in the forwarder README that
 ```
- max_payload_size = 333
+ max_payload_size = 297
 ```
 
 Based on the payload encoding and account contexts of data feed cache on_report, here are the estimated number of decimal reports that can be sent in one transmission:
 
 
 Best case (no legacy feeds)
-
 ```
-333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N)
+297 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N)
 
-N = 7.7
+N = 6.93
 ```
 * 4 + 40*N is the total payload size for N `ReceivedDecimalReport`s
 * Remember we're using the address lookup table, so accounts take 1 byte only
 
 Worst case (all reports are tied with legacy feeds)
 
-```
-333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
 
-N = 7.5
+```
+297 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
+
+N = 6.67
 ```
 * in the account context calculations, we use 3N over 2N because the extra N comes from the legacy feed accounts in ctx.remaining_accounts
 
-So we can at most support 7 decimal feed reports with ALTs
+Rounding down, we can at most support 6 decimal feed reports with ALTs
 
 
 

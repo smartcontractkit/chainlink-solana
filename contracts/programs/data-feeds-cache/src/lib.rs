@@ -166,6 +166,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Recommended limit of N = 20 data ids can be initialized at once.
     pub fn init_decimal_reports<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitDecimalReports<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -228,6 +229,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Recommended limit of 15 legacy feeds can be initialized at once.
     pub fn init_legacy_feeds_config(
         ctx: Context<InitLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
@@ -247,6 +249,7 @@ pub mod data_feeds_cache {
         )
     }
 
+    /// Recommended limit of 15 legacy feeds can be updated at once.
     pub fn update_legacy_feeds_config(
         ctx: Context<UpdateLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
@@ -443,6 +446,11 @@ pub mod data_feeds_cache {
         Ok(delete_permission_accounts)
     }
 
+    /// Given N data ids and M workflows, configures N feed config accounts and N*M write permission accounts.
+    /// Creates feed config and permission accounts where they do not exist.
+    /// All feed config accounts and permission accounts are passed as ctx.remaining_accounts (see SetDecimalFeedConfigs context).
+    /// Because there are two variables N and M which directly influence the size, the table in
+    /// docs/data-feeds-cache/README.md#L297 shows safe ranges for N and M as guidelines.
     pub fn set_decimal_feed_configs<'info>(
         ctx: Context<'_, '_, 'info, 'info, SetDecimalFeedConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -709,6 +717,8 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Maximum amount of 6 ReceivedDecimalReports can be included in the report
+    /// for calculation look to ../../docs/data-feeds-cache/README.md#L579
     // // todo: change report and metadata to &[u8]
     pub fn on_report<'info>(
         ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,

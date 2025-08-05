@@ -154,26 +154,26 @@ We use ALTs (address lookup tables) for the following accounts for a hypothetica
 * system program
 * receiver data account state which stores some arbitrary data (part of ctx.remaining_accounts)
 
-This uses 901 bytes, so we have 1232 - 901 = 331 bytes left over for the payload. 
+This uses 937 bytes, so we have 1232 - 937 = 295 bytes left over for the payload. 
 
-This 331 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 333 bytes with a clean slate.
+This 295 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 297 (295 + 1 + 1) bytes as the theoretical maximum amount of space.
 
 In an internal data feeds use case we can assume that the receiver program is static and that the data accounts we are writing to per price asset are also static. However, a realistic use case would definitely have extra data accounts passed into ctx.remaining_accounts. 
 
 So for internal data feeds use case:
 ```
-max_payload_size = 333 - (ctx.remaining_accounts.len())
+max_payload_size = 297 - (ctx.remaining_accounts.len())
 ```
 
 For an external use-case, for an arbitrary receiver, the user will need to pass in another ALT (Solana can support passing 4 ALTs per transaction) on top of the internal ALT we always pass in. So we lose 32 bytes. Assuming the user also puts the receiver program and extra data accounts in their personal ALT:
 ```
-max_payload_size = 333 - 32 = 301 - (ctx.remaining_accounts.len())
+max_payload_size = 297 - 32 = 265 - (ctx.remaining_accounts.len())
 ```
 
 If they don't pass in another ALT:
 
 ```
-max_payload_size = 333 - 32 - 32*(ctx.remaining_accounts.len()) = 301 - 32*(ctx.remaining_accounts.len()) 
+max_payload_size = 297 - 32 - 32*(ctx.remaining_accounts.len()) = 265 - 32*(ctx.remaining_accounts.len()) 
 ```
 (the first 32 bytes is deducted for the receiver account address)
 

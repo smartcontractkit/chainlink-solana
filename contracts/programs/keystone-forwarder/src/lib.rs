@@ -133,6 +133,9 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+    /// Available space for receiver payload is 297 bytes. However, many factors will affect
+    /// this number including adding more accounts in the ctx.remaining_accounts and/or using address
+    /// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
     // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
