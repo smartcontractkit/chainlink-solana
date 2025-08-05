@@ -157,10 +157,12 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 			return nil, fmt.Errorf("invalid feed id %v", feedID)
 		}
 		dataID, _ := new(big.Int).SetString(feedID, 0)
+		var data [16]byte
+		copy(data[:], dataID.Bytes())
 		decimalReportSeeds := [][]byte{
 			[]byte("decimal_report"),
 			cacheStateKey.Bytes(),
-			dataID.Bytes(),
+			data[:],
 		}
 
 		decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, cacheProgram)
