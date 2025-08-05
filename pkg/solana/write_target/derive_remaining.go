@@ -197,13 +197,13 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
 		if err != nil {
-			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v repHash: %x authority: %s cacheState: %s cacheProgram: %s",
-				feedID, reportHash, authority.String(), cacheStateKey.String(), cacheProgram.String())
+			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
+				feedID)
 		}
 
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedID)
+			return nil, fmt.Errorf("error fetching write flag account %v for data id %v  repHash: %x authority: %s cacheState: %s cacheProgram: %s", writeFlagKey, feedID, reportHash, authority.String(), cacheStateKey.String(), cacheProgram.String())
 		}
 
 		if writeFlagAccount.Value == nil {
