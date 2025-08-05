@@ -2,8 +2,8 @@
 #![deny(rustdoc::all)]
 #![allow(rustdoc::missing_doc_code_examples)]
 #![deny(missing_docs)]
-
-use borsh::{BorshDeserialize, BorshSerialize};
+extern crate borsh as external_borsh;
+use external_borsh::{BorshDeserialize, BorshSerialize};
 
 use solana_program::{
     account_info::AccountInfo,
@@ -108,4 +108,203 @@ pub fn aggregator<'info>(
     feed: AccountInfo<'info>,
 ) -> Result<Pubkey, ProgramError> {
     query(program_id, feed, Query::Aggregator)
+}
+
+/// Support direct reads from feed accounts
+pub mod direct {
+    use super::Round;
+    use std::{cell::Ref, convert::TryInto, mem::size_of};
+
+    use anchor_lang::prelude::*;
+
+    ///
+    #[constant]
+    pub const HEADER_SIZE: usize = 192;
+
+    /// Potential Errors
+    #[derive(Debug)]
+    pub enum ReadError {
+        /// Transmissions deserialization failed
+        DeserializeFailed,
+        /// Feed Length is not 1
+        FeedLengthInvalid,
+        /// Feed data missing
+        MalformedData,
+    }
+
+    /// Internal representation of a single transmission
+    #[repr(C)]
+    #[derive(
+        Debug,
+        Default,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        bytemuck::Pod,
+        bytemuck::Zeroable,
+    )]
+    pub struct Transmission {
+        slot: u64,
+        timestamp: u32,
+        _padding0: u32,
+        answer: i128,
+        _padding1: u64,
+        _padding2: u64,
+    }
+
+    /// Feed consists of metadata header and transmission
+    pub struct Feed {
+        /// Header contains important metadata
+        header: Transmissions,
+        /// Contains a single transmission
+        live: Transmission,
+    }
+
+    /// Transmissions includes the header information
+    #[account]
+    pub struct Transmissions {
+        version: u8,
+        state: u8,
+        owner: Pubkey,
+        proposed_owner: Pubkey,
+        writer: Pubkey,
+        description: [u8; 32],
+        decimals: u8,
+        flagging_threshold: u32,
+        latest_round_id: u32,
+        granularity: u8,
+        live_length: u32,
+        live_cursor: u32,
+        historical_cursor: u32,
+    }
+
+    /// Reads account's data. Pass in account_info.try_borrow_data()?;
+    pub fn read<'a>(data: Ref<&'a mut [u8]>) -> std::result::Result<Feed, ReadError> {
+        let header = Transmissions::try_deserialize(&mut &data[..])
+            .map_err(|_| ReadError::DeserializeFailed)?;
+
+        let (_header, rest) = data.split_at(8 + HEADER_SIZE);
+
+        let array: &[u8; 48] = rest
+            .get(..size_of::<Transmission>())
+            .and_then(|s| s.try_into().ok())
+            .ok_or(ReadError::MalformedData)?;
+
+        let live_trans = *bytemuck::from_bytes::<Transmission>(array);
+
+        let feed = Feed {
+            header,
+            live: live_trans,
+        };
+
+        if feed.header.live_length != 1 {
+            return Err(ReadError::FeedLengthInvalid);
+        }
+
+        Ok(feed)
+    }
+
+    impl Feed {
+        /// Returns round data for the latest round.
+        pub fn latest_round_data(&self) -> Option<Round> {
+            if self.header.latest_round_id == 0 {
+                return None;
+            }
+
+            Some(Round {
+                round_id: self.header.latest_round_id,
+                slot: self.live.slot,
+                timestamp: self.live.timestamp,
+                answer: self.live.answer,
+            })
+        }
+
+        /// Returns the feed description.
+        pub fn description(&self) -> [u8; 32] {
+            self.header.description
+        }
+
+        /// Returns the amount of decimal places.
+        pub fn decimals(&self) -> u8 {
+            self.header.decimals
+        }
+
+        /// Returns the address of the underlying OCR2 aggregator.
+        pub fn aggregator(&self) -> Pubkey {
+            self.header.writer
+        }
+
+        /// Query the feed version.
+        pub fn version(&self) -> u8 {
+            self.header.version
+        }
+    }
+
+    #[test]
+    fn test_feed_read() {
+        use anchor_lang::AnchorSerialize;
+        use anchor_lang::Discriminator;
+        use std::cell::RefCell;
+
+        #[constant]
+        pub const T_START: usize = 8 + HEADER_SIZE;
+
+        #[constant]
+        pub const T_END: usize = 8 + HEADER_SIZE + size_of::<Transmission>();
+
+        let alignment = std::mem::align_of::<Transmission>();
+
+        print!("alignment {:?}", alignment);
+
+        let mut buffer = [0u8; 8 + HEADER_SIZE + size_of::<Transmission>()];
+
+        let header = Transmissions {
+            version: 1,
+            state: 0,
+            owner: Pubkey::default(),
+            proposed_owner: Pubkey::default(),
+            writer: Pubkey::default(),
+            description: [0; 32],
+            decimals: 8,
+            flagging_threshold: 42,
+            latest_round_id: 10,
+            granularity: 1,
+            live_length: 1,
+            live_cursor: 0,
+            historical_cursor: 0,
+        };
+
+        let discriminator = Transmissions::discriminator(); // [u8; 8]
+        buffer[..8].copy_from_slice(&discriminator);
+
+        header.serialize(&mut &mut buffer[8..]).unwrap();
+
+        let dummy_tx = Transmission {
+            slot: 123,
+            timestamp: 1,
+            _padding0: 0,
+            answer: 12,
+            _padding1: 0,
+            _padding2: 2,
+        };
+
+        let tx_bytes = bytemuck::bytes_of(&dummy_tx);
+        buffer[T_START..T_END].copy_from_slice(tx_bytes);
+
+        let data = RefCell::new(&mut buffer[..]);
+
+        print!("hello asdfadfa");
+        let feed = read(data.borrow()).unwrap();
+        print!("pinecone");
+
+        assert_eq!(feed.header.version, 1);
+        assert_eq!(feed.live.slot, 123);
+
+        let x = feed.latest_round_data().unwrap();
+
+        assert_eq!(x.answer, 12);
+    }
 }
