@@ -387,14 +387,14 @@ func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram s
 	return ret, err
 }
 
-func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) [32]byte {
+func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) ([32]byte, []byte) {
 	var data []byte
 	data = append(data, dataID...)
 	data = append(data, forwarderAuthority...)
 	data = append(data, workflowOwner...)
 	data = append(data, workflowID...)
 
-	return sha3.Sum256(data)
+	return sha3.Sum256(data), data
 }
 
 func accountsFromConfig(cfg config.Workflow) (accounts, error) {
