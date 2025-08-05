@@ -183,7 +183,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		// add to remaining accounts
 		reportHash := createReportHash(
-			dataID.Bytes(),
+			data[:],
 			authority.Bytes(),
 			[]byte(meta.WorkflowOwner),
 			[]byte(meta.WorkflowID),
@@ -204,7 +204,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
 			return nil, fmt.Errorf("error fetching write flag account %v for data id %v owner: %x ID: %x data: %x", writeFlagKey, feedID,
-				[]byte(meta.WorkflowOwner), []byte(meta.WorkflowID), dataID.Bytes())
+				[]byte(meta.WorkflowOwner), []byte(meta.WorkflowID), data[:])
 		}
 
 		if writeFlagAccount.Value == nil {
