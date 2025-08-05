@@ -197,6 +197,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
 		if err != nil {
+			dr.lggr.Info("rep hash", reportHash, "authority", authority, "dataID", dataID)
 			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v", feedID)
 		}
 
