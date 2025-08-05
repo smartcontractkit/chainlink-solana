@@ -2,6 +2,7 @@ package writetarget
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/sha3"
 	"errors"
 	"fmt"
@@ -387,14 +388,14 @@ func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram s
 	return ret, err
 }
 
-func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) ([32]byte, []byte) {
+func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) [32]byte {
 	var data []byte
 	data = append(data, dataID...)
 	data = append(data, forwarderAuthority...)
 	data = append(data, workflowOwner...)
 	data = append(data, workflowID...)
 
-	return sha3.Sum256(data), data
+	return sha256.Sum256(data)
 }
 
 func accountsFromConfig(cfg config.Workflow) (accounts, error) {

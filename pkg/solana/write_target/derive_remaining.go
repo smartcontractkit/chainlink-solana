@@ -182,7 +182,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		derivedAccounts[i] = &solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
 
 		// add to remaining accounts
-		reportHash, buf := createReportHash(
+		reportHash := createReportHash(
 			data[:],
 			authority.Bytes(),
 			[]byte(meta.WorkflowOwner),
@@ -204,7 +204,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
 			return nil, fmt.Errorf("error fetching write flag account %v for data id %v owner: %x ID: %x data: %x authority: %s hash: %x \nbuf: %x", writeFlagKey, feedID,
-				[]byte(meta.WorkflowOwner), []byte(meta.WorkflowID), data[:], authority.String(), reportHash, buf)
+				[]byte(meta.WorkflowOwner), []byte(meta.WorkflowID), data[:], authority.String(), reportHash)
 		}
 
 		if writeFlagAccount.Value == nil {
