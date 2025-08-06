@@ -233,6 +233,8 @@ pub mod data_feeds_cache {
     }
 
     /// Recommended limit of 15 legacy feeds can be initialized at once.
+    /// Instruction does not verify internally if data id and associated legacy feed account
+    /// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
     pub fn init_legacy_feeds_config(
         ctx: Context<InitLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
@@ -253,6 +255,8 @@ pub mod data_feeds_cache {
     }
 
     /// Recommended limit of 15 legacy feeds can be updated at once.
+    /// Instruction does not verify internally if data id and associated legacy feed account
+    /// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
     pub fn update_legacy_feeds_config(
         ctx: Context<UpdateLegacyFeedsConfig>,
         data_ids: Vec<[u8; 16]>,
