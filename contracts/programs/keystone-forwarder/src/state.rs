@@ -36,6 +36,7 @@ pub struct ForwarderState {
     pub proposed_owner: Pubkey,
 }
 
+/// Will never be closed. Provides verification if a transmission was received successfully on-chain.
 #[account]
 #[derive(Default, InitSpace)]
 pub struct ExecutionState {

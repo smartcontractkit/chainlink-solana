@@ -25,6 +25,8 @@ use state::{
 // derived from hash::hash("global:cache_submit".as_bytes()).to_bytes()[..8].to_vec()
 pub const SUBMIT_DISCRIMINATOR: [u8; 8] = [173, 69, 171, 96, 179, 143, 243, 226];
 
+///
+/// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds.
 #[program]
 pub mod data_feeds_cache {
 
