@@ -143,8 +143,9 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    // closes the decimal report account and feed config account
-    // you must set the feed configs workflowmetadata to empty list beforehand
+    /// Closes the data id's associated decimal report account and feed config account.
+    /// The feed config must have an empty workflow metadata list, by calling
+    /// `set_decimal_feeds_config` prior
     pub fn close_decimal_report(ctx: Context<CloseDecimalReport>, data_id: [u8; 16]) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
@@ -449,6 +450,8 @@ pub mod data_feeds_cache {
     /// Given N data ids and M workflows, configures N feed config accounts and N*M write permission accounts.
     /// Creates feed config and permission accounts where they do not exist.
     /// All feed config accounts and permission accounts are passed as ctx.remaining_accounts (see SetDecimalFeedConfigs context).
+    /// If you'd like to prepare the feed config account for closing by calling `close_decimal_report` you need to 
+    /// set the data id's feed config to an empty workflow metadata and [0; 32] (empty) description.
     /// Because there are two variables N and M which directly influence the size, the table in
     /// docs/data-feeds-cache/README.md#L297 shows safe ranges for N and M as guidelines.
     pub fn set_decimal_feed_configs<'info>(
