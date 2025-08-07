@@ -9,6 +9,9 @@ use static_assertions::const_assert;
 
 use crate::common::MAX_WORKFLOW_METADATAS;
 
+/// Cache State account contains owners and admin 
+/// information in addition to the bump/nonce for the 
+/// PDA which writes to legacy data feeds
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct CacheState {
@@ -19,6 +22,7 @@ pub struct CacheState {
     pub _padding: [u8; 7],
 }
 
+/// Decimal report received by the cache from the forwarder
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct ReceivedDecimalReport {
     pub timestamp: u32,
@@ -27,12 +31,14 @@ pub struct ReceivedDecimalReport {
 }
 // 16 + 20 + 4 = 40 bytes
 
+/// Report sent to legacy feed
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct CacheTransmission {
     pub timestamp: u32,
     pub answer: u128,
 }
 
+/// Decimal Report stored
 #[account]
 #[derive(InitSpace)]
 pub struct DecimalReport {
@@ -40,7 +46,9 @@ pub struct DecimalReport {
     pub answer: u128,
 }
 
-// account also derived by the dataId
+/// Contains feed information such as description
+/// and the authorized workflows permitted to
+/// report on the data id. Account key is derived by the data id.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct FeedConfig {
@@ -49,6 +57,7 @@ pub struct FeedConfig {
     pub workflow_metadata: WorkflowMetadataList,
 }
 
+/// Fixed size struct which stores list of public keys
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct AccountList {
@@ -60,6 +69,8 @@ const_assert!(
     mem::size_of::<AccountList>() == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ENTRIES
 );
 
+
+/// Fixed size struct which stores list of workflow metadatas
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct WorkflowMetadataList {
@@ -74,7 +85,8 @@ const_assert!(
                 * MAX_WORKFLOW_METADATAS
 );
 
-// #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, InitSpace)]
+/// Represents information about a workflow which can be used to authorize it 
+/// for the reporting of a feed
 #[zero_copy]
 #[derive(InitSpace, BorshSerialize, BorshDeserialize)]
 pub struct WorkflowMetadata {
@@ -83,11 +95,12 @@ pub struct WorkflowMetadata {
     pub allowed_workflow_name: [u8; 10], // ──╯ Name of the workflow UTF-bytes encoded
 }
 
+/// The existence of this account means that a data id can be reported by a workflow
 #[account]
 #[derive(Default)]
 pub struct WritePermissionFlag {}
 
-// 16 + 32 = 48 bytes
+/// Contains config information of a legacy feed
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct LegacyFeedEntry {
@@ -100,9 +113,10 @@ pub struct LegacyFeedEntry {
     pub write_disabled: u8,
 }
 
-// in reality, there are only ~14 legacy feeds, but we provide a healthy buffer
+// in reality, there are only ~14 legacy feeds at the time of writing, but we provide a healthy buffer
 const MAX_ENTRIES: usize = 64;
 
+/// Fixed size struct which stores list of legacy feed entries.
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct LegacyFeedList {
@@ -118,9 +132,10 @@ const_assert!(
                 * MAX_ENTRIES
 );
 
-// 3080 + 32 = 3112 (can use init)
-// flagged feeds need to be written to the legacy store
-// we can assume there's only going to be a limited amount of legacy feeds
+
+/// Stores data ids which are flagged to have their reports written to 
+/// the legacy store program as well. 
+/// We can assume there's only going to be a limited amount of legacy feeds to write to
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct LegacyFeedsConfig {
