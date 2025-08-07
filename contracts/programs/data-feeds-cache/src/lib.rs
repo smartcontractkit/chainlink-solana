@@ -772,14 +772,6 @@ pub mod data_feeds_cache {
 
         let legacy_feeds_config = if let Some(loader) = &ctx.accounts.legacy_feeds_config {
             let loader = loader.load()?;
-            // check legacy feed entries are sorted by data id
-            require!(
-                loader
-                    .id_to_feed
-                    .windows(2)
-                    .all(|w| w[0].data_id < w[1].data_id),
-                DataCacheError::IdsMustStrictlyIncrease
-            );
 
             // if included, check that the legacy store passed in via account context the same as the one in the config
             if let Some(legacy_store) = &ctx.accounts.legacy_store {
