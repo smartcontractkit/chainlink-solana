@@ -575,7 +575,6 @@ pub mod data_feeds_cache {
 
             let feed_config_exists = feed_config_account_infos[i].data_len() != 0;
 
-            // todo: make string a [u8; 32]
             let feed_config_loader = if feed_config_exists {
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
             } else {
@@ -617,14 +616,13 @@ pub mod data_feeds_cache {
                 // go over current workflows
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-
                     let derived_report_hash = create_report_hash(
                         curr_data_id,
                         &metadata.allowed_sender,
                         &metadata.allowed_workflow_owner,
                         &metadata.allowed_workflow_name,
                     );
-                    // todo: should you store the nonce? or permission account in metadata? i don't think it is necessary
+
                     let (permission_flag, _) = Pubkey::find_program_address(
                         &[
                             b"permission_flag",
@@ -758,16 +756,11 @@ pub mod data_feeds_cache {
     /// There are three optional accounts, all related to legacy feed writing.
     /// If you omit any of these or have write_disabled = 1 for all feeds
     /// then we guarentee no legacy feeds will be written to.
-    // // todo: change report and metadata to &[u8]
     pub fn on_report<'info>(
         ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
         metadata: Vec<u8>,
         report: Vec<u8>,
     ) -> Result<()> {
-        // todo: check if legacy_store and legacy_feed_config are both there
-        // let legacy_feed_config_included = ctx.accounts.legacy_feeds_config.is_some();
-        // let legacy_store_included = ctx.accounts.legacy_store.is_some();
-
         let legacy_feeds_config = if let Some(loader) = &ctx.accounts.legacy_feeds_config {
             let loader = loader.load()?;
 
@@ -916,8 +909,6 @@ pub mod data_feeds_cache {
                 timestamp: received_decimal_report.timestamp,
                 data_id: received_decimal_report.data_id
             });
-
-            // todo: add dfc update event here
 
             // 3. check if the report is also associated with a legacy feed
             // a. search config by data_id to get the account key

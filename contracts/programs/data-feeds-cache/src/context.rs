@@ -64,7 +64,7 @@ pub struct InitLegacyFeedsConfig<'info> {
     #[account(
         init,
         payer = owner,
-        space = ANCHOR_DISCRIMINATOR + LegacyFeedsConfig::INIT_SPACE, // todo add legacy feeds config size
+        space = ANCHOR_DISCRIMINATOR + LegacyFeedsConfig::INIT_SPACE,
         seeds = [b"legacy_feeds_config", state.key().as_ref()],
         bump
     )]
@@ -78,7 +78,7 @@ pub struct InitLegacyFeedsConfig<'info> {
     // pub legacy_feed: UncheckedAccount<'info>
 }
 
-// todo: the offchain code will need to wrap add/remove data_ids mappings
+
 #[derive(Accounts)]
 pub struct UpdateLegacyFeedsConfig<'info> {
     #[account(mut, address = state.load()?.owner @ AuthError::Unauthorized)]
@@ -206,7 +206,6 @@ pub struct PreviewDecimalFeedConfigs<'info> {
 
 #[derive(Accounts)]
 pub struct SetDecimalFeedConfigs<'info> {
-    // todo: inline check if it is an admin
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
@@ -293,7 +292,7 @@ pub struct OnReport<'info> {
 
     // omit if you don't want to write to the store
     #[account(
-        seeds = [b"legacy_feeds_config", cache_state.key().as_ref()], // todo: add the current state
+        seeds = [b"legacy_feeds_config", cache_state.key().as_ref()],
         bump
     )]
     pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>,

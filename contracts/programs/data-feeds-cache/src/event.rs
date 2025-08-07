@@ -11,7 +11,6 @@ pub struct DecimalFeedConfigSet {
     pub workflow_metadatas: Vec<WorkflowMetadata>,
 }
 
-// todo: should be per
 #[event]
 pub struct LegacyFeedsReported {
     pub state: Pubkey,
