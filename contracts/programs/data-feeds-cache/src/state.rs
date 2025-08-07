@@ -9,8 +9,8 @@ use static_assertions::const_assert;
 
 use crate::common::MAX_WORKFLOW_METADATAS;
 
-/// Cache State account contains owners and admin 
-/// information in addition to the bump/nonce for the 
+/// Cache State account contains owners and admin
+/// information in addition to the bump/nonce for the
 /// PDA which writes to legacy data feeds
 #[account(zero_copy)]
 #[derive(InitSpace)]
@@ -69,7 +69,6 @@ const_assert!(
     mem::size_of::<AccountList>() == mem::size_of::<u64>() + mem::size_of::<Pubkey>() * MAX_ENTRIES
 );
 
-
 /// Fixed size struct which stores list of workflow metadatas
 #[zero_copy]
 #[derive(InitSpace)]
@@ -85,7 +84,7 @@ const_assert!(
                 * MAX_WORKFLOW_METADATAS
 );
 
-/// Represents information about a workflow which can be used to authorize it 
+/// Represents information about a workflow which can be used to authorize it
 /// for the reporting of a feed
 #[zero_copy]
 #[derive(InitSpace, BorshSerialize, BorshDeserialize)]
@@ -132,9 +131,8 @@ const_assert!(
                 * MAX_ENTRIES
 );
 
-
-/// Stores data ids which are flagged to have their reports written to 
-/// the legacy store program as well. 
+/// Stores data ids which are flagged to have their reports written to
+/// the legacy store program as well.
 /// We can assume there's only going to be a limited amount of legacy feeds to write to
 #[account(zero_copy)]
 #[derive(InitSpace)]

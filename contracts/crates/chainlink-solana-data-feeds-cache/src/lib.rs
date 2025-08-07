@@ -22,7 +22,7 @@ pub fn query_values<'info>(
 
 /// Returns a feed's workflow metadata. Chunks return values by `max_count`.
 /// Can be used on-chain to verify a feed's configuration.
-/// If `start_index` is out of bounds the function will return an empty array. 
+/// If `start_index` is out of bounds the function will return an empty array.
 /// If `max_count = 0` then function will return the entire workflow metadata list.
 pub fn query_feed_metadata<'info>(
     data_cache_program: AccountInfo<'info>,

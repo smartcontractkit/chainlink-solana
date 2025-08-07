@@ -22,9 +22,11 @@ mod utils;
 
 declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 
-/// Forwarder authenticates chainlink reports and relays them to designated receiver programs. 
+/// Forwarder authenticates chainlink reports and relays them to designated receiver programs.
 #[program]
 pub mod keystone_forwarder {
+    use std::io::Cursor;
+
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
     use crate::{
@@ -107,7 +109,7 @@ pub mod keystone_forwarder {
 
     /// Initialize oracles config which describes the set of oracles which
     /// are expected to sign a verified forwarder report. Many oracle config accounts
-    /// may exist for a forwarder because more than one DON may be allowed to sign 
+    /// may exist for a forwarder because more than one DON may be allowed to sign
     /// reports for a forwarder.
     pub fn init_oracles_config(
         ctx: Context<InitOraclesConfig>,
@@ -162,8 +164,8 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    /// The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report. 
-    /// After verification it will create a PDA to store the execution state if it does not exist. 
+    /// The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report.
+    /// After verification it will create a PDA to store the execution state if it does not exist.
     /// The ctx.remaining_accounts accounts are passed on to the receiver, alongside the forwarder state account
     /// and forwarder authority signer.
     /// Available space for receiver payload is ~ 297 bytes. However, many factors will affect
@@ -262,15 +264,26 @@ pub mod keystone_forwarder {
             ForwarderError::InvalidAccountHash
         );
 
+        let mut payload: Vec<u8> = Vec::with_capacity(
+            ON_REPORT_DISCRIMINATOR.len()
+                + 4
+                + (METADATA_LENGTH - FORWARDER_METADATA_LENGTH)
+                + 4
+                + forwarder_report.payload.len(),
+        );
+
         // payload begins with the Anchor discriminator
-        let mut payload = ON_REPORT_DISCRIMINATOR.to_vec();
+        payload.extend_from_slice(&ON_REPORT_DISCRIMINATOR);
+        let mut cursor = Cursor::new(&mut payload);
+        cursor.set_position(ON_REPORT_DISCRIMINATOR.len() as u64);
+
         // borsh serialization of metadata vector and report vector
         // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
-        let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
-        let report = forwarder_report.payload.as_slice();
-        // Borsh serialize each part separately
-        payload.extend(&metadata.try_to_vec()?);
-        payload.extend(&report.try_to_vec()?);
+        let metadata = raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
+        let report = forwarder_report.payload;
+        // Borsh serialize each part separately as Vec<u8>
+        metadata.serialize(&mut cursor)?;
+        report.serialize(&mut cursor)?;
 
         let ix = Instruction::new_with_bytes(ctx.accounts.receiver_program.key(), &payload, metas);
 

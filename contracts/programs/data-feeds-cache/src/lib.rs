@@ -49,7 +49,7 @@ pub mod data_feeds_cache {
     };
 
     use super::*;
-    
+
     /// Creates a new data cache instance with a dedicated state account.
     /// Sets the initial feed admins and state configuration.
     pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
@@ -86,7 +86,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    /// Add or remove a feed admin. 
+    /// Add or remove a feed admin.
     /// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds
     /// and the authorization of workflows.
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
@@ -186,7 +186,7 @@ pub mod data_feeds_cache {
 
     /// Create decimal report accounts, where report data lives (i.e answer, timestamp, etc.)
     /// Recommended limit of N = 20 data ids can be initialized at once.
-    /// The decimal report account and feed config account must exist before reports can 
+    /// The decimal report account and feed config account must exist before reports can
     /// be received successfully in `on_report`
     pub fn init_decimal_reports<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitDecimalReports<'info>>,
@@ -250,7 +250,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    /// Initializes the legacy feeds config account, which stores the legacy store program 
+    /// Initializes the legacy feeds config account, which stores the legacy store program
     /// and data id to legacy feed account mappings for double writing if enabled.
     /// Write disabled flags are set to 0 by default (writes enabled), however if
     /// optional legacy accounts are omitted in `on_report` context no legacy writes will occur
@@ -307,7 +307,7 @@ pub mod data_feeds_cache {
         )
     }
 
-    /// Closes the legacy feeds config. Only to be used once all legacy feeds are 
+    /// Closes the legacy feeds config. Only to be used once all legacy feeds are
     /// no longer used.
     pub fn close_legacy_feeds_config(_ctx: Context<CloseLegacyFeedsConfig>) -> Result<()> {
         Ok(())
@@ -484,7 +484,7 @@ pub mod data_feeds_cache {
     /// Given N data ids and M workflows, configures N feed config accounts and N*M write permission accounts.
     /// Creates feed config and permission accounts where they do not exist.
     /// All feed config accounts and permission accounts are passed as ctx.remaining_accounts (see SetDecimalFeedConfigs context).
-    /// If you'd like to prepare the feed config account for closing by calling `close_decimal_report` you need to 
+    /// If you'd like to prepare the feed config account for closing by calling `close_decimal_report` you need to
     /// set the data id's feed config to an empty workflow metadata and [0; 32] (empty) description.
     /// Because there are two variables N and M which directly influence the size, the table in
     /// docs/data-feeds-cache/README.md#L297 shows safe ranges for N and M as guidelines.
@@ -758,7 +758,7 @@ pub mod data_feeds_cache {
     /// Maximum amount of 6 ReceivedDecimalReports can be included in the report before
     /// the transaction limit will be exceeded.
     /// for calculation look to ../../docs/data-feeds-cache/README.md#L579
-    /// There are three optional accounts, all related to legacy feed writing. 
+    /// There are three optional accounts, all related to legacy feed writing.
     /// If you omit any of these or have write_disabled = 1 for all feeds
     /// then we guarentee no legacy feeds will be written to.
     // // todo: change report and metadata to &[u8]
@@ -1070,8 +1070,8 @@ pub mod data_feeds_cache {
     /// Returns a feed's workflow metadata. Chunks return
     /// values by `max_count`.
     /// Can be used on-chain to verify a feed's configuration.
-    /// If `start_index` is out of bounds the function will return an 
-    /// empty array. 
+    /// If `start_index` is out of bounds the function will return an
+    /// empty array.
     /// If `max_count = 0` then function will return the entire
     /// workflow metadata list.
     pub fn query_feed_metadata(

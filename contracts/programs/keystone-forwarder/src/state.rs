@@ -37,7 +37,7 @@ pub struct ForwarderState {
     pub proposed_owner: Pubkey,
 }
 
-/// Account which stores status of a transmission. 
+/// Account which stores status of a transmission.
 /// This account will never be closed because it provides persistent proof if a transmission was received on-chain.
 #[account]
 #[derive(Default, InitSpace)]
