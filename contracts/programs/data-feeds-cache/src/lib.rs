@@ -1,9 +1,7 @@
-use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use std::cell::RefMut;
-use std::io::Cursor;
-use std::{io::Write, ops::DerefMut};
+use std::{ops::DerefMut};
 
 declare_id!("3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa");
 
@@ -1235,10 +1233,6 @@ fn close_account(account: AccountInfo, destination: AccountInfo) -> Result<()> {
     for byte in data.deref_mut().iter_mut() {
         *byte = 0;
     }
-
-    let dst: &mut [u8] = &mut data;
-    let mut cursor = Cursor::new(dst);
-    cursor.write_all(&CLOSED_ACCOUNT_DISCRIMINATOR).unwrap();
 
     Ok(())
 }
