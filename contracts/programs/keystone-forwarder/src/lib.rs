@@ -182,12 +182,9 @@ pub mod keystone_forwarder {
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
-        let f = oracles_config.f;
-        require_neq!(f, 0, ForwarderError::InvalidConfig);
-
         require_gte!(
             num_signatures,
-            (f + 1) as usize,
+            (oracles_config.f + 1) as usize,
             ForwarderError::InvalidSignatureCount
         );
 

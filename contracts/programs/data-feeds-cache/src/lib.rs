@@ -1,6 +1,7 @@
 use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
+use std::cell::RefMut;
 use std::io::Cursor;
 use std::{io::Write, ops::DerefMut};
 
@@ -241,10 +242,10 @@ pub mod data_feeds_cache {
                     state: ctx.accounts.state.key(),
                     data_id: *data_id
                 });
+            } else {
+                // verify expected format
+                DecimalReport::try_deserialize(&mut &curr_report_account_info.data.borrow()[..])?;
             }
-
-            // todo: probably optional... just makes sure the account is the right type
-            DecimalReport::try_deserialize(&mut &curr_report_account_info.data.borrow()[..])?;
         }
 
         Ok(())
@@ -268,8 +269,7 @@ pub mod data_feeds_cache {
         });
 
         set_legacy_feeds_config(
-            true,
-            &mut ctx.accounts.legacy_feeds_config,
+            ctx.accounts.legacy_feeds_config.load_init()?,
             ctx.accounts.legacy_store.key(),
             ctx.remaining_accounts,
             &data_ids,
@@ -298,8 +298,7 @@ pub mod data_feeds_cache {
             .collect();
 
         set_legacy_feeds_config(
-            false,
-            &mut ctx.accounts.legacy_feeds_config,
+            ctx.accounts.legacy_feeds_config.load_mut()?,
             ctx.accounts.legacy_store.key(),
             ctx.remaining_accounts,
             &data_ids,
@@ -1264,8 +1263,7 @@ fn get_workflow_metadata(metadata: &[u8]) -> Result<(&[u8], &[u8])> {
 }
 
 fn set_legacy_feeds_config(
-    init: bool,
-    config: &mut AccountLoader<LegacyFeedsConfig>,
+    mut legacy_feeds_config: RefMut<LegacyFeedsConfig>,
     legacy_store: Pubkey,
     legacy_feeds: &[AccountInfo],
     data_ids: &[[u8; 16]],
@@ -1275,12 +1273,6 @@ fn set_legacy_feeds_config(
         data_ids.len() == legacy_feeds.len() && data_ids.len() == write_disabled.len(),
         DataCacheError::ArrayLengthMismatch
     );
-
-    let mut legacy_feeds_config = if init {
-        config.load_init()?
-    } else {
-        config.load_mut()?
-    };
 
     // reset the array
     legacy_feeds_config.id_to_feed.clear();
