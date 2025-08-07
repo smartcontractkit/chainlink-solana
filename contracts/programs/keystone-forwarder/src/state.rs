@@ -18,7 +18,7 @@ const_assert!(
         == mem::size_of::<u64>() + mem::size_of::<[u8; 20]>() * MAX_ACCTS
 );
 
-// combination of solidity's OracleSet and the configId mapping
+/// Account which represent a set of oracles expected to sign a forwarder report.
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct OraclesConfig {
@@ -28,6 +28,7 @@ pub struct OraclesConfig {
     pub signer_addresses: SignerAddressList, // 64*20 + 1 + 7 = 1288 bytes
 }
 
+/// Account which represents a distinct instance of a forwarder.
 #[account]
 #[derive(Default, InitSpace)]
 pub struct ForwarderState {
@@ -36,7 +37,8 @@ pub struct ForwarderState {
     pub proposed_owner: Pubkey,
 }
 
-/// Will never be closed. Provides verification if a transmission was received successfully on-chain.
+/// Account which stores status of a transmission. 
+/// This account will never be closed because it provides persistent proof if a transmission was received on-chain.
 #[account]
 #[derive(Default, InitSpace)]
 pub struct ExecutionState {

@@ -21,6 +21,8 @@ mod state;
 mod utils;
 
 declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
+
+/// Forwarder authenticates chainlink reports and relays them to designated receiver programs. 
 #[program]
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
@@ -32,6 +34,24 @@ pub mod keystone_forwarder {
 
     use super::*;
 
+    // Receiver contract will implement this in Anchor (or equivalent in pure Rust)
+    // pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
+    // with the following declared accounts
+    //
+    // #[derive(Accounts)]
+    // pub struct OnReport<'info> {
+    //     #[account(owner = FORWARDER_ID)]
+    //     pub state: Account<'info, ForwarderState>,
+
+    //     /// CHECK: This is a PDA
+    //    /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
+    //    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    //    pub forwarder_authority: Signer<'info>,
+
+    //    // remaining accounts passed in as well
+    // }
+
+    /// Initializes a new Forwarder instance and stores data in its state account
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
@@ -45,6 +65,7 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+    /// Step 1 of 2-step ownership process: propose a new owner
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
@@ -68,6 +89,7 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+    /// Step 2 of 2-step ownership process: accept ownership
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         let state_previous_owner = state.owner;
@@ -83,6 +105,10 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+    /// Initialize oracles config which describes the set of oracles which
+    /// are expected to sign a verified forwarder report. Many oracle config accounts
+    /// may exist for a forwarder because more than one DON may be allowed to sign 
+    /// reports for a forwarder.
     pub fn init_oracles_config(
         ctx: Context<InitOraclesConfig>,
         don_id: u32,
@@ -104,6 +130,8 @@ pub mod keystone_forwarder {
         set_oracles_config(config, don_id, config_version, f, signer_addresses.clone())
     }
 
+    /// Updates oracles config under circumstances which the designated
+    /// signers or configuration parameters change
     pub fn update_oracles_config(
         ctx: Context<UpdateOraclesConfig>,
         don_id: u32,
@@ -125,6 +153,7 @@ pub mod keystone_forwarder {
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
 
+    /// Closes oracle config account
     pub fn close_oracles_config(
         _ctx: Context<CloseOraclesConfig>,
         _don_id: u32,
@@ -133,7 +162,11 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    /// Available space for receiver payload is 297 bytes. However, many factors will affect
+    /// The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report. 
+    /// After verification it will create a PDA to store the execution state if it does not exist. 
+    /// The ctx.remaining_accounts accounts are passed on to the receiver, alongside the forwarder state account
+    /// and forwarder authority signer.
+    /// Available space for receiver payload is ~ 297 bytes. However, many factors will affect
     /// this number including adding more accounts in the ctx.remaining_accounts and/or using address
     /// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
     // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
@@ -213,7 +246,7 @@ pub mod keystone_forwarder {
         // report should always be of type ForwarderReport because the account hash needs to be verified
         let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
             .map_err(|_| ForwarderError::ForwarderReportExpected)?;
-        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...)
+        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...remaining accounts)
         let account_key_bytes = account_infos.iter().fold(
             Vec::with_capacity(account_infos.len() * 32),
             |mut buf, x| {
@@ -360,21 +393,3 @@ fn set_oracles_config(
 
     Ok(())
 }
-
-//
-// Receiver contract will implement this in Anchor (or equivalent in pure Rust)
-// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
-// with the following declared accounts
-//
-// #[derive(Accounts)]
-// pub struct OnReport<'info> {
-//     #[account(owner = FORWARDER_ID)]
-//     pub state: Account<'info, ForwarderState>,
-
-//     /// CHECK: This is a PDA
-//     /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
-//     /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
-//     pub forwarder_authority: Signer<'info>,
-
-//     // remaining accounts passed in as well
-// }
