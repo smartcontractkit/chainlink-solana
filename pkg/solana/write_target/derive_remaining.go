@@ -131,7 +131,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 	cacheStateAccount, err := dr.client.GetAccountInfoWithOpts(ctx, cacheStateKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 	if err != nil {
-		return nil, fmt.Errorf("error fetching cache state account %v", cacheStateKey)
+		return nil, fmt.Errorf("error fetching cache state account %v; err: %w", cacheStateKey, err)
 	}
 
 	if cacheStateAccount.Value == nil {
