@@ -25,8 +25,10 @@ use state::{
 // derived from hash::hash("global:cache_submit".as_bytes()).to_bytes()[..8].to_vec()
 pub const SUBMIT_DISCRIMINATOR: [u8; 8] = [173, 69, 171, 96, 179, 143, 243, 226];
 
-///
-/// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds.
+/// Data Feed Cache receives report updates from an pre-authorized Forwarder authority (sender)
+/// only for pre-authorized data ids and workflows.
+/// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds
+/// and the authorization of workflows.
 #[program]
 pub mod data_feeds_cache {
 
@@ -47,7 +49,9 @@ pub mod data_feeds_cache {
     };
 
     use super::*;
-
+    
+    /// Creates a new data cache instance with a dedicated state account.
+    /// Sets the initial feed admins and state configuration.
     pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
@@ -59,6 +63,11 @@ pub mod data_feeds_cache {
                 DataCacheError::AddressesMustStrictlyIncrease
             );
             state.feed_admins.push(*admin);
+            emit!(FeedAdminUpdated {
+                state: ctx.accounts.state.key(),
+                admin: admin.clone(),
+                is_admin: true,
+            });
             prev_admin = *admin;
         }
 
@@ -77,6 +86,9 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Add or remove a feed admin. 
+    /// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds
+    /// and the authorization of workflows.
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
         require_keys_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
 
@@ -109,6 +121,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Step 1 of 2-step ownership process: propose a new owner
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
@@ -131,6 +144,7 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Step 2 of 2-step ownership process: accept ownership
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
 
@@ -147,7 +161,8 @@ pub mod data_feeds_cache {
 
     /// Closes the data id's associated decimal report account and feed config account.
     /// The feed config must have an empty workflow metadata list, by calling
-    /// `set_decimal_feeds_config` prior
+    /// `set_decimal_feeds_config` prior to clear out the workflow metadata and
+    /// close write permission flag accounts
     pub fn close_decimal_report(ctx: Context<CloseDecimalReport>, data_id: [u8; 16]) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
@@ -169,7 +184,10 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Create decimal report accounts, where report data lives (i.e answer, timestamp, etc.)
     /// Recommended limit of N = 20 data ids can be initialized at once.
+    /// The decimal report account and feed config account must exist before reports can 
+    /// be received successfully in `on_report`
     pub fn init_decimal_reports<'info>(
         ctx: Context<'_, '_, 'info, 'info, InitDecimalReports<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -232,6 +250,11 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Initializes the legacy feeds config account, which stores the legacy store program 
+    /// and data id to legacy feed account mappings for double writing if enabled.
+    /// Write disabled flags are set to 0 by default (writes enabled), however if
+    /// optional legacy accounts are omitted in `on_report` context no legacy writes will occur
+    /// (see `on_report`).
     /// Recommended limit of 15 legacy feeds can be initialized at once.
     /// Instruction does not verify internally if data id and associated legacy feed account
     /// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
@@ -254,6 +277,7 @@ pub mod data_feeds_cache {
         )
     }
 
+    /// Updates legacy feed config.
     /// Recommended limit of 15 legacy feeds can be updated at once.
     /// Instruction does not verify internally if data id and associated legacy feed account
     /// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
@@ -283,14 +307,18 @@ pub mod data_feeds_cache {
         )
     }
 
+    /// Closes the legacy feeds config. Only to be used once all legacy feeds are 
+    /// no longer used.
     pub fn close_legacy_feeds_config(_ctx: Context<CloseLegacyFeedsConfig>) -> Result<()> {
         Ok(())
     }
 
-    // previews the permission accounts to be closed when
-    // calling set_decimal_feed_configs
-    // used for tx simulation only
-    // no state changes
+    /// An instruction which is only meant to be simulated off-chain. This instruction
+    /// does nothing beyond returning a list of permission accounts to be closed when
+    /// calling `set_decimal_feed_configs`. No account state changes in this function.
+    /// You should call this function before calling `set_decimal_feed_configs` in order
+    /// to know the write permission accounts that must be passed into the `set_decimal_feed_configs`
+    /// context to be closed.
     pub fn preview_decimal_feed_configs<'info>(
         ctx: Context<'_, '_, 'info, 'info, PreviewDecimalFeedConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -726,8 +754,13 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    /// Maximum amount of 6 ReceivedDecimalReports can be included in the report
+    /// Receives the a forwarder report that contains a list of [`ReceivedDecimalReport`]
+    /// Maximum amount of 6 ReceivedDecimalReports can be included in the report before
+    /// the transaction limit will be exceeded.
     /// for calculation look to ../../docs/data-feeds-cache/README.md#L579
+    /// There are three optional accounts, all related to legacy feed writing. 
+    /// If you omit any of these or have write_disabled = 1 for all feeds
+    /// then we guarentee no legacy feeds will be written to.
     // // todo: change report and metadata to &[u8]
     pub fn on_report<'info>(
         ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
@@ -1034,6 +1067,13 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+    /// Returns a feed's workflow metadata. Chunks return
+    /// values by `max_count`.
+    /// Can be used on-chain to verify a feed's configuration.
+    /// If `start_index` is out of bounds the function will return an 
+    /// empty array. 
+    /// If `max_count = 0` then function will return the entire
+    /// workflow metadata list.
     pub fn query_feed_metadata(
         ctx: Context<QueryFeedMetadata>,
         _data_id: [u8; 16],
@@ -1068,6 +1108,8 @@ pub mod data_feeds_cache {
         Ok(feed_config.workflow_metadata[start_index..end_index].to_vec())
     }
 
+    /// The data ids passed in must match the ordering of the decimal report accounts
+    /// passed into the remaining account context.
     pub fn query_values<'info>(
         ctx: Context<'_, '_, 'info, 'info, QueryValues<'info>>,
         data_ids: Vec<[u8; 16]>,
