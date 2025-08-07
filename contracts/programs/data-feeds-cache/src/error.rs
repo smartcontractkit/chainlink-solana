@@ -43,9 +43,6 @@ pub enum DataCacheError {
     #[msg("invalid workflow name")]
     InvalidWorkflowName,
 
-    #[msg("unclosed permission flags")]
-    UnclosedPermissionFlags,
-
     #[msg("exceeded max amount allowed")]
     MaxWorkflowsExceeded,
 
