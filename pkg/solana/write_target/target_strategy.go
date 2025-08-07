@@ -22,7 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
-	binary "github.com/gagliardetto/binary"
+	"encoding/binary"
+
+	sol_binary "github.com/gagliardetto/binary"
+
 	"github.com/gagliardetto/solana-go/rpc"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -44,7 +47,6 @@ type targetStrategy struct {
 type accounts struct {
 	forwarderState     solana.PublicKey
 	forwarderProgramID solana.PublicKey
-	oraclesConfig      solana.PublicKey
 	transmitter        solana.PublicKey
 	lookupTable        solana.PublicKey
 }
@@ -63,7 +65,6 @@ func newTargetStrategy(client client.Reader, txm Txm, cfg config.Workflow, lggr 
 	}
 
 	lookup[accs.lookupTable] = solana.PublicKeySlice{
-		accs.oraclesConfig,
 		accs.forwarderState,
 		accs.forwarderProgramID,
 		accs.transmitter,
@@ -113,7 +114,7 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 
 	var transmissionInfo ks_forwarder.ExecutionState
 
-	err = binary.UnmarshalBorsh(&transmissionInfo, acc.Bytes())
+	err = sol_binary.UnmarshalBorsh(&transmissionInfo, acc.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarashal transmission info: %w", err)
 	}
@@ -153,7 +154,12 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return "", fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
 
-	tx, err := ts.newTransaction(r, blockhash.Value.Blockhash)
+	configPDA, err := ts.getOracleConfigPDA(ctx, r.Metadata.WorkflowDonID, r.Metadata.WorkflowDonConfigVersion)
+	if err != nil {
+		return "", fmt.Errorf("failed to get oracle config PDA: %w", err)
+	}
+
+	tx, err := ts.newTransaction(r, configPDA, blockhash.Value.Blockhash)
 	if err != nil {
 		return "", fmt.Errorf("failed to create solana tx: %w", err)
 	}
@@ -286,7 +292,7 @@ func validateBytes16(s string) bool {
 	return n.BitLen() <= 128
 }
 
-func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash) (*solana.Transaction, error) {
+func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solana.PublicKey, blockHash solana.Hash) (*solana.Transaction, error) {
 	executionState, err := ts.deriveExecutionState(r)
 	if err != nil {
 		return nil, err
@@ -296,10 +302,11 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash
 	if err != nil {
 		return nil, err
 	}
+
 	inst := ks_forwarder.NewReportInstruction(
 		r.toPayload(),
 		ts.accounts.forwarderState,
-		ts.accounts.oraclesConfig,
+		oracleConfigPDA,
 		ts.accounts.transmitter,
 		authority,
 		executionState,
@@ -325,6 +332,41 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, blockHash solana.Hash
 		solana.TransactionPayer(ts.accounts.transmitter),
 		solana.TransactionAddressTables(lookup),
 	)
+}
+
+func (ts *targetStrategy) getOracleConfigPDA(ctx context.Context, workflowDonID, configVersion uint32) (solana.PublicKey, error) {
+	oracleConfigPDA := getConfigPDA(ts.accounts.forwarderState, workflowDonID, configVersion, ts.accounts.forwarderProgramID)
+
+	oracleConfigAccount, err := ts.client.GetAccountInfoWithOpts(ctx, oracleConfigPDA, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+	if err != nil {
+		return oracleConfigPDA, fmt.Errorf("error fetching cache state account %v; err: %w", oracleConfigPDA, err)
+	}
+
+	if oracleConfigAccount.Value == nil {
+		return oracleConfigPDA, fmt.Errorf("cache state account does not exist %v", oracleConfigPDA)
+	}
+
+	return oracleConfigPDA, err
+
+}
+
+func getConfigPDA(statePubkey solana.PublicKey, donID uint32, configVersion uint32, programID solana.PublicKey) solana.PublicKey {
+	configID := getConfigID(donID, configVersion)
+	reqIDBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(reqIDBytes, configID)
+
+	seeds := [][]byte{
+		[]byte("config"),
+		statePubkey.Bytes(),
+		reqIDBytes,
+	}
+
+	addr, _, _ := solana.FindProgramAddress(seeds, programID)
+	return addr
+}
+
+func getConfigID(donID uint32, configVersion uint32) uint64 {
+	return (uint64(donID) << 32) | uint64(configVersion)
 }
 
 // Wrapper around the ChainWriter to get the transaction status
@@ -407,11 +449,6 @@ func accountsFromConfig(cfg config.Workflow) (accounts, error) {
 	}
 
 	ret.forwarderState, err = solana.PublicKeyFromBase58(cfg.ForwarderState())
-	if err != nil {
-		return ret, err
-	}
-
-	ret.oraclesConfig, err = solana.PublicKeyFromBase58(cfg.OraclesConfigPDA())
 	if err != nil {
 		return ret, err
 	}

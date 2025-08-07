@@ -88,7 +88,6 @@ type Workflow interface {
 	ForwarderAddress() string
 	FromAddress() string
 	ForwarderState() string
-	OraclesConfigPDA() string
 	LookupTable() string
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
@@ -102,7 +101,6 @@ type WorkflowConfig struct {
 	ForwarderAddress  *string
 	FromAddress       *string
 	ForwarderState    *string
-	OraclesConfigPDA  *string
 	LookupTable       *string
 	GasLimitDefault   *uint64
 	TxAcceptanceState *commontypes.TransactionStatus

@@ -279,10 +279,6 @@ func (c *TOMLConfig) ForwarderState() string {
 	return *c.Workflow.ForwarderState
 }
 
-func (c *TOMLConfig) OraclesConfigPDA() string {
-	return *c.Workflow.OraclesConfigPDA
-}
-
 func (c *TOMLConfig) LookupTable() string {
 	return *c.Workflow.LookupTable
 }
