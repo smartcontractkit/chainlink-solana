@@ -340,13 +340,10 @@ pub struct TestStruct {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct TestStructData {
     pub field: i32,
-    // _padding0: [u8; 4],
     pub oracle_id: u8,
-    // _padding1: [u8; 15],
     pub oracle_ids: [u8; 32],
     pub accounts: [[u8; 32]; 2],
     pub different_field: String,
-    // _padding2: [u8; 8],
     pub big_field: i128,
 
     pub account_struct: AccountStruct,
