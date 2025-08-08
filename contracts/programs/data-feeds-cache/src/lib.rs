@@ -114,19 +114,16 @@ pub mod data_feeds_cache {
         let mut state = ctx.accounts.state.load_mut()?;
         let mut changed = false;
 
-        match state.feed_admins.binary_search_by(|a| a.cmp(&admin)) {
-            Ok(i) => {
-                if !is_admin {
-                    state.feed_admins.remove(i);
-                    changed = true;
-                }
-            }
-            Err(i) => {
-                if is_admin {
-                    state.feed_admins.insert(i, admin);
-                    changed = true;
-                }
-            }
+        match (is_admin, state.feed_admins.binary_search(&admin)) {
+            (false, Ok(i)) => {
+                state.feed_admins.remove(i);
+                changed = true;
+            },
+            (true, Err(i)) => {
+                state.feed_admins.insert(i, admin);
+                changed = true;
+            },
+            _ => {},
         }
 
         if changed {
