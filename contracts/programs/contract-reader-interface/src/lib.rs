@@ -88,12 +88,15 @@ pub mod contract_reader_interface {
         Ok(())
     }
 
-    pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
-        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
-
+    pub fn store(
+        ctx: Context<StoreTestStruct>,
+        test_idx: u64,
+        _list_idx: u64,
+        data: TestStructData,
+    ) -> Result<()> {
+        let test_struct_account = &mut ctx.accounts.test_struct;
+    
         test_struct_account.idx = test_idx;
-        test_struct_account.bump = ctx.bumps.test_struct;
-
         test_struct_account.field = data.field;
         test_struct_account.oracle_id = data.oracle_id;
         test_struct_account.oracle_ids = data.oracle_ids;
@@ -103,7 +106,7 @@ pub mod contract_reader_interface {
         test_struct_account.account_struct = data.account_struct;
         test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
         test_struct_account.nested_static_struct = data.nested_static_struct;
-
+    
         Ok(())
     }
 
@@ -129,6 +132,22 @@ pub mod contract_reader_interface {
 
         // Intentionally fail the transaction after emitting the event
         Err(ErrorCode::IntentionalFailure.into())
+    }
+
+    pub fn trigger_event(_ctx: Context<Events>, data: TestStructData) -> Result<()> {
+        emit!(SomeEvent {
+            field: data.field,
+            oracle_id: data.oracle_id,
+            big_field: data.big_field,
+            oracle_ids: data.oracle_ids,
+            accounts: data.accounts,
+            different_field: data.different_field,
+            account_struct: data.account_struct,
+            nested_dynamic_struct: data.nested_dynamic_struct,
+            nested_static_struct: data.nested_static_struct,
+        });
+
+        Ok(())
     }
 }
 
@@ -262,19 +281,23 @@ pub struct InitializeLookupTableData<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(test_idx: u64)]
+#[instruction(test_idx: u64, list_idx: u64)]
 pub struct StoreTestStruct<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
     #[account(
-        init_if_needed,
+        init,
         payer = signer,
-        space = size_of::<TestStruct>() + 8,
-        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
-        bump
+        space = 8 + size_of::<TestStruct>(),
+        seeds = [
+            b"struct_data".as_ref(),
+            test_idx.to_le_bytes().as_ref(),
+            list_idx.to_le_bytes().as_ref()
+        ],
+        bump,
     )]
-    pub test_struct: AccountLoader<'info, TestStruct>,
+    pub test_struct: Account<'info, TestStruct>,
 
     pub system_program: Program<'info, System>,
 }
@@ -295,6 +318,70 @@ pub struct StoreVal<'info> {
 
     /// System Program required for PDA creation
     pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(Default)]
+pub struct TestStruct {
+    pub idx: u64,
+    pub bump: u8,
+    pub field: i32,
+    pub oracle_id: u8,
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8; 32]; 2],
+    pub different_field: String, 
+    pub big_field: i128,
+
+    pub account_struct: AccountStruct,
+    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
+    pub nested_static_struct: MidLevelStaticTestStruct,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct TestStructData {
+    pub field: i32,
+    // _padding0: [u8; 4],
+    pub oracle_id: u8,
+    // _padding1: [u8; 15],
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8; 32]; 2],
+    pub different_field: String,
+    // _padding2: [u8; 8],
+    pub big_field: i128,
+
+    pub account_struct: AccountStruct,
+    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
+    pub nested_static_struct: MidLevelStaticTestStruct,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct AccountStruct {
+    pub account: Pubkey,
+    pub account_str: Pubkey,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct MidLevelDynamicTestStruct {
+    pub fixed_bytes: [u8; 2],
+    pub inner: InnerDynamicTestStruct,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct InnerDynamicTestStruct {
+    pub i: i64,
+    pub s: String,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct MidLevelStaticTestStruct {
+    pub fixed_bytes: [u8; 2],
+    pub inner: InnerStaticTestStruct,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct InnerStaticTestStruct {
+    pub i: i64,
+    pub a: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -345,81 +432,6 @@ pub struct TokenAccountData {
     pub account: Pubkey,
 }
 
-#[account(zero_copy)]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct TestStruct {
-    pub idx: u64,
-    pub bump: u8,
-    _padding0: [u8; 7],
-    pub field: i32,
-    _padding1: [u8; 4],
-    pub oracle_id: u8,
-    _padding2: [u8; 15],
-    pub oracle_ids: [u8; 32],
-    pub accounts: [[u8; 32]; 2],
-    pub different_field: [u8; 32], // hiding field since string does not play well with zero copy
-    _padding3: [u8; 8],
-    pub big_field: i128,
-
-    pub account_struct: AccountStruct,
-    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
-    pub nested_static_struct: MidLevelStaticTestStruct,
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct TestStructData {
-    pub field: i32,
-    _padding0: [u8; 4],
-    pub oracle_id: u8,
-    _padding1: [u8; 15],
-    pub oracle_ids: [u8; 32],
-    pub accounts: [[u8; 32]; 2],
-    pub different_field: [u8; 32],
-    _padding2: [u8; 8],
-    pub big_field: i128,
-
-    pub account_struct: AccountStruct,
-    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
-    pub nested_static_struct: MidLevelStaticTestStruct,
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct AccountStruct {
-    pub account: Pubkey,
-    pub account_str: Pubkey,
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct MidLevelDynamicTestStruct {
-    pub fixed_bytes: [u8; 2],
-    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
-    pub inner: InnerDynamicTestStruct,
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct InnerDynamicTestStruct {
-    pub i: i64,
-    pub s: [u8; 32],
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct MidLevelStaticTestStruct {
-    pub fixed_bytes: [u8; 2],
-    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
-    pub inner: InnerStaticTestStruct,
-}
-
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct InnerStaticTestStruct {
-    pub i: i64,
-    pub a: Pubkey,
-}
 
 #[account]
 pub struct MultiRead1 {
@@ -501,4 +513,23 @@ pub enum ErrorCode {
 #[event]
 pub struct StateChangedEvent {
     pub new_state: String,
+}
+
+#[event]
+pub struct SomeEvent {
+    pub field: i32,
+    pub oracle_id: u8,
+    pub oracle_ids: [u8; 32],
+    pub accounts: [[u8; 32]; 2],
+    pub different_field: String,
+    pub big_field: i128,
+
+    pub account_struct: AccountStruct,
+    pub nested_dynamic_struct: MidLevelDynamicTestStruct,
+    pub nested_static_struct: MidLevelStaticTestStruct,
+}
+
+#[event]
+pub struct TriggeredEventWithDynamicTopic {
+    pub field: String,
 }
