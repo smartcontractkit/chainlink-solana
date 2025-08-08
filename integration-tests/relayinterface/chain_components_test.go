@@ -1602,7 +1602,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
-	// testStruct := CreateTestStruct(0, it)
 	pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
 	require.NoError(t, err)
 	pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
