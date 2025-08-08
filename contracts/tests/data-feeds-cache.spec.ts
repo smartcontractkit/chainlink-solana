@@ -1289,11 +1289,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: decimalReportPDA(
               cacheStateAccount.publicKey,
               legacyFeeds[0].dataId
@@ -1403,11 +1398,6 @@ describe("data feeds cache", function () {
           },
           {
             pubkey: cacheProgram.programId, // legacy writer (omitted)
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: anchor.web3.SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },
@@ -1524,11 +1514,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1599,11 +1584,6 @@ describe("data feeds cache", function () {
           },
           {
             pubkey: cacheProgram.programId, // legacy writer (omitted)
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: anchor.web3.SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },
@@ -1718,11 +1698,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1805,11 +1780,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1867,11 +1837,6 @@ describe("data feeds cache", function () {
           },
           {
             pubkey: cacheProgram.programId, // legacy writer (omitted)
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: anchor.web3.SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },

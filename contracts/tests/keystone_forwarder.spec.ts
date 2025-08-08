@@ -383,7 +383,6 @@ describe("keystone_storage", function () {
         state: forwarderState.publicKey,
         oraclesConfig: oraclesConfigStorage,
         owner: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 

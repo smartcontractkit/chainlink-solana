@@ -301,8 +301,7 @@ pub struct OnReport<'info> {
     /// CHECK: This is a PDA
     #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_bump)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,
-
-    pub system_program: Program<'info, System>,
+    // pub system_program: Program<'info, System>,
     // remaining accounts (N data ids, M legacy feeds)
 
     // N accounts

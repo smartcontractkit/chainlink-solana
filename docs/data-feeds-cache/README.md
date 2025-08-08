@@ -559,9 +559,9 @@ Based on the payload encoding and account contexts of data feed cache on_report,
 
 Best case (no legacy feeds)
 ```
-297 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N)
+297 = 4 + 40*N + (cache_state (1) + 2*N)
 
-N = 6.93
+N = 6.9
 ```
 * 4 + 40*N is the total payload size for N `ReceivedDecimalReport`s
 * Remember we're using the address lookup table, so accounts take 1 byte only
@@ -570,9 +570,9 @@ Worst case (all reports are tied with legacy feeds)
 
 
 ```
-297 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
+297 = 4 + 40*N + (cache_state (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1)  + 3N)
 
-N = 6.67
+N = 6.6
 ```
 * in the account context calculations, we use 3N over 2N because the extra N comes from the legacy feed accounts in ctx.remaining_accounts
 

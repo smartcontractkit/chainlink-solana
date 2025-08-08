@@ -57,7 +57,6 @@ pub mod keystone_forwarder {
     //     // remaining accounts
     // }
 
-
     /// Initializes a new Forwarder instance and stores data in its state account
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
