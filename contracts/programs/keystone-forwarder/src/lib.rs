@@ -44,18 +44,19 @@ pub mod keystone_forwarder {
     //
     // #[derive(Accounts)]
     // pub struct OnReport<'info> {
-    //     #[account(owner = FORWARDER_ID)]
-    //     pub state: Account<'info, ForwarderState>,
+    //     // Note: the data feed cache's on_report function does not directly authenticate the forwarder state.
+    //     // Instead, it indirectly verifies the correct state by enforcing that the forwarder_authority is authorized.
+    //     // WARNING: the FORWARDER_ID deployed in an environment may be different
+    //     // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    //     // the correct FORWARDER_ID to use
+    //     pub forwarder_state: Account<'info, ForwarderState>,
 
-    // WARNING: the FORWARDER_ID deployed in an environment may be different
-    // than the one in source control. you need to view the official chainlink docs to determine
-    // the correct FORWARDER_ID to use
-    //     /// CHECK: This is a PDA
-    //    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = FORWARDER_ID)]
-    //    pub forwarder_authority: Signer<'info>,
+    //     #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = cache_state.load()?.forwarder_id)]
+    //     pub forwarder_authority: Signer<'info>,
 
-    //    // remaining accounts passed in as well
+    //     // remaining accounts
     // }
+
 
     /// Initializes a new Forwarder instance and stores data in its state account
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
@@ -293,7 +294,7 @@ pub mod keystone_forwarder {
         let receiver_program = ctx.accounts.receiver_program.key();
 
         // calculate the bump on-the-fly
-        let (_, authority_nonce) = Pubkey::find_program_address(
+        let (_, authority_bump) = Pubkey::find_program_address(
             &[
                 b"forwarder",
                 forwarder_state.as_ref(),
@@ -306,7 +307,7 @@ pub mod keystone_forwarder {
             b"forwarder",
             forwarder_state.as_ref(),
             receiver_program.as_ref(),
-            &[authority_nonce],
+            &[authority_bump],
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;

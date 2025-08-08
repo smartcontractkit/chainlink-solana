@@ -299,7 +299,7 @@ pub struct OnReport<'info> {
 
     // omit if you don't want to write to the store
     /// CHECK: This is a PDA
-    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
+    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_bump)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,
 
     pub system_program: Program<'info, System>,

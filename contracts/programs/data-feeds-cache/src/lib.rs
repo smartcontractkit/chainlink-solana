@@ -71,17 +71,17 @@ pub mod data_feeds_cache {
             prev_admin = *admin;
         }
 
-        let (_, authority_nonce) = Pubkey::find_program_address(
+        let (_, bump) = Pubkey::find_program_address(
             &[b"legacy_writer", ctx.accounts.state.key().as_ref()],
             &crate::ID,
         );
-        state.legacy_writer_nonce = authority_nonce;
+        state.legacy_writer_bump = bump;
 
         emit!({
             CacheInitialized {
                 state: ctx.accounts.state.key(),
                 forwarder_id: state.forwarder_id,
-                legacy_writer_bump: state.legacy_writer_nonce,
+                legacy_writer_bump: state.legacy_writer_bump,
             }
         });
 
@@ -350,7 +350,7 @@ pub mod data_feeds_cache {
         require_eq!(
             ctx.remaining_accounts.len(),
             expected_len,
-            DataCacheError::MissingAccounts
+            DataCacheError::InvalidAccountCount
         );
 
         // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
@@ -458,7 +458,7 @@ pub mod data_feeds_cache {
         require_gte!(
             ctx.remaining_accounts.len(),
             minimum_len,
-            DataCacheError::MissingAccounts
+            DataCacheError::InvalidAccountCount
         );
 
         // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
@@ -921,7 +921,7 @@ pub mod data_feeds_cache {
                 let signer_seeds = &[
                     b"legacy_writer",
                     cache_state_key.as_ref(),
-                    &[ctx.accounts.cache_state.load()?.legacy_writer_nonce],
+                    &[ctx.accounts.cache_state.load()?.legacy_writer_bump],
                 ];
 
                 invoke_signed(&ix, &account_infos, &[signer_seeds])

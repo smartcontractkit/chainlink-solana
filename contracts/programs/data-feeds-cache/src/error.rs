@@ -31,8 +31,8 @@ pub enum DataCacheError {
     #[msg("invalid data id")]
     InvalidDataId,
 
-    #[msg("missing accounts")]
-    MissingAccounts,
+    #[msg("invalid number of accounts")]
+    InvalidAccountCount,
 
     #[msg("account mismatch")]
     AccountMismatch,

@@ -127,13 +127,13 @@ pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub feed_admins: AdminList,
-    pub legacy_writer_nonce: u8, // pda writing to the legacy feeds
+    pub legacy_writer_bump: u8, // pda writing to the legacy feeds
     pub _padding: [u8; 7],
 }
 ```
 
 * The feed admins list is also a fixed size arrayvec.
-* The legacy writer nonce is the bump of the PDA that is responsible for signing the `invoke_signed` CPI to the legacy store for writing legacy feeds.
+* The legacy writer bump is the bump of the PDA that is responsible for signing the `invoke_signed` CPI to the legacy store for writing legacy feeds.
 * The padding is for byte alignment.
 
 
@@ -201,7 +201,7 @@ For the two optional accounts in the OnReport context you have to pass in the ca
 
 The cache state account is a keypair account that's ownership is transferred to the program. 
 
-We pre-compute the legacy writer nonce to store in the cache state for usage later in invoke_signed (in `on_report`) similar to how the forwarder stores the forwarder authority nonce.
+We pre-compute the legacy writer bump to store in the cache state for usage later in invoke_signed (in `on_report`)
 
 ### init_decimal_reports
 
@@ -494,7 +494,7 @@ pub struct OnReport<'info> {
 
     // omit if you don't want to write to the store
     /// CHECK: This is a PDA
-    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
+    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_bump)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,
 
     pub system_program: Program<'info, System>,

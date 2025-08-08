@@ -186,9 +186,9 @@ describe("data feeds cache", function () {
       );
 
       assert.equal(
-        actualCacheState.legacyWriterNonce,
+        actualCacheState.legacyWriterBump,
         bump,
-        "legacy writer nonces equal"
+        "legacy writer bump equal"
       );
     });
   });

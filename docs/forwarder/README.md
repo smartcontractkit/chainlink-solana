@@ -6,7 +6,6 @@ The forwarder verifies that the a report comes from a valid oracle network and r
 
 Let's look at the accounts associated with a report instruction to understand what it does.
 
-```
 #[derive(Accounts)]
 #[instruction(data: Vec<u8>)]
 pub struct Report<'info> {
@@ -14,21 +13,23 @@ pub struct Report<'info> {
 
     #[account(
         mut,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
-    oracles_config: Account<'info, OraclesConfig>,
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut)]
     pub transmitter: Signer<'info>,
 
     /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
     #[account(
         init_if_needed,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         payer = transmitter,
         space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [
@@ -47,7 +48,7 @@ pub struct Report<'info> {
     pub system_program: Program<'info, System>,
     // remaining accounts passed to receiver
 }
-```
+
 
 `state` is a keypair, program owned account which represents the forwarder instance we are working with. Think of this is a specific forwarder instance.
 
