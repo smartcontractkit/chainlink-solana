@@ -20,7 +20,7 @@ pub fn handler(ctx: Context<CloseDecimalReport>, data_id: [u8; 16]) -> Result<()
 
     emit!(DecimalReportClosed {
         state: ctx.accounts.state.key(),
-        data_id: data_id
+        data_id
     });
 
     Ok(())

@@ -22,7 +22,7 @@ pub fn handler(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()>
         state.feed_admins.push(*admin);
         emit!(FeedAdminUpdated {
             state: ctx.accounts.state.key(),
-            admin: admin.clone(),
+            admin: *admin,
             is_admin: true,
         });
         prev_admin = *admin;

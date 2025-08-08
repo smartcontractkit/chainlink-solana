@@ -5,8 +5,6 @@ pub use instructions::*;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
-use std::cell::RefMut;
-use std::ops::DerefMut;
 
 declare_id!("3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa");
 
@@ -16,14 +14,9 @@ mod error;
 mod event;
 pub mod state;
 
-use anchor_lang::solana_program::{hash, system_instruction};
-use common::{MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
+use common::ZERO_DATA_ID;
 use context::*;
-use error::{AuthError, DataCacheError};
-use state::{
-    AccountList, CacheTransmission, DecimalReport, FeedConfig, LegacyFeedEntry, LegacyFeedsConfig,
-    WorkflowMetadata,
-};
+use state::{CacheTransmission, DecimalReport, FeedConfig, WorkflowMetadata};
 
 /// Data Feed Cache receives report updates from an pre-authorized Forwarder authority (sender)
 /// only for pre-authorized data ids and workflows.

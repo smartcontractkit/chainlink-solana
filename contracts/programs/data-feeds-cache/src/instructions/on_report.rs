@@ -12,6 +12,8 @@ use crate::{
 };
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
+type LegacyWriteEntry<'a> = (&'a LegacyFeedEntry, &'a ReceivedDecimalReport);
+
 pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -191,11 +193,10 @@ pub fn handler<'info>(
     }
 
     // or add generic dfc event out here
-
     // seperate out write disabled entries
     let (write_disabled_entries, write_enabled_entries): (
-        Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)>,
-        Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)>,
+        Vec<LegacyWriteEntry>,
+        Vec<LegacyWriteEntry>,
     ) = candidate_legacy_writes
         .iter()
         .partition(|e| e.0.write_disabled != 0);
