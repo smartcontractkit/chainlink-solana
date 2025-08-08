@@ -13,6 +13,7 @@ use events::{
 use context::*;
 pub use error::*;
 pub use state::{ExecutionState, ForwarderState, OraclesConfig};
+use static_assertions::const_assert;
 use utils::{extract_transmission_id, get_config_id};
 
 mod common;
@@ -335,10 +336,7 @@ fn verify_signatures(
     oracles_config: &OraclesConfig,
     num_signers: usize,
 ) -> Result<()> {
-    // ensure MAX_SIGNERS fit in the bits of uniques
     let mut uniques: u32 = 0;
-    assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_ORACLES as u32);
-
     for sig in signatures.chunks(SIGNATURE_LEN) {
         // sig is [R || S || V] format where V is 0 or 1
         let v = sig[64];
