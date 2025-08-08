@@ -13,7 +13,6 @@ use events::{
 use context::*;
 pub use error::*;
 pub use state::{ExecutionState, ForwarderState, OraclesConfig};
-use static_assertions::const_assert;
 use utils::{extract_transmission_id, get_config_id};
 
 mod common;
@@ -32,10 +31,7 @@ pub mod keystone_forwarder {
 
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::{
-        program::KeystoneForwarder,
-        utils::{report_size_ok, ForwarderReport},
-    };
+    use crate::utils::{report_size_ok, ForwarderReport};
 
     use super::*;
 
