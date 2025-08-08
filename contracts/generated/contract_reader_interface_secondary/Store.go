@@ -13,6 +13,7 @@ import (
 // Store is the `store` instruction.
 type Store struct {
 	TestIdx *uint64
+	ListIdx *uint64
 	Data    *TestStructData
 
 	// [0] = [WRITE, SIGNER] signer
@@ -34,6 +35,12 @@ func NewStoreInstructionBuilder() *Store {
 // SetTestIdx sets the "testIdx" parameter.
 func (inst *Store) SetTestIdx(testIdx uint64) *Store {
 	inst.TestIdx = &testIdx
+	return inst
+}
+
+// SetListIdx sets the "listIdx" parameter.
+func (inst *Store) SetListIdx(listIdx uint64) *Store {
+	inst.ListIdx = &listIdx
 	return inst
 }
 
@@ -99,6 +106,9 @@ func (inst *Store) Validate() error {
 		if inst.TestIdx == nil {
 			return errors.New("TestIdx parameter is not set")
 		}
+		if inst.ListIdx == nil {
+			return errors.New("ListIdx parameter is not set")
+		}
 		if inst.Data == nil {
 			return errors.New("Data parameter is not set")
 		}
@@ -128,8 +138,9 @@ func (inst *Store) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("TestIdx", *inst.TestIdx))
+						paramsBranch.Child(ag_format.Param("ListIdx", *inst.ListIdx))
 						paramsBranch.Child(ag_format.Param("   Data", *inst.Data))
 					})
 
@@ -149,6 +160,11 @@ func (obj Store) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `ListIdx` param:
+	err = encoder.Encode(obj.ListIdx)
+	if err != nil {
+		return err
+	}
 	// Serialize `Data` param:
 	err = encoder.Encode(obj.Data)
 	if err != nil {
@@ -159,6 +175,11 @@ func (obj Store) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `TestIdx`:
 	err = decoder.Decode(&obj.TestIdx)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ListIdx`:
+	err = decoder.Decode(&obj.ListIdx)
 	if err != nil {
 		return err
 	}
@@ -174,6 +195,7 @@ func (obj *Store) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 func NewStoreInstruction(
 	// Parameters:
 	testIdx uint64,
+	listIdx uint64,
 	data TestStructData,
 	// Accounts:
 	signer ag_solanago.PublicKey,
@@ -181,6 +203,7 @@ func NewStoreInstruction(
 	systemProgram ag_solanago.PublicKey) *Store {
 	return NewStoreInstructionBuilder().
 		SetTestIdx(testIdx).
+		SetListIdx(listIdx).
 		SetData(data).
 		SetSignerAccount(signer).
 		SetTestStructAccount(testStruct).

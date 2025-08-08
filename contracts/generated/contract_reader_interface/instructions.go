@@ -45,6 +45,8 @@ var (
 	Instruction_StoreTokenAccount = ag_binary.TypeID([8]byte{101, 151, 158, 155, 161, 155, 28, 57})
 
 	Instruction_CreateEventAndFail = ag_binary.TypeID([8]byte{251, 62, 24, 64, 226, 94, 171, 223})
+
+	Instruction_TriggerEvent = ag_binary.TypeID([8]byte{62, 245, 116, 130, 115, 50, 252, 128})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -68,6 +70,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "StoreTokenAccount"
 	case Instruction_CreateEventAndFail:
 		return "CreateEventAndFail"
+	case Instruction_TriggerEvent:
+		return "TriggerEvent"
 	default:
 		return ""
 	}
@@ -114,6 +118,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"create_event_and_fail", (*CreateEventAndFail)(nil),
+		},
+		{
+			"trigger_event", (*TriggerEvent)(nil),
 		},
 	},
 )
