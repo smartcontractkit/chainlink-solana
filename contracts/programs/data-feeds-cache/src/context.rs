@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use keystone_forwarder::ForwarderState;
-use keystone_forwarder::ID as FORWARDER_ID;
 
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::error::AuthError;

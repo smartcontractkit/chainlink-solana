@@ -344,7 +344,7 @@ Below is an example.
 
 ```
 // ex: data_ids: [1, 2]
-// workflow metdatas [5, 6, 7]
+// workflow metadatas [5, 6, 7]
 // ctx remaining accounts:
 // [1-feed-config]  |- feed_config_accounts
 // [2-feed-config]  |

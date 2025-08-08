@@ -330,6 +330,8 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
+
+
     /// An instruction which is only meant to be simulated off-chain. This instruction
     /// does nothing beyond returning a list of permission accounts to be closed when
     /// calling `set_decimal_feed_configs`. No account state changes in this function.
@@ -342,30 +344,7 @@ pub mod data_feeds_cache {
         descriptions: Vec<[u8; 32]>,
         workflow_metadatas: Vec<WorkflowMetadata>,
     ) -> Result<Vec<Pubkey>> {
-        require_gte!(
-            MAX_WORKFLOW_METADATAS,
-            workflow_metadatas.len(),
-            DataCacheError::MaxWorkflowsExceeded
-        );
-
-        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
-
-        require_eq!(
-            data_ids.len(),
-            descriptions.len(),
-            DataCacheError::ArrayLengthMismatch
-        );
-
-        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
-        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
-        // are not allowed
-        for d in descriptions.iter() {
-            if workflow_metadatas.is_empty() {
-                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
-            } else {
-                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
-            }
-        }
+        validate_feed_config_inputs(&data_ids, &descriptions, &workflow_metadatas)?;
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let expected_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
@@ -375,22 +354,6 @@ pub mod data_feeds_cache {
             expected_len,
             DataCacheError::MissingAccounts
         );
-
-        for metadata in workflow_metadatas.iter() {
-            require_keys_neq!(
-                metadata.allowed_sender,
-                Pubkey::default(),
-                DataCacheError::InvalidAddress
-            );
-            require!(
-                !metadata.allowed_workflow_name.is_empty(),
-                DataCacheError::InvalidWorkflowName
-            );
-            require!(
-                metadata.allowed_workflow_owner != ZERO_ADDRESS,
-                DataCacheError::InvalidAddress
-            );
-        }
 
         // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
         let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
@@ -428,46 +391,17 @@ pub mod data_feeds_cache {
 
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-
-                    let derived_report_hash = create_report_hash(
-                        curr_data_id,
-                        &metadata.allowed_sender,
-                        &metadata.allowed_workflow_owner,
-                        &metadata.allowed_workflow_name,
-                    );
-
-                    let (permission_flag, _) = Pubkey::find_program_address(
-                        &[
-                            b"permission_flag",
-                            cache_state_key.as_ref(),
-                            &derived_report_hash,
-                        ],
-                        &crate::ID,
-                    );
+                    let (permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                     sorted_insert(&mut temp_candidates_deletion, permission_flag)
                 }
             }
 
-            for (j, metadata) in workflow_metadatas.iter().enumerate() {
-                let report_hash = create_report_hash(
-                    curr_data_id,
-                    &metadata.allowed_sender,
-                    &metadata.allowed_workflow_owner,
-                    &metadata.allowed_workflow_name,
-                );
-
-                let (curr_permission_flag, _) = Pubkey::find_program_address(
-                    &[
-                        b"permission_flag",
-                        ctx.accounts.state.key().as_ref(),
-                        &report_hash,
-                    ],
-                    &crate::ID,
-                );
+            for (j, metadata) in workflow_metadatas.iter().enumerate() {                
+                let (curr_permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                 // ex: data_ids: [1, 2]
-                // workflow metdatas [5, 6, 7]
+                // workflow metadatas [5, 6, 7]
                 // ctx remaining accounts:
                 // [1-feed-config]  |- feed_config_accounts
                 // [2-feed-config]  |
@@ -515,30 +449,7 @@ pub mod data_feeds_cache {
         let state = &mut ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-        require_gte!(
-            MAX_WORKFLOW_METADATAS,
-            workflow_metadatas.len(),
-            DataCacheError::MaxWorkflowsExceeded
-        );
-
-        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
-
-        require_eq!(
-            data_ids.len(),
-            descriptions.len(),
-            DataCacheError::ArrayLengthMismatch
-        );
-
-        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
-        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
-        // are not allowed
-        for d in descriptions.iter() {
-            if workflow_metadatas.is_empty() {
-                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
-            } else {
-                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
-            }
-        }
+        validate_feed_config_inputs(&data_ids, &descriptions, &workflow_metadatas)?;
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let minimum_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
@@ -549,22 +460,6 @@ pub mod data_feeds_cache {
             minimum_len,
             DataCacheError::MissingAccounts
         );
-
-        for metadata in workflow_metadatas.iter() {
-            require_keys_neq!(
-                metadata.allowed_sender,
-                Pubkey::default(),
-                DataCacheError::InvalidAddress
-            );
-            require!(
-                !metadata.allowed_workflow_name.is_empty(),
-                DataCacheError::InvalidWorkflowName
-            );
-            require!(
-                metadata.allowed_workflow_owner != ZERO_ADDRESS,
-                DataCacheError::InvalidAddress
-            );
-        }
 
         // require ctx.remaining_accounts are in the correct order [ [...feed_config] [...permission_flags] ]
         let feed_config_account_infos = &ctx.remaining_accounts[..data_ids.len()];
@@ -580,7 +475,7 @@ pub mod data_feeds_cache {
             require!(*curr_data_id != ZERO_DATA_ID, DataCacheError::InvalidDataId);
 
             // derive the PDA
-            // get the existing config feed , see if it's empty or not
+            // get the existing config feed, see if it's empty or not
             let (curr_feed_config, feed_config_bump) = Pubkey::find_program_address(
                 &[b"feed_config", cache_state_key.as_ref(), curr_data_id],
                 &crate::ID,
@@ -625,7 +520,7 @@ pub mod data_feeds_cache {
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
             };
 
-            // load_mut instead of load_mut because we write the discriminator above
+            // load_mut instead of load_init because we write the discriminator above
             let mut feed_config = feed_config_loader.load_mut()?;
 
             // sorted
@@ -636,21 +531,7 @@ pub mod data_feeds_cache {
                 // go over current workflows
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-                    let derived_report_hash = create_report_hash(
-                        curr_data_id,
-                        &metadata.allowed_sender,
-                        &metadata.allowed_workflow_owner,
-                        &metadata.allowed_workflow_name,
-                    );
-
-                    let (permission_flag, _) = Pubkey::find_program_address(
-                        &[
-                            b"permission_flag",
-                            cache_state_key.as_ref(),
-                            &derived_report_hash,
-                        ],
-                        &crate::ID,
-                    );
+                    let (permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                     sorted_insert(&mut temp_candidates_deletion, permission_flag);
                 }
@@ -679,7 +560,7 @@ pub mod data_feeds_cache {
                 );
 
                 // ex: data_ids: [1, 2]
-                // workflow metdatas [5, 6, 7]
+                // workflow metadatas [5, 6, 7]
                 // ctx remaining accounts:
                 // [1-feed-config]  |- feed_config_accounts
                 // [2-feed-config]  |
@@ -784,7 +665,7 @@ pub mod data_feeds_cache {
         let legacy_feeds_config = if let Some(loader) = &ctx.accounts.legacy_feeds_config {
             let loader = loader.load()?;
 
-            // if included, check that the legacy store passed in via account context the same as the one in the config
+            // if included, check that the legacy store passed in via account context is the same as the one in the config
             if let Some(legacy_store) = &ctx.accounts.legacy_store {
                 require_keys_eq!(
                     *legacy_store.key,
@@ -902,7 +783,7 @@ pub mod data_feeds_cache {
             let latest_report =
                 DecimalReport::try_deserialize(&mut &report_account_infos[i].data.borrow()[..])?;
 
-            // dont update if the received report is stale
+            // don't update if the received report is stale
             if received_decimal_report.timestamp <= latest_report.timestamp {
                 emit!(StaleDecimalReport {
                     state: ctx.accounts.cache_state.key(),
@@ -972,7 +853,7 @@ pub mod data_feeds_cache {
                 .cloned()
                 .collect();
 
-        let mut write_occured = false;
+        let mut write_occurred = false;
 
         // condition III & condition IV
         if let (Some(legacy_store), Some(legacy_writer)) =
@@ -1045,13 +926,13 @@ pub mod data_feeds_cache {
                 invoke_signed(&ix, &account_infos, &[signer_seeds])
                     .map_err(|_| DataCacheError::FailedLegacyWrite)?;
 
-                write_occured = true;
+                write_occurred = true;
             }
         }
 
         // emit legacy event only if there were candidates identified by the feed config
         if !candidate_legacy_writes.is_empty() {
-            let (feeds_skipped, feeds_written) = if write_occured {
+            let (feeds_skipped, feeds_written) = if write_occurred {
                 (write_disabled_entries, write_enabled_entries)
             } else {
                 (candidate_legacy_writes, vec![])
@@ -1300,3 +1181,69 @@ fn sorted_insert<T: Ord>(vec: &mut Vec<T>, value: T) {
         Ok(pos) | Err(pos) => vec.insert(pos, value),
     }
 }
+
+fn validate_feed_config_inputs(
+    data_ids: &Vec<[u8; 16]>,
+    descriptions: &Vec<[u8; 32]>,
+    workflow_metadatas: &Vec<WorkflowMetadata>,
+) -> Result<()> {
+    require_gte!(
+        MAX_WORKFLOW_METADATAS,
+        workflow_metadatas.len(),
+        DataCacheError::MaxWorkflowsExceeded
+    );
+
+    require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
+
+    require_eq!(
+        data_ids.len(),
+        descriptions.len(),
+        DataCacheError::ArrayLengthMismatch
+    );
+
+    for d in descriptions.iter() {
+        if workflow_metadatas.is_empty() {
+            require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
+        } else {
+            require!(*d != [0; 32], DataCacheError::InvalidDescrption);
+        }
+    }
+
+    for metadata in workflow_metadatas.iter() {
+        require_keys_neq!(
+            metadata.allowed_sender,
+            Pubkey::default(),
+            DataCacheError::InvalidAddress
+        );
+        require!(
+            !metadata.allowed_workflow_name.is_empty(),
+            DataCacheError::InvalidWorkflowName
+        );
+        require!(
+            metadata.allowed_workflow_owner != ZERO_ADDRESS,
+            DataCacheError::InvalidAddress
+        );
+    }
+
+    Ok(())
+}
+
+fn permission_flag(metadata: &WorkflowMetadata, data_id: &[u8; 16], cache_state: &[u8]) -> (Pubkey, u8) {
+
+    let derived_report_hash = create_report_hash(
+        data_id,
+        &metadata.allowed_sender,
+        &metadata.allowed_workflow_owner,
+        &metadata.allowed_workflow_name,
+    );
+
+    Pubkey::find_program_address(
+        &[
+            b"permission_flag",
+            cache_state,
+            &derived_report_hash,
+        ],
+        &crate::ID,
+    )
+}
+
