@@ -22,7 +22,7 @@ pub mod contract_reader_interface_secondary {
         data: TestStructData,
     ) -> Result<()> {
         let test_struct_account = &mut ctx.accounts.test_struct;
-    
+
         test_struct_account.idx = test_idx;
         test_struct_account.field = data.field;
         test_struct_account.oracle_id = data.oracle_id;
@@ -33,10 +33,9 @@ pub mod contract_reader_interface_secondary {
         test_struct_account.account_struct = data.account_struct;
         test_struct_account.nested_dynamic_struct = data.nested_dynamic_struct;
         test_struct_account.nested_static_struct = data.nested_static_struct;
-    
+
         Ok(())
     }
-
 }
 
 #[derive(Accounts)]
