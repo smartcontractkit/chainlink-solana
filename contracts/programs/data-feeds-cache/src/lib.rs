@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use std::cell::RefMut;
-use std::{ops::DerefMut};
+use std::ops::DerefMut;
 
 declare_id!("3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa");
 
@@ -43,7 +43,7 @@ pub mod data_feeds_cache {
 
     use crate::event::{
         CacheInitialized, DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdate,
-        FeedAdminUpdated, InvalidUpdatePermission, LegacyFeedsConfigInitialized,
+        FeedAdminUpdated, ForwarderUpdated, InvalidUpdatePermission, LegacyFeedsConfigInitialized,
         LegacyFeedsConfigUpdated, OwnershipAcceptance, OwnershipTransfer, StaleDecimalReport,
     };
 
@@ -54,6 +54,7 @@ pub mod data_feeds_cache {
     pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
         let state = &mut ctx.accounts.state.load_init()?;
         state.owner = ctx.accounts.owner.key();
+        state.forwarder_id = ctx.accounts.forwarder_program.key();
 
         let mut prev_admin = Pubkey::default();
         for admin in feed_admins.iter() {
@@ -79,8 +80,27 @@ pub mod data_feeds_cache {
         emit!({
             CacheInitialized {
                 state: ctx.accounts.state.key(),
+                forwarder_id: state.forwarder_id,
+                legacy_writer_bump: state.legacy_writer_nonce,
             }
         });
+
+        Ok(())
+    }
+
+    /// Not to be used in normal circumstances unless the original forwarder
+    /// undergoes maintenance.
+    pub fn update_forwarder_id(ctx: Context<UpdateForwarder>) -> Result<()> {
+        let mut state = ctx.accounts.state.load_mut()?;
+
+        emit!({
+            ForwarderUpdated {
+                previous_forwarder: state.forwarder_id,
+                new_forwarder: ctx.accounts.forwarder_program.key(),
+            }
+        });
+
+        state.forwarder_id = ctx.accounts.forwarder_program.key();
 
         Ok(())
     }

@@ -46,7 +46,7 @@ pub fn extract_transmission_id(raw_report: &[u8], receiver: &Pubkey) -> [u8; 32]
     let workflow_execution_id = &raw_report[1..33];
     let report_id = &raw_report[107..109];
 
-    // use sha-256 bc it's much cheaper than keccak-256
+    // use sha-256 (instead of keccak-256)
     hash::hash(&[&receiver.to_bytes(), workflow_execution_id, report_id].concat()).to_bytes()
 }
 

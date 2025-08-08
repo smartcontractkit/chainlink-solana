@@ -45,9 +45,11 @@ pub mod keystone_forwarder {
     //     #[account(owner = FORWARDER_ID)]
     //     pub state: Account<'info, ForwarderState>,
 
+    // WARNING: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control. you need to view the official chainlink docs to determine
+    // the correct FORWARDER_ID to use
     //     /// CHECK: This is a PDA
-    //    /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
-    //    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    //    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = FORWARDER_ID)]
     //    pub forwarder_authority: Signer<'info>,
 
     //    // remaining accounts passed in as well

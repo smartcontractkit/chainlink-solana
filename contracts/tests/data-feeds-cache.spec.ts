@@ -145,6 +145,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -207,6 +208,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -404,6 +406,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -647,6 +650,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -1141,6 +1145,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])

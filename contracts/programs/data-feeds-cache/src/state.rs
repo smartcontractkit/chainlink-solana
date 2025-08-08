@@ -18,6 +18,7 @@ pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub feed_admins: AccountList,
+    pub forwarder_id: Pubkey,
     pub legacy_writer_nonce: u8, // pda writing to the legacy feeds
     pub _padding: [u8; 7],
 }

@@ -106,12 +106,16 @@ pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> 
 
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    #[account(owner = FORWARDER_ID)]
+    // Note: the receiver function does not need to directly authenticate the forwarder state
+    // as long as it verifies the forwarder_authority.
+    // WARNING: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    // the correct FORWARDER_ID to use
+    #[account(owner = <FORWARDER_ID>)]
     pub state: Account<'info, ForwarderState>,
 
     /// CHECK: This is a PDA
-    /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
-    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = <FORWARDER_ID>)]
     pub forwarder_authority: Signer<'info>,
 
     // remaining accounts passed in as well

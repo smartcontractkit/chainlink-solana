@@ -20,7 +20,26 @@ pub struct Initialize<'info> {
     )]
     pub state: AccountLoader<'info, CacheState>,
 
+    #[account(executable)]
+    /// CHECK: We don't specify the static forwarder program id from the forwarder crate because
+    /// the actual program id on chain may have been generated through a different mechanism
+    pub forwarder_program: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateForwarder<'info> {
+    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    pub owner: Signer<'info>,
+
+    #[account(mut)]
+    pub state: AccountLoader<'info, CacheState>,
+
+    #[account(executable)]
+    /// CHECK: We don't specify the static forwarder program id from the forwarder crate because
+    /// the actual program id on chain may have been generated through a different mechanism
+    pub forwarder_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -77,7 +96,6 @@ pub struct InitLegacyFeedsConfig<'info> {
     // we just need to know what the account address is for verification purposes
     // pub legacy_feed: UncheckedAccount<'info>
 }
-
 
 #[derive(Accounts)]
 pub struct UpdateLegacyFeedsConfig<'info> {
@@ -254,33 +272,16 @@ pub struct SetDecimalFeedConfigs<'info> {
     // pub permission_flag: UncheckedAccount<'info>
 }
 
-// So for internal data feeds use case:
-//
-// max_payload_size = 333
-
-// best case (no legacy feeds)
-// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N) ==> N = 7.7
-//       ^payload ^accounts
-
-// worst case (all reports are tied with legacy feeds)
-// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
-// N = 7.5
-
-// So we can at most support 7 decimal feed reports with ALTs
-
-// ```
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    // #[account(owner = FORWARDER_ID)]
-    // checking the owner of the state is optional and not necessary
-    // because the forwarder state is uniquely associated with the
-    // forwarder authority which is verified in the instruction
-    // warning: the FORWARDER_ID deployed in an environment may be different
-    // than the one in source control. you need to view the docs to determine
-    // what the actual deployed program id is.
+    // Note: the data feed cache's on_report function does not directly authenticate the forwarder state.
+    // Instead, it indirectly verifies the correct state by enforcing that the forwarder_authority is authorized.
+    // WARNING: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    // the correct FORWARDER_ID to use
     pub forwarder_state: Account<'info, ForwarderState>,
 
-    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = FORWARDER_ID)]
+    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = cache_state.load()?.forwarder_id)]
     pub forwarder_authority: Signer<'info>,
 
     #[account()]
@@ -329,15 +330,11 @@ pub struct OnReport<'info> {
     // )]
     // pub permission_flag: UncheckedAccount<'info>
 
-    // M transmission feed accounts
-    // should be sorted
+    // M transmission feed accounts (sorted)
     //
-    // included if and only if both legacy_store and legacy_feeds_config is included.
-    // if only 1 or 0 or the legacy_store / legacy_feeds_config accounts are included
-    // this should not be included.
-    //
-    // note: not all of the legacy feed accounts supplied may be written to because there is
-    // a write_disabled flag per account. assume this is sorted.
+    // Note: not all of the legacy feed accounts supplied may be written to because there is
+    // a write_disabled flag per account. Additionally, if either legacy_store, legacy_feeds_config,
+    // or legacy_writer is omitted no legacy feeds will be written to
     //
     // pub legacy_feed: UncheckedAccount<'info>
 }

@@ -91,4 +91,12 @@ pub struct LegacyFeedsConfigUpdated {
 #[event]
 pub struct CacheInitialized {
     pub state: Pubkey,
+    pub forwarder_id: Pubkey,
+    pub legacy_writer_bump: u8,
+}
+
+#[event]
+pub struct ForwarderUpdated {
+    pub previous_forwarder: Pubkey,
+    pub new_forwarder: Pubkey,
 }
