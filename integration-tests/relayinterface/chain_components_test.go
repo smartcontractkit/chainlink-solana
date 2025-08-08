@@ -445,14 +445,14 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				bound := BindingsByName(bindings, AnyContractName)[0]
 
 				// ContractReaderQueryKeyNotFound
-				logs, err := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, &TestStruct{})
-				require.NoError(t, err)
+				logs, logError := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, &TestStruct{})
+				require.NoError(t, logError)
 				assert.Len(t, logs, 0)
 
 				// ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent
 				result := &TestStruct{}
-				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, nil, &result)
-				assert.True(t, errors.Is(err, types.ErrNotFound))
+				latestEventError := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, nil, &result)
+				assert.True(t, errors.Is(latestEventError, types.ErrNotFound))
 
 				testStructs := make([]TestStruct, 4)
 
@@ -474,15 +474,15 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				// ContractReaderGetLatestValueWithFilteringForEvent
 				filterParams := &FilterEventParams{Field: *ts1.Field}
 				assert.Never(t, func() bool {
-					result := &TestStruct{}
-					err := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result)
-					return err == nil && reflect.DeepEqual(result, &ts2)
+					result2 := &TestStruct{}
+					latestEventError2 := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result2)
+					return latestEventError2 == nil && reflect.DeepEqual(result2, &ts2)
 				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
 
 				// get the result one more time to verify it.
 				// Using the result from the Never statement by creating result outside the block is a data race
 				result = &TestStruct{}
-				err = cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result)
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result)
 				require.NoError(t, err)
 				assert.Equal(t, &ts1, result)
 
@@ -492,7 +492,6 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 					// sequences from queryKey without limit and sort should be in descending order
 					sequences, err := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, tst)
 					return err == nil && len(sequences) == 2 && reflect.DeepEqual(&ts1, sequences[1].Data) && reflect.DeepEqual(&ts2, sequences[0].Data)
-
 				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
 
 				// ContractReaderQueryKeyReturnsDataAsValuesDotValue
