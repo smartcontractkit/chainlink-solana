@@ -840,19 +840,12 @@ pub mod data_feeds_cache {
         // or add generic dfc event out here
 
         // seperate out write disabled entries
-        let write_disabled_entries: Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)> =
-            candidate_legacy_writes
-                .iter()
-                .filter(|e| e.0.write_disabled != 0)
-                .cloned()
-                .collect();
-
-        let write_enabled_entries: Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)> =
-            candidate_legacy_writes
-                .iter()
-                .filter(|e| e.0.write_disabled == 0)
-                .cloned()
-                .collect();
+        let (write_disabled_entries, write_enabled_entries): (
+            Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)>,
+            Vec<(&LegacyFeedEntry, &ReceivedDecimalReport)>,
+        ) = candidate_legacy_writes
+            .iter()
+            .partition(|e| e.0.write_disabled != 0);
 
         let mut write_occurred = false;
 
