@@ -376,7 +376,7 @@ pub mod data_feeds_cache {
                 DataCacheError::AccountMismatch
             );
 
-            let feed_config_exists = feed_config_account_infos[i].data_len() != 0;
+            let feed_config_exists = !feed_config_account_infos[i].data_is_empty();
 
             // sorted
             let mut temp_candidates_deletion: Vec<Pubkey> = Vec::new();
@@ -488,7 +488,7 @@ pub mod data_feeds_cache {
                 DataCacheError::AccountMismatch
             );
 
-            let feed_config_exists = feed_config_account_infos[i].data_len() != 0;
+            let feed_config_exists = !feed_config_account_infos[i].data_is_empty();
 
             let feed_config_loader = if feed_config_exists {
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
