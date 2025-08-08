@@ -42,7 +42,7 @@ pub mod data_feeds_cache {
     };
 
     use crate::event::{
-        CacheInitialized, DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdate,
+        CacheInitialized, DecimalReportClosed, DecimalReportInitialized, DecimalReportUpdated,
         FeedAdminUpdated, ForwarderUpdated, InvalidUpdatePermission, LegacyFeedsConfigInitialized,
         LegacyFeedsConfigUpdated, OwnershipAcceptance, OwnershipTransfer, StaleDecimalReport,
     };
@@ -330,8 +330,6 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-
-
     /// An instruction which is only meant to be simulated off-chain. This instruction
     /// does nothing beyond returning a list of permission accounts to be closed when
     /// calling `set_decimal_feed_configs`. No account state changes in this function.
@@ -391,14 +389,16 @@ pub mod data_feeds_cache {
 
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-                    let (permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
+                    let (permission_flag, _) =
+                        permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                     sorted_insert(&mut temp_candidates_deletion, permission_flag)
                 }
             }
 
-            for (j, metadata) in workflow_metadatas.iter().enumerate() {                
-                let (curr_permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
+            for (j, metadata) in workflow_metadatas.iter().enumerate() {
+                let (curr_permission_flag, _) =
+                    permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                 // ex: data_ids: [1, 2]
                 // workflow metadatas [5, 6, 7]
@@ -531,7 +531,8 @@ pub mod data_feeds_cache {
                 // go over current workflows
                 for metadata in feed_config.workflow_metadata.iter() {
                     // these entries are not to be deleted yet... we'll find out at the end if we need to delete them
-                    let (permission_flag, _) = permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
+                    let (permission_flag, _) =
+                        permission_flag(metadata, curr_data_id, cache_state_key.as_ref());
 
                     sorted_insert(&mut temp_candidates_deletion, permission_flag);
                 }
@@ -804,7 +805,7 @@ pub mod data_feeds_cache {
 
             updated_report.serialize(&mut &mut dst[ANCHOR_DISCRIMINATOR..])?;
 
-            emit!(DecimalReportUpdate {
+            emit!(DecimalReportUpdated {
                 state: ctx.accounts.cache_state.key(),
                 answer: received_decimal_report.answer,
                 timestamp: received_decimal_report.timestamp,
@@ -1228,8 +1229,11 @@ fn validate_feed_config_inputs(
     Ok(())
 }
 
-fn permission_flag(metadata: &WorkflowMetadata, data_id: &[u8; 16], cache_state: &[u8]) -> (Pubkey, u8) {
-
+fn permission_flag(
+    metadata: &WorkflowMetadata,
+    data_id: &[u8; 16],
+    cache_state: &[u8],
+) -> (Pubkey, u8) {
     let derived_report_hash = create_report_hash(
         data_id,
         &metadata.allowed_sender,
@@ -1238,12 +1242,7 @@ fn permission_flag(metadata: &WorkflowMetadata, data_id: &[u8; 16], cache_state:
     );
 
     Pubkey::find_program_address(
-        &[
-            b"permission_flag",
-            cache_state,
-            &derived_report_hash,
-        ],
+        &[b"permission_flag", cache_state, &derived_report_hash],
         &crate::ID,
     )
 }
-

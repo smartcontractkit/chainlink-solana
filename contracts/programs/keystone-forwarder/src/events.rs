@@ -19,7 +19,7 @@ pub struct ConfigSet {
 }
 
 #[event]
-pub struct InitializeEmit {
+pub struct ForwarderInitialize {
     pub state: Pubkey,
     pub owner: Pubkey,
 }

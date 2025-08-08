@@ -123,7 +123,7 @@ describe("keystone_storage", function () {
   it("Is initialized!", async () => {
     const eventPromise = waitForEvent(
       program,
-      "InitializeEmit",
+      "ForwarderInitialize",
       (event: any, slot) => {
         assert.isNotNull(event.authorityNonce);
         assert.isTrue(

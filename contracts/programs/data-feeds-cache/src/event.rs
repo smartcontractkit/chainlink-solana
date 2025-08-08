@@ -36,7 +36,7 @@ pub struct StaleDecimalReport {
 }
 
 #[event]
-pub struct DecimalReportUpdate {
+pub struct DecimalReportUpdated {
     pub state: Pubkey,
     pub data_id: [u8; 16],
     pub timestamp: u32,

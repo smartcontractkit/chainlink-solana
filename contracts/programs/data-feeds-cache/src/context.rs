@@ -149,7 +149,7 @@ pub struct InitDecimalReports<'info> {
     //     init,
     //     seeds = [
     //         b"decimal_report",
-    //         cache_state.key().as_ref()
+    //         state.key().as_ref()
     //         data_id,
     //     ],
     //     bump

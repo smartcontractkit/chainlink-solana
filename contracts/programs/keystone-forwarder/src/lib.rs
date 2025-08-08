@@ -6,7 +6,9 @@ use common::{
     REPORT_CONTEXT_LEN, SIGNATURE_LEN, STATE_VERSION,
 };
 
-use events::{ConfigSet, InitializeEmit, OwnershipAcceptance, OwnershipTransfer, ReportProcessed};
+use events::{
+    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportProcessed,
+};
 
 use context::*;
 pub use error::*;
@@ -61,7 +63,7 @@ pub mod keystone_forwarder {
         state.version = STATE_VERSION;
         state.owner = ctx.accounts.owner.key();
 
-        emit!(InitializeEmit {
+        emit!(ForwarderInitialize {
             state: state.key(),
             owner: ctx.accounts.owner.key(),
         });
