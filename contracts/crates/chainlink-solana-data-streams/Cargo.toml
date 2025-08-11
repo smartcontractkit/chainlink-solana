@@ -16,10 +16,10 @@ default = []
 borsh = "0.10.3"
 
 [target.'cfg(target_os = "solana")'.dependencies]
-solana-program = "1.17"
+solana-program = "2.1.0"
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
-solana-sdk = "1.17"
+solana-sdk = "2.1.0"
 
 [dev-dependencies]
-solana-sdk = "1.17"
+solana-sdk = "2.1.0"
