@@ -64,9 +64,11 @@ const (
 
 var trueVal = true
 
+// StoreTestStruct is used to send data on chain
+// TestIdx is hardcoded per test in chainReaderConfig
 type StoreTestStruct struct {
-	Data    TestStruct
-	ListIdx uint8
+	Data    TestStruct // test data
+	ListIdx uint8      // identifier to differentiate between different test structs in the same test
 }
 
 func TestChainComponents(t *testing.T) {
@@ -1502,7 +1504,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							Prefix: pdaStructDataPrefix,
 							Seeds: []codec.PDASeed{
 								{
-									Name: "I",
+									Name: "I", // this is read from params passed in while reading the account, its analogous to ListIdx which is used while writing to chain
 									Type: codec.IdlType{AsString: codec.IdlTypeU64},
 								},
 							},
@@ -1944,7 +1946,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 									{Static: testIdx},
 									{Dynamic: chainwriter.Lookup{
 										AccountLookup: &chainwriter.AccountLookup{
-											Location: "ListIdx",
+											Location: "ListIdx", // this will be sent as input params while writing to chain, see StoreTestStruct
 										},
 									}},
 								},
