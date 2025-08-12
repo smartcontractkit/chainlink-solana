@@ -670,6 +670,8 @@ func (txm *Txm) simulate() {
 			// Certain errors can be considered not to be failures during simulation to allow the process to continue
 			if txState, errType := txm.ProcessError(ctx, msg.signatures[0], res.Err, true, msg.id); errType != NoFailure {
 				if len(res.Logs) > 0 {
+					// Although this surfaces revert errors, keep log level as Debug. Data Feeds expects stale report reverts often.
+					// Increasing the level to Error would generate too much noise.
 					txm.lggr.Debugw("simulated transaction error logs", "logs", res.Logs)
 				}
 				id, err := txm.txs.OnError(msg.signatures[0], txm.cfg.TxRetentionTimeout(), txState, errType)
@@ -987,7 +989,7 @@ func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Trans
 		// Certain errors can be considered not to be failures during simulation to allow the process to continue
 		if txState, errType := txm.ProcessError(ctx, sig, res.Err, true, id); errType != NoFailure {
 			if len(res.Logs) > 0 {
-				txm.lggr.Debugw("simulated transaction error logs", "logs", res.Logs)
+				txm.lggr.Errorw("simulated transaction error logs", "logs", res.Logs)
 			}
 			err := txm.txs.OnPrebroadcastError(id, txm.cfg.TxRetentionTimeout(), txState, errType)
 			if err != nil {

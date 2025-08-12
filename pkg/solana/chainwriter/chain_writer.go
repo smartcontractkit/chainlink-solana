@@ -308,6 +308,19 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	}
 
 	options := []txmutils.SetTxConfig{}
+	// Transform args if necessary
+	if methodConfig.ArgsTransform != "" {
+		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
+		if tfErr != nil {
+			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
+		}
+		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
+		args, accounts, staticTableMap, options, err = transformFunc(ctx, s.client, s.lggr, args, accounts, staticTableMap, derivedTableMap, feePayer, toAddress, methodConfig.ComputeUnitLimitOverhead, options, debugID)
+		if err != nil {
+			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
+		}
+	}
+
 	if len(methodConfig.ATAs) > 0 {
 		s.lggr.Debugw("Creating ATAs", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
 		createATAInstructions, ataErr := CreateATAs(ctx, args, methodConfig.ATAs, derivedTableMap, s.client, feePayer, s.lggr)
@@ -321,19 +334,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		if ataUUID != "" {
 			// Wait till ATA creation is finalized before proceeding with the main transaction
 			options = append(options, txmutils.AppendDependencyTxs([]txmutils.DependencyTx{{TxID: ataUUID, DesiredStatus: types.Finalized}}))
-		}
-	}
-
-	// Transform args if necessary
-	if methodConfig.ArgsTransform != "" {
-		transformFunc, tfErr := FindTransform(methodConfig.ArgsTransform)
-		if tfErr != nil {
-			return errorWithDebugID(fmt.Errorf("error finding transform function: %w", tfErr), debugID)
-		}
-		s.lggr.Debugw("Applying args transformation", "contract", contractName, "method", method, "tx", transactionID, "debugID", debugID)
-		args, accounts, options, err = transformFunc(ctx, s.client, args, accounts, derivedTableMap, toAddress, methodConfig.ComputeUnitLimitOverhead, options)
-		if err != nil {
-			return errorWithDebugID(fmt.Errorf("error transforming args: %w", err), debugID)
 		}
 	}
 
