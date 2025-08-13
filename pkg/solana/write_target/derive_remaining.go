@@ -194,8 +194,8 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		reportHash := createReportHash(
 			data[:],
 			authority.Bytes(),
-			[]byte(meta.WorkflowOwner),
 			wfOwner,
+			[]byte(meta.WorkflowName),
 		)
 
 		writeFlagSeeds := [][]byte{
