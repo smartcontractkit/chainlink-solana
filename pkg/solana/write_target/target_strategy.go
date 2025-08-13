@@ -3,7 +3,6 @@ package writetarget
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/sha3"
 	"errors"
 	"fmt"
 	"math/big"
@@ -417,7 +416,7 @@ func extractTransmissionID(receiver solana.PublicKey, rawReport []byte) ([32]byt
 	reportID := rawReport[executionIDOffset : executionIDOffset+executionIDSize]
 	data = append(data, reportID...)
 
-	return sha3.Sum256(data), nil
+	return sha256.Sum256(data), nil
 }
 
 func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram solana.PublicKey, forwarderProgram solana.PublicKey) (solana.PublicKey, error) {
