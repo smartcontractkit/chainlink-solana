@@ -94,11 +94,11 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 	}
 
 	acc, err := ts.client.GetAccountInfoWithOpts(ctx, executionState, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-	if err != nil {
+	if err != nil && !errors.Is(err, rpc.ErrNotFound) {
 		return nil, fmt.Errorf("failed to get transmission state latest value: %w", err)
 	}
 
-	if acc.Value == nil {
+	if errors.Is(err, rpc.ErrNotFound) || acc.Value == nil {
 		ts.lggr.Infow("non-empty report - transmission not attempted", "request", request,
 			"reportLen", len(r.Inputs.SignedReport.Report),
 			"reportContextLen", len(r.Inputs.SignedReport.Context),
