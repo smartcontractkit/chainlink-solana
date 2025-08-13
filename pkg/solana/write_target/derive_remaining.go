@@ -51,29 +51,6 @@ func GenerateDeriveRemainingName(chainID string) string {
 	return id
 }
 
-func NewWriteTargetID(chainFamilyName, networkName, chainID, version string) (string, error) {
-	// Input args should not be empty
-	if version == "" {
-		return "", fmt.Errorf("version must not be empty")
-	}
-
-	// Network ID: network name is optional, if not provided, use the chain ID
-	networkID := networkName
-	if networkID == "" && chainID == "" {
-		return "", fmt.Errorf("invalid input: networkName or chainID must not be empty")
-	}
-	if networkID == "" || networkID == "unknown" {
-		networkID = chainID
-	}
-
-	// allow for chain family to be empty
-	if chainFamilyName == "" {
-		return fmt.Sprintf("%s_%s@%s", DeriveRemainingName, networkID, version), nil
-	}
-
-	return fmt.Sprintf("%s_%s-%s@%s", DeriveRemainingName, chainFamilyName, networkID, version), nil
-}
-
 type deriver struct {
 	capabilities.CapabilityInfo
 	client   client.Reader
@@ -89,6 +66,11 @@ type CacheDetails struct {
 
 func (dr *deriver) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
 	var res capabilities.CapabilityResponse
+
+	// Notice: error skipped as implementation always returns nil
+	capInfo, _ := dr.Info(ctx)
+
+	dr.lggr.Debugw("Execute", "request", request, "capInfo", capInfo)
 
 	if request.Config == nil {
 		return res, errors.New("missing config field")
