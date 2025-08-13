@@ -413,7 +413,7 @@ func extractTransmissionID(receiver solana.PublicKey, rawReport []byte) ([32]byt
 	data = append(data, executionID...)
 
 	// 3. add reportID
-	reportID := rawReport[executionIDOffset : executionIDOffset+executionIDSize]
+	reportID := rawReport[reportIDOffset : reportIDOffset+reporIDSize]
 	data = append(data, reportID...)
 
 	return sha256.Sum256(data), nil
