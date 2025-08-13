@@ -315,7 +315,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 	for _, acc := range r.Inputs.RemainingAccounts {
 		if acc.PublicKey.Equals(ts.accounts.forwarderState) ||
 			acc.PublicKey.Equals(authority) {
-			// These accounts are part of remaining cause they included in remaining hash sum
+			// These accounts are part of remaining cause they will be included by forwarder itself
 			continue
 		}
 		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)

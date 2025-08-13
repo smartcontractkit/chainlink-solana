@@ -203,12 +203,16 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		if len(wfOwner) != 20 {
 			return nil, fmt.Errorf("workflow owner address size is invalid: %d, expected 20", len(wfOwner))
 		}
+		wfName := []byte(meta.WorkflowName)
+		if len(wfName) != 10 {
+			return nil, fmt.Errorf("workflow name size is invalid: %d, expected 10", len(wfName))
+		}
 		// add to remaining accounts
 		reportHash := createReportHash(
 			data[:],
 			authority.Bytes(),
 			wfOwner,
-			[]byte(meta.WorkflowName),
+			wfName,
 		)
 
 		writeFlagSeeds := [][]byte{
