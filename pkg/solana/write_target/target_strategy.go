@@ -6,7 +6,6 @@ import (
 	"crypto/sha3"
 	"errors"
 	"fmt"
-	"maps"
 	"math/big"
 
 	"github.com/gagliardetto/solana-go"
@@ -314,15 +313,17 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		solana.SystemProgramID,
 	)
 
-	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
-	maps.Copy(lookup, ts.lookupTable)
+	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts...)
 
-	for _, acc := range r.Inputs.RemainingAccounts {
-		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
+	/*	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
+		maps.Copy(lookup, ts.lookupTable)
 
-		lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
-	}
+		for _, acc := range r.Inputs.RemainingAccounts {
+			inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
 
+			lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
+		}
+	*/
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {
 		return nil, fmt.Errorf("failed build and validate report instruction: %w", err)
@@ -330,7 +331,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 
 	return solana.NewTransaction([]solana.Instruction{tx}, blockHash,
 		solana.TransactionPayer(ts.accounts.transmitter),
-		solana.TransactionAddressTables(lookup),
+	//	solana.TransactionAddressTables(lookup),
 	)
 }
 
