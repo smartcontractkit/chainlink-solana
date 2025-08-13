@@ -121,6 +121,21 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		return nil, fmt.Errorf("cache state account does not exist %v", cacheStateKey)
 	}
 
+	authority, err := deriveForwarderAuthority(dr.accounts.forwarderState, cacheProgram, dr.accounts.forwarderProgramID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 0 state
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: dr.accounts.forwarderState,
+	})
+
+	// 1 authority
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: authority,
+	})
+
 	// add cache state key
 	ret = append(ret, &solana.AccountMeta{
 		PublicKey:  cacheStateKey,
@@ -129,10 +144,6 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 	derivedAccounts := make([]*solana.AccountMeta, 2*len(cd.FeedIDs))
 
-	authority, err := deriveForwarderAuthority(dr.accounts.forwarderState, cacheProgram, dr.accounts.forwarderProgramID)
-	if err != nil {
-		return nil, err
-	}
 	// derive pdas and check existence on-chain
 	for i, feedID := range cd.FeedIDs {
 		validBytes := validateBytes16(feedID)

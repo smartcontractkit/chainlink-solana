@@ -312,7 +312,15 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		solana.SystemProgramID,
 	)
 
-	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts...)
+	for _, acc := range r.Inputs.RemainingAccounts {
+		if acc.PublicKey.Equals(ts.accounts.forwarderState) ||
+			acc.PublicKey.Equals(authority) {
+			// These accounts are part of remaining cause they included in remaining hash sum
+			continue
+		}
+		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
+
+	}
 
 	/*	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 		maps.Copy(lookup, ts.lookupTable)
