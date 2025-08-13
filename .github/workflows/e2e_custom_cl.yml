@@ -6,7 +6,7 @@ on:
       cl_branch_ref:
         description: Chainlink repo branch to integrate with
         required: true
-        default: develop
+        default: PRIV-126-workflow-key
         type: string
       team:
         description: Team to run the tests for (e.g. BIX, CCIP)
