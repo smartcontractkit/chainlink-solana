@@ -136,9 +136,15 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		PublicKey: authority,
 	})
 
-	// add cache state key
+	// 2 cache state
 	ret = append(ret, &solana.AccountMeta{
 		PublicKey:  cacheStateKey,
+		IsWritable: false,
+	})
+
+	// 3 system
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey:  solana.SystemProgramID,
 		IsWritable: false,
 	})
 
