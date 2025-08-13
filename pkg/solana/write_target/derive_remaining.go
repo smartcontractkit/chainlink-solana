@@ -142,10 +142,24 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		IsWritable: false,
 	})
 
-	// 3 system
+	// 3 dummy legacy store
 	ret = append(ret, &solana.AccountMeta{
-		PublicKey:  solana.SystemProgramID,
-		IsWritable: false,
+		PublicKey: cacheProgram,
+	})
+
+	// dummy legacy feed config
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: cacheProgram,
+	})
+
+	// dummy legacy writer
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: cacheProgram,
+	})
+
+	// system
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: solana.SystemProgramID,
 	})
 
 	derivedAccounts := make([]*solana.AccountMeta, 2*len(cd.FeedIDs))
