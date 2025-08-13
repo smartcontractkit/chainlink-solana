@@ -219,7 +219,7 @@ func (ts *targetRequest) toPayload() []byte {
 	report := ts.Inputs.SignedReport
 
 	// 1. data_size ret[0]
-	ret[0] = byte(len(report.Signatures))
+	ret = append(ret, byte(len(report.Signatures)))
 
 	// 2. add N signatures
 	for _, sig := range report.Signatures {
