@@ -2,6 +2,7 @@ package writetarget
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -181,12 +182,20 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		derivedAccounts[i] = &solana.AccountMeta{PublicKey: decimalReportKey, IsWritable: true}
 
+		wfOwner, err := hex.DecodeString(meta.WorkflowOwner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode hex workflow owner %s: %w", wfOwner, err)
+		}
+
+		if len(wfOwner) != 20 {
+			return nil, fmt.Errorf("workflow owner address size is invalid: %d, expected 20", len(wfOwner))
+		}
 		// add to remaining accounts
 		reportHash := createReportHash(
 			data[:],
 			authority.Bytes(),
 			[]byte(meta.WorkflowOwner),
-			[]byte(meta.WorkflowName),
+			wfOwner,
 		)
 
 		writeFlagSeeds := [][]byte{
@@ -203,7 +212,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
-			return nil, fmt.Errorf("error fetching write flag account %v for data id %v", writeFlagKey, feedID)
+			return nil, fmt.Errorf("error fetching write flag account %v for data id %v: %w", writeFlagKey, feedID, err)
 		}
 
 		if writeFlagAccount.Value == nil {
