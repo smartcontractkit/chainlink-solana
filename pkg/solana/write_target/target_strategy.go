@@ -355,28 +355,24 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		r.Inputs.RemainingAccounts[2].PublicKey.Bytes(), // 2 cache state
 		reportHash[:],
 	}
-	ts.lggr.Debugf("target strategy, rep_hash:x% cacheState:%v", reportHash[:], r.Inputs.RemainingAccounts[2].PublicKey.String())
+	ts.lggr.Debugf("target strategy, rep_hash:%x cacheState:%s", reportHash[:], r.Inputs.RemainingAccounts[2].PublicKey.String())
 	writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, r.Receiver)
 	if err != nil {
 		return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
 			rep[0].DataID)
 	}
 
-	for _, acc := range r.Inputs.RemainingAccounts {
-		if acc.PublicKey.Equals(ts.accounts.forwarderState) ||
-			acc.PublicKey.Equals(authority) {
-			// These accounts are part of remaining cause they will be included by forwarder itself
-			continue
-		}
-		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
-
-	}
-
 	_, err = ts.client.GetAccountInfoWithOpts(context.TODO(), writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 	if err != nil {
-		return nil, fmt.Errorf("error fetching permission flag accounts", err)
+		return nil, fmt.Errorf("error fetching permission flag accounts: %w", err)
 	}
 
+	if !writeFlagKey.Equals(r.Inputs.RemainingAccounts[8].PublicKey) {
+		return nil, errors.New("missmatch write flag key")
+	}
+
+	// append remainings except for forwarderState + Authority
+	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts[2:]...)
 	/*	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
 		maps.Copy(lookup, ts.lookupTable)
 
