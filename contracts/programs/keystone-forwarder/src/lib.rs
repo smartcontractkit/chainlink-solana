@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
+use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
 
 use common::{
     FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR,
@@ -25,23 +25,20 @@ declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
+    use crate::{
+        program::KeystoneForwarder,
+        utils::{report_size_ok, ForwarderReport},
+    };
+
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        // store forwarder PDA bump for later
-        let (_, authority_nonce) = Pubkey::find_program_address(
-            &[b"forwarder", ctx.accounts.state.key().as_ref()],
-            &crate::ID,
-        );
-
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
-        state.authority_nonce = authority_nonce;
         state.owner = ctx.accounts.owner.key();
 
         emit!(InitializeEmit {
             owner: ctx.accounts.owner.key(),
-            authority_nonce
         });
 
         Ok(())
@@ -52,11 +49,17 @@ pub mod keystone_forwarder {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
-        let state_current_owner = state.owner;
+        require!(
+            proposed_owner != Pubkey::default()
+                && proposed_owner != state.owner
+                && proposed_owner != state.proposed_owner,
+            ForwarderError::InvalidProposedOwner
+        );
+
         state.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransfer {
-            current_owner: state_current_owner,
+            current_owner: state.owner,
             proposed_owner: state.proposed_owner
         });
 
@@ -114,10 +117,9 @@ pub mod keystone_forwarder {
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
-        let num_signatures = data[0] as usize;
-        let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
-        require_gt!(data.len(), min_data_size, ForwarderError::InvalidReport);
+        let num_signatures = data[0] as usize;
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
@@ -184,12 +186,31 @@ pub mod keystone_forwarder {
             .chain(ctx.remaining_accounts.iter().cloned())
             .collect();
 
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
+        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...)
+        let account_key_bytes = account_infos.iter().fold(
+            Vec::with_capacity(account_infos.len() * 32),
+            |mut buf, x| {
+                buf.extend_from_slice(&x.key().to_bytes());
+                buf
+            },
+        );
+        let computed_account_hash = hash::hash(&account_key_bytes);
+
+        require_eq!(
+            computed_account_hash,
+            Hash::from(forwarder_report.account_hash),
+            ForwarderError::InvalidAccountHash
+        );
+
         // payload begins with the Anchor discriminator
         let mut payload = ON_REPORT_DISCRIMINATOR.to_vec();
         // borsh serialization of metadata vector and report vector
         // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
         let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
-        let report = &raw_report[METADATA_LENGTH..].to_vec();
+        let report = forwarder_report.payload.as_slice();
         // Borsh serialize each part separately
         payload.extend(&metadata.try_to_vec()?);
         payload.extend(&report.try_to_vec()?);
@@ -198,10 +219,23 @@ pub mod keystone_forwarder {
 
         // used to derive the forwarder authority PDA
         let forwarder_state = ctx.accounts.state.key();
+        let receiver_program = ctx.accounts.receiver_program.key();
+
+        // calculate the bump on-the-fly
+        let (_, authority_nonce) = Pubkey::find_program_address(
+            &[
+                b"forwarder",
+                forwarder_state.as_ref(),
+                receiver_program.as_ref(),
+            ],
+            &crate::ID,
+        );
+
         let signers_seeds = &[
             b"forwarder",
             forwarder_state.as_ref(),
-            &[ctx.accounts.state.authority_nonce],
+            receiver_program.as_ref(),
+            &[authority_nonce],
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;

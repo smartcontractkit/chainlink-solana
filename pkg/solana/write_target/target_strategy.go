@@ -296,6 +296,11 @@ type decimalReport struct {
 	Answer    uint128
 }
 
+type forwarderReport struct {
+	Hash    [32]byte
+	Payload []byte
+}
+
 type uint128 struct {
 	Low  uint64
 	High uint64
@@ -331,10 +336,16 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 	name := meta[32:42]
 	owner := meta[42:62]
 	report := raw_report[metaLen:]
-	var rep []decimalReport
-	err = sol_binary.UnmarshalBorsh(&rep, report)
+	var fReport forwarderReport
+	err = sol_binary.UnmarshalBorsh(&fReport, report)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal forwarder report: %w", err)
+	}
+
+	var rep []decimalReport
+	err = sol_binary.UnmarshalBorsh(&rep, fReport.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal decimal report: %w", err)
 	}
 	reportHash := createReportHash(rep[0].DataID[:], authority.Bytes(), owner, name)
 	writeFlagSeeds := [][]byte{
