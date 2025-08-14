@@ -348,12 +348,14 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		return nil, fmt.Errorf("failed to unmarshal decimal report: %w", err)
 	}
 	reportHash := createReportHash(rep[0].DataID[:], authority.Bytes(), owner, name)
+
+	ts.lggr.Debugf("ts dataID:%x authority:%v wfOwner:%x wfName:%x", rep[0].DataID[:], authority.String(), owner, name)
 	writeFlagSeeds := [][]byte{
 		[]byte("permission_flag"),
 		r.Inputs.RemainingAccounts[2].PublicKey.Bytes(), // 2 cache state
 		reportHash[:],
 	}
-
+	ts.lggr.Debugf("target strategy, rep_hash:x% cacheState:%v", reportHash[:], r.Inputs.RemainingAccounts[2].PublicKey.String())
 	writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, r.Receiver)
 	if err != nil {
 		return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",

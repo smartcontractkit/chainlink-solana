@@ -214,12 +214,14 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 			wfOwner,
 			wfName,
 		)
+		dr.lggr.Debugf("dr dataID:%x authority:%v wfOwner:%x wfName:%x", data[:], authority.String(), wfOwner, wfName)
 
 		writeFlagSeeds := [][]byte{
 			[]byte("permission_flag"),
 			cacheStateKey.Bytes(),
 			reportHash[:],
 		}
+		dr.lggr.Debugf("der rem repHash: %x cacheState:%v", reportHash[:], cacheStateKey.String())
 
 		writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, cacheProgram)
 		if err != nil {
