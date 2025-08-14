@@ -126,7 +126,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		return nil, err
 	}
 
-	// 0 state
+	// 0 forwarder state
 	ret = append(ret, &solana.AccountMeta{
 		PublicKey: dr.accounts.forwarderState,
 	})

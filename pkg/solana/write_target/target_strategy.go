@@ -290,6 +290,17 @@ func validateBytes16(s string) bool {
 	return n.BitLen() <= 128
 }
 
+type decimalReport struct {
+	DataID    [16]byte
+	Timestamp uint32
+	Answer    uint128
+}
+
+type uint128 struct {
+	Low  uint64
+	High uint64
+}
+
 func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solana.PublicKey, blockHash solana.Hash) (*solana.Transaction, error) {
 	executionState, err := ts.deriveExecutionState(r)
 	if err != nil {
@@ -312,6 +323,32 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		solana.SystemProgramID,
 	)
 
+	forwarderMetaLen := 45
+	metaLen := 109
+
+	raw_report := r.Inputs.SignedReport.Report
+	meta := raw_report[forwarderMetaLen:metaLen]
+	name := meta[32:42]
+	owner := meta[42:62]
+	report := raw_report[metaLen:]
+	var rep []decimalReport
+	err = sol_binary.UnmarshalBorsh(&rep, report)
+	if err != nil {
+		return nil, err
+	}
+	reportHash := createReportHash(rep[0].DataID[:], authority.Bytes(), owner, name)
+	writeFlagSeeds := [][]byte{
+		[]byte("permission_flag"),
+		r.Inputs.RemainingAccounts[2].PublicKey.Bytes(), // 2 cache state
+		reportHash[:],
+	}
+
+	writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, r.Receiver)
+	if err != nil {
+		return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
+			rep[0].DataID)
+	}
+
 	for _, acc := range r.Inputs.RemainingAccounts {
 		if acc.PublicKey.Equals(ts.accounts.forwarderState) ||
 			acc.PublicKey.Equals(authority) {
@@ -320,6 +357,11 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		}
 		inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
 
+	}
+
+	_, err = ts.client.GetAccountInfoWithOpts(context.TODO(), writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+	if err != nil {
+		return nil, fmt.Errorf("error fetching permission flag accounts", err)
 	}
 
 	/*	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
@@ -438,12 +480,12 @@ func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram s
 	return ret, err
 }
 
-func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowID []byte) [32]byte {
+func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []byte, workflowName []byte) [32]byte {
 	var data []byte
 	data = append(data, dataID...)
 	data = append(data, forwarderAuthority...)
 	data = append(data, workflowOwner...)
-	data = append(data, workflowID...)
+	data = append(data, workflowName...)
 
 	return sha256.Sum256(data)
 }
