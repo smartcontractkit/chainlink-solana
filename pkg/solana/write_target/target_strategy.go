@@ -291,9 +291,9 @@ func validateBytes16(s string) bool {
 }
 
 type decimalReport struct {
-	DataID    [16]byte
 	Timestamp uint32
 	Answer    uint128
+	DataID    [16]byte
 }
 
 type forwarderReport struct {
