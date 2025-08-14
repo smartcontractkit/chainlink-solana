@@ -775,6 +775,13 @@ pub mod data_feeds_cache {
                 workflow_owner,
                 workflow_name,
             );
+            msg!(
+    "parts: data_id={} fwd_auth={} owner_20={} name_10={}",
+    hex::encode(&received_decimal_report.data_id),
+    ctx.accounts.forwarder_authority.key(),
+    hex::encode(workflow_owner),
+    hex::encode(workflow_name)
+            );
 
             let (curr_permission_flag, _) = Pubkey::find_program_address(
                 &[
