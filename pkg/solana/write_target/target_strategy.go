@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"encoding/binary"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -20,11 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
-	"encoding/binary"
-
 	sol_binary "github.com/gagliardetto/binary"
 
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -172,7 +173,8 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 
 	transactionID := txID.String()
-	if err := ts.txm.Enqueue(ctx, ts.accounts.forwarderProgramID.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight); err != nil {
+	options := []utils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(false), txmutils.SetComputeUnitLimit(500_000)}
+	if err := ts.txm.Enqueue(ctx, ts.accounts.forwarderProgramID.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
 		return "", fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
@@ -316,7 +318,8 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 	if err != nil {
 		return nil, err
 	}
-
+	limitIx := computebudget.NewSetComputeUnitLimit(500_000)
+	solana.C
 	inst := ks_forwarder.NewReportInstruction(
 		r.toPayload(),
 		ts.accounts.forwarderState,
