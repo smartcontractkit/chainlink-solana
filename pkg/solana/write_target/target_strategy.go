@@ -370,6 +370,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 	if !writeFlagKey.Equals(r.Inputs.RemainingAccounts[8].PublicKey) {
 		return nil, errors.New("missmatch write flag key")
 	}
+	ts.lggr.Debugf("writekeyflag %s", writeFlagKey.String())
 
 	// append remainings except for forwarderState + Authority
 	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts[2:]...)
