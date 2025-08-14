@@ -328,49 +328,48 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		solana.SystemProgramID,
 	)
 
-	/*	forwarderMetaLen := 45
-		metaLen := 109
+	forwarderMetaLen := 45
+	metaLen := 109
 
-		raw_report := r.Inputs.SignedReport.Report
-		meta := raw_report[forwarderMetaLen:metaLen]
-		name := meta[32:42]
-		owner := meta[42:62]
-		report := raw_report[metaLen:]
-		var fReport forwarderReport
-		err = sol_binary.UnmarshalBorsh(&fReport, report)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal forwarder report: %w", err)
-		}
+	raw_report := r.Inputs.SignedReport.Report
+	meta := raw_report[forwarderMetaLen:metaLen]
+	name := meta[32:42]
+	owner := meta[42:62]
+	report := raw_report[metaLen:]
+	var fReport forwarderReport
+	err = sol_binary.UnmarshalBorsh(&fReport, report)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal forwarder report: %w", err)
+	}
 
-		var rep []decimalReport
-		err = sol_binary.UnmarshalBorsh(&rep, fReport.Payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal decimal report: %w", err)
-		}
-		reportHash := createReportHash(rep[0].DataID[:], authority.Bytes(), owner, name)
+	var rep []decimalReport
+	err = sol_binary.UnmarshalBorsh(&rep, fReport.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal decimal report: %w", err)
+	}
+	reportHash := createReportHash(rep[0].DataID[:], authority.Bytes(), owner, name)
 
-		ts.lggr.Debugf("ts dataID:%x authority:%v wfOwner:%x wfName:%x", rep[0].DataID[:], authority.String(), owner, name)
-		writeFlagSeeds := [][]byte{
-			[]byte("permission_flag"),
-			r.Inputs.RemainingAccounts[2].PublicKey.Bytes(), // 2 cache state
-			reportHash[:],
-		}
-		ts.lggr.Debugf("target strategy, rep_hash:%x cacheState:%s", reportHash[:], r.Inputs.RemainingAccounts[2].PublicKey.String())
-		writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, r.Receiver)
-		if err != nil {
-			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
-				rep[0].DataID)
-		}
+	ts.lggr.Debugf("ts dataID:%x authority:%v wfOwner:%x wfName:%x", rep[0].DataID[:], authority.String(), owner, name)
+	writeFlagSeeds := [][]byte{
+		[]byte("permission_flag"),
+		r.Inputs.RemainingAccounts[2].PublicKey.Bytes(), // 2 cache state
+		reportHash[:],
+	}
+	ts.lggr.Debugf("target strategy, rep_hash:%x cacheState:%s", reportHash[:], r.Inputs.RemainingAccounts[2].PublicKey.String())
+	writeFlagKey, _, err := solana.FindProgramAddress(writeFlagSeeds, r.Receiver)
+	if err != nil {
+		return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
+			rep[0].DataID)
+	}
 
-		_, err = ts.client.GetAccountInfoWithOpts(context.TODO(), writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-		if err != nil {
-			return nil, fmt.Errorf("error fetching permission flag accounts: %w", err)
-		}
+	_, err = ts.client.GetAccountInfoWithOpts(context.TODO(), writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+	if err != nil {
+		return nil, fmt.Errorf("error fetching permission flag accounts: %w", err)
+	}
 
-		if !writeFlagKey.Equals(r.Inputs.RemainingAccounts[8].PublicKey) {
-			return nil, errors.New("missmatch write flag key")
-		}
-	*/
+	if !writeFlagKey.Equals(r.Inputs.RemainingAccounts[8].PublicKey) {
+		return nil, errors.New("missmatch write flag key")
+	}
 
 	// append remainings except for forwarderState + Authority
 	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts[2:]...)

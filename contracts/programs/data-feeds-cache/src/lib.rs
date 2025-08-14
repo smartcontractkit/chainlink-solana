@@ -784,6 +784,13 @@ pub mod data_feeds_cache {
                 ],
                 &crate::ID,
             );
+            msg!(
+    "perm_flag seeds => cache_state={}, report_hash(hex)={}",
+    ctx.accounts.cache_state.key(),
+    hex::encode(report_hash),
+            );
+            msg!("expected_permission_flag={}", curr_permission_flag);
+            msg!("provided_flag = {}", permission_flag_account_infos[i].key);
 
             require_keys_eq!(
                 curr_permission_flag,

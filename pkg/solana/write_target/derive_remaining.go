@@ -140,25 +140,22 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 	ret = append(ret, &solana.AccountMeta{
 		PublicKey: cacheStateKey,
 	})
-	// omit legacy
+
+	// 3 dummy legacy store
 	ret = append(ret, &solana.AccountMeta{
-		PublicKey: solana.SystemProgramID,
+		PublicKey: cacheProgram,
 	})
-	/*	// 3 dummy legacy store
-		ret = append(ret, &solana.AccountMeta{
-			PublicKey: cacheProgram,
-		})
 
-		// 4 dummy legacy feed config
-		ret = append(ret, &solana.AccountMeta{
-			PublicKey: cacheProgram,
-		})
+	// 4 dummy legacy feed config
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: cacheProgram,
+	})
 
-		// 5 dummy legacy writer
-		ret = append(ret, &solana.AccountMeta{
-			PublicKey: cacheProgram,
-		})
-	*/
+	// 5 dummy legacy writer
+	ret = append(ret, &solana.AccountMeta{
+		PublicKey: cacheProgram,
+	})
+
 	// 6 system
 	ret = append(ret, &solana.AccountMeta{
 		PublicKey: solana.SystemProgramID,
