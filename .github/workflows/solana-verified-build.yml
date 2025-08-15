@@ -47,9 +47,13 @@ jobs:
     - name: Get Long and Short SHAs
       id: get_sha
       run: |
-        FULL_SHA=$(git rev-parse ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.sha || github.sha }})
-        echo "short_sha=${FULL_SHA:0:12}" >> $GITHUB_OUTPUT
-        echo "full_sha=$FULL_SHA" >> $GITHUB_OUTPUT
+        set -euo pipefail
+        TARGET_SHA="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.sha || github.sha }}"
+        FULL_SHA="$(git rev-parse "${TARGET_SHA}")"
+        {
+          echo "short_sha=${FULL_SHA:0:12}"
+          echo "full_sha=${FULL_SHA}"
+        } >> "$GITHUB_OUTPUT"
     - uses: actions/checkout@v4
       with:
         ref: ${{ steps.get_sha.outputs.full_sha }}
