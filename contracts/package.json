@@ -15,7 +15,7 @@
     "mocha": "^11.0.0",
     "prettier": "^2.5.1",
     "rpc-websockets": "<=7.10.0",
-    "secp256k1": "^4.0.2",
+    "secp256k1": "^4.0.4",
     "ts-mocha": "^8.0.0",
     "typescript": "^4.5.4"
   },

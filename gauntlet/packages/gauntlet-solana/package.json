@@ -30,6 +30,6 @@
     "@ledgerhq/hw-transport-node-hid": "^6.20.0",
     "@coral-xyz/anchor": "^0.29.0",
     "@coral-xyz/borsh": "^0.29.0",
-    "@solana/web3.js": "^1.50.1"
+    "@solana/web3.js": "^1.50.2"
   }
 }
