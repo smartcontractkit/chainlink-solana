@@ -381,7 +381,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 			},
 		},
 		{
-			Name: "Solana" + ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
+			Name: "Solana" + ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				cw := it.GetContractWriter(t)
