@@ -9,13 +9,10 @@ import (
 
 type TestStructData struct {
 	Field               int32
-	Padding0            [4]uint8
 	OracleId            uint8
-	Padding1            [15]uint8
 	OracleIds           [32]uint8
 	Accounts            [2][32]uint8
-	DifferentField      [32]uint8
-	Padding2            [8]uint8
+	DifferentField      string
 	BigField            ag_binary.Int128
 	AccountStruct       AccountStruct
 	NestedDynamicStruct MidLevelDynamicTestStruct
@@ -28,18 +25,8 @@ func (obj TestStructData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	if err != nil {
 		return err
 	}
-	// Serialize `Padding0` param:
-	err = encoder.Encode(obj.Padding0)
-	if err != nil {
-		return err
-	}
 	// Serialize `OracleId` param:
 	err = encoder.Encode(obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding1` param:
-	err = encoder.Encode(obj.Padding1)
 	if err != nil {
 		return err
 	}
@@ -55,11 +42,6 @@ func (obj TestStructData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	}
 	// Serialize `DifferentField` param:
 	err = encoder.Encode(obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding2` param:
-	err = encoder.Encode(obj.Padding2)
 	if err != nil {
 		return err
 	}
@@ -92,18 +74,8 @@ func (obj *TestStructData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
-	if err != nil {
-		return err
-	}
 	// Deserialize `OracleId`:
 	err = decoder.Decode(&obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding1`:
-	err = decoder.Decode(&obj.Padding1)
 	if err != nil {
 		return err
 	}
@@ -119,11 +91,6 @@ func (obj *TestStructData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `DifferentField`:
 	err = decoder.Decode(&obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding2`:
-	err = decoder.Decode(&obj.Padding2)
 	if err != nil {
 		return err
 	}
@@ -185,18 +152,12 @@ func (obj *AccountStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 
 type MidLevelDynamicTestStruct struct {
 	FixedBytes [2]uint8
-	Padding    [6]uint8
 	Inner      InnerDynamicTestStruct
 }
 
 func (obj MidLevelDynamicTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `FixedBytes` param:
 	err = encoder.Encode(obj.FixedBytes)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding` param:
-	err = encoder.Encode(obj.Padding)
 	if err != nil {
 		return err
 	}
@@ -214,11 +175,6 @@ func (obj *MidLevelDynamicTestStruct) UnmarshalWithDecoder(decoder *ag_binary.De
 	if err != nil {
 		return err
 	}
-	// Deserialize `Padding`:
-	err = decoder.Decode(&obj.Padding)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Inner`:
 	err = decoder.Decode(&obj.Inner)
 	if err != nil {
@@ -229,7 +185,7 @@ func (obj *MidLevelDynamicTestStruct) UnmarshalWithDecoder(decoder *ag_binary.De
 
 type InnerDynamicTestStruct struct {
 	I int64
-	S [32]uint8
+	S string
 }
 
 func (obj InnerDynamicTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -262,18 +218,12 @@ func (obj *InnerDynamicTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decod
 
 type MidLevelStaticTestStruct struct {
 	FixedBytes [2]uint8
-	Padding    [6]uint8
 	Inner      InnerStaticTestStruct
 }
 
 func (obj MidLevelStaticTestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `FixedBytes` param:
 	err = encoder.Encode(obj.FixedBytes)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding` param:
-	err = encoder.Encode(obj.Padding)
 	if err != nil {
 		return err
 	}
@@ -288,11 +238,6 @@ func (obj MidLevelStaticTestStruct) MarshalWithEncoder(encoder *ag_binary.Encode
 func (obj *MidLevelStaticTestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `FixedBytes`:
 	err = decoder.Decode(&obj.FixedBytes)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding`:
-	err = decoder.Decode(&obj.Padding)
 	if err != nil {
 		return err
 	}

@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -35,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 
@@ -60,6 +63,13 @@ const (
 )
 
 var trueVal = true
+
+// StoreTestStruct is used to send data on chain
+// TestIdx is hardcoded per test in chainReaderConfig
+type StoreTestStruct struct {
+	Data    TestStruct // test data
+	ListIdx uint8      // identifier to differentiate between different test structs in the same test
+}
 
 func TestChainComponents(t *testing.T) {
 	t.Parallel()
@@ -90,26 +100,31 @@ func DisableTests(it *SolanaChainComponentsInterfaceTester[*testing.T]) {
 	it.DisableTests([]string{
 		// solana is a no-op on confidence level
 		ContractReaderGetLatestValueBasedOnConfidenceLevel,
-		// disable failing tests
-		ContractReaderBatchGetLatestValueSetsErrorsProperly,
+		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
+		// these two tests do not make sense for solana
+		ContractReaderGetLatestValueWithModifiersUsingOwnMapstrctureOverrides,
+		ContractReaderBatchGetLatestValueWithModifiersOwnMapstructureOverride,
+
+		// THESE TESTS HAVE BEEN ADAPTED FOR SOLANA BELOW, under Solana(TestName)
 		ContractReaderGetLatestValue,
 		ContractReaderGetLatestValueAsValuesDotValue,
 		ContractReaderBatchGetLatestValue,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
 		ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
 
-		// events not supported yet
+		// THESE TESTS HAVE BEEN ADAPTED FOR SOLANA BELOW
+		// All lumped into "SolanaContractReader_QueryKeyTests_And_GetsLatestForEventTests" below
+		// We are not deploying multiple contracts, so we cannot test order of logs if we run tests in parallel
 		ContractReaderGetLatestValueGetsLatestForEvent,
-		ContractReaderGetLatestValueBasedOnConfidenceLevelForEvent,
 		ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent,
 		ContractReaderGetLatestValueWithFilteringForEvent,
-
-		// query key not implemented yet
 		ContractReaderQueryKeyNotFound,
 		ContractReaderQueryKeyReturnsData,
 		ContractReaderQueryKeyReturnsDataAsValuesDotValue,
 		ContractReaderQueryKeyCanFilterWithValueComparator,
 		ContractReaderQueryKeyCanLimitResultsWithCursor,
+
+		// query keys not implemented yet
 		ContractReaderQueryKeysReturnsDataTwoEventTypes,
 		ContractReaderQueryKeysNotFound,
 		ContractReaderQueryKeysReturnsData,
@@ -139,7 +154,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 					require.Error(t, cr.Bind(ctx, bound1))
 				})
 
-				addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, CreateTestStruct(0, it)).String()
+				addressToBeShared := it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()
 				t.Run("Namespace is part of an address share group that doesn't have a registered address and provides an address during Bind", func(t T) {
 					bound1 := []types.BoundContract{{Name: AnyContractNameWithSharedAddress1, Address: addressToBeShared}}
 
@@ -195,8 +210,8 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				})
 			},
 		},
-
-		{Name: ContractReaderGetLatestValueGetTokenPrices,
+		{
+			Name: ContractReaderGetLatestValueGetTokenPrices,
 			Test: func(t T) {
 				cr := it.GetContractReader(t)
 				bindings := it.GetBindings(t)
@@ -226,7 +241,346 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				require.Equal(t, uint32(1700000001), res[0].Timestamp)
 				require.Equal(t, "17980346130170174053328187512531209543631592085982266692926093439168", res[1].Value.String())
 				require.Equal(t, uint32(1800000002), res[1].Timestamp)
-			}},
+			},
+		},
+		{
+			Name: "Solana" + ContractReaderGetLatestValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				firstItemData := CreateTestStruct(1, it)
+				firstItem := StoreTestStruct{
+					Data:    firstItemData,
+					ListIdx: uint8(1),
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, firstItem, bound, types.Finalized)
+
+				secondItemData := CreateTestStruct(2, it)
+				secondItem := StoreTestStruct{
+					Data:    secondItemData,
+					ListIdx: uint8(2),
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, secondItem, bound, types.Finalized)
+
+				actual := &TestStruct{}
+				params := &LatestParams{I: int(firstItem.ListIdx)}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Finalized, params, actual))
+				assert.Equal(t, &firstItemData, actual)
+
+				params.I = int(secondItem.ListIdx)
+				actual = &TestStruct{}
+				require.NoError(t, cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Finalized, params, actual))
+				assert.Equal(t, &secondItemData, actual)
+			},
+		},
+		{
+			Name: "Solana" + ContractReaderGetLatestValueAsValuesDotValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				firstItemData := CreateTestStruct(1, it)
+				firstItem := StoreTestStruct{
+					Data:    firstItemData,
+					ListIdx: uint8(1),
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, firstItem, bound, types.Finalized)
+
+				params := &LatestParams{I: int(firstItem.ListIdx)}
+				var value values.Value
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(MethodTakingLatestParamsReturningTestStruct), primitives.Finalized, params, &value)
+				require.NoError(t, err)
+				actual := TestStruct{}
+				err = value.UnwrapTo(&actual)
+				require.NoError(t, err)
+				assert.Equal(t, &firstItemData, &actual)
+			},
+		},
+		{
+			Name: "Solana" + ContractReaderBatchGetLatestValue,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				firstItemData := CreateTestStruct(1, it)
+				firstItem := StoreTestStruct{
+					Data:    firstItemData,
+					ListIdx: uint8(1),
+				}
+				_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, firstItem, bound, types.Finalized)
+
+				params, actual := &LatestParams{I: int(firstItem.ListIdx)}, &TestStruct{}
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchGetLatestValueRequest[bound] = []types.BatchRead{
+					{
+						ReadName:  MethodTakingLatestParamsReturningTestStruct,
+						Params:    params,
+						ReturnVal: actual,
+					},
+				}
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+
+				anyContractBatch := result[bound]
+				returnValue, err := anyContractBatch[0].GetResult()
+				assert.NoError(t, err)
+				assert.Contains(t, anyContractBatch[0].ReadName, MethodTakingLatestParamsReturningTestStruct)
+				assert.Equal(t, &firstItemData, returnValue)
+			},
+		},
+		{
+			Name: "Solana" + ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrder,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchCallEntry := make(BatchCallEntry)
+				for i := 0; i < 3; i++ {
+					// setup test data
+					ts := CreateTestStruct(i, it)
+					tsItem := StoreTestStruct{
+						Data:    ts,
+						ListIdx: uint8(i),
+					}
+					// this is only used for assertion below, but not for batch writing
+					batchCallEntry[bound] = append(batchCallEntry[bound], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &ts})
+					_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, tsItem, bound, types.Finalized)
+					// setup call data
+					batchGetLatestValueRequest[bound] = append(
+						batchGetLatestValueRequest[bound],
+						types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: i}, ReturnVal: &TestStruct{}},
+					)
+				}
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+				for i := 0; i < 3; i++ {
+					resultAnyContract, testDataAnyContract := result[bound], batchCallEntry[bound]
+					returnValue, err := resultAnyContract[i].GetResult()
+					assert.NoError(t, err)
+					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValue)
+				}
+			},
+		},
+		{
+			Name: "Solana" + ContractReaderBatchGetLatestValueDifferentParamsResultsRetainOrderMultipleContracts,
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound1 := BindingsByName(bindings, AnyContractName)[0]
+				bound2 := BindingsByName(bindings, AnySecondContractName)[0]
+
+				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
+				batchCallEntry := make(BatchCallEntry)
+				for i := 0; i < 3; i++ {
+					// setup test data
+					firstItemIdx := i
+					secondItemIdx := i + 10
+					ts1, ts2 := CreateTestStruct(firstItemIdx, it), CreateTestStruct(secondItemIdx, it)
+					ts1Item, ts2Item := StoreTestStruct{
+						Data:    ts1,
+						ListIdx: uint8(firstItemIdx),
+					}, StoreTestStruct{
+						Data:    ts2,
+						ListIdx: uint8(secondItemIdx),
+					}
+					batchCallEntry[bound1] = append(batchCallEntry[bound1], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &ts1})
+					batchCallEntry[bound2] = append(batchCallEntry[bound2], ReadEntry{Name: MethodTakingLatestParamsReturningTestStruct, ReturnValue: &ts2})
+					_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, ts1Item, bound1, types.Finalized)
+					_ = SubmitTransactionToCW(t, it, cw, MethodSettingStruct, ts2Item, bound2, types.Finalized)
+					// setup call data
+					batchGetLatestValueRequest[bound1] = append(batchGetLatestValueRequest[bound1], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: firstItemIdx}, ReturnVal: &TestStruct{}})
+					batchGetLatestValueRequest[bound2] = append(batchGetLatestValueRequest[bound2], types.BatchRead{ReadName: MethodTakingLatestParamsReturningTestStruct, Params: &LatestParams{I: secondItemIdx}, ReturnVal: &TestStruct{}})
+				}
+				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
+				require.NoError(t, err)
+				for idx := 0; idx < 3; idx++ {
+					fmt.Printf("expected: %+v\n", batchCallEntry[bound1][idx].ReturnValue)
+					if val, err := result[bound1][idx].GetResult(); err == nil {
+						fmt.Printf("result: %+v\n", val)
+					}
+				}
+
+				for i := 0; i < 3; i++ {
+					testDataAnyContract, testDataAnySecondContract := batchCallEntry[bound1], batchCallEntry[bound2]
+					resultAnyContract, resultAnySecondContract := result[bound1], result[bound2]
+					returnValueAnyContract, errAnyContract := resultAnyContract[i].GetResult()
+					returnValueAnySecondContract, errAnySecondContract := resultAnySecondContract[i].GetResult()
+					assert.NoError(t, errAnyContract)
+					assert.NoError(t, errAnySecondContract)
+					assert.Contains(t, resultAnyContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Contains(t, resultAnySecondContract[i].ReadName, MethodTakingLatestParamsReturningTestStruct)
+					assert.Equal(t, testDataAnyContract[i].ReturnValue, returnValueAnyContract)
+					assert.Equal(t, testDataAnySecondContract[i].ReturnValue, returnValueAnySecondContract)
+				}
+			},
+		},
+		{
+			Name: "SolanaContractReader_QueryKeyTests_And_GetsLatestForEventTests",
+			Test: func(t T) {
+				cr := it.GetContractReader(t)
+				cw := it.GetContractWriter(t)
+				bindings := it.GetBindings(t)
+				ctx := t.Context()
+				require.NoError(t, cr.Bind(ctx, bindings))
+				bound := BindingsByName(bindings, AnyContractName)[0]
+
+				// ContractReaderQueryKeyNotFound
+				logs, logError := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, &TestStruct{})
+				require.NoError(t, logError)
+				assert.Len(t, logs, 0)
+
+				// ContractReaderGetLatestValueReturnsNotFoundWhenNotTriggeredForEvent
+				result := &TestStruct{}
+				latestEventError := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, nil, &result)
+				assert.True(t, errors.Is(latestEventError, types.ErrNotFound))
+
+				testStructs := make([]TestStruct, 4)
+
+				ts1 := CreateTestStruct[T](0, it)
+				testStructs[0] = ts1
+				_ = SubmitTransactionToCW(t, it, cw, MethodTriggeringEvent, it.Helper.DataWrap(ts1), bound, types.Finalized)
+
+				ts2 := CreateTestStruct[T](1, it)
+				testStructs[1] = ts2
+				_ = SubmitTransactionToCW(t, it, cw, MethodTriggeringEvent, it.Helper.DataWrap(ts2), bound, types.Finalized)
+
+				// ContractReaderGetLatestValueGetsLatestForEvent
+				result = &TestStruct{}
+				require.Eventually(t, func() bool {
+					err := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Finalized, nil, &result)
+					return err == nil && reflect.DeepEqual(result, &testStructs[1])
+				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
+
+				// ContractReaderGetLatestValueWithFilteringForEvent
+				filterParams := &FilterEventParams{Field: *ts1.Field}
+				assert.Never(t, func() bool {
+					result2 := &TestStruct{}
+					latestEventError2 := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result2)
+					return latestEventError2 == nil && reflect.DeepEqual(result2, &ts2)
+				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
+
+				// get the result one more time to verify it.
+				// Using the result from the Never statement by creating result outside the block is a data race
+				result = &TestStruct{}
+				err := cr.GetLatestValue(ctx, bound.ReadIdentifier(EventName), primitives.Unconfirmed, filterParams, &result)
+				require.NoError(t, err)
+				assert.Equal(t, &ts1, result)
+
+				// ContractReaderQueryKeyReturnsData
+				tst := &TestStruct{}
+				require.Eventually(t, func() bool {
+					// sequences from queryKey without limit and sort should be in descending order
+					sequences, err := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, tst)
+					return err == nil && len(sequences) == 2 && reflect.DeepEqual(&ts1, sequences[1].Data) && reflect.DeepEqual(&ts2, sequences[0].Data)
+				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
+
+				// ContractReaderQueryKeyReturnsDataAsValuesDotValue
+				var value values.Value
+				require.Eventually(t, func() bool {
+					// sequences from queryKey without limit and sort should be in descending order
+					sequences, err := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName}, query.LimitAndSort{}, &value)
+					if err != nil || len(sequences) != 2 {
+						return false
+					}
+
+					data1 := *sequences[1].Data.(*values.Value)
+					ts := TestStruct{}
+					err = data1.UnwrapTo(&ts)
+					require.NoError(t, err)
+					fmt.Printf("ts from data1: %+v\n", ts)
+					assert.Equal(t, &ts1, &ts)
+
+					data2 := *sequences[0].Data.(*values.Value)
+					ts = TestStruct{}
+					err = data2.UnwrapTo(&ts)
+					require.NoError(t, err)
+					fmt.Printf("ts from data2: %+v\n", ts)
+					assert.Equal(t, &ts2, &ts)
+
+					return true
+				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
+
+				ts5 := CreateTestStruct[T](5, it)
+				testStructs[2] = ts5
+				_ = SubmitTransactionToCW(t, it, cw, MethodTriggeringEvent, it.Helper.DataWrap(ts5), bound, types.Finalized)
+
+				ts10 := CreateTestStruct[T](10, it)
+				testStructs[3] = ts10
+				_ = SubmitTransactionToCW(t, it, cw, MethodTriggeringEvent, it.Helper.DataWrap(ts10), bound, types.Finalized)
+
+				// ContractReaderQueryKeyCanFilterWithValueComparator
+				tst = &TestStruct{}
+				require.Eventually(t, func() bool {
+					sequences, err := cr.QueryKey(ctx, bound, query.KeyFilter{Key: EventName, Expressions: []query.Expression{
+						query.Comparator("Field",
+							primitives.ValueComparator{
+								Value:    *ts5.Field,
+								Operator: primitives.Gte,
+							},
+							primitives.ValueComparator{
+								Value:    *ts10.Field,
+								Operator: primitives.Lte,
+							}),
+					},
+					}, query.LimitAndSort{}, tst)
+
+					return err == nil && len(sequences) == 2 && reflect.DeepEqual(&ts5, sequences[1].Data) && reflect.DeepEqual(&ts10, sequences[0].Data)
+				}, it.MaxWaitTimeForEvents(), time.Millisecond*10)
+
+				// ContractReaderQueryKeyCanLimitResultsWithCursor
+				require.Eventually(t, func() bool {
+					var allSequences []types.Sequence
+
+					filter := query.KeyFilter{Key: EventName, Expressions: []query.Expression{
+						query.Confidence(primitives.Finalized),
+					}}
+					limit := query.LimitAndSort{
+						SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+						Limit:  query.CountLimit(2),
+					}
+
+					for idx := 0; idx < len(testStructs)/2; idx++ {
+						// sequences from queryKey without limit and sort should be in descending order
+						sequences, err := cr.QueryKey(ctx, bound, filter, limit, &TestStruct{})
+
+						require.NoError(t, err)
+
+						if len(sequences) == 0 {
+							continue
+						}
+
+						limit.Limit = query.CursorLimit(sequences[len(sequences)-1].Cursor, query.CursorFollowing, 2)
+						allSequences = append(allSequences, sequences...)
+					}
+
+					return len(allSequences) == len(testStructs) &&
+						reflect.DeepEqual(&testStructs[0], allSequences[0].Data) &&
+						reflect.DeepEqual(&testStructs[len(testStructs)-1], allSequences[len(testStructs)-1].Data)
+				}, it.MaxWaitTimeForEvents(), 500*time.Millisecond)
+			},
+		},
 	}
 
 	RunTests(t, it, testCases)
@@ -615,12 +969,13 @@ type SolanaChainComponentsInterfaceTesterHelper[T WrappedTestingT[T]] interface 
 	Logger(t T) logger.Logger
 	GetPrimaryIDL(t T) []byte
 	GetSecondaryIDL(t T) []byte
-	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey
+	CreateAccount(t T, it SolanaChainComponentsInterfaceTester[T], contractName string, value uint64) solana.PublicKey
 	TXM() *txm.TxManager
 	MultiClient() *client.MultiClient
 	SolanaClient() *client.Client
 	Sender() solana.PrivateKey
 	Database() *sqlx.DB
+	DataWrap(testStruct any) map[string]any
 }
 
 type WrappedTestingT[T any] interface {
@@ -719,10 +1074,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) getTestIdx(name string) uint6
 
 func (it *SolanaChainComponentsInterfaceTester[T]) GetBindings(t T) []types.BoundContract {
 	// Create a new account with fresh state for each test
-	testStruct := CreateTestStruct(0, it)
 	return []types.BoundContract{
-		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument, testStruct).String()},
-		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument, testStruct).String()},
+		{Name: AnyContractName, Address: it.Helper.CreateAccount(t, *it, AnyContractName, AnyValueToReadWithoutAnArgument).String()},
+		{Name: AnySecondContractName, Address: it.Helper.CreateAccount(t, *it, AnySecondContractName, AnyDifferentValueToReadWithoutAnArgument).String()},
 	}
 }
 
@@ -883,7 +1237,7 @@ func (h *helper) GetJSONEncodedIDL(t *testing.T, fileName string) []byte {
 	return bts
 }
 
-func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64, testStruct TestStruct) solana.PublicKey {
+func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTester[*testing.T], contractName string, value uint64) solana.PublicKey {
 	t.Helper()
 
 	var programID solana.PublicKey
@@ -900,7 +1254,7 @@ func (h *helper) CreateAccount(t *testing.T, it SolanaChainComponentsInterfaceTe
 		programID = h.secondaryProgramID
 	}
 
-	h.runInitialize(t, it, contractName, programID, value, testStruct)
+	h.runInitialize(t, it, contractName, programID, value)
 	return programID
 }
 
@@ -912,6 +1266,12 @@ func (h *helper) Database() *sqlx.DB {
 	return h.db
 }
 
+func (h *helper) DataWrap(testStruct any) map[string]any {
+	return map[string]any{
+		"Data": testStruct,
+	}
+}
+
 type DataAccountArgs struct {
 	TestIdx uint64
 	Value   uint64
@@ -919,11 +1279,6 @@ type DataAccountArgs struct {
 
 type LookupTableArgs struct {
 	LookupTable solana.PublicKey
-}
-
-type StoreStructArgs struct {
-	TestIdx uint64
-	Data    TestStruct
 }
 
 type StoreTokenAccountArgs struct {
@@ -945,7 +1300,6 @@ func (h *helper) runInitialize(
 	contractName string,
 	programID solana.PublicKey,
 	value uint64,
-	testStruct TestStruct,
 ) {
 	t.Helper()
 
@@ -964,12 +1318,6 @@ func (h *helper) runInitialize(
 		Value:   value,
 	}
 	SubmitTransactionToCW(t, &it, cw, "initialize", initArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
-
-	storeStructArgs := StoreStructArgs{
-		TestIdx: testIdx,
-		Data:    testStruct,
-	}
-	SubmitTransactionToCW(t, &it, cw, MethodSettingStruct, storeStructArgs, types.BoundContract{Name: contractName, Address: programID.String()}, types.Finalized)
 }
 
 const (
@@ -988,7 +1336,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	pdaDataPrefix = binary.LittleEndian.AppendUint64(pdaDataPrefix, idx)
 	pdaStructDataPrefix := []byte("struct_data")
 	pdaStructDataPrefix = binary.LittleEndian.AppendUint64(pdaStructDataPrefix, idx)
-	testStruct := CreateTestStruct(0, it)
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
@@ -1140,14 +1487,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
-								OnChainValues: map[string]any{
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
-								},
 								OffChainValues: map[string]any{
-									"ExtraField":                  AnyExtraValue,
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+									"ExtraField": AnyExtraValue,
 								},
 							},
 							&commoncodec.AddressBytesToStringModifierConfig{
@@ -1156,22 +1497,19 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 					},
 					MethodTakingLatestParamsReturningTestStruct: {
-						ChainSpecificName: "TestStruct",
+						ChainSpecificName:       "TestStruct",
+						ReadType:                config.Account,
+						ErrOnMissingAccountData: true,
 						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
-						},
-						OutputModifications: commoncodec.ModifiersConfig{
-							&commoncodec.HardCodeModifierConfig{
-								OnChainValues: map[string]any{
-									"DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
-								},
-								OffChainValues: map[string]any{
-									"ExtraField":                  AnyExtraValue,
-									"DifferentField":              testStruct.DifferentField,
-									"NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
+							Seeds: []codec.PDASeed{
+								{
+									Name: "I", // this is read from params passed in while reading the account, its analogous to ListIdx which is used while writing to chain
+									Type: codec.IdlType{AsString: codec.IdlTypeU64},
 								},
 							},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.AddressBytesToStringModifierConfig{
 								Fields: []string{"AccountStruct.AccountStr"},
 							},
@@ -1183,6 +1521,29 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						EventDefinitions: &config.EventDefinitions{
 							PollingFilter: &config.PollingFilter{
 								IncludeReverted: &trueVal,
+							},
+						},
+					},
+					EventName: {
+						ChainSpecificName: "SomeEvent",
+						ReadType:          config.Event,
+						EventDefinitions: &config.EventDefinitions{
+							PollingFilter: &config.PollingFilter{
+								IncludeReverted: &trueVal,
+							},
+							IndexedField0: &config.IndexedField{
+								OffChainPath: "Field",
+								OnChainPath:  "Field",
+							},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.HardCodeModifierConfig{
+								OffChainValues: map[string]any{
+									"ExtraField": AnyExtraValue,
+								},
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
 							},
 						},
 					},
@@ -1198,6 +1559,25 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.PropertyExtractorConfig{FieldName: "U64Value"},
+						},
+					},
+					MethodTakingLatestParamsReturningTestStruct: {
+						ChainSpecificName:       "TestStruct",
+						ReadType:                config.Account,
+						ErrOnMissingAccountData: true,
+						PDADefinition: codec.PDATypeDef{
+							Prefix: pdaStructDataPrefix,
+							Seeds: []codec.PDASeed{
+								{
+									Name: "I",
+									Type: codec.IdlType{AsString: codec.IdlTypeU64},
+								},
+							},
+						},
+						OutputModifications: commoncodec.ModifiersConfig{
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"AccountStruct.AccountStr"},
+							},
 						},
 					},
 				},
@@ -1223,7 +1603,6 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	idx := it.getTestIdx(t.Name())
 	testIdx := binary.LittleEndian.AppendUint64([]byte{}, idx)
 	fromAddress := solana.MustPrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1]).PublicKey().String()
-	testStruct := CreateTestStruct(0, it)
 	pubKey1, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey1)
 	require.NoError(t, err)
 	pubKey2, err := solana.PublicKeyFromBase58(GetTokenPricesPubKey2)
@@ -1538,23 +1917,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					MethodSettingStruct: {
 						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
-							&commoncodec.AddressBytesToStringModifierConfig{
-								Fields: []string{"Data.AccountStruct.AccountStr"},
-							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0":                    []byte{},
-									"Data.Padding1":                    []byte{},
-									"Data.Padding2":                    []byte{},
-									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding":  []byte{},
-									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+									"TestIdx": idx,
 								},
-								OffChainValues: map[string]any{
-									"Data.DifferentField":              testStruct.DifferentField,
-									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
 							},
 						},
 						ChainSpecificName: "store",
@@ -1575,6 +1944,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
+									{Dynamic: chainwriter.Lookup{
+										AccountLookup: &chainwriter.AccountLookup{
+											Location: "ListIdx", // this will be sent as input params while writing to chain, see StoreTestStruct
+										},
+									}},
 								},
 								IsWritable: true,
 								IsSigner:   false,
@@ -1592,6 +1966,31 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 						FromAddress:       fromAddress,
 						ChainSpecificName: "createEventAndFail",
 						LookupTables:      chainwriter.LookupTables{},
+						Accounts: []chainwriter.Lookup{
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "Signer",
+								Address:    fromAddress,
+								IsSigner:   true,
+								IsWritable: true,
+							}},
+							{AccountConstant: &chainwriter.AccountConstant{
+								Name:       "SystemProgram",
+								Address:    solana.SystemProgramID.String(),
+								IsWritable: false,
+								IsSigner:   false,
+							}},
+						},
+						DebugIDLocation: "",
+					},
+					MethodTriggeringEvent: {
+						FromAddress:       fromAddress,
+						ChainSpecificName: "triggerEvent",
+						InputModifications: []commoncodec.ModifierConfig{
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
+							},
+						},
+						LookupTables: chainwriter.LookupTables{},
 						Accounts: []chainwriter.Lookup{
 							{AccountConstant: &chainwriter.AccountConstant{
 								Name:       "Signer",
@@ -1652,23 +2051,13 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 					MethodSettingStruct: {
 						FromAddress: fromAddress,
 						InputModifications: []commoncodec.ModifierConfig{
-							&commoncodec.AddressBytesToStringModifierConfig{
-								Fields: []string{"Data.AccountStruct.AccountStr"},
-							},
 							&commoncodec.HardCodeModifierConfig{
 								OnChainValues: map[string]any{
-									"Data.Padding0":                    []byte{},
-									"Data.Padding1":                    []byte{},
-									"Data.Padding2":                    []byte{},
-									"Data.NestedDynamicStruct.Padding": []byte{},
-									"Data.NestedStaticStruct.Padding":  []byte{},
-									"Data.DifferentField":              copy(make([]byte, 32), []byte(testStruct.DifferentField)),
-									"Data.NestedDynamicStruct.Inner.S": copy(make([]byte, 32), []byte(testStruct.NestedDynamicStruct.Inner.S)),
+									"TestIdx": idx,
 								},
-								OffChainValues: map[string]any{
-									"Data.DifferentField":              testStruct.DifferentField,
-									"Data.NestedDynamicStruct.Inner.S": testStruct.NestedDynamicStruct.Inner.S,
-								},
+							},
+							&commoncodec.AddressBytesToStringModifierConfig{
+								Fields: []string{"Data.AccountStruct.AccountStr"},
 							},
 						},
 						ChainSpecificName: "store",
@@ -1689,6 +2078,11 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 								Seeds: []chainwriter.Seed{
 									{Static: []byte("struct_data")},
 									{Static: testIdx},
+									{Dynamic: chainwriter.Lookup{
+										AccountLookup: &chainwriter.AccountLookup{
+											Location: "ListIdx",
+										},
+									}},
 								},
 								IsWritable: true,
 								IsSigner:   false,

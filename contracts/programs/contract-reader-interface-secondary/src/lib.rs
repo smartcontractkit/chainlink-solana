@@ -15,12 +15,15 @@ pub mod contract_reader_interface_secondary {
         Ok(())
     }
 
-    pub fn store(ctx: Context<StoreTestStruct>, test_idx: u64, data: TestStructData) -> Result<()> {
-        let test_struct_account = &mut ctx.accounts.test_struct.load_init()?;
+    pub fn store(
+        ctx: Context<StoreTestStruct>,
+        test_idx: u64,
+        _list_idx: u64,
+        data: TestStructData,
+    ) -> Result<()> {
+        let test_struct_account = &mut ctx.accounts.test_struct;
 
         test_struct_account.idx = test_idx;
-        test_struct_account.bump = ctx.bumps.test_struct;
-
         test_struct_account.field = data.field;
         test_struct_account.oracle_id = data.oracle_id;
         test_struct_account.oracle_ids = data.oracle_ids;
@@ -53,24 +56,6 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-#[instruction(test_idx: u64)]
-pub struct StoreTestStruct<'info> {
-    #[account(mut)]
-    pub signer: Signer<'info>,
-
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = size_of::<TestStruct>() + 8,
-        seeds=[b"struct_data".as_ref(), test_idx.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub test_struct: AccountLoader<'info, TestStruct>,
-
-    pub system_program: Program<'info, System>,
-}
-
 #[account]
 pub struct Data {
     pub u64_value: u64,
@@ -78,20 +63,38 @@ pub struct Data {
     pub bump: u8,
 }
 
-#[account(zero_copy)]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(Accounts)]
+#[instruction(test_idx: u64, list_idx: u64)]
+pub struct StoreTestStruct<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + size_of::<TestStruct>(),
+        seeds = [
+            b"struct_data".as_ref(),
+            test_idx.to_le_bytes().as_ref(),
+            list_idx.to_le_bytes().as_ref()
+        ],
+        bump,
+    )]
+    pub test_struct: Account<'info, TestStruct>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+#[derive(Default)]
 pub struct TestStruct {
     pub idx: u64,
     pub bump: u8,
-    _padding0: [u8; 7],
     pub field: i32,
-    _padding1: [u8; 4],
     pub oracle_id: u8,
-    _padding2: [u8; 15],
     pub oracle_ids: [u8; 32],
     pub accounts: [[u8; 32]; 2],
-    pub different_field: [u8; 32], // hiding field since string does not play well with zero copy
-    _padding3: [u8; 8],
+    pub different_field: String,
     pub big_field: i128,
 
     pub account_struct: AccountStruct,
@@ -99,17 +102,13 @@ pub struct TestStruct {
     pub nested_static_struct: MidLevelStaticTestStruct,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct TestStructData {
     pub field: i32,
-    _padding0: [u8; 4],
     pub oracle_id: u8,
-    _padding1: [u8; 15],
     pub oracle_ids: [u8; 32],
     pub accounts: [[u8; 32]; 2],
-    pub different_field: [u8; 32],
-    _padding2: [u8; 8],
+    pub different_field: String,
     pub big_field: i128,
 
     pub account_struct: AccountStruct,
@@ -117,38 +116,31 @@ pub struct TestStructData {
     pub nested_static_struct: MidLevelStaticTestStruct,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct AccountStruct {
     pub account: Pubkey,
     pub account_str: Pubkey,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MidLevelDynamicTestStruct {
     pub fixed_bytes: [u8; 2],
-    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
     pub inner: InnerDynamicTestStruct,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InnerDynamicTestStruct {
     pub i: i64,
-    pub s: [u8; 32],
+    pub s: String,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct MidLevelStaticTestStruct {
     pub fixed_bytes: [u8; 2],
-    pub _padding: [u8; 6], // explicit padding to avoid uninitialized bytes for zero_copy
     pub inner: InnerStaticTestStruct,
 }
 
-#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InnerStaticTestStruct {
     pub i: i64,
     pub a: Pubkey,
