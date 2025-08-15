@@ -117,7 +117,7 @@ pub struct OnReport<'info> {
     pub state: Account<'info, ForwarderState>,
 
     // note the forwarder authority is a PDA signer
-    #[account(seeds = [b"forwarder", state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = FORWARDER_ID)]
+    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = FORWARDER_ID)]
     pub forwarder_authority: Signer<'info>,
 
     #[account(mut)]

@@ -17,8 +17,6 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
-# hex works in no_std when you enable alloc; good for Solana BPF
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
 static_assertions = "1.1.0"
 keystone-forwarder = { version = "0.1.0", path = "../keystone-forwarder", default-features = false, features = ["cpi"] }
 store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }

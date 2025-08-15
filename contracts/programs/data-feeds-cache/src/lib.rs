@@ -1,6 +1,5 @@
 use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke_signed;
 use std::io::Cursor;
 use std::{io::Write, ops::DerefMut};
 
@@ -12,7 +11,7 @@ mod error;
 mod event;
 pub mod state;
 
-use anchor_lang::solana_program::{hash, system_instruction};
+use anchor_lang::solana_program::hash;
 use common::{ANCHOR_DISCRIMINATOR, MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_DATA_ID};
 use context::*;
 use error::{AuthError, DataCacheError};
@@ -30,11 +29,7 @@ pub mod data_feeds_cache {
 
     use anchor_lang::{
         prelude::borsh::BorshSerialize,
-        solana_program::{
-            instruction::Instruction,
-            program::{invoke, invoke_signed},
-            system_instruction,
-        },
+        solana_program::{instruction::Instruction, program::invoke_signed, system_instruction},
         Discriminator,
     };
 
@@ -76,8 +71,6 @@ pub mod data_feeds_cache {
     }
 
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
-        require_keys_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
-
         let mut state = ctx.accounts.state.load_mut()?;
         let mut changed = false;
 
@@ -108,14 +101,8 @@ pub mod data_feeds_cache {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
-        require!(
-            proposed_owner != Pubkey::default()
-                && proposed_owner != state.owner
-                && proposed_owner != state.proposed_owner,
-            DataCacheError::InvalidProposedOwner
-        );
-
         state.proposed_owner = proposed_owner;
+
         emit!(OwnershipTransfer {
             current_owner: state.owner,
             proposed_owner
@@ -137,22 +124,44 @@ pub mod data_feeds_cache {
         Ok(())
     }
 
-    // closes the decimal report account and feed config account
-    // you must set the feed configs workflowmetadata to empty list beforehand
-    pub fn close_decimal_report(ctx: Context<CloseDecimalReport>, data_id: [u8; 16]) -> Result<()> {
+    pub fn close_decimal_reports(
+        ctx: Context<CloseDecimalReports>,
+        data_ids: Vec<[u8; 16]>,
+    ) -> Result<()> {
         let state = &ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-        let feed_config = ctx.accounts.feed_config.load()?;
+        let state_key = ctx.accounts.state.key();
 
-        // if feed config workflow list is empty, then all permission accounts
-        // have also been closed as well
-        require!(
-            feed_config.workflow_metadata.is_empty(),
-            DataCacheError::FeedConfigListNotEmpty
+        let data_ids_account_infos = ctx.remaining_accounts;
+
+        require_eq!(
+            data_ids.len(),
+            data_ids_account_infos.len(),
+            DataCacheError::ArrayLengthMismatch
         );
 
-        emit!(DecimalReportClosed { data_id: data_id });
+        for (i, data_id) in data_ids.iter().enumerate() {
+            let curr_report_account_info = &data_ids_account_infos[i];
+
+            let (decimal_report, _) = Pubkey::find_program_address(
+                &[b"decimal_report", state_key.as_ref(), data_id],
+                &crate::ID,
+            );
+
+            require_keys_eq!(
+                decimal_report,
+                *curr_report_account_info.key,
+                DataCacheError::AccountMismatch
+            );
+
+            close_account(
+                curr_report_account_info.clone(),
+                ctx.accounts.feed_admin.to_account_info(),
+            )?;
+
+            emit!(DecimalReportClosed { data_id: *data_id });
+        }
 
         Ok(())
     }
@@ -191,16 +200,25 @@ pub mod data_feeds_cache {
 
             // only initialize if required
             if curr_report_account_info.data_is_empty() {
-                let space = ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE;
+                let rent =
+                    Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE);
+
                 let seeds: &[&[u8]] = &[b"decimal_report", state_key.as_ref(), data_id, &[bump]];
-                let payer = ctx.accounts.feed_admin.clone();
-                create_account(
-                    space,
-                    seeds,
-                    payer,
-                    curr_report_account_info.clone(),
-                    crate::ID,
-                    ctx.accounts.system_program.to_account_info(),
+
+                invoke_signed(
+                    &system_instruction::create_account(
+                        ctx.accounts.feed_admin.key,
+                        &decimal_report,
+                        rent,
+                        (ANCHOR_DISCRIMINATOR + DecimalReport::INIT_SPACE) as u64,
+                        ctx.program_id,
+                    ),
+                    &[
+                        ctx.accounts.feed_admin.to_account_info(),
+                        curr_report_account_info.clone(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    &[seeds],
                 )?;
 
                 let mut dst = curr_report_account_info.try_borrow_mut_data()?;
@@ -279,24 +297,16 @@ pub mod data_feeds_cache {
             DataCacheError::MaxWorkflowsExceeded
         );
 
-        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
+        require!(
+            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
+            DataCacheError::EmptyConfig
+        );
 
         require_eq!(
             data_ids.len(),
             descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
-
-        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
-        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
-        // are not allowed
-        for d in descriptions.iter() {
-            if workflow_metadatas.is_empty() {
-                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
-            } else {
-                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
-            }
-        }
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let expected_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
@@ -445,24 +455,16 @@ pub mod data_feeds_cache {
             DataCacheError::MaxWorkflowsExceeded
         );
 
-        require!(!descriptions.is_empty(), DataCacheError::EmptyConfig);
+        require!(
+            !workflow_metadatas.is_empty() && !descriptions.is_empty(),
+            DataCacheError::EmptyConfig
+        );
 
         require_eq!(
             data_ids.len(),
             descriptions.len(),
             DataCacheError::ArrayLengthMismatch
         );
-
-        // we allow workflow_metadatas.is_empty() in the event that feeds are decomissioned
-        // in this case we enforce all descriptions must be [0; 32] otherwise empty descriptions
-        // are not allowed
-        for d in descriptions.iter() {
-            if workflow_metadatas.is_empty() {
-                require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
-            } else {
-                require!(*d != [0; 32], DataCacheError::InvalidDescrption);
-            }
-        }
 
         // check the remaining accounts length has sufficient feed config and permission accounts
         let minimum_len = data_ids.len() + data_ids.len() * workflow_metadatas.len();
@@ -523,7 +525,8 @@ pub mod data_feeds_cache {
             let feed_config_loader = if feed_config_exists {
                 AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
             } else {
-                let space = ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE;
+                let rent =
+                    Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE);
                 // initialize it
                 let seeds: &[&[u8]] = &[
                     b"feed_config",
@@ -532,13 +535,20 @@ pub mod data_feeds_cache {
                     &[feed_config_bump],
                 ];
 
-                create_account(
-                    space,
-                    seeds,
-                    ctx.accounts.feed_admin.clone(),
-                    feed_config_account_infos[i].clone(),
-                    crate::ID,
-                    ctx.accounts.system_program.to_account_info(),
+                invoke_signed(
+                    &system_instruction::create_account(
+                        ctx.accounts.feed_admin.key,
+                        &curr_feed_config,
+                        rent,
+                        (ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE) as u64,
+                        ctx.program_id,
+                    ),
+                    &[
+                        ctx.accounts.feed_admin.to_account_info(),
+                        feed_config_account_infos[i].clone(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    &[seeds],
                 )?;
 
                 // avoid double borrow to write discriminator
@@ -624,6 +634,8 @@ pub mod data_feeds_cache {
 
                 // create permission_flag if needed
                 if permission_flag_account_info.data_is_empty() {
+                    let rent = Rent::get()?.minimum_balance(ANCHOR_DISCRIMINATOR);
+
                     let seeds: &[&[u8]] = &[
                         b"permission_flag",
                         cache_state_key.as_ref(),
@@ -631,13 +643,20 @@ pub mod data_feeds_cache {
                         &[bump],
                     ];
 
-                    create_account(
-                        ANCHOR_DISCRIMINATOR,
-                        seeds,
-                        ctx.accounts.feed_admin.clone(),
-                        permission_flag_account_info.clone(),
-                        crate::ID,
-                        ctx.accounts.system_program.to_account_info(),
+                    invoke_signed(
+                        &system_instruction::create_account(
+                            ctx.accounts.feed_admin.key,
+                            &curr_permission_flag,
+                            rent,
+                            ANCHOR_DISCRIMINATOR as u64,
+                            ctx.program_id,
+                        ),
+                        &[
+                            ctx.accounts.feed_admin.to_account_info(),
+                            permission_flag_account_info.clone(),
+                            ctx.accounts.system_program.to_account_info(),
+                        ],
+                        &[seeds],
                     )?;
 
                     let mut dst = permission_flag_account_info.try_borrow_mut_data()?;
@@ -669,12 +688,6 @@ pub mod data_feeds_cache {
 
             delete_permission_accounts.append(&mut temp_candidates_deletion)
         }
-
-        require_eq!(
-            delete_permission_accounts.len(),
-            delete_permission_account_infos.len(),
-            DataCacheError::ArrayLengthMismatch
-        );
 
         for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
             let curr_permission_account_info = &delete_permission_account_infos[i];
@@ -775,13 +788,6 @@ pub mod data_feeds_cache {
                 workflow_owner,
                 workflow_name,
             );
-            msg!(
-    "parts: data_id={} fwd_auth={} owner_20={} name_10={}",
-    hex::encode(&received_decimal_report.data_id),
-    ctx.accounts.forwarder_authority.key(),
-    hex::encode(workflow_owner),
-    hex::encode(workflow_name)
-            );
 
             let (curr_permission_flag, _) = Pubkey::find_program_address(
                 &[
@@ -791,13 +797,6 @@ pub mod data_feeds_cache {
                 ],
                 &crate::ID,
             );
-            msg!(
-    "perm_flag seeds => cache_state={}, report_hash(hex)={}",
-    ctx.accounts.cache_state.key(),
-    hex::encode(report_hash),
-            );
-            msg!("expected_permission_flag={}", curr_permission_flag);
-            msg!("provided_flag = {}", permission_flag_account_infos[i].key);
 
             require_keys_eq!(
                 curr_permission_flag,
@@ -1048,12 +1047,6 @@ pub mod data_feeds_cache {
         ctx: Context<'_, '_, 'info, 'info, QueryValues<'info>>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<Vec<DecimalReport>> {
-        require_eq!(
-            data_ids.len(),
-            ctx.remaining_accounts.len(),
-            DataCacheError::ArrayLengthMismatch
-        );
-
         let mut reports = Vec::new();
 
         for (i, data_id) in data_ids.iter().enumerate() {
@@ -1084,66 +1077,6 @@ pub mod data_feeds_cache {
 
         Ok(reports)
     }
-}
-
-// already checked it's empty
-fn create_account<'info>(
-    space: usize,
-    seeds: &[&[u8]],
-    payer: Signer<'info>,
-    to_account: AccountInfo<'info>,
-    program_id: Pubkey,
-    system_program: AccountInfo<'info>,
-) -> Result<()> {
-    let rent = Rent::get()?.minimum_balance(space);
-
-    let current_lamports = to_account.lamports();
-    if current_lamports == 0 {
-        invoke_signed(
-            &system_instruction::create_account(
-                payer.key,
-                to_account.key,
-                rent,
-                space as u64,
-                &program_id,
-            ),
-            &[
-                payer.to_account_info(),
-                to_account.clone(),
-                system_program.clone(),
-            ],
-            &[seeds],
-        )?;
-    } else {
-        // do extra stuff
-        let required_lamports = rent.saturating_sub(current_lamports);
-        // transfer remaining lamports
-        if required_lamports > 0 {
-            let cpi_accounts = anchor_lang::system_program::Transfer {
-                from: payer.to_account_info(),
-                to: to_account.clone(),
-            };
-            let cpi_context =
-                anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
-            anchor_lang::system_program::transfer(cpi_context, required_lamports)?;
-        }
-        // allocate space
-        let cpi_accounts = anchor_lang::system_program::Allocate {
-            account_to_allocate: to_account.clone(),
-        };
-        let cpi_context =
-            anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
-        anchor_lang::system_program::allocate(cpi_context.with_signer(&[seeds]), space as u64)?;
-
-        // Assign ownership to program
-        let cpi_accounts = anchor_lang::system_program::Assign {
-            account_to_assign: to_account.clone(),
-        };
-        let cpi_context =
-            anchor_lang::context::CpiContext::new(system_program.clone(), cpi_accounts);
-        anchor_lang::system_program::assign(cpi_context.with_signer(&[seeds]), &program_id)?;
-    }
-    Ok(())
 }
 
 fn verify_feed_admin(admin: &Signer, admin_list: &AccountList) -> Result<()> {

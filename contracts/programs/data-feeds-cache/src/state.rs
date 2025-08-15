@@ -7,8 +7,6 @@ use anchor_lang::prelude::{
 use arrayvec::arrayvec;
 use static_assertions::const_assert;
 
-use crate::common::MAX_WORKFLOW_METADATAS;
-
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct CacheState {
@@ -63,7 +61,7 @@ const_assert!(
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct WorkflowMetadataList {
-    pub xs: [WorkflowMetadata; MAX_WORKFLOW_METADATAS],
+    pub xs: [WorkflowMetadata; MAX_ENTRIES],
     pub len: u64,
 }
 arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
@@ -71,7 +69,7 @@ const_assert!(
     mem::size_of::<WorkflowMetadataList>()
         == mem::size_of::<u64>()
             + (mem::size_of::<Pubkey>() + mem::size_of::<[u8; 20]>() + mem::size_of::<[u8; 10]>())
-                * MAX_WORKFLOW_METADATAS
+                * MAX_ENTRIES
 );
 
 // #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, InitSpace)]

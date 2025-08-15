@@ -32,6 +32,7 @@ pub struct OraclesConfig {
 #[derive(Default, InitSpace)]
 pub struct ForwarderState {
     pub version: u8,
+    pub authority_nonce: u8, // bump
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 }
