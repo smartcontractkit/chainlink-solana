@@ -79,66 +79,6 @@ func (_c *SimpleKeystore_Accounts_Call) RunAndReturn(run func(context.Context) (
 	return _c
 }
 
-// Decrypt provides a mock function with given fields: ctx, account, encrypted
-func (_m *SimpleKeystore) Decrypt(ctx context.Context, account string, encrypted []byte) ([]byte, error) {
-	ret := _m.Called(ctx, account, encrypted)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Decrypt")
-	}
-
-	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) ([]byte, error)); ok {
-		return rf(ctx, account, encrypted)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, []byte) []byte); ok {
-		r0 = rf(ctx, account, encrypted)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, []byte) error); ok {
-		r1 = rf(ctx, account, encrypted)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// SimpleKeystore_Decrypt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Decrypt'
-type SimpleKeystore_Decrypt_Call struct {
-	*mock.Call
-}
-
-// Decrypt is a helper method to define mock.On call
-//   - ctx context.Context
-//   - account string
-//   - encrypted []byte
-func (_e *SimpleKeystore_Expecter) Decrypt(ctx interface{}, account interface{}, encrypted interface{}) *SimpleKeystore_Decrypt_Call {
-	return &SimpleKeystore_Decrypt_Call{Call: _e.mock.On("Decrypt", ctx, account, encrypted)}
-}
-
-func (_c *SimpleKeystore_Decrypt_Call) Run(run func(ctx context.Context, account string, encrypted []byte)) *SimpleKeystore_Decrypt_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]byte))
-	})
-	return _c
-}
-
-func (_c *SimpleKeystore_Decrypt_Call) Return(decrypted []byte, err error) *SimpleKeystore_Decrypt_Call {
-	_c.Call.Return(decrypted, err)
-	return _c
-}
-
-func (_c *SimpleKeystore_Decrypt_Call) RunAndReturn(run func(context.Context, string, []byte) ([]byte, error)) *SimpleKeystore_Decrypt_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Sign provides a mock function with given fields: ctx, account, data
 func (_m *SimpleKeystore) Sign(ctx context.Context, account string, data []byte) ([]byte, error) {
 	ret := _m.Called(ctx, account, data)
