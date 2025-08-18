@@ -20,6 +20,7 @@ import (
 	"github.com/gagliardetto/solana-go/text"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -47,7 +48,7 @@ func TestEventLoader(t *testing.T) {
 		deadline = time.Now().Add(time.Minute)
 	}
 
-	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
 	defer cancel()
 
 	// Getting the default localnet private key
@@ -116,6 +117,59 @@ func TestEventLoader(t *testing.T) {
 	tests.AssertEventually(t, func() bool {
 		return parser.Sum() == expectedSumOfLogValues
 	})
+}
+
+func TestTruncatedLogs(t *testing.T) {
+	// t.Parallel()
+
+	deadline, ok := t.Deadline()
+	if !ok {
+		deadline = time.Now().Add(time.Minute)
+	}
+
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
+
+	// Getting the default localnet private key
+	privateKey, err := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
+	require.NoError(t, err)
+
+	rpcURL, wsURL := setupTestValidator(t, privateKey.PublicKey().String())
+	cl, rpcClient, err := client.NewTestClient(rpcURL, config.NewDefault(), 1*time.Second, logger.Nop())
+	require.NoError(t, err)
+	wsClient, err := ws.Connect(ctx, wsURL)
+	require.NoError(t, err)
+
+	defer wsClient.Close()
+
+	require.NoError(t, err)
+	solanatesting.FundTestAccounts(t, []solana.PublicKey{privateKey.PublicKey()}, rpcURL)
+
+	sender := newLogSender(t, rpcClient, wsClient)
+	orm := logpollermocks.NewMockORM(t) // TODO: replace with real DB, when available
+	programPubKey, err := solana.PublicKeyFromBase58(programPubKey)
+	require.NoError(t, err)
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]logpollertypes.Filter{{ID: 1, IsBackfilled: false, Address: logpollertypes.PublicKey(programPubKey)}}, nil).Once()
+	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
+	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+	lggr, observed := logger.TestObservedSugared(t, zapcore.DebugLevel)
+	lp := logpoller.New(lggr, orm, cl, config.NewDefault())
+
+	require.NoError(t, lp.Start(ctx))
+	t.Cleanup(func() {
+		require.NoError(t, lp.Close())
+	})
+
+	signerFunc := func(_ solana.PublicKey) *solana.PrivateKey {
+		return &privateKey
+	}
+
+	err = sender.sendTruncatedLog(t.Context(), signerFunc, privateKey.PublicKey(), 0)
+	require.NoError(t, err)
+
+	// eventually process all logs
+	tests.AssertLogEventually(t, observed, "Encountered truncated logs")
 }
 
 // upgradeAuthority is admin solana.PrivateKey as string
@@ -235,6 +289,26 @@ func (s *logSender) sendLog(
 	contract.SetProgramID(pubKey)
 
 	inst, err := contract.NewCreateLogInstruction(value, payer, solana.SystemProgramID).ValidateAndBuild()
+	if err != nil {
+		return err
+	}
+
+	return s.sendInstruction(ctx, inst, signerFunc, payer)
+}
+
+func (s *logSender) sendTruncatedLog(
+	ctx context.Context,
+	signerFunc func(key solana.PublicKey) *solana.PrivateKey,
+	payer solana.PublicKey,
+	value uint64,
+) error {
+	s.t.Helper()
+
+	pubKey, err := solana.PublicKeyFromBase58(programPubKey)
+	require.NoError(s.t, err)
+	contract.SetProgramID(pubKey)
+
+	inst, err := contract.NewCreateTruncatedLogInstruction(value, payer, solana.SystemProgramID).ValidateAndBuild()
 	if err != nil {
 		return err
 	}
