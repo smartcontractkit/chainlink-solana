@@ -80,5 +80,5 @@ pub enum DataCacheError {
     EmptyDescriptionEnforced,
 
     #[msg("invalid description")]
-    InvalidDescrption,
+    InvalidDescription,
 }

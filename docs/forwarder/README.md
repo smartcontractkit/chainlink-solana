@@ -6,6 +6,7 @@ The forwarder verifies that the a report comes from a valid oracle network and r
 
 Let's look at the accounts associated with a report instruction to understand what it does.
 
+```
 #[derive(Accounts)]
 #[instruction(data: Vec<u8>)]
 pub struct Report<'info> {
@@ -48,7 +49,7 @@ pub struct Report<'info> {
     pub system_program: Program<'info, System>,
     // remaining accounts passed to receiver
 }
-
+```
 
 `state` is a keypair, program owned account which represents the forwarder instance we are working with. Think of this is a specific forwarder instance.
 
@@ -76,7 +77,7 @@ The following instructions exist on the program:
 
 ## initialize
 
-An important responsibility of this instruction is to pre-compute the forwarder authority PDA and store the bump in the state account for future usage. The bump (along with seed phrases) is used to deterministically compute the forwarder authority PDA. So this means that given a state account, known seeds, and the bump in authority nonce (or bump) you can deterministically derive the associated forwarder authority PDA.
+Basic instruction which creates a new state account and sets the owner.
 
 ## report
 
@@ -88,7 +89,7 @@ If everything looks good, it'll begin constructing the CPI instruction. The repo
 The report function takes a raw data buffer `Vec<u8>` with a custom encoding format to save space
 
 ```
-data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 ```
 
 The `report_context` is extra information about the report that is included before signing the entire report blob.

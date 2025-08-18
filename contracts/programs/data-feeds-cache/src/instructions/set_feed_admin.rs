@@ -6,26 +6,27 @@ pub fn handler(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Res
     require_keys_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
 
     let mut state = ctx.accounts.state.load_mut()?;
-    let mut changed = false;
 
     match (is_admin, state.feed_admins.binary_search(&admin)) {
         (false, Ok(i)) => {
             state.feed_admins.remove(i);
-            changed = true;
+
+            emit!(FeedAdminUpdated {
+                state: ctx.accounts.state.key(),
+                admin,
+                is_admin: false
+            });
         }
         (true, Err(i)) => {
             state.feed_admins.insert(i, admin);
-            changed = true;
+
+            emit!(FeedAdminUpdated {
+                state: ctx.accounts.state.key(),
+                admin,
+                is_admin: true
+            });
         }
         _ => {}
-    }
-
-    if changed {
-        emit!(FeedAdminUpdated {
-            state: ctx.accounts.state.key(),
-            admin,
-            is_admin
-        });
     }
 
     Ok(())

@@ -165,7 +165,6 @@ pub struct CloseDecimalReport<'info> {
 
     pub state: AccountLoader<'info, CacheState>,
 
-    // N data report accounts
     #[account(
         mut,
         seeds = [

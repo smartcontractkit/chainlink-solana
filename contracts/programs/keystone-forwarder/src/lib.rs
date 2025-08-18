@@ -41,7 +41,7 @@ pub mod keystone_forwarder {
     //
     // #[derive(Accounts)]
     // pub struct OnReport<'info> {
-    //     // Note: the data feed cache's on_report function does not directly authenticate the forwarder state.
+    //     // Note: a receiver program's on_report function does not necessarily need to directly authenticate the forwarder state.
     //     // Instead, it indirectly verifies the correct state by enforcing that the forwarder_authority is authorized.
     //     // WARNING: the FORWARDER_ID deployed in an environment may be different
     //     // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
@@ -133,7 +133,7 @@ pub mod keystone_forwarder {
         set_oracles_config(config, don_id, config_version, f, signer_addresses.clone())
     }
 
-    /// Updates oracles config under circumstances which the designated
+    /// Updates oracles config under circumstances where the designated
     /// signers or configuration parameters change
     pub fn update_oracles_config(
         ctx: Context<UpdateOraclesConfig>,
@@ -172,7 +172,7 @@ pub mod keystone_forwarder {
     /// Available space for receiver payload is ~ 297 bytes. However, many factors will affect
     /// this number including adding more accounts in the ctx.remaining_accounts and/or using address
     /// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
-    // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,

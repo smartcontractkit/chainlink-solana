@@ -30,7 +30,6 @@ pub struct ReceivedDecimalReport {
     pub answer: u128,
     pub data_id: [u8; 16],
 }
-// 16 + 20 + 4 = 40 bytes
 
 /// Report sent to legacy feed
 #[derive(AnchorSerialize, AnchorDeserialize)]

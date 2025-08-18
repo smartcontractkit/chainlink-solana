@@ -15,7 +15,7 @@ pub fn report_size_ok(data: &[u8]) -> bool {
     }
 }
 
-// data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+// data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 pub fn extract_raw_report(data: &[u8]) -> &[u8] {
     let num_signatures = data[0] as usize;
     let data = &data[1..];

@@ -7,7 +7,7 @@ use std::mem;
 #[zero_copy]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
 pub struct SignerAddressList {
-    pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 64 addresses (20 bytes each)
+    pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 32 addresses (20 bytes each)
     pub len: u64,
 }
 
@@ -25,7 +25,7 @@ pub struct OraclesConfig {
     pub config_id: u64,                      // 8 bytes
     pub f: u8,                               // 1 byte
     pub _padding: [u8; 7],                   // 7 bytes to align to 8 bytes
-    pub signer_addresses: SignerAddressList, // 64*20 + 1 + 7 = 1288 bytes
+    pub signer_addresses: SignerAddressList, // 32*20 + 8 = 648 bytes
 }
 
 /// Account which represents a distinct instance of a forwarder.

@@ -144,7 +144,7 @@ pub mod data_feeds_cache {
     /// Receives the a forwarder report that contains a list of [`ReceivedDecimalReport`]
     /// Maximum amount of 6 ReceivedDecimalReports can be included in the report before
     /// the transaction limit will be exceeded.
-    /// for calculation look to ../../docs/data-feeds-cache/README.md#L579
+    /// For calculation look to ../../docs/data-feeds-cache/README.md#L579
     /// There are three optional accounts, all related to legacy feed writing.
     /// If you omit any of these or have write_disabled = 1 for all feeds
     /// then we guarentee no legacy feeds will be written to.
