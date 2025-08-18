@@ -34,14 +34,16 @@ func Test_capEncoder(t *testing.T) {
         { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }
       ]
     }`,
-		definedTypes: `[
+		definedTypes: `
+		[
       {
         "name":"DecimalReport",
          "type":{
           "kind":"struct",
           "fields":[
             { "name":"timestamp", "type":"u32" },
-            { "name":"answer",    "type":"u128" }
+            { "name":"answer",    "type":"u128" },
+            { "name": "dataId",   "type": {"array": ["u8",16]}}
           ]
         }
       }
@@ -53,12 +55,14 @@ func Test_capEncoder(t *testing.T) {
 	require.NoError(t, err, "failed to create encoder")
 	expTS := uint32(10)
 	expAnswer := big.NewInt(14)
+	expDataID := [16]byte{1, 2, 3, 4}
 	m := map[string]any{
 		"account_ctx_hash": [32]byte{1, 2, 3},
 		"payload": []any{
 			map[string]any{
 				"Timestamp": expTS,
 				"Answer":    expAnswer,
+				"DataId":    expDataID,
 			},
 		},
 		consensustypes.MetadataFieldName: getMetadata(workflowID),
@@ -79,6 +83,7 @@ func Test_capEncoder(t *testing.T) {
 	type Result struct {
 		Timestamp uint32
 		Answer    [16]byte // little-endian
+		DataID    [16]byte
 	}
 
 	var r []Result
@@ -87,6 +92,7 @@ func Test_capEncoder(t *testing.T) {
 	require.Equal(t, expTS, r[0].Timestamp)
 	n := binary.LittleEndian.Uint64(r[0].Answer[:])
 	require.Equal(t, expAnswer, new(big.Int).SetUint64(n))
+	require.Equal(t, expDataID, r[0].DataID)
 }
 
 func getMetadata(cid string) consensustypes.Metadata {
