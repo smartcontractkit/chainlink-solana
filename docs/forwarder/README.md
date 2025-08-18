@@ -117,7 +117,7 @@ pub struct OnReport<'info> {
     pub state: Account<'info, ForwarderState>,
 
     /// CHECK: This is a PDA
-    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce, seeds::program = <FORWARDER_ID>)]
+    /// #[account(seeds = [b"forwarder", state.key().as_ref(), <RECEIVER_PROGRAM_ID>], bump = state.authority_nonce, seeds::program = <FORWARDER_ID>)]
     pub forwarder_authority: Signer<'info>,
 
     // remaining accounts passed in as well

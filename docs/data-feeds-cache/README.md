@@ -472,7 +472,7 @@ pub struct OnReport<'info> {
     // what the actual deployed program id is.
     pub forwarder_state: Account<'info, ForwarderState>,
 
-    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref()], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
+    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), <RECEIVER_PROGRAM_ID>], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
     pub forwarder_authority: Signer<'info>,
 
     #[account()]
