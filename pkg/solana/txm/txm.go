@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
@@ -37,13 +37,6 @@ const (
 	MaxComputeUnitLimit            = 1_400_000        // max compute unit limit a transaction can have
 )
 
-type SimpleKeystore interface {
-	Sign(ctx context.Context, account string, data []byte) (signature []byte, err error)
-	Accounts(ctx context.Context) (accounts []string, err error)
-}
-
-var _ loop.Keystore = (SimpleKeystore)(nil)
-
 type TxManager interface {
 	services.Service
 	Enqueue(ctx context.Context, accountID string, tx *solanaGo.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
@@ -63,7 +56,7 @@ type Txm struct {
 	done   sync.WaitGroup
 	cfg    config.Config
 	txs    PendingTxContext
-	ks     SimpleKeystore
+	ks     core.Keystore
 	client utils.Loader[client.ReaderWriter]
 	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
@@ -74,7 +67,7 @@ type Txm struct {
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
 func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
-	cfg config.Config, ks SimpleKeystore, lggr logger.Logger) *Txm {
+	cfg config.Config, ks core.Keystore, lggr logger.Logger) *Txm {
 	if sendTx == nil {
 		// default sendTx using a single RPC
 		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {

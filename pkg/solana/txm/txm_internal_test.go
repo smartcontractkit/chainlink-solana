@@ -23,6 +23,7 @@ import (
 	relayconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	bigmath "github.com/smartcontractkit/chainlink-common/pkg/utils/big_math"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -55,7 +56,7 @@ func (p soltxmProm) getInflight() float64 {
 }
 
 // create placeholder transaction and returns func for signed tx with fee
-func getTx(t *testing.T, val uint64, keystore SimpleKeystore) (*solana.Transaction, func(fees.ComputeUnitPrice, bool, fees.ComputeUnitLimit) *solana.Transaction) {
+func getTx(t *testing.T, val uint64, keystore core.Keystore) (*solana.Transaction, func(fees.ComputeUnitPrice, bool, fees.ComputeUnitLimit) *solana.Transaction) {
 	pubkey := solana.PublicKey{}
 
 	// create transfer tx
@@ -1141,7 +1142,7 @@ func TestTxm_Enqueue(t *testing.T) {
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
-	validKey :=  GetRandomPubKey(t)
+	validKey := GetRandomPubKey(t)
 	invalidKey := GetRandomPubKey(t)
 	mkey.On("Sign", mock.Anything, validKey.String(), mock.Anything).Return([]byte{1}, nil)
 	mkey.On("Sign", mock.Anything, invalidKey.String(), mock.Anything).Return([]byte{}, relayconfig.KeyNotFoundError{ID: invalidKey.String(), KeyType: "Solana"})
@@ -1212,7 +1213,7 @@ func TestTxm_Enqueue(t *testing.T) {
 	})
 }
 
-func addSigAndLimitToTx(t *testing.T, keystore SimpleKeystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
+func addSigAndLimitToTx(t *testing.T, keystore core.Keystore, pubkey solana.PublicKey, tx solana.Transaction, limit fees.ComputeUnitLimit) *solana.Transaction {
 	txCopy := utils.DeepCopyTx(tx)
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
