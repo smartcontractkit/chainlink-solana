@@ -30,7 +30,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Helper function to parse oracle config account data
 function parseOraclesConfigAccount(data: Buffer) {
   // Layout: discriminator(8) + config_id(8) + f(1) + padding(7) + signer_addresses
-  // SignerAddresses layout: xs(64*20) + len(1) + padding(7)
+  // SignerAddresses layout: xs(32*20) + len(1) + padding(7)
 
   let offset = 8; // Skip discriminator
 
@@ -46,8 +46,8 @@ function parseOraclesConfigAccount(data: Buffer) {
   offset += 7;
 
   // Read SignerAddresses structure
-  // Layout: xs (64*20 bytes) + len (1 byte) + padding (7 bytes)
-  const signerAddressesLen = data.readUInt8(offset + 64 * 20); // len is after xs array
+  // Layout: xs (32*20 bytes) + len (1 byte) + padding (7 bytes)
+  const signerAddressesLen = data.readUInt8(offset + 32 * 20); // len is after xs array
 
   // Extract the actual addresses from xs array
   const signerAddresses = [];

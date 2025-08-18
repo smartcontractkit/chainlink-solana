@@ -5,8 +5,8 @@ use crate::{
     event::DecimalFeedConfigSet,
     state::WritePermissionFlag,
     utils::{
-        close_account, create_account, create_report_hash, get_decimals, permission_flag,
-        sorted_insert, validate_feed_config_inputs, verify_feed_admin,
+        create_account, create_report_hash, get_decimals, permission_flag, sorted_insert,
+        validate_feed_config_inputs, verify_feed_admin,
     },
     FeedConfig, WorkflowMetadata, ZERO_DATA_ID,
 };
@@ -208,16 +208,14 @@ pub fn handler<'info>(
     for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
         let curr_permission_account_info = &delete_permission_account_infos[i];
 
+        let account: Account<WritePermissionFlag> = Account::try_from(curr_permission_account_info)?;
+        account.close(ctx.accounts.feed_admin.to_account_info())?;
+
         require_keys_eq!(
             *permission_account,
             *curr_permission_account_info.key,
             DataCacheError::AccountMismatch
         );
-
-        close_account(
-            curr_permission_account_info.clone(),
-            ctx.accounts.feed_admin.to_account_info(),
-        )?;
     }
 
     Ok(())

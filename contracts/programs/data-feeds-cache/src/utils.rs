@@ -92,21 +92,6 @@ pub fn get_decimals(data_id: &[u8; 16]) -> u8 {
     }
 }
 
-pub fn close_account(account: AccountInfo, destination: AccountInfo) -> Result<()> {
-    **destination.lamports.borrow_mut() = destination
-        .lamports()
-        .checked_add(account.lamports())
-        .unwrap();
-    **account.lamports.borrow_mut() = 0;
-
-    let mut data = account.try_borrow_mut_data()?;
-    for byte in data.deref_mut().iter_mut() {
-        *byte = 0;
-    }
-
-    Ok(())
-}
-
 // workflow_cid           offset  0, size 32
 // workflow_name          offset  32, size 10
 // workflow_owner         offset  42, size 20
@@ -183,7 +168,7 @@ pub fn validate_feed_config_inputs(
         if workflow_metadatas.is_empty() {
             require!(*d == [0; 32], DataCacheError::EmptyDescriptionEnforced);
         } else {
-            require!(*d != [0; 32], DataCacheError::InvalidDescrption);
+            require!(*d != [0; 32], DataCacheError::InvalidDescription);
         }
     }
 
