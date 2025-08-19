@@ -125,15 +125,13 @@ func (e *capEncoder) Encode(ctx context.Context, input values.Map) ([]byte, erro
 	if !ok {
 		return nil, fmt.Errorf("missing expected field: %s", accountCtxHash)
 	}
-
 	// 2. encode forwarder report
-	var accCtxHash [32]byte
-	err = inAccCtx.UnwrapTo(&accountCtxHash)
+	var hash [32]byte
+	err = inAccCtx.UnwrapTo(&hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unwrap account ctx hash: %w", err)
 	}
-
-	forwarderReport := ForwarderReport{accCtxHash, userPayload}
+	forwarderReport := ForwarderReport{hash, userPayload}
 
 	encReport, err := sol_binary.MarshalBorsh(forwarderReport)
 	if err != nil {

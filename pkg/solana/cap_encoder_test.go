@@ -56,8 +56,9 @@ func Test_capEncoder(t *testing.T) {
 	expTS := uint32(10)
 	expAnswer := big.NewInt(14)
 	expDataID := [16]byte{1, 2, 3, 4}
+	expHash := [32]byte{7, 8, 9}
 	m := map[string]any{
-		"account_ctx_hash": [32]byte{1, 2, 3},
+		"account_ctx_hash": expHash,
 		"payload": []any{
 			map[string]any{
 				"Timestamp": expTS,
@@ -79,7 +80,7 @@ func Test_capEncoder(t *testing.T) {
 	var fr ForwarderReport
 	err = sol_binary.UnmarshalBorsh(&fr, trail)
 	require.NoError(t, err, "failed to unmarshal borsh forwarder report")
-
+	require.Equal(t, expHash, fr.Hash)
 	type Result struct {
 		Timestamp uint32
 		Answer    [16]byte // little-endian
