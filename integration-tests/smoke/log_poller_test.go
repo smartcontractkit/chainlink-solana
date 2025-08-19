@@ -120,7 +120,7 @@ func TestEventLoader(t *testing.T) {
 }
 
 func TestTruncatedLogs(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 
 	deadline, ok := t.Deadline()
 	if !ok {
