@@ -208,14 +208,15 @@ pub fn handler<'info>(
     for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
         let curr_permission_account_info = &delete_permission_account_infos[i];
 
-        let account: Account<WritePermissionFlag> = Account::try_from(curr_permission_account_info)?;
-        account.close(ctx.accounts.feed_admin.to_account_info())?;
-
         require_keys_eq!(
             *permission_account,
             *curr_permission_account_info.key,
             DataCacheError::AccountMismatch
         );
+
+        let account: Account<WritePermissionFlag> =
+            Account::try_from(curr_permission_account_info)?;
+        account.close(ctx.accounts.feed_admin.to_account_info())?;
     }
 
     Ok(())
