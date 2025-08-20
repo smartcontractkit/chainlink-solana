@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"reflect"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 const CrossChainAmountLength = 32
@@ -37,7 +37,7 @@ func (d *crossChainAmount) Encode(value any, into []byte) ([]byte, error) {
 
 func (d *crossChainAmount) Decode(encoded []byte) (any, []byte, error) {
 	decoded, remaining, err := encodings.SafeDecode(encoded, CrossChainAmountLength, func(raw []byte) cciptypes.BigInt {
-		return decodeLEToBigInt(raw)
+		return DecodeLEToBigInt(raw)
 	})
 	if err != nil {
 		return nil, nil, err
@@ -60,7 +60,7 @@ func encodeBigIntToFixedLengthLE(bi *big.Int, length int) []byte {
 	return paddedBytes
 }
 
-func decodeLEToBigInt(data []byte) cciptypes.BigInt {
+func DecodeLEToBigInt(data []byte) cciptypes.BigInt {
 	// Avoid modifying original data
 	buf := make([]byte, len(data))
 	copy(buf, data)

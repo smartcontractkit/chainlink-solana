@@ -9,14 +9,18 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/provider"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -426,4 +430,17 @@ func (r *Relayer) NewPluginProvider(ctx context.Context, rargs relaytypes.RelayA
 
 func (r *Relayer) NewOCR3CapabilityProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.OCR3CapabilityProvider, error) {
 	return nil, errors.New("ocr3 capability provider is not supported for solana")
+}
+
+func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPProviderArgs) (relaytypes.CCIPProvider, error) {
+	chainSelector, ok := chainsel.SolanaChainIdToChainSelector()[r.chain.ID()]
+	if !ok {
+		return nil, fmt.Errorf("invalid chain ID %s: could not find chain selector", r.chain.ID())
+	}
+
+	if r.chain.MultiClient() == nil {
+		return nil, errors.New("chain multi client is not set")
+	}
+
+	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator())
 }

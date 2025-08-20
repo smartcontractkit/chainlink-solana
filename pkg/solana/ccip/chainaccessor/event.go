@@ -1,0 +1,642 @@
+package chainaccessor
+
+import (
+	"context"
+	"crypto/sha3"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math/big"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
+	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+)
+
+var (
+	ccipOffRampIDL = idl.FetchCCIPOfframpIDL()
+	ccipRouterIDL  = idl.FetchCCIPRouterIDL()
+
+	// defaultCCIPLogsRetention defines the duration for which logs critical for Commit/Exec plugins processing are retained.
+	// Although Exec relies on permissionlessExecThreshold which is lower than 24hours for picking eligible CommitRoots,
+	// Commit still can reach to older logs because it filters them by sequence numbers. For instance, in case of RMN curse on chain,
+	// we might have logs waiting in OnRamp to be committed first. When outage takes days we still would
+	// be able to bring back processing without replaying any logs from chain. You can read that param as
+	// "how long CCIP can be down and still be able to process all the messages after getting back to life".
+	// Breaching this threshold would require replaying chain using LogPoller from the beginning of the outage.
+	// Using same default retention as v1.5 https://github.com/smartcontractkit/ccip/pull/530/files
+	defaultCCIPLogsRetention = 30 * 24 * time.Hour // 30 days
+)
+
+type IndexedField struct {
+	OnChainPath string
+}
+
+type filterConfig struct {
+	idl             string
+	includeReverted bool
+	indexedField0   *string
+	indexedField1   *string
+	indexedField2   *string
+	indexedField3   *string
+}
+
+var (
+	// On-chain paths for the CCIPMessageSent event
+	msgSentSrcChainPath  = "Message.Header.SourceChainSelector"
+	msgSentDestChainPath = "Message.Header.DestChainSelector"
+	msgSentSeqNumPath    = "Message.Header.SequenceNumber"
+
+	// On-chain paths for the ExecutionStateChanged event
+	execStateChangedSrcChainPath = "SourceChainSelector"
+	execStateChangedSeqNumPath   = consts.EventAttributeSequenceNumber
+	execStateChangedStatePath    = consts.EventAttributeState
+)
+
+// Map of relevant events and their metadata required to build the codec and bind program addresses
+var eventFilterConfigMap = map[string]map[string]filterConfig{
+	consts.ContractNameOnRamp: {
+		consts.EventNameCCIPMessageSent: {
+			idl:             ccipRouterIDL,
+			includeReverted: false,
+			indexedField0:   &msgSentSrcChainPath,
+			indexedField1:   &msgSentDestChainPath,
+			indexedField2:   &msgSentSeqNumPath,
+		},
+	},
+	consts.ContractNameOffRamp: {
+		consts.EventNameCommitReportAccepted: {
+			idl:             ccipOffRampIDL,
+			includeReverted: false,
+		},
+		consts.EventNameExecutionStateChanged: {
+			idl:             ccipOffRampIDL,
+			includeReverted: true,
+			indexedField0:   &execStateChangedSrcChainPath,
+			indexedField1:   &execStateChangedSeqNumPath,
+			indexedField2:   &execStateChangedStatePath,
+		},
+	},
+}
+
+// bindContractEvent binds contract events to the logpoller for monitoring blockchain events.
+// This operation is idempotent - if the same address exists, it performs no operation;
+// if the address is changed, it updates to the new address, overwriting the existing one;
+// if the contract is not bound, it binds to the new address.
+// Supports OnRamp and OffRamp contract types with their respective event filters.
+// Returns an error if filter registration fails.
+func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName string, address solana.PublicKey) error {
+	eventsMap, exists := eventFilterConfigMap[contractName]
+	if !exists {
+		return nil // No events to bind for unknown contract types
+	}
+
+	for eventName, config := range eventsMap {
+		if err := a.registerFilterIfNotExists(ctx, eventName, address, config); err != nil {
+			return fmt.Errorf("failed to register filter for event %s: %w", eventName, err)
+		}
+	}
+
+	return nil
+}
+
+func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
+	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, eventName, codecIDL)
+	if err != nil {
+		return codec.IdlEvent{}, err
+	}
+	eventIdl, isOk := idlDef.(codec.IdlEvent)
+	if !isOk {
+		return codec.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
+	}
+	return eventIdl, nil
+}
+
+// registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
+func (a *SolanaAccessor) registerFilterIfNotExists(
+	ctx context.Context,
+	eventName string,
+	address solana.PublicKey,
+	filterConfig filterConfig,
+) error {
+	conf := config.PollingFilter{
+		Retention: &defaultCCIPLogsRetention,
+	}
+
+	var codecIDL codec.IDL
+	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
+		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
+	}
+
+	eventIdl, err := extractEventIDL(eventName, codecIDL)
+	if err != nil {
+		return fmt.Errorf("failed to extract event IDL: %w", err)
+	}
+
+	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
+
+	subKeyPaths := processSubKeyPaths(filterConfig)
+
+	filter := logpollertypes.Filter{
+		Address:         logpollertypes.PublicKey(address),
+		EventName:       eventName,
+		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
+		EventIdl:        lpEventIDL,
+		SubkeyPaths:     subKeyPaths,
+		StartingBlock:   conf.GetStartingBlock(),
+		Retention:       conf.GetRetention(),
+		MaxLogsKept:     conf.GetMaxLogsKept(),
+		IncludeReverted: filterConfig.includeReverted,
+	}
+
+	filterName := deriveName(filter)
+
+	// Filter already registered so return early
+	if hasFilter := a.logPoller.HasFilter(ctx, filterName); hasFilter {
+		return nil
+	}
+
+	filter.Name = filterName
+
+	a.lggr.Debugw("registering log poller filter", "name", filterName, "eventName", eventName, "eventSig", filter.EventSig.String(), "address", address)
+
+	if err := a.logPoller.RegisterFilter(ctx, filter); err != nil {
+		return fmt.Errorf("failed to register logpoller filter: %w", err)
+	}
+
+	return nil
+}
+
+// convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic
+// chainaccessor.SendRequestedEvent. This function is idempotent and performs a
+// one-to-one mapping of event fields from the Solana format to the standard CCIP format.
+func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onrampAddr solana.PublicKey) ([]*chainaccessor.SendRequestedEvent, error) {
+	iter, err := a.decodeLogsIntoSequences(consts.EventNameCCIPMessageSent, logs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
+	}
+
+	if len(logs) != len(iter) {
+		return nil, fmt.Errorf("failed to convert all logs into generic ccip event, logs %d, events %d", len(logs), len(iter))
+	}
+
+	genericEvents := make([]*chainaccessor.SendRequestedEvent, 0)
+	for i, seq := range iter {
+		event, ok := seq.Data.(*ccip.EventCCIPMessageSent)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast %T to EventCCIPMessageSent", seq.Data)
+		}
+		msg := ccipocr3.Message{
+			Header: ccipocr3.RampMessageHeader{
+				MessageID:           ccipocr3.Bytes32(event.Message.Header.MessageId),
+				SourceChainSelector: a.chainSelector,
+				DestChainSelector:   ccipocr3.ChainSelector(event.Message.Header.DestChainSelector),
+				SequenceNumber:      ccipocr3.SeqNum(event.Message.Header.SequenceNumber),
+				Nonce:               event.Message.Header.Nonce,
+				TxHash:              logs[i].TxHash.ToSolana().String(),
+				OnRamp:              ccipocr3.UnknownAddress(onrampAddr.String()),
+				// MsgHash: , TODO: need to set this field also?
+			},
+			Sender:         ccipocr3.UnknownAddress(event.Message.Sender.String()),
+			Data:           ccipocr3.Bytes(event.Message.Data),
+			Receiver:       ccipocr3.UnknownAddress(event.Message.Receiver),
+			ExtraArgs:      ccipocr3.Bytes(event.Message.ExtraArgs),
+			FeeToken:       ccipocr3.UnknownAddress(event.Message.FeeToken.String()),
+			FeeTokenAmount: codec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
+			TokenAmounts:   convertTokenAmounts(event.Message.TokenAmounts),
+			FeeValueJuels:  codec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
+		}
+		genericEvents = append(genericEvents, &chainaccessor.SendRequestedEvent{
+			DestChainSelector: msg.Header.DestChainSelector,
+			SequenceNumber:    msg.Header.SequenceNumber,
+			Message:           msg,
+		})
+	}
+	return genericEvents, nil
+}
+
+func convertTokenAmounts(transfers []ccip_router.SVM2AnyTokenTransfer) []ccipocr3.RampTokenAmount {
+	genericTokenAmounts := make([]ccipocr3.RampTokenAmount, 0, len(transfers))
+	for _, transfer := range transfers {
+		genericTokenAmounts = append(genericTokenAmounts, ccipocr3.RampTokenAmount{
+			SourcePoolAddress: transfer.SourcePoolAddress.Bytes(),
+			DestTokenAddress:  transfer.DestTokenAddress,
+			ExtraData:         transfer.ExtraData,
+			Amount:            codec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
+			DestExecData:      transfer.DestExecData,
+		})
+	}
+	return genericTokenAmounts
+}
+
+func deriveName(filter logpollertypes.Filter) string {
+	// include eventSig, readDef, address, subkeyPaths, indexedSubkeys
+	data := filter.EventSig[:]
+	data = append(data, filter.Address.ToSolana().Bytes()...)
+	data = append(data, []byte(filter.EventName)...)
+
+	for _, sub := range filter.SubkeyPaths {
+		for _, key := range sub {
+			data = append(data, []byte(key)...)
+		}
+	}
+	hash := sha3.Sum256(data)
+
+	return fmt.Sprintf("%s.%s.%x", filter.EventName, filter.Address.String(), hash[:])
+}
+
+func processSubKeyPaths(cfg filterConfig) [][]string {
+	subKeyPaths := make([][]string, 0)
+
+	if cfg.indexedField0 != nil {
+		subKeyPaths = append(subKeyPaths, strings.Split(*cfg.indexedField0, "."))
+	}
+	if cfg.indexedField1 != nil {
+		subKeyPaths = append(subKeyPaths, strings.Split(*cfg.indexedField1, "."))
+	}
+	if cfg.indexedField2 != nil {
+		subKeyPaths = append(subKeyPaths, strings.Split(*cfg.indexedField2, "."))
+	}
+	if cfg.indexedField3 != nil {
+		subKeyPaths = append(subKeyPaths, strings.Split(*cfg.indexedField3, "."))
+	}
+
+	return subKeyPaths
+}
+
+func (a *SolanaAccessor) processCommitReports(
+	logs []logpollertypes.Log, ts time.Time, limit int,
+) ([]ccipocr3.CommitPluginReportWithMeta, error) {
+	iter, err := a.decodeLogsIntoSequences(consts.EventNameCommitReportAccepted, logs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
+	}
+
+	reports := make([]ccipocr3.CommitPluginReportWithMeta, 0)
+	for _, item := range iter {
+		ev, err := validateCommitReportAcceptedEvent(item, ts)
+		if err != nil {
+			a.lggr.Errorw("validate commit report accepted event", "err", err, "ev", item.Data)
+			continue
+		}
+
+		a.lggr.Debugw("processing commit report", "report", ev, "item", item)
+
+		unblessedMerkleRoots := a.processMerkleRoot(ev.Report)
+
+		if len(unblessedMerkleRoots) > 0 {
+			a.lggr.Debugw("found commit report with merkle root", "roots", unblessedMerkleRoots)
+		}
+
+		priceUpdates, err := a.processPriceUpdates(ev.PriceUpdates)
+		if err != nil {
+			a.lggr.Errorw("failed to process price updates", "err", err, "priceUpdates", ev.PriceUpdates)
+			continue
+		}
+
+		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
+		if err != nil {
+			a.lggr.Errorw("failed to parse block number", "blockNum", item.Head.Height, "err", err)
+			continue
+		}
+
+		reports = append(reports, ccipocr3.CommitPluginReportWithMeta{
+			Report: ccipocr3.CommitPluginReport{
+				BlessedMerkleRoots:   nil,
+				UnblessedMerkleRoots: unblessedMerkleRoots, // All roots default to unblessed on solana
+				PriceUpdates:         priceUpdates,
+			},
+			Timestamp: time.Unix(int64(item.Timestamp), 0), // nolint:gosec // G115: timestamp will always fit in int64 for unix
+			BlockNum:  blockNum,
+		})
+	}
+
+	a.lggr.Debugw("decoded commit reports", "reports", reports)
+
+	if len(reports) < limit {
+		return reports, nil
+	}
+	return reports[:limit], nil
+}
+
+func validateCommitReportAcceptedEvent(
+	seq types.Sequence, gteTimestamp time.Time,
+) (*ccip.EventCommitReportAccepted, error) {
+	ev, is := (seq.Data).(*ccip.EventCommitReportAccepted)
+	if !is {
+		return nil, fmt.Errorf("unexpected type %T while expecting EventCommitReportAccepted", seq.Data)
+	}
+
+	if ev == nil {
+		return nil, fmt.Errorf("commit report accepted event is nil")
+	}
+
+	if seq.Timestamp < uint64(gteTimestamp.Unix()) { // nolint:gosec // G115: timestamp is always positive
+		return nil, fmt.Errorf("commit report accepted event timestamp is less than the minimum timestamp %v<%v",
+			seq.Timestamp, gteTimestamp.Unix())
+	}
+
+	if err := validateMerkleRoot(ev.Report); err != nil {
+		return nil, fmt.Errorf("merkle roots: %w", err)
+	}
+
+	for _, tpus := range ev.PriceUpdates.TokenPriceUpdates {
+		if tpus.SourceToken.IsZero() {
+			return nil, fmt.Errorf("invalid source token address: %s", tpus.SourceToken.String())
+		}
+		price := new(big.Int)
+		price.SetBytes(tpus.UsdPerToken[:])
+		if price.Cmp(big.NewInt(0)) <= 0 {
+			return nil, fmt.Errorf("non-positive usd per token")
+		}
+	}
+
+	for _, gpus := range ev.PriceUpdates.GasPriceUpdates {
+		price := new(big.Int)
+		price.SetBytes(gpus.UsdPerUnitGas[:])
+		if price.Cmp(big.NewInt(0)) < 0 {
+			return nil, fmt.Errorf("negative usd per unit gas: %s", price.String())
+		}
+	}
+
+	return ev, nil
+}
+
+func (a *SolanaAccessor) processMerkleRoot(
+	merkleRoot *ccip_offramp.MerkleRoot,
+) (blessedMerkleRoot []ccipocr3.MerkleRootChain) {
+	// Return early if merkle root is nil
+	// Valid scenario if commit report only contains price updates
+	if merkleRoot == nil {
+		return nil
+	}
+	return []ccipocr3.MerkleRootChain{
+		{
+			ChainSel:      ccipocr3.ChainSelector(merkleRoot.SourceChainSelector),
+			OnRampAddress: merkleRoot.OnRampAddress,
+			SeqNumsRange: ccipocr3.NewSeqNumRange(
+				ccipocr3.SeqNum(merkleRoot.MinSeqNr),
+				ccipocr3.SeqNum(merkleRoot.MaxSeqNr),
+			),
+			MerkleRoot: merkleRoot.MerkleRoot,
+		},
+	}
+}
+
+func validateMerkleRoot(merkleRoot *ccip_offramp.MerkleRoot) error {
+	// Return early if merkle root is nil
+	// Valid scenario if commit report only contains price updates
+	if merkleRoot == nil {
+		return nil
+	}
+	if merkleRoot.SourceChainSelector == 0 {
+		return fmt.Errorf("source chain is zero")
+	}
+	if merkleRoot.MinSeqNr == 0 {
+		return fmt.Errorf("minSeqNr is zero")
+	}
+	if merkleRoot.MaxSeqNr == 0 {
+		return fmt.Errorf("maxSeqNr is zero")
+	}
+	if merkleRoot.MinSeqNr > merkleRoot.MaxSeqNr {
+		return fmt.Errorf("minSeqNr is greater than maxSeqNr")
+	}
+	if merkleRoot.MerkleRoot == [32]byte{} {
+		return fmt.Errorf("empty merkle root")
+	}
+	if merkleRoot.OnRampAddress == nil {
+		return errors.New("nil onramp address")
+	}
+
+	return nil
+}
+
+func (a *SolanaAccessor) processPriceUpdates(priceUpdates ccip_offramp.PriceUpdates) (ccipocr3.PriceUpdates, error) {
+	updates := ccipocr3.PriceUpdates{
+		TokenPriceUpdates: make([]ccipocr3.TokenPrice, 0),
+		GasPriceUpdates:   make([]ccipocr3.GasPriceChain, 0),
+	}
+
+	for _, tokenPriceUpdate := range priceUpdates.TokenPriceUpdates {
+		// UsdPerToken expected to be big endian so SetBytes works here
+		// https://github.com/smartcontractkit/chainlink/blob/9383bea5a7c05b4c7ae807799d6a8cb03c6d3476/core/capabilities/ccip/ccipsolana/commitcodec.go#L61
+		price := new(big.Int).SetBytes(tokenPriceUpdate.UsdPerToken[:])
+		updates.TokenPriceUpdates = append(updates.TokenPriceUpdates, ccipocr3.TokenPrice{
+			TokenID: ccipocr3.UnknownEncodedAddress(tokenPriceUpdate.SourceToken.String()),
+			Price:   ccipocr3.NewBigInt(price),
+		})
+	}
+
+	for _, gasPriceUpdate := range priceUpdates.GasPriceUpdates {
+		// UsdPerUnitGas expected to be big endian so SetBytes works here
+		// https://github.com/smartcontractkit/chainlink/blob/9383bea5a7c05b4c7ae807799d6a8cb03c6d3476/core/capabilities/ccip/ccipsolana/commitcodec.go#L73
+		price := new(big.Int).SetBytes(gasPriceUpdate.UsdPerUnitGas[:])
+		updates.GasPriceUpdates = append(updates.GasPriceUpdates, ccipocr3.GasPriceChain{
+			ChainSel: ccipocr3.ChainSelector(gasPriceUpdate.DestChainSelector),
+			GasPrice: ccipocr3.NewBigInt(price),
+		})
+	}
+
+	return updates, nil
+}
+
+func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) (query.KeyFilter, uint64) {
+	var chainExpressions []query.Expression
+	var countSqNrs uint64
+	// final query should look like
+	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
+	sortedChains := maps.Keys(rangesPerChain)
+	slices.Sort(sortedChains)
+	for _, srcChain := range sortedChains {
+		seqNumRanges := rangesPerChain[srcChain]
+		var seqRangeExpressions []query.Expression
+		for _, seqNrRange := range seqNumRanges {
+			expr := query.Comparator(consts.EventAttributeSequenceNumber,
+				primitives.ValueComparator{
+					Value:    seqNrRange.Start(),
+					Operator: primitives.Gte,
+				},
+				primitives.ValueComparator{
+					Value:    seqNrRange.End(),
+					Operator: primitives.Lte,
+				})
+			seqRangeExpressions = append(seqRangeExpressions, expr)
+			countSqNrs += uint64(seqNrRange.End() - seqNrRange.Start() + 1)
+		}
+		combinedSeqNrs := query.Or(seqRangeExpressions...)
+
+		chainExpressions = append(chainExpressions, query.And(
+			combinedSeqNrs,
+			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+				Value:    srcChain,
+				Operator: primitives.Eq,
+			}),
+		))
+	}
+	extendedQuery := query.Or(chainExpressions...)
+
+	keyFilter := query.KeyFilter{
+		Key: consts.EventNameExecutionStateChanged,
+		Expressions: []query.Expression{
+			extendedQuery,
+			// We don't need to wait for an execute state changed event to be finalized
+			// before we optimistically mark a message as executed.
+			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
+				Value:    0, // > 0 corresponds to:  IN_PROGRESS, SUCCESS, FAILURE
+				Operator: primitives.Gt,
+			}),
+			query.Confidence(primitives.Finalized),
+		},
+	}
+	return keyFilter, countSqNrs
+}
+
+func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertypes.Log, nonEmptyRangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error) {
+	iter, err := a.decodeLogsIntoSequences(consts.EventNameExecutionStateChanged, logs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
+	}
+
+	executed := make(map[ccipocr3.ChainSelector][]ccipocr3.SeqNum)
+	for _, item := range iter {
+		stateChange, ok := item.Data.(*ccip.EventExecutionStateChanged)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast %T to ExecutionStateChangedEvent", item.Data)
+		}
+
+		if err := validateExecutionStateChangedEvent(stateChange, nonEmptyRangesPerChain); err != nil {
+			a.lggr.Errorw("failed validate execution state changed event",
+				"err", err, "stateChange", stateChange)
+			continue
+		}
+
+		executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)] =
+			append(executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)], ccipocr3.SeqNum(stateChange.SequenceNumber))
+	}
+	return executed, nil
+}
+
+func validateExecutionStateChangedEvent(
+	ev *ccip.EventExecutionStateChanged, rangesByChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) error {
+	if ev == nil {
+		return fmt.Errorf("execution state changed event is nil")
+	}
+
+	if _, ok := rangesByChain[ccipocr3.ChainSelector(ev.SourceChainSelector)]; !ok {
+		return fmt.Errorf("source chain of messages was not queries")
+	}
+
+	if !ccipocr3.SeqNum(ev.SequenceNumber).IsWithinRanges(rangesByChain[ccipocr3.ChainSelector(ev.SourceChainSelector)]) {
+		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
+	}
+
+	if ev.MessageHash == [32]byte{} {
+		return fmt.Errorf("empty message hash")
+	}
+
+	if ev.MessageID == [32]byte{} {
+		return fmt.Errorf("message ID is empty")
+	}
+
+	if ev.State == 0 {
+		return fmt.Errorf("state is zero")
+	}
+
+	return nil
+}
+
+func (a *SolanaAccessor) decodeLogsIntoSequences(
+	event string,
+	logs []logpollertypes.Log,
+) ([]types.Sequence, error) {
+	sequences := make([]types.Sequence, len(logs))
+
+	for idx := range logs {
+		sequences[idx] = types.Sequence{
+			Cursor: logpoller.FormatContractReaderCursor(logs[idx]),
+			Head: types.Head{
+				Height:    fmt.Sprint(logs[idx].BlockNumber),
+				Hash:      solana.PublicKey(logs[idx].BlockHash).Bytes(),
+				Timestamp: uint64(logs[idx].BlockTimestamp.Unix()), //nolint:gosec // BlockTimestamp can never be negative so it is safe to cast it to uint64
+			},
+		}
+
+		switch event {
+		case consts.EventNameCommitReportAccepted:
+			e := &ccip.EventCommitReportAccepted{}
+			// if the event is `EventCommitReportAccepted`, we need to handle it separately
+			derr := decodeCommitReportAcceptedEvent(logs[idx].Data, e)
+			if derr != nil {
+				return nil, derr
+			}
+			sequences[idx].Data = e
+		case consts.EventNameCCIPMessageSent:
+			e := &ccip.EventCCIPMessageSent{}
+			if err := bin.UnmarshalBorsh(e, logs[idx].Data); err != nil {
+				return nil, err
+			}
+			sequences[idx].Data = e
+		case consts.EventNameExecutionStateChanged:
+			e := &ccip.EventExecutionStateChanged{}
+			if err := bin.UnmarshalBorsh(e, logs[idx].Data); err != nil {
+				return nil, err
+			}
+			sequences[idx].Data = e
+		default:
+			return nil, fmt.Errorf("unsupported event %s", event)
+		}
+	}
+
+	return sequences, nil
+}
+
+func decodeCommitReportAcceptedEvent(data []byte, obj *ccip.EventCommitReportAccepted) error {
+	decoder := bin.NewBorshDecoder(data)
+
+	// Deserialize `Discriminator`:
+	err := decoder.Decode(&obj.Discriminator)
+	if err != nil {
+		return err
+	}
+
+	// Deserialize `Report` (optional):
+	{
+		ok, dErr := decoder.ReadBool()
+		if dErr != nil {
+			return dErr
+		}
+		if ok {
+			dErr = decoder.Decode(&obj.Report)
+			if dErr != nil {
+				return dErr
+			}
+		}
+	}
+	// Deserialize `PriceUpdates`:
+	err = decoder.Decode(&obj.PriceUpdates)
+	if err != nil {
+		return err
+	}
+	return nil
+}

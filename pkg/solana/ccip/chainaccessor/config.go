@@ -1,0 +1,290 @@
+package chainaccessor
+
+import (
+	"context"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"slices"
+
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	router "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
+	feequoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
+	rmnremote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/rmn_remote"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+)
+
+// https://github.com/smartcontractkit/chainlink-ccip/blob/7cae1b8434dd376eb70f2ddaace43093982f3a57/chains/solana/contracts/programs/rmn-remote/src/state.rs#L20-L27
+var globalCurseValue = []byte{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+
+// getOffRampConfig retrieves static, dynamic, commitOCR3, and execOCR3 configurations for the off-ramp contract
+func (a *SolanaAccessor) getOffRampConfig(ctx context.Context) (ccipocr3.OfframpConfig, error) {
+	offrampAddr, err := a.getBinding(consts.ContractNameOffRamp)
+	if err != nil {
+		return ccipocr3.OfframpConfig{}, fmt.Errorf("failed to get binding for offramp: %w", err)
+	}
+
+	config, err := a.getOfframpConfig(ctx)
+	if err != nil {
+		return ccipocr3.OfframpConfig{}, err
+	}
+
+	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx, offrampAddr)
+	if err != nil {
+		return ccipocr3.OfframpConfig{}, err
+	}
+
+	staticConfig := ccipocr3.OffRampStaticChainConfig{
+		ChainSelector:        ccipocr3.ChainSelector(config.SvmChainSelector),
+		GasForCallExactCheck: 0,
+		RmnRemote:            offrampRefAddress.RmnRemote.Bytes(),
+		TokenAdminRegistry:   []byte{}, // PDA dependent on the token address
+		NonceManager:         offrampRefAddress.Router.Bytes(),
+	}
+
+	dynamicConfig := ccipocr3.OffRampDynamicChainConfig{
+		FeeQuoter:                               offrampRefAddress.FeeQuoter.Bytes(),
+		PermissionLessExecutionThresholdSeconds: uint32(config.EnableManualExecutionAfter), // nolint:gosec // G115: value validated to be within uint32 max above
+		IsRMNVerificationDisabled:               true,
+		MessageInterceptor:                      []byte{}, // expected to be empty for solana
+	}
+
+	commitConfig := config.Ocr3[0]
+	commitOCR3Config := ccipocr3.OCRConfigResponse{
+		OCRConfig: ccipocr3.OCRConfig{
+			ConfigInfo: ccipocr3.ConfigInfo{
+				ConfigDigest:                   commitConfig.ConfigInfo.ConfigDigest,
+				F:                              commitConfig.ConfigInfo.F,
+				N:                              commitConfig.ConfigInfo.N,
+				IsSignatureVerificationEnabled: commitConfig.ConfigInfo.IsSignatureVerificationEnabled == 1,
+			},
+			Signers:      convertSignersType(commitConfig.Signers, commitConfig.ConfigInfo.N),
+			Transmitters: convertTransmittersType(commitConfig.Transmitters, commitConfig.ConfigInfo.N),
+		},
+	}
+
+	executeConfig := config.Ocr3[1]
+	executeOCR3Config := ccipocr3.OCRConfigResponse{
+		OCRConfig: ccipocr3.OCRConfig{
+			ConfigInfo: ccipocr3.ConfigInfo{
+				ConfigDigest:                   executeConfig.ConfigInfo.ConfigDigest,
+				F:                              executeConfig.ConfigInfo.F,
+				N:                              executeConfig.ConfigInfo.N,
+				IsSignatureVerificationEnabled: executeConfig.ConfigInfo.IsSignatureVerificationEnabled == 1,
+			},
+			Signers:      convertSignersType(executeConfig.Signers, executeConfig.ConfigInfo.N),
+			Transmitters: convertTransmittersType(executeConfig.Transmitters, executeConfig.ConfigInfo.N),
+		},
+	}
+
+	return ccipocr3.OfframpConfig{
+		CommitLatestOCRConfig: commitOCR3Config,
+		ExecLatestOCRConfig:   executeOCR3Config,
+		StaticConfig:          staticConfig,
+		DynamicConfig:         dynamicConfig,
+	}, nil
+}
+
+func convertSignersType(signers [16][20]uint8, n uint8) [][]byte {
+	newSigners := make([][]byte, 0, n)
+	for i := range n {
+		newSigners = append(newSigners, signers[i][:])
+	}
+	return newSigners
+}
+
+func convertTransmittersType(transmitters [16][32]uint8, n uint8) [][]byte {
+	newTransmitters := make([][]byte, 0, n)
+	for i := range n {
+		newTransmitters = append(newTransmitters, transmitters[i][:])
+	}
+	return newTransmitters
+}
+
+// getOffRampSourceChainConfigs retrieves source chain configurations from the off-ramp contract
+func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, error) {
+	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors)
+	offrampAddr, err := a.getBinding(consts.ContractNameOffRamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get binding for offramp: %w", err)
+	}
+
+	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors, "offrampAddr", offrampAddr.String())
+
+	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx, offrampAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors, "offrampAddr", offrampAddr.String())
+
+	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
+	for _, selector := range sourceChainSelectors {
+		sourceChainPDA, err := a.pdaCache.offrampSourceChain(uint64(selector), offrampAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate offramp source chain config PDA: %w", err)
+		}
+
+		a.lggr.Debugw("fetching source chain config", "sourceChainSelector", selector, "offramp", offrampAddr.String(), "sourceChainPDA", sourceChainPDA.String())
+
+		var sourceChain offramp.SourceChain
+		err = a.client.GetAccountDataBorshInto(ctx, sourceChainPDA, &sourceChain)
+		// The plugin is built with EVM behaviour in mind: if account is not found insert entry for chain with source chain config disabled
+		if errors.Is(err, rpc.ErrNotFound) {
+			sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+				IsEnabled: false,
+			}
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch source chain config for selector %d: %w", selector, err)
+		}
+
+		a.lggr.Debugw("fetching source chain config", "sourceChainSelector", selector, "offramp", offrampAddr.String(), "sourceChainPDA", sourceChainPDA.String(), "sourceChain", sourceChain)
+
+		onRampBytes := sourceChain.Config.OnRamp.Bytes[:sourceChain.Config.OnRamp.Len]
+
+		sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+			Router:                    offrampRefAddress.Router.Bytes(),
+			IsEnabled:                 sourceChain.Config.IsEnabled,
+			IsRMNVerificationDisabled: sourceChain.Config.IsRmnVerificationDisabled,
+			MinSeqNr:                  sourceChain.State.MinSeqNr,
+			OnRamp:                    ccipocr3.UnknownAddress(onRampBytes),
+		}
+	}
+	return sourceChainConfigs, nil
+}
+
+// getFeeQuoterStaticConfig retrieves static configuration from the fee quoter contract
+func (a *SolanaAccessor) getFeeQuoterStaticConfig(ctx context.Context) (ccipocr3.FeeQuoterStaticConfig, error) {
+	// Validate fee quoter binding exists
+	_, err := a.getBinding(consts.ContractNameFeeQuoter)
+	if err != nil {
+		return ccipocr3.FeeQuoterStaticConfig{}, fmt.Errorf("failed to get binding for fee quoter: %w", err)
+	}
+	configPDA := a.pdaCache.feeQuoterConfig()
+
+	var cfg feequoter.Config
+	err = a.client.GetAccountDataBorshInto(ctx, configPDA, &cfg)
+	if err != nil {
+		return ccipocr3.FeeQuoterStaticConfig{}, fmt.Errorf("failed to get fee quoter config account: %w", err)
+	}
+	return ccipocr3.FeeQuoterStaticConfig{
+		MaxFeeJuelsPerMsg: ccipocr3.NewBigInt(cfg.MaxFeeJuelsPerMsg.BigInt()),
+		LinkToken:         cfg.LinkTokenMint.Bytes(),
+		// Value not used for Solana, defaulting to 0
+		StalenessThreshold: 0,
+	}, nil
+}
+
+// getOnRampDynamicConfig retrieves dynamic configuration from the on-ramp contract
+func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.OnRampDynamicConfig, error) {
+	// Validate router binding exists
+	_, err := a.getBinding(consts.ContractNameRouter)
+	if err != nil {
+		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
+	}
+	configPDA := a.pdaCache.routerConfig()
+
+	var cfg router.Config
+	err = a.client.GetAccountDataBorshInto(ctx, configPDA, &cfg)
+	if err != nil {
+		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get fee quoter config account: %w", err)
+	}
+	return ccipocr3.OnRampDynamicConfig{
+		FeeQuoter:              cfg.FeeQuoter.Bytes(),
+		ReentrancyGuardEntered: false,
+		MessageInterceptor:     []byte{}, // expected to be empty for Solana
+		FeeAggregator:          cfg.FeeAggregator.Bytes(),
+		AllowListAdmin:         cfg.Owner.Bytes(),
+	}, nil
+}
+
+// getOnRampDestChainConfig retrieves destination chain configuration from the on-ramp contract
+func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccipocr3.ChainSelector) (ccipocr3.OnRampDestChainConfig, error) {
+	routerAddr, err := a.getBinding(consts.ContractNameRouter)
+	if err != nil {
+		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
+	}
+
+	destChainStatePDA, err := a.pdaCache.routerDestChain(uint64(dest), routerAddr)
+	if err != nil {
+		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to fetch dest chain state PDA from cache: %w", err)
+	}
+
+	var destChain router.DestChain
+	err = a.client.GetAccountDataBorshInto(ctx, destChainStatePDA, &destChain)
+	if err != nil {
+		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get destination chain config account: %w", err)
+	}
+
+	return ccipocr3.OnRampDestChainConfig{
+		SequenceNumber:   destChain.State.SequenceNumber,
+		AllowListEnabled: destChain.Config.AllowListEnabled,
+		Router:           routerAddr.Bytes(),
+	}, nil
+}
+
+// getCurseInfo retrieves curse information for RMN verification
+func (a *SolanaAccessor) getCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, error) {
+	// Validate the RMN Remote contract binding exists
+	_, err := a.getBinding(consts.ContractNameRMNRemote)
+	if err != nil {
+		return ccipocr3.CurseInfo{}, fmt.Errorf("failed to get binding for router: %w", err)
+	}
+	cursePDA := a.pdaCache.rmnRemoteCurse()
+
+	var curses rmnremote.Curses
+	err = a.client.GetAccountDataBorshInto(ctx, cursePDA, &curses)
+	if err != nil {
+		return ccipocr3.CurseInfo{}, fmt.Errorf("failed to get rmn remote curses account: %w", err)
+	}
+
+	cursedChains := make(map[ccipocr3.ChainSelector]bool)
+	globalCurse := false
+	for _, curse := range curses.CursedSubjects {
+		if slices.Equal(curse.Value[:], globalCurseValue) {
+			globalCurse = true
+			continue
+		}
+		chainSel := binary.LittleEndian.Uint64(curse.Value[:])
+		cursedChains[ccipocr3.ChainSelector(chainSel)] = true
+	}
+
+	return ccipocr3.CurseInfo{
+		CursedSourceChains: cursedChains,
+		CursedDestination:  false, // TODO: how do we read cursed subjects to determine this value?
+		GlobalCurse:        globalCurse,
+	}, nil
+}
+
+func (a *SolanaAccessor) getOfframpConfig(ctx context.Context) (offramp.Config, error) {
+	configPDA := a.pdaCache.offampConfigPDA()
+
+	var config offramp.Config
+	err := a.client.GetAccountDataBorshInto(ctx, configPDA, &config)
+	if err != nil {
+		return offramp.Config{}, fmt.Errorf("failed to get offramp reference addresses account: %w", err)
+	}
+	return config, nil
+}
+
+func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context, offrampAddr solana.PublicKey) (offramp.ReferenceAddresses, error) {
+	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String())
+	refAddrPDA := a.pdaCache.offrampRefAddresses()
+
+	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String(), "refAddrPDA", refAddrPDA.String())
+
+	var refAddreses offramp.ReferenceAddresses
+	err := a.client.GetAccountDataBorshInto(ctx, refAddrPDA, &refAddreses)
+	if err != nil {
+		return offramp.ReferenceAddresses{}, fmt.Errorf("failed to get offramp reference addresses account: %w", err)
+	}
+
+	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String(), "refAddrPDA", refAddrPDA.String(), "refAddreses", refAddreses)
+	return refAddreses, nil
+}
