@@ -72,6 +72,9 @@ func ParseProgramLogs(logs []string) []types.ProgramOutput {
 			}
 
 			output.Truncated = true
+
+			// return early if truncated logs are encountered
+			return instLogs
 		} else {
 			matches := invokeMatcher.FindStringSubmatch(log)
 
