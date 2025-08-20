@@ -25,7 +25,7 @@ declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
 pub mod keystone_forwarder {
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::{program::KeystoneForwarder, utils::report_size_ok};
+    use crate::utils::report_size_ok;
 
     use super::*;
 
