@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250718211650-37ca415e72a0
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250819172412-352e0d5adbc8
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250819172412-352e0d5adbc8
 	github.com/smartcontractkit/chainlink/v2 v2.26.0-debug-tracing.0.20250819172412-352e0d5adbc8
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
