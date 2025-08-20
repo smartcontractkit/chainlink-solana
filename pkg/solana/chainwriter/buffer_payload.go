@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -34,7 +34,7 @@ func FindCreateBufferInstructionsMethod(id string) (func(context.Context, any, s
 // - Updates the args to clear out the raw report field which the buffer is used for
 func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.AccountMetaSlice, programID, feePayer solana.PublicKey) ([]solana.Instruction, solana.Instruction, solana.AccountMetaSlice, any, error) {
 	// Max 64 chunks is supported by the CCIP execution report buffer because of the bitmap used to track already uploaded chunks
-	// TODO: Add link to chainlink-ccip code with this limit once merged to develop
+	// https://github.com/smartcontractkit/chainlink-ccip/blob/c36be4fc94127a780c0146714ac89c93b6f906f7/chains/solana/contracts/programs/ccip-offramp/src/instructions/v1/buffering.rs#L124
 	const maxNumChunks = 64
 
 	var execCallArgs ccipsolana.SVMExecCallArgs
@@ -60,10 +60,8 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 		return nil, nil, nil, nil, fmt.Errorf("failed to calculate offramp condig PDA: %w", err)
 	}
 
-	ccip_offramp.ProgramID = programID
-
 	// Create empty buffer instruction to calculate an accurate chunk size
-	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, reportLen, []byte{}, 0, 1, bufferPDA, offrampConfigPDA, feePayer)
+	emptyBufferIx, err := buildBufferExecutionReportIx(bufferID, reportLen, []byte{}, 0, 1, bufferPDA, offrampConfigPDA, feePayer, programID)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to build empty buffer instruction: %w", err)
 	}
@@ -79,7 +77,7 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	bufferIxs := make([]solana.Instruction, 0, len(chunks))
 
 	for i, chunkPayload := range chunks {
-		ix, ixErr := buildBufferExecutionReportIx(bufferID, reportLen, chunkPayload, uint8(i), uint8(len(chunks)), bufferPDA, offrampConfigPDA, feePayer) //nolint:gosec // number of chunks is validated to be within uint8 max above
+		ix, ixErr := buildBufferExecutionReportIx(bufferID, reportLen, chunkPayload, uint8(i), uint8(len(chunks)), bufferPDA, offrampConfigPDA, feePayer, programID) //nolint:gosec // number of chunks is validated to be within uint8 max above
 		if ixErr != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to build buffer instruction: %w", ixErr)
 		}
@@ -98,14 +96,19 @@ func CCIPExecutionReportBuffer(ctx context.Context, args any, accounts solana.Ac
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to build close execution report buffer instruction: %w", err)
 	}
+	closeBufferData, err := closeBufferIx.Data()
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to encode close buffer instruction data: %w", err)
+	}
+	closeBufferSolanaIx := solana.NewInstruction(programID, closeBufferIx.Accounts(), closeBufferData)
 
 	// Transform args to clear out the report since the buffer will be used instead
 	execCallArgs.Report = []byte{}
 
-	return bufferIxs, closeBufferIx, accounts, execCallArgs, nil
+	return bufferIxs, closeBufferSolanaIx, accounts, execCallArgs, nil
 }
 
-func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayload []byte, index uint8, numChunks uint8, bufferPDA, offrampConfigPDA, feePayer solana.PublicKey) (solana.Instruction, error) {
+func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayload []byte, index uint8, numChunks uint8, bufferPDA, offrampConfigPDA, feePayer, programID solana.PublicKey) (solana.Instruction, error) {
 	ix, ixErr := ccip_offramp.NewBufferExecutionReportInstruction(
 		bufferID,
 		reportLen,
@@ -119,7 +122,12 @@ func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayloa
 	if ixErr != nil {
 		return nil, fmt.Errorf("failed to build buffer instruction: %w", ixErr)
 	}
-	return ix, nil
+	data, dataErr := ix.Data()
+	if dataErr != nil {
+		return nil, fmt.Errorf("failed to encode instruction data: %w", ixErr)
+	}
+	solanaIx := solana.NewInstruction(programID, ix.Accounts(), data)
+	return solanaIx, nil
 }
 
 // sendBufferInstructions handles building transactions, queueing them, and marking them with the appropriate dependencies

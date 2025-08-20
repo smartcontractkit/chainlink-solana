@@ -74,15 +74,11 @@ func (obj *Data) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 type TestStruct struct {
 	Idx                 uint64
 	Bump                uint8
-	Padding0            [7]uint8
 	Field               int32
-	Padding1            [4]uint8
 	OracleId            uint8
-	Padding2            [15]uint8
 	OracleIds           [32]uint8
 	Accounts            [2][32]uint8
-	DifferentField      [32]uint8
-	Padding3            [8]uint8
+	DifferentField      string
 	BigField            ag_binary.Int128
 	AccountStruct       AccountStruct
 	NestedDynamicStruct MidLevelDynamicTestStruct
@@ -107,28 +103,13 @@ func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `Padding0` param:
-	err = encoder.Encode(obj.Padding0)
-	if err != nil {
-		return err
-	}
 	// Serialize `Field` param:
 	err = encoder.Encode(obj.Field)
 	if err != nil {
 		return err
 	}
-	// Serialize `Padding1` param:
-	err = encoder.Encode(obj.Padding1)
-	if err != nil {
-		return err
-	}
 	// Serialize `OracleId` param:
 	err = encoder.Encode(obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding2` param:
-	err = encoder.Encode(obj.Padding2)
 	if err != nil {
 		return err
 	}
@@ -144,11 +125,6 @@ func (obj TestStruct) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	}
 	// Serialize `DifferentField` param:
 	err = encoder.Encode(obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Serialize `Padding3` param:
-	err = encoder.Encode(obj.Padding3)
 	if err != nil {
 		return err
 	}
@@ -199,28 +175,13 @@ func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
-	if err != nil {
-		return err
-	}
 	// Deserialize `Field`:
 	err = decoder.Decode(&obj.Field)
 	if err != nil {
 		return err
 	}
-	// Deserialize `Padding1`:
-	err = decoder.Decode(&obj.Padding1)
-	if err != nil {
-		return err
-	}
 	// Deserialize `OracleId`:
 	err = decoder.Decode(&obj.OracleId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding2`:
-	err = decoder.Decode(&obj.Padding2)
 	if err != nil {
 		return err
 	}
@@ -236,11 +197,6 @@ func (obj *TestStruct) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `DifferentField`:
 	err = decoder.Decode(&obj.DifferentField)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Padding3`:
-	err = decoder.Decode(&obj.Padding3)
 	if err != nil {
 		return err
 	}

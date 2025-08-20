@@ -33,11 +33,15 @@ packages:
           filename: "Estimator.go"
   github.com/smartcontractkit/chainlink-solana/pkg/solana/txm:
     interfaces:
-      SimpleKeystore:
+      TxManager:
+  github.com/smartcontractkit/chainlink-common/pkg/types/core:
+    interfaces:
+      Keystore:
         config:
+          dir: "pkg/solana/txm/mocks"
           filename: simple_keystore.go
           case: underscore
-      TxManager:
+          mockname: SimpleKeystore
   github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller:
     interfaces:
       RPCClient:
