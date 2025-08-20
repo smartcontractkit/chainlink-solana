@@ -1,0 +1,48 @@
+package codec
+
+import (
+	"encoding/binary"
+	"fmt"
+
+	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+)
+
+type addressCodec struct{}
+
+var _ ccipocr3.AddressCodec = &addressCodec{}
+
+func NewAddressCodec() ccipocr3.AddressCodec {
+	return addressCodec{}
+}
+
+func (a addressCodec) AddressBytesToString(addr ccipocr3.UnknownAddress, _ ccipocr3.ChainSelector) (string, error) {
+	if len(addr) != solana.PublicKeyLength {
+		return "", fmt.Errorf("invalid SVM address length, expected %v, got %d", solana.PublicKeyLength, len(addr))
+	}
+	return solana.PublicKeyFromBytes(addr).String(), nil
+}
+
+
+func (a addressCodec) AddressStringToBytes(addr string, _ ccipocr3.ChainSelector) (ccipocr3.UnknownAddress, error) {
+	pk, err := solana.PublicKeyFromBase58(addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode SVM address '%s': %w", addr, err)
+	}
+	return pk.Bytes(), nil
+}
+
+func (a addressCodec) OracleIDAsAddressBytes(oracleID uint8) ([]byte, error) {
+	addr := make([]byte, solana.PublicKeyLength)
+
+	// write oracleID into addr in little endian, since solana is little endian
+	binary.LittleEndian.PutUint32(addr, uint32(oracleID))
+
+	// TODO: is it alright if the pub key is off the curve?
+	return solana.PublicKeyFromBytes(addr).Bytes(), nil
+}
+
+func (a addressCodec) TransmitterBytesToString(addr ccipocr3.UnknownAddress, chainSel ccipocr3.ChainSelector) (string, error) {
+	// Transmitter accounts are addresses
+	return a.AddressBytesToString(addr, chainSel)
+}
