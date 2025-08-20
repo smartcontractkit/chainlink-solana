@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.24.4
+go 1.24.5
 
 require (
 	github.com/cometbft/cometbft v0.38.17
@@ -10,7 +10,7 @@ require (
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/gagliardetto/utilz v0.1.1
-	github.com/go-viper/mapstructure/v2 v2.3.0
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/jackc/pgx/v4 v4.18.3
@@ -19,14 +19,14 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250819213341-a34a005d3129
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250804184440-c0506474fc44
-	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250813154823-1652ea0f0500
+	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
-	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250806152407-159881c7589c
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250717121125-2350c82883e2
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250729142306-508e798f6a5d
+	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/freeport v0.1.1
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
 	github.com/stretchr/testify v1.10.0
@@ -168,7 +168,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250324211829-b45e905df463 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
