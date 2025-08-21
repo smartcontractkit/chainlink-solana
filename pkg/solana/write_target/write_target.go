@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
-	df "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/monitoring/pb/data-feeds/on-chain/registry"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/report/platform/processor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -34,10 +33,6 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 	cfg := chain.Config().WF()
 
 	// TODO metrics used to initialize product processors
-	_, err := df.NewMetrics()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new registry metrics: %w", err)
-	}
 
 	emitter := writetarget.NewMonitorEmitter(lggr)
 
