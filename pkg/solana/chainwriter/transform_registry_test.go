@@ -17,8 +17,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	ccip_common_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_common"
+	ccip_offramp_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_offramp"
+	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/mock"
@@ -106,7 +107,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 	requiredMessagingAccountsLen := 2
 	nonPoolTTAccountsLen := 4
 
-	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
+	mandatoryAccountsLen := cap(ccip_offramp_v0_1_0.NewExecuteInstructionBuilder().AccountMetaSlice)
 
 	t.Run("CCIPExecute", func(t *testing.T) {
 		tableMap := make(map[string]map[string][]*solana.AccountMeta)
@@ -545,7 +546,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 
 		requiredMessagingAccountsLen := 2
 		nonPoolTTAccountsLen := 4
-		mandatoryExecuteAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
+		mandatoryExecuteAccountsLen := cap(ccip_offramp_v0_1_1.NewExecuteInstructionBuilder().AccountMetaSlice)
 
 		t.Run("ArgsTransform includes token indexes and sets the corresponding IsWritable flag", func(t *testing.T) {
 			// Mock the account derivation simulations
@@ -978,10 +979,10 @@ func mockExecuteAccountDerivation(t *testing.T, rw *clientmocks.ReaderWriter, of
 
 func mockGatherBasicInfoStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string) {
 	basicAccountsLen := 3
-	toSave := make([]ccip_offramp.CcipAccountMeta, 0, basicAccountsLen)
+	toSave := make([]ccip_offramp_v0_1_1.CcipAccountMeta, 0, basicAccountsLen)
 	basicAccounts := CreateTestPubKeys(t, basicAccountsLen)
 	for _, addr := range basicAccounts {
-		toSave = append(toSave, ccip_offramp.CcipAccountMeta{Pubkey: addr})
+		toSave = append(toSave, ccip_offramp_v0_1_1.CcipAccountMeta{Pubkey: addr})
 	}
 	// Proper ask again accounts do not have to be returned since the follow up derivation call mock does not check them. Just can't return empty accounts
 	askAgain := toSave[0:]
@@ -991,13 +992,13 @@ func mockGatherBasicInfoStage(t *testing.T, rw *clientmocks.ReaderWriter, offram
 
 func mockMainAccountListStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string, userMessagingAccounts []solana.PublicKey, logicReceiver solana.PublicKey, ttAccounts []tokenTransferAccounts) {
 	requiredAccounts := CreateTestPubKeys(t, 9)
-	toSave := []ccip_offramp.CcipAccountMeta{}
+	toSave := []ccip_offramp_v0_1_1.CcipAccountMeta{}
 	for _, addr := range requiredAccounts {
-		toSave = append(toSave, ccip_offramp.CcipAccountMeta{Pubkey: addr})
+		toSave = append(toSave, ccip_offramp_v0_1_1.CcipAccountMeta{Pubkey: addr})
 	}
 
 	if !logicReceiver.IsZero() {
-		toSave = append(toSave, ccip_offramp.CcipAccountMeta{
+		toSave = append(toSave, ccip_offramp_v0_1_1.CcipAccountMeta{
 			Pubkey:     logicReceiver,
 			IsSigner:   false,
 			IsWritable: true,
@@ -1005,7 +1006,7 @@ func mockMainAccountListStage(t *testing.T, rw *clientmocks.ReaderWriter, offram
 		offramp := solana.MustPublicKeyFromBase58(offrampStr)
 		externalExecutionConfig, _, err := state.FindExternalExecutionConfigPDA(logicReceiver, offramp)
 		require.NoError(t, err)
-		toSave = append(toSave, ccip_offramp.CcipAccountMeta{
+		toSave = append(toSave, ccip_offramp_v0_1_1.CcipAccountMeta{
 			Pubkey:     externalExecutionConfig,
 			IsSigner:   false,
 			IsWritable: false,
@@ -1018,7 +1019,7 @@ func mockMainAccountListStage(t *testing.T, rw *clientmocks.ReaderWriter, offram
 		toSave = append(toSave, userMessagingCCIPMetas...)
 	}
 	// Proper ask again accounts do not have to be returned since the follow up derivation call mock does not check them. Just can't return empty accounts
-	askAgain := []ccip_offramp.CcipAccountMeta{}
+	askAgain := []ccip_offramp_v0_1_1.CcipAccountMeta{}
 	nextStage := ""
 	if len(ttAccounts) > 0 {
 		askAgain = toSave[:1]
@@ -1032,15 +1033,15 @@ func mockRetrieveLUTStage(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr
 	if len(ttAccounts) == 0 {
 		return
 	}
-	askAgain := []ccip_offramp.CcipAccountMeta{{Pubkey: GetRandomPubKey(t)}}
+	askAgain := []ccip_offramp_v0_1_1.CcipAccountMeta{{Pubkey: GetRandomPubKey(t)}}
 	// Lookup table stage does not return accounts or lookup tables to save. Just processes accounts to ask again with.
-	log := buildEncodedResponse(t, offrampStr, []ccip_offramp.CcipAccountMeta{}, askAgain, nil, "RetrieveTokenLookupTables", "TokenTransferStaticAccounts/0/0")
+	log := buildEncodedResponse(t, offrampStr, []ccip_offramp_v0_1_1.CcipAccountMeta{}, askAgain, nil, "RetrieveTokenLookupTables", "TokenTransferStaticAccounts/0/0")
 	rw.On("SimulateTx", mock.Anything, mock.Anything, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true}).Return(&rpc.SimulateTransactionResult{Logs: []string{log}}, nil).Once()
 }
 
 func mockTokenTransferStages(t *testing.T, rw *clientmocks.ReaderWriter, offrampStr string, ttAccounts []tokenTransferAccounts, lookupTables []solana.PublicKey) {
 	for i, ttAccount := range ttAccounts {
-		toSave := []ccip_offramp.CcipAccountMeta{
+		toSave := []ccip_offramp_v0_1_1.CcipAccountMeta{
 			{
 				Pubkey: ttAccount.offrampPoolSigner,
 			},
@@ -1057,24 +1058,24 @@ func mockTokenTransferStages(t *testing.T, rw *clientmocks.ReaderWriter, offramp
 			},
 		}
 		for _, poolKey := range ttAccount.poolKeys {
-			toSave = append(toSave, ccip_offramp.CcipAccountMeta{
+			toSave = append(toSave, ccip_offramp_v0_1_1.CcipAccountMeta{
 				Pubkey:     poolKey,
 				IsWritable: true,
 			})
 		}
-		var askAgain []ccip_offramp.CcipAccountMeta
+		var askAgain []ccip_offramp_v0_1_1.CcipAccountMeta
 		nextStage := ""
 		if i < len(ttAccounts)-1 {
 			nextStage = "TokenTransferStaticAccounts/" + strconv.Itoa(i+1) + "/0"
-			askAgain = []ccip_offramp.CcipAccountMeta{{Pubkey: ttAccounts[i+1].mint}}
+			askAgain = []ccip_offramp_v0_1_1.CcipAccountMeta{{Pubkey: ttAccounts[i+1].mint}}
 		}
 		log := buildEncodedResponse(t, offrampStr, toSave, askAgain, []solana.PublicKey{lookupTables[i]}, "TokenTransferStaticAccounts/"+strconv.Itoa(i)+"/0", nextStage)
 		rw.On("SimulateTx", mock.Anything, mock.Anything, &rpc.SimulateTransactionOpts{SigVerify: false, ReplaceRecentBlockhash: true}).Return(&rpc.SimulateTransactionResult{Logs: []string{log}}, nil).Once()
 	}
 }
 
-func buildEncodedResponse(t *testing.T, offramp string, toSave, askAgainWith []ccip_offramp.CcipAccountMeta, lookupTables []solana.PublicKey, currentStage, nextStage string) string {
-	response := ccip_offramp.DeriveAccountsResponse{
+func buildEncodedResponse(t *testing.T, offramp string, toSave, askAgainWith []ccip_offramp_v0_1_1.CcipAccountMeta, lookupTables []solana.PublicKey, currentStage, nextStage string) string {
+	response := ccip_offramp_v0_1_1.DeriveAccountsResponse{
 		AccountsToSave:     toSave,
 		AskAgainWith:       askAgainWith,
 		CurrentStage:       currentStage,
@@ -1091,7 +1092,7 @@ func buildEncodedResponse(t *testing.T, offramp string, toSave, askAgainWith []c
 
 func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminRegistryAddr solana.PublicKey) {
 	lookupTablePubkey := GetRandomPubKey(t)
-	tokenAdminRegistry := ccip_common.TokenAdminRegistry{
+	tokenAdminRegistry := ccip_common_v0_1_0.TokenAdminRegistry{
 		Version:              1,
 		Administrator:        GetRandomPubKey(t),
 		PendingAdministrator: GetRandomPubKey(t),
@@ -1109,7 +1110,7 @@ func mockWritableIndexes(t *testing.T, rw *clientmocks.ReaderWriter, tokenAdminR
 func mockFetchFeeQuoterAddress(t *testing.T, rw *clientmocks.ReaderWriter, feeQuoterAddr, offrampAddr solana.PublicKey) {
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("reference_addresses")}, offrampAddr)
 	require.NoError(t, err)
-	referenceAddresses := ccip_offramp.ReferenceAddresses{
+	referenceAddresses := ccip_offramp_v0_1_1.ReferenceAddresses{
 		Version:            1,
 		Router:             solana.PublicKey{},
 		FeeQuoter:          feeQuoterAddr,

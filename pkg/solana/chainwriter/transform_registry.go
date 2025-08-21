@@ -17,8 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
+	ccip_common_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_common"
+	ccip_offramp_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_offramp"
+	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -67,7 +68,7 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 	}
 
 	options = append(options, txmutils.SetEstimateComputeUnitLimit(false), txmutils.SetComputeUnitLimit(computeUnits))
-	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
+	mandatoryAccountsLen := cap(ccip_offramp_v0_1_0.NewExecuteInstructionBuilder().AccountMetaSlice)
 
 	if len(accounts) < mandatoryAccountsLen {
 		return nil, nil, nil, nil, fmt.Errorf("encountered unexpected number of accounts, expected at least %d, got %d", mandatoryAccountsLen, len(accounts))
@@ -148,11 +149,11 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 	}
 	merkleRoot := argsTransformed.Info.MerkleRoots[0].MerkleRoot
 
-	var messageAccounts []ccip_offramp.CcipAccountMeta
+	var messageAccounts []ccip_offramp_v0_1_1.CcipAccountMeta
 	if !message.Receiver.IsZeroOrEmpty() {
 		logicReceiver := solana.PublicKeyFromBytes(message.Receiver)
 		// Append logic receiver as the first messaging account for derivation
-		messageAccounts = append(messageAccounts, ccip_offramp.CcipAccountMeta{
+		messageAccounts = append(messageAccounts, ccip_offramp_v0_1_1.CcipAccountMeta{
 			Pubkey:     logicReceiver,
 			IsSigner:   false,
 			IsWritable: false,
@@ -173,11 +174,11 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 	}
 
 	// Extract token transfers
-	var tokenTransfers []ccip_offramp.TokenTransferAndOffchainData
+	var tokenTransfers []ccip_offramp_v0_1_1.TokenTransferAndOffchainData
 	var tokenReceiver solana.PublicKey
 	var messageTokenData [][]byte
 	if len(message.TokenAmounts) > 0 {
-		tokenTransfers = make([]ccip_offramp.TokenTransferAndOffchainData, 0, len(message.TokenAmounts))
+		tokenTransfers = make([]ccip_offramp_v0_1_1.TokenTransferAndOffchainData, 0, len(message.TokenAmounts))
 		if len(argsTransformed.ExtraData.DestExecDataDecoded) != len(message.TokenAmounts) {
 			return nil, nil, nil, nil, fmt.Errorf("unexpected number of DestExecData encountered. expect the same number as token transfers %d, got %d", len(message.TokenAmounts), len(argsTransformed.ExtraData.DestExecDataDecoded))
 		}
@@ -199,11 +200,11 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 			if tokenAmount.Amount.Int.Sign() < 0 {
 				return nil, nil, nil, nil, fmt.Errorf("negative amount for token: %s", destTokenAddress.String())
 			}
-			tokenTransfers = append(tokenTransfers, ccip_offramp.TokenTransferAndOffchainData{
-				Transfer: ccip_offramp.Any2SVMTokenTransfer{
+			tokenTransfers = append(tokenTransfers, ccip_offramp_v0_1_1.TokenTransferAndOffchainData{
+				Transfer: ccip_offramp_v0_1_1.Any2SVMTokenTransfer{
 					SourcePoolAddress: tokenAmount.SourcePoolAddress,
 					DestTokenAddress:  destTokenAddress,
-					Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
+					Amount:            ccip_offramp_v0_1_1.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
 					ExtraData:         tokenAmount.ExtraData,
 					DestGasAmount:     destGasAmount,
 				},
@@ -221,7 +222,7 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 		tokenReceiver = tokenReceivers[0].PublicKey
 	}
 
-	params := ccip_offramp.DeriveAccountsExecuteParams{
+	params := ccip_offramp_v0_1_1.DeriveAccountsExecuteParams{
 		ExecuteCaller:       transmitter,
 		MessageAccounts:     messageAccounts,
 		SourceChainSelector: uint64(sourceChainSel),
@@ -421,7 +422,7 @@ func appendTokenTransferAccounts(tokenAccountsRequired bool, accounts solana.Acc
 	return accounts, tokenIndexes, nil
 }
 
-func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp.DeriveAccountsExecuteParams, messageTokenData [][]byte, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
+func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp_v0_1_1.DeriveAccountsExecuteParams, messageTokenData [][]byte, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
 	blockhash, err := client.LatestBlockhash(ctx)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error fetching latest blockhash: %w", err)
@@ -437,14 +438,14 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 	var derivedAccounts, accountsToAskWith solana.AccountMetaSlice
 	lookupTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 	tokenIndexes := []uint8{}
-	mandatoryAccountsLen := cap(ccip_offramp.NewExecuteInstructionBuilder().AccountMetaSlice)
+	mandatoryAccountsLen := cap(ccip_offramp_v0_1_1.NewExecuteInstructionBuilder().AccountMetaSlice)
 	stage := "Start"
 	ttAccountsMatcher, err := regexp.Compile(`^TokenTransferStaticAccounts/\d+/0$`)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to compile token transfer stage matcher: %w", err)
 	}
 	for {
-		deriveAccountsIxRaw := ccip_offramp.NewDeriveAccountsExecuteInstruction(params, stage, config)
+		deriveAccountsIxRaw := ccip_offramp_v0_1_1.NewDeriveAccountsExecuteInstruction(params, stage, config)
 		deriveAccountsIxRaw.AccountMetaSlice = append(deriveAccountsIxRaw.AccountMetaSlice, accountsToAskWith...)
 		deriveAccountsIx, err := deriveAccountsIxRaw.ValidateAndBuild()
 		if err != nil {
@@ -468,7 +469,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 		if res.Err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to simulate derive execute accounts transaction at stage %s. Err: %v, Logs: %v", stage, res.Err, res.Logs)
 		}
-		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
+		derivation, err := common.ExtractAnchorTypedReturnValue[ccip_offramp_v0_1_1.DeriveAccountsResponse](ctx, res.Logs, offrampStr)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to exract accounts from simulated transaction log: %w", err)
 		}
@@ -530,7 +531,7 @@ func fetchPoolLookupAccounts(ctx context.Context, client client.MultiClient, poo
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch token admin registry account: %w", err)
 		}
-		tokenAdminRegistry := ccip_common.TokenAdminRegistry{}
+		tokenAdminRegistry := ccip_common_v0_1_0.TokenAdminRegistry{}
 		err = bin.NewBorshDecoder(resp.GetBinary()).Decode(&tokenAdminRegistry)
 		if err != nil {
 			return nil, fmt.Errorf("failed to borsh decode token admin registry account: %w", err)
@@ -609,13 +610,13 @@ func getPoolChainConfig(sourceChainSelector, destTokenAddress []byte, poolProgra
 	return poolChainConfig, err
 }
 
-func ConvertToCCIPAccountMetas(metas solana.AccountMetaSlice) []ccip_offramp.CcipAccountMeta {
+func ConvertToCCIPAccountMetas(metas solana.AccountMetaSlice) []ccip_offramp_v0_1_1.CcipAccountMeta {
 	if len(metas) == 0 {
 		return nil
 	}
-	ccipMetas := make([]ccip_offramp.CcipAccountMeta, 0, len(metas))
+	ccipMetas := make([]ccip_offramp_v0_1_1.CcipAccountMeta, 0, len(metas))
 	for _, account := range metas {
-		ccipMetas = append(ccipMetas, ccip_offramp.CcipAccountMeta{
+		ccipMetas = append(ccipMetas, ccip_offramp_v0_1_1.CcipAccountMeta{
 			Pubkey:     account.PublicKey,
 			IsSigner:   account.IsSigner,
 			IsWritable: account.IsWritable,
@@ -624,7 +625,7 @@ func ConvertToCCIPAccountMetas(metas solana.AccountMetaSlice) []ccip_offramp.Cci
 	return ccipMetas
 }
 
-func ConvertToSolanaAccountMetas(metas []ccip_offramp.CcipAccountMeta) solana.AccountMetaSlice {
+func ConvertToSolanaAccountMetas(metas []ccip_offramp_v0_1_1.CcipAccountMeta) solana.AccountMetaSlice {
 	if len(metas) == 0 {
 		return nil
 	}
