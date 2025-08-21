@@ -279,10 +279,6 @@ func (c *TOMLConfig) ForwarderState() string {
 	return *c.Workflow.ForwarderState
 }
 
-func (c *TOMLConfig) LookupTable() string {
-	return *c.Workflow.LookupTable
-}
-
 func (c *TOMLConfig) GasLimitDefault() *uint64 {
 	return c.Workflow.GasLimitDefault
 }

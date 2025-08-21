@@ -315,15 +315,6 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 
 	// append remainings except for forwarderState + Authority
 	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts[2:]...)
-	/*	lookup := make(map[solana.PublicKey]solana.PublicKeySlice)
-		maps.Copy(lookup, ts.lookupTable)
-
-		for _, acc := range r.Inputs.RemainingAccounts {
-			inst.AccountMetaSlice = append(inst.AccountMetaSlice, acc)
-
-			lookup[ts.accounts.lookupTable] = append(lookup[ts.accounts.lookupTable], acc.PublicKey)
-		}
-	*/
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {
 		return nil, fmt.Errorf("failed build and validate report instruction: %w", err)
@@ -331,7 +322,6 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 
 	return solana.NewTransaction([]solana.Instruction{tx}, blockHash,
 		solana.TransactionPayer(ts.accounts.transmitter),
-	//	solana.TransactionAddressTables(lookup),
 	)
 }
 
@@ -455,11 +445,6 @@ func accountsFromConfig(cfg config.Workflow) (accounts, error) {
 	}
 
 	ret.transmitter, err = solana.PublicKeyFromBase58(cfg.FromAddress())
-	if err != nil {
-		return ret, err
-	}
-
-	ret.lookupTable, err = solana.PublicKeyFromBase58(cfg.LookupTable())
 	if err != nil {
 		return ret, err
 	}

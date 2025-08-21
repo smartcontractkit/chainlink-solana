@@ -88,7 +88,6 @@ type Workflow interface {
 	ForwarderAddress() string
 	FromAddress() string
 	ForwarderState() string
-	LookupTable() string
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
 	Local() bool // shows if workflow is run against local network
@@ -101,7 +100,6 @@ type WorkflowConfig struct {
 	ForwarderAddress  *string
 	FromAddress       *string
 	ForwarderState    *string
-	LookupTable       *string
 	GasLimitDefault   *uint64
 	TxAcceptanceState *commontypes.TransactionStatus
 	Enabled           bool
