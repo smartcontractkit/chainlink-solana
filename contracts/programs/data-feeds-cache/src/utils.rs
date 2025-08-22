@@ -1,4 +1,4 @@
-use std::{cell::RefMut, ops::DerefMut};
+use std::{cell::RefMut};
 
 use anchor_lang::{
     prelude::*,
