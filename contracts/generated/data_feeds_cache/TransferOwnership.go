@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// TransferOwnership is the `transferOwnership` instruction.
+// Step 1 of 2-step ownership process: propose a new owner
 type TransferOwnership struct {
 	ProposedOwner *ag_solanago.PublicKey
 
