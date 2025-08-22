@@ -18,13 +18,13 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250819171941-494b0aaa8f0a
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250819172412-352e0d5adbc8
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250819172412-352e0d5adbc8
-	github.com/smartcontractkit/chainlink/v2 v2.26.0-debug-tracing.0.20250819172412-352e0d5adbc8
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250821121906-52f5372c5da8
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20250821121906-52f5372c5da8
+	github.com/smartcontractkit/chainlink/v2 v2.26.0-debug-tracing.0.20250821121906-52f5372c5da8
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
@@ -362,7 +362,7 @@ require (
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2 // indirect
 	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0 // indirect
-	github.com/smartcontractkit/chainlink-evm v0.3.1 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.3.2 // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250818175541-3389ac08a563 // indirect
