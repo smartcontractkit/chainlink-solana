@@ -71,6 +71,8 @@ pub mod data_feeds_cache {
     }
 
     pub fn set_feed_admin(ctx: Context<SetFeedAdmin>, admin: Pubkey, is_admin: bool) -> Result<()> {
+        require_keys_neq!(admin, Pubkey::default(), DataCacheError::InvalidAddress);
+
         let mut state = ctx.accounts.state.load_mut()?;
         let mut changed = false;
 
@@ -101,8 +103,14 @@ pub mod data_feeds_cache {
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state.load_mut()?;
-        state.proposed_owner = proposed_owner;
+        require!(
+            proposed_owner != Pubkey::default()
+                && proposed_owner != state.owner
+                && proposed_owner != state.proposed_owner,
+            DataCacheError::InvalidProposedOwner
+        );
 
+        state.proposed_owner = proposed_owner;
         emit!(OwnershipTransfer {
             current_owner: state.owner,
             proposed_owner
@@ -689,6 +697,12 @@ pub mod data_feeds_cache {
             delete_permission_accounts.append(&mut temp_candidates_deletion)
         }
 
+        require_eq!(
+            delete_permission_accounts.len(),
+            delete_permission_account_infos.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
         for (i, permission_account) in delete_permission_accounts.iter().enumerate() {
             let curr_permission_account_info = &delete_permission_account_infos[i];
 
@@ -1047,6 +1061,12 @@ pub mod data_feeds_cache {
         ctx: Context<'_, '_, 'info, 'info, QueryValues<'info>>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<Vec<DecimalReport>> {
+        require_eq!(
+            data_ids.len(),
+            ctx.remaining_accounts.len(),
+            DataCacheError::ArrayLengthMismatch
+        );
+
         let mut reports = Vec::new();
 
         for (i, data_id) in data_ids.iter().enumerate() {
