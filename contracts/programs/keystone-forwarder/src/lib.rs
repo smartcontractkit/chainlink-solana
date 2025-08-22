@@ -1,12 +1,14 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{hash, keccak, secp256k1_recover::*};
+use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
 
 use common::{
     FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR,
     REPORT_CONTEXT_LEN, SIGNATURE_LEN, STATE_VERSION,
 };
 
-use events::{ConfigSet, InitializeEmit, OwnershipAcceptance, OwnershipTransfer, ReportProcessed};
+use events::{
+    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportProcessed,
+};
 
 use context::*;
 pub use error::*;
@@ -21,48 +23,76 @@ mod state;
 mod utils;
 
 declare_id!("whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz");
+
+/// Forwarder authenticates chainlink reports and relays them to designated receiver programs.
 #[program]
 pub mod keystone_forwarder {
+    use std::io::Cursor;
+
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
+
+    use crate::utils::{report_size_ok, ForwarderReport};
 
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        // store forwarder PDA bump for later
-        let (_, authority_nonce) = Pubkey::find_program_address(
-            &[b"forwarder", ctx.accounts.state.key().as_ref()],
-            &crate::ID,
-        );
+    // Receiver contract will implement this in Anchor (or equivalent in pure Rust)
+    // pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
+    // with the following declared accounts
+    //
+    // #[derive(Accounts)]
+    // pub struct OnReport<'info> {
+    //     // Note: a receiver program's on_report function does not necessarily need to directly authenticate the forwarder state.
+    //     // Instead, it indirectly verifies the correct state by enforcing that the forwarder_authority is authorized.
+    //     // WARNING: the FORWARDER_ID deployed in an environment may be different
+    //     // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    //     // the correct FORWARDER_ID to use
+    //     pub forwarder_state: Account<'info, ForwarderState>,
 
+    //     #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = cache_state.load()?.forwarder_id)]
+    //     pub forwarder_authority: Signer<'info>,
+
+    //     // remaining accounts
+    // }
+
+    /// Initializes a new Forwarder instance and stores data in its state account
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
-        state.authority_nonce = authority_nonce;
         state.owner = ctx.accounts.owner.key();
 
-        emit!(InitializeEmit {
+        emit!(ForwarderInitialize {
+            state: state.key(),
             owner: ctx.accounts.owner.key(),
-            authority_nonce
         });
 
         Ok(())
     }
 
+    /// Step 1 of 2-step ownership process: propose a new owner
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let state = &mut ctx.accounts.state;
-        let state_current_owner = state.owner;
+        require!(
+            proposed_owner != Pubkey::default()
+                && proposed_owner != state.owner
+                && proposed_owner != state.proposed_owner,
+            ForwarderError::InvalidProposedOwner
+        );
+
         state.proposed_owner = proposed_owner;
 
         emit!(OwnershipTransfer {
-            current_owner: state_current_owner,
+            state: state.key(),
+            current_owner: state.owner,
             proposed_owner: state.proposed_owner
         });
 
         Ok(())
     }
 
+    /// Step 2 of 2-step ownership process: accept ownership
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let state = &mut ctx.accounts.state;
         let state_previous_owner = state.owner;
@@ -70,6 +100,7 @@ pub mod keystone_forwarder {
         state.proposed_owner = Pubkey::default();
 
         emit!(OwnershipAcceptance {
+            state: state.key(),
             previous_owner: state_previous_owner,
             new_owner: state.owner
         });
@@ -77,6 +108,10 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
+    /// Initialize oracles config which describes the set of oracles which
+    /// are expected to sign a verified forwarder report. Many oracle config accounts
+    /// may exist for a forwarder because more than one DON may be allowed to sign
+    /// reports for a forwarder.
     pub fn init_oracles_config(
         ctx: Context<InitOraclesConfig>,
         don_id: u32,
@@ -86,9 +121,20 @@ pub mod keystone_forwarder {
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_init()?;
 
-        set_oracles_config(config, don_id, config_version, f, signer_addresses)
+        emit!(ConfigSet {
+            state: ctx.accounts.state.key(),
+            oracles_config: ctx.accounts.oracles_config.key(),
+            don_id,
+            config_version,
+            f,
+            signers: signer_addresses.clone(),
+        });
+
+        set_oracles_config(config, don_id, config_version, f, signer_addresses.clone())
     }
 
+    /// Updates oracles config under circumstances where the designated
+    /// signers or configuration parameters change
     pub fn update_oracles_config(
         ctx: Context<UpdateOraclesConfig>,
         don_id: u32,
@@ -98,9 +144,19 @@ pub mod keystone_forwarder {
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_mut()?;
 
+        emit!(ConfigSet {
+            state: ctx.accounts.state.key(),
+            oracles_config: ctx.accounts.oracles_config.key(),
+            don_id,
+            config_version,
+            f,
+            signers: signer_addresses.clone(),
+        });
+
         set_oracles_config(config, don_id, config_version, f, signer_addresses)
     }
 
+    /// Closes oracle config account
     pub fn close_oracles_config(
         _ctx: Context<CloseOraclesConfig>,
         _don_id: u32,
@@ -109,24 +165,27 @@ pub mod keystone_forwarder {
         Ok(())
     }
 
-    // data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+    /// The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report.
+    /// After verification it will create a PDA to store the execution state if it does not exist.
+    /// The ctx.remaining_accounts accounts are passed on to the receiver, alongside the forwarder state account
+    /// and forwarder authority signer.
+    /// Available space for receiver payload is ~ 297 bytes. However, many factors will affect
+    /// this number including adding more accounts in the ctx.remaining_accounts and/or using address
+    /// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
+    // data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
-        let num_signatures = data[0] as usize;
-        let min_data_size = 1 + num_signatures * SIGNATURE_LEN + REPORT_CONTEXT_LEN;
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
-        require_gt!(data.len(), min_data_size, ForwarderError::InvalidReport);
+        let num_signatures = data[0] as usize;
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
-        let f = oracles_config.f;
-        require_neq!(f, 0, ForwarderError::InvalidConfig);
-
         require_gte!(
             num_signatures,
-            (f + 1) as usize,
+            (oracles_config.f + 1) as usize,
             ForwarderError::InvalidSignatureCount
         );
 
@@ -184,24 +243,67 @@ pub mod keystone_forwarder {
             .chain(ctx.remaining_accounts.iter().cloned())
             .collect();
 
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
+        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...remaining accounts)
+        let account_key_bytes = account_infos.iter().fold(
+            Vec::with_capacity(account_infos.len() * 32),
+            |mut buf, x| {
+                buf.extend_from_slice(&x.key().to_bytes());
+                buf
+            },
+        );
+        let computed_account_hash = hash::hash(&account_key_bytes);
+
+        require_eq!(
+            computed_account_hash,
+            Hash::from(forwarder_report.account_hash),
+            ForwarderError::InvalidAccountHash
+        );
+
+        let mut payload: Vec<u8> = Vec::with_capacity(
+            ON_REPORT_DISCRIMINATOR.len()
+                + 4
+                + (METADATA_LENGTH - FORWARDER_METADATA_LENGTH)
+                + 4
+                + forwarder_report.payload.len(),
+        );
+
         // payload begins with the Anchor discriminator
-        let mut payload = ON_REPORT_DISCRIMINATOR.to_vec();
+        payload.extend_from_slice(&ON_REPORT_DISCRIMINATOR);
+        let mut cursor = Cursor::new(&mut payload);
+        cursor.set_position(ON_REPORT_DISCRIMINATOR.len() as u64);
+
         // borsh serialization of metadata vector and report vector
         // metadata is just workflow_cid, workflow_name, workflow_owner, and report_id (see format above)
-        let metadata = &raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
-        let report = &raw_report[METADATA_LENGTH..].to_vec();
-        // Borsh serialize each part separately
-        payload.extend(&metadata.try_to_vec()?);
-        payload.extend(&report.try_to_vec()?);
+        let metadata = raw_report[FORWARDER_METADATA_LENGTH..METADATA_LENGTH].to_vec();
+        let report = forwarder_report.payload;
+        // Borsh serialize each part separately as Vec<u8>
+        metadata.serialize(&mut cursor)?;
+        report.serialize(&mut cursor)?;
 
         let ix = Instruction::new_with_bytes(ctx.accounts.receiver_program.key(), &payload, metas);
 
         // used to derive the forwarder authority PDA
         let forwarder_state = ctx.accounts.state.key();
+        let receiver_program = ctx.accounts.receiver_program.key();
+
+        // calculate the bump on-the-fly
+        let (_, authority_bump) = Pubkey::find_program_address(
+            &[
+                b"forwarder",
+                forwarder_state.as_ref(),
+                receiver_program.as_ref(),
+            ],
+            &crate::ID,
+        );
+
         let signers_seeds = &[
             b"forwarder",
             forwarder_state.as_ref(),
-            &[ctx.accounts.state.authority_nonce],
+            receiver_program.as_ref(),
+            &[authority_bump],
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
@@ -213,6 +315,7 @@ pub mod keystone_forwarder {
         execution_state.success = true;
 
         emit!(ReportProcessed {
+            state: ctx.accounts.state.key(),
             receiver: ctx.accounts.receiver_program.key(),
             transmission_id,
             result: true,
@@ -229,10 +332,7 @@ fn verify_signatures(
     oracles_config: &OraclesConfig,
     num_signers: usize,
 ) -> Result<()> {
-    // ensure MAX_SIGNERS fit in the bits of uniques
     let mut uniques: u32 = 0;
-    assert!(uniques.count_ones() + uniques.count_zeros() >= MAX_ORACLES as u32);
-
     for sig in signatures.chunks(SIGNATURE_LEN) {
         // sig is [R || S || V] format where V is 0 or 1
         let v = sig[64];
@@ -299,30 +399,5 @@ fn set_oracles_config(
 
     oracles_config.signer_addresses.extend(&signer_addresses);
 
-    emit!(ConfigSet {
-        don_id,
-        config_version,
-        f,
-        signers: signer_addresses,
-    });
-
     Ok(())
 }
-
-//
-// Receiver contract will implement this in Anchor (or equivalent in pure Rust)
-// pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> Result<()>
-// with the following declared accounts
-//
-// #[derive(Accounts)]
-// pub struct OnReport<'info> {
-//     #[account(owner = FORWARDER_ID)]
-//     pub state: Account<'info, ForwarderState>,
-
-//     /// CHECK: This is a PDA
-//     /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
-//     /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
-//     pub forwarder_authority: Signer<'info>,
-
-//     // remaining accounts passed in as well
-// }

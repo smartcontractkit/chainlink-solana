@@ -10,7 +10,9 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetFeedAdmin is the `setFeedAdmin` instruction.
+// Add or remove a feed admin.
+// Feed Admins are highly priveleged roles who can unilaterally edit the configuration of feeds
+// and the authorization of workflows.
 type SetFeedAdmin struct {
 	Admin   *ag_solanago.PublicKey
 	IsAdmin *bool

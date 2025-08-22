@@ -10,7 +10,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitOraclesConfig is the `initOraclesConfig` instruction.
+// Initialize oracles config which describes the set of oracles which
+// are expected to sign a verified forwarder report. Many oracle config accounts
+// may exist for a forwarder because more than one DON may be allowed to sign
+// reports for a forwarder.
 type InitOraclesConfig struct {
 	DonId           *uint32
 	ConfigVersion   *uint32

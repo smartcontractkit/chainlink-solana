@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 use keystone_forwarder::ForwarderState;
-use keystone_forwarder::ID as FORWARDER_ID;
 
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::error::AuthError;
 use crate::state::CacheState;
+use crate::state::DecimalReport;
 use crate::state::FeedConfig;
 use crate::state::LegacyFeedsConfig;
 #[derive(Accounts)]
@@ -19,7 +19,26 @@ pub struct Initialize<'info> {
     )]
     pub state: AccountLoader<'info, CacheState>,
 
+    #[account(executable)]
+    /// CHECK: We don't specify the static forwarder program id from the forwarder crate because
+    /// the actual program id on chain may have been generated through a different mechanism
+    pub forwarder_program: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateForwarder<'info> {
+    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    pub owner: Signer<'info>,
+
+    #[account(mut)]
+    pub state: AccountLoader<'info, CacheState>,
+
+    #[account(executable)]
+    /// CHECK: We don't specify the static forwarder program id from the forwarder crate because
+    /// the actual program id on chain may have been generated through a different mechanism
+    pub forwarder_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -63,7 +82,7 @@ pub struct InitLegacyFeedsConfig<'info> {
     #[account(
         init,
         payer = owner,
-        space = ANCHOR_DISCRIMINATOR + LegacyFeedsConfig::INIT_SPACE, // todo add legacy feeds config size
+        space = ANCHOR_DISCRIMINATOR + LegacyFeedsConfig::INIT_SPACE,
         seeds = [b"legacy_feeds_config", state.key().as_ref()],
         bump
     )]
@@ -77,7 +96,6 @@ pub struct InitLegacyFeedsConfig<'info> {
     // pub legacy_feed: UncheckedAccount<'info>
 }
 
-// todo: the offchain code will need to wrap add/remove data_ids mappings
 #[derive(Accounts)]
 pub struct UpdateLegacyFeedsConfig<'info> {
     #[account(mut, address = state.load()?.owner @ AuthError::Unauthorized)]
@@ -131,7 +149,7 @@ pub struct InitDecimalReports<'info> {
     //     init,
     //     seeds = [
     //         b"decimal_report",
-    //         cache_state.key().as_ref()
+    //         state.key().as_ref()
     //         data_id,
     //     ],
     //     bump
@@ -140,22 +158,36 @@ pub struct InitDecimalReports<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CloseDecimalReports<'info> {
+#[instruction(data_id: [u8; 16])]
+pub struct CloseDecimalReport<'info> {
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
     pub state: AccountLoader<'info, CacheState>,
-    // N data report accounts
-    // #[account(
-    //     init,
-    //     seeds = [
-    //         b"decimal_report",
-    //         cache_state.key().as_ref()
-    //         data_id,
-    //     ],
-    //     bump
-    // )]
-    // pub report: UncheckedAccount<'info>
+
+    #[account(
+        mut,
+        seeds = [
+            b"decimal_report",
+            state.key().as_ref(),
+            &data_id,
+        ],
+        bump,
+        close = feed_admin,
+    )]
+    pub decimal_report: Account<'info, DecimalReport>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"feed_config",
+            state.key().as_ref(),
+            &data_id,
+        ],
+        bump,
+        close = feed_admin,
+      )]
+    pub feed_config: AccountLoader<'info, FeedConfig>,
 }
 
 #[derive(Accounts)]
@@ -190,7 +222,6 @@ pub struct PreviewDecimalFeedConfigs<'info> {
 
 #[derive(Accounts)]
 pub struct SetDecimalFeedConfigs<'info> {
-    // todo: inline check if it is an admin
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
@@ -239,33 +270,16 @@ pub struct SetDecimalFeedConfigs<'info> {
     // pub permission_flag: UncheckedAccount<'info>
 }
 
-// So for internal data feeds use case:
-//
-// max_payload_size = 333
-
-// best case (no legacy feeds)
-// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N) ==> N = 7.7
-//       ^payload ^accounts
-
-// worst case (all reports are tied with legacy feeds)
-// 333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
-// N = 7.5
-
-// So we can at most support 7 decimal feed reports with ALTs
-
-// ```
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    // #[account(owner = FORWARDER_ID)]
-    // checking the owner of the state is optional and not necessary
-    // because the forwarder state is uniquely associated with the
-    // forwarder authority which is verified in the instruction
-    // warning: the FORWARDER_ID deployed in an environment may be different
-    // than the one in source control. you need to view the docs to determine
-    // what the actual deployed program id is.
+    // Note: the data feed cache's on_report function does not directly authenticate the forwarder state.
+    // Instead, it indirectly verifies the correct state by enforcing that the forwarder_authority is authorized.
+    // WARNING: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    // the correct FORWARDER_ID to use
     pub forwarder_state: Account<'info, ForwarderState>,
 
-    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref()], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
+    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()], bump, seeds::program = cache_state.load()?.forwarder_id)]
     pub forwarder_authority: Signer<'info>,
 
     #[account()]
@@ -277,17 +291,16 @@ pub struct OnReport<'info> {
 
     // omit if you don't want to write to the store
     #[account(
-        seeds = [b"legacy_feeds_config", cache_state.key().as_ref()], // todo: add the current state
+        seeds = [b"legacy_feeds_config", cache_state.key().as_ref()],
         bump
     )]
     pub legacy_feeds_config: Option<AccountLoader<'info, LegacyFeedsConfig>>,
 
     // omit if you don't want to write to the store
     /// CHECK: This is a PDA
-    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
+    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_bump)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,
-
-    pub system_program: Program<'info, System>,
+    // pub system_program: Program<'info, System>,
     // remaining accounts (N data ids, M legacy feeds)
 
     // N accounts
@@ -314,15 +327,11 @@ pub struct OnReport<'info> {
     // )]
     // pub permission_flag: UncheckedAccount<'info>
 
-    // M transmission feed accounts
-    // should be sorted
+    // M transmission feed accounts (sorted)
     //
-    // included if and only if both legacy_store and legacy_feeds_config is included.
-    // if only 1 or 0 or the legacy_store / legacy_feeds_config accounts are included
-    // this should not be included.
-    //
-    // note: not all of the legacy feed accounts supplied may be written to because there is
-    // a write_disabled flag per account. assume this is sorted.
+    // Note: not all of the legacy feed accounts supplied may be written to because there is
+    // a write_disabled flag per account. Additionally, if either legacy_store, legacy_feeds_config,
+    // or legacy_writer is omitted no legacy feeds will be written to
     //
     // pub legacy_feed: UncheckedAccount<'info>
 }

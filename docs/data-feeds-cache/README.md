@@ -127,13 +127,13 @@ pub struct CacheState {
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
     pub feed_admins: AdminList,
-    pub legacy_writer_nonce: u8, // pda writing to the legacy feeds
+    pub legacy_writer_bump: u8, // pda writing to the legacy feeds
     pub _padding: [u8; 7],
 }
 ```
 
 * The feed admins list is also a fixed size arrayvec.
-* The legacy writer nonce is the bump of the PDA that is responsible for signing the `invoke_signed` CPI to the legacy store for writing legacy feeds.
+* The legacy writer bump is the bump of the PDA that is responsible for signing the `invoke_signed` CPI to the legacy store for writing legacy feeds.
 * The padding is for byte alignment.
 
 
@@ -201,7 +201,7 @@ For the two optional accounts in the OnReport context you have to pass in the ca
 
 The cache state account is a keypair account that's ownership is transferred to the program. 
 
-We pre-compute the legacy writer nonce to store in the cache state for usage later in invoke_signed (in `on_report`) similar to how the forwarder stores the forwarder authority nonce.
+We pre-compute the legacy writer bump to store in the cache state for usage later in invoke_signed (in `on_report`)
 
 ### init_decimal_reports
 
@@ -296,6 +296,26 @@ Similar to init_legacy_feeds_config however it enables you to disable legacy fee
 
 ### set_decimal_feed_configs
 
+Because this function takes in a variable number of data ids and workflows, the transaction limit
+may be met if those bounds are exceeded. 
+
+Below is a table of acceptable ranges where `N` (row) is the number of data ids and `M` (column) is the number of workflows. The table value is the estimated number of bytes. This is meant to be a guideline and does 
+not necessarily guarentee the success of the transaction.
+
+Note, the table below assumes 0 deleted write permission flag accounts. Please account for them by adding to the estimated transaction size.
+
+| (N, M) | 1   | 2   | 3     | 4    | 5    | 6    | 7    | 8    | 9 | 10   |
+|-----|-----|-----|-------|------|------|------|------|------|------|------|
+| 1   | 302 | 396 | 490   | 584  | 678  | 772  | 866  | 960  | 1054 | 1148 | 
+| 2   | 414 | 540 | 666   | 792  | 918  | 1044 |      |      |      |      |      
+| 3   | 526 | 684 | 842   | 1000 |      |      |      |      |      |      |      
+| 4   | 638 | 828 | 1018  | 1208 |      |      |      |      |      |      |      
+| 5   | 750 | 972 | 1194  |      |      |      |      |      |      |      |      
+| 6   | 862 | 1116|       |      |      |      |      |      |      |      |      
+| 7   | 974 |     |       |      |      |      |      |      |      |      |      
+| 8   | 1086|     |       |      |      |      |      |      |      |      |      
+| 9   | 1198|     |       |      |      |      |      |      |      |      |         
+
 Given N data ids, N descriptions, and M workflows, this instruction will
 1. create (if doesn't exist) and update the N decimal feed config accounts
 2. create (if doesn't exist) N x M permission flag accounts (M for each data id)
@@ -324,7 +344,7 @@ Below is an example.
 
 ```
 // ex: data_ids: [1, 2]
-// workflow metdatas [5, 6, 7]
+// workflow metadatas [5, 6, 7]
 // ctx remaining accounts:
 // [1-feed-config]  |- feed_config_accounts
 // [2-feed-config]  |
@@ -452,7 +472,7 @@ pub struct OnReport<'info> {
     // what the actual deployed program id is.
     pub forwarder_state: Account<'info, ForwarderState>,
 
-    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref()], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
+    #[account(seeds = [b"forwarder", forwarder_state.key().as_ref(), <RECEIVER_PROGRAM_ID>], bump = forwarder_state.authority_nonce, seeds::program = FORWARDER_ID)]
     pub forwarder_authority: Signer<'info>,
 
     #[account()]
@@ -474,7 +494,7 @@ pub struct OnReport<'info> {
 
     // omit if you don't want to write to the store
     /// CHECK: This is a PDA
-    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_nonce)]
+    #[account(seeds = [b"legacy_writer", cache_state.key().as_ref()], bump = cache_state.load()?.legacy_writer_bump)]
     pub legacy_writer: Option<UncheckedAccount<'info>>,
 
     pub system_program: Program<'info, System>,
@@ -531,32 +551,32 @@ Note that if you supply legacy_feeds in remaining accounts that are not required
 
 So for internal data feeds use case we said in the forwarder README that
 ```
- max_payload_size = 333
+ max_payload_size = 297
 ```
 
 Based on the payload encoding and account contexts of data feed cache on_report, here are the estimated number of decimal reports that can be sent in one transmission:
 
 
 Best case (no legacy feeds)
-
 ```
-333 = 4 + 40*N + (cache_state (1) + system_program (1) + 2*N)
+297 = 4 + 40*N + (cache_state (1) + 2*N)
 
-N = 7.7
+N = 6.9
 ```
 * 4 + 40*N is the total payload size for N `ReceivedDecimalReport`s
 * Remember we're using the address lookup table, so accounts take 1 byte only
 
 Worst case (all reports are tied with legacy feeds)
 
-```
-333 = 4 + 40*N + (cache_state (1) + system_program (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1) + system_program (1) + 3N)
 
-N = 7.5
+```
+297 = 4 + 40*N + (cache_state (1) + legacy_store (1) + legacy_feed_config (1) + legacy_writer (1)  + 3N)
+
+N = 6.6
 ```
 * in the account context calculations, we use 3N over 2N because the extra N comes from the legacy feed accounts in ctx.remaining_accounts
 
-So we can at most support 7 decimal feed reports with ALTs
+Rounding down, we can at most support 6 decimal feed reports with ALTs
 
 
 
