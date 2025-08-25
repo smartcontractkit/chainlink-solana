@@ -127,7 +127,7 @@ func evaluate(rawRequest capabilities.CapabilityRequest) (string, error) {
 }
 
 func GenerateWriteTargetName(chainID string) string {
-	id := fmt.Sprintf("write_%v@1.0.0", chainID)
+	id := fmt.Sprintf("write_%v@1.0.0", strings.ToLower(chainID))
 
 	chainName, err := chainselectors.SolanaNameFromChainId(chainID)
 	if err == nil {

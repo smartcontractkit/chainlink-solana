@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -38,7 +39,7 @@ func NewDeriveRemaining(chain Chain, client client.Reader, cfg config.Workflow, 
 }
 
 func GenerateDeriveRemainingName(chainID string) string {
-	id := fmt.Sprintf("derive_%v@1.0.0", chainID)
+	id := fmt.Sprintf("derive_%v@1.0.0", strings.ToLower(chainID)) // have to use ToLower because of workflow file validation regexp
 
 	chainName, err := chainselectors.SolanaNameFromChainId(chainID)
 	if err == nil {
