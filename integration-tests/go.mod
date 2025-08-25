@@ -16,7 +16,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
-	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
+	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250821165341-a060a982f5f6
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4

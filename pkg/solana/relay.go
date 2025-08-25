@@ -10,14 +10,16 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/provider"
@@ -373,17 +375,32 @@ func (r *Relayer) NewOCR3CapabilityProvider(ctx context.Context, rargs relaytype
 	return nil, errors.New("ocr3 capability provider is not supported for solana")
 }
 
-func (r *Relayer) NewCCIPProvider(ctx context.Context, rargs relaytypes.RelayArgs) (relaytypes.CCIPProvider, error) {
+func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPProviderArgs) (relaytypes.CCIPProvider, error) {
 	chainSelector, ok := chainsel.SolanaChainIdToChainSelector()[r.chain.ID()]
 	if !ok {
 		return nil, fmt.Errorf("invalid chain ID %s: could not find chain selector", r.chain.ID())
 	}
-	contractReader, err := r.NewContractReader(ctx, )
+	accountReader, err := r.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init account reader err: %s", err)
+	}
+
+	crCfg := config.ContractReader{}
+	if err := json.Unmarshal(ccipArgs.ContractReaderConfig, &crCfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain reader config err: %s", err)
+	}
+
+	contractReader, err := chainreader.NewContractReaderService(r.lggr, &chainreader.RPCClientWrapper{AccountReader: accountReader}, crCfg, r.chain.LogPoller())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialized contract reader: %w", err)
 	}
 
-	chainWriter, err := r.NewContractWriter(ctx, )
+	cwCfg := chainwriter.ChainWriterConfig{}
+	if err := json.Unmarshal(ccipArgs.ChainWriterConfig, &cwCfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall chain writer config err: %s", err)
+	}
+
+	chainWriter, err := chainwriter.NewSolanaChainWriterService(r.lggr, *r.chain.MultiClient(), r.chain.TxManager(), r.chain.FeeEstimator(), cwCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialized chain writer: %w", err)
 	}
