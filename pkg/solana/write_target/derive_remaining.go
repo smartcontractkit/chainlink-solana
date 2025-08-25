@@ -13,6 +13,7 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	workflowUtils "github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -203,20 +204,15 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		if len(wfOwner) != 20 {
 			return nil, fmt.Errorf("workflow owner address size is invalid: %d, expected 20", len(wfOwner))
 		}
-		wfName, err := hex.DecodeString(meta.WorkflowName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode hex wf name: %w", err)
-		}
+		//wfName, err := hex.DecodeString(meta.WorkflowName)
+		wfName := getHashedWFName(meta.WorkflowName) // we hash WF name before passing it to CLD as well
 
-		if len(wfName) != 10 {
-			return nil, fmt.Errorf("workflow name size is invalid: %d, expected 10", len(wfName))
-		}
 		// add to remaining accounts
 		reportHash := createReportHash(
 			data[:],
 			authority.Bytes(),
 			wfOwner,
-			wfName,
+			wfName[:],
 		)
 		dr.lggr.Debugf("dr dataID:%x authority:%v wfOwner:%x wfName:%x", data[:], authority.String(), wfOwner, wfName)
 
@@ -249,6 +245,13 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 	ret = append(ret, derivedAccounts...)
 
 	return ret, nil
+}
+
+func getHashedWFName(name string) [10]byte {
+	nameHash := workflowUtils.HashTruncateName(name)
+	var result [10]byte
+	copy(result[:], nameHash)
+	return result
 }
 
 func (dr *deriver) RegisterToWorkflow(ctx context.Context, request capabilities.RegisterToWorkflowRequest) error {
