@@ -25,7 +25,7 @@ var (
 func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	idl, err := getIDLFromConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse borsh encoder config: %w", err)
 	}
 	parsed := &codec.ParsedTypes{
 		EncoderDefs: make(map[string]codec.Entry),
