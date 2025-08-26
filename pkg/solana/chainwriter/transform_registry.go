@@ -22,8 +22,8 @@ import (
 	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"

@@ -15,7 +15,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	ccipconsts "github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/consts"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"

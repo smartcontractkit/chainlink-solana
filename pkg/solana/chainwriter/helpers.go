@@ -12,7 +12,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/ocr3/pkg/types/ccipocr3"
 )
 
 type TestArgs struct {

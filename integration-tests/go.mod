@@ -15,7 +15,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250826175556-39cbb32278d7
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802
@@ -358,7 +358,8 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250818164129-fa2e60d95157 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250814153237-9a6c5a35e950 // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250805210128-7f8a0f403c3a // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250826175556-39cbb32278d7 // indirect
+	github.com/smartcontractkit/chainlink-ccip/ocr3 v0.0.0-20250826175556-39cbb32278d7 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2 // indirect
 	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0 // indirect
