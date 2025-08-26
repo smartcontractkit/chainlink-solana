@@ -8,6 +8,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
+
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestPublicKeyFromBytes(t *testing.T) {
@@ -65,7 +67,7 @@ func TestPublicKeyFromBase58(t *testing.T) {
 	tests := []struct {
 		name        string
 		in          string
-		expected    []byte
+		expected    ccipocr3common.UnknownAddress
 		expectedErr error
 	}{
 		{
