@@ -19,7 +19,7 @@ var (
 	encoderName    = "user"
 	reportSchema   = "report_schema"
 	definedTypes   = "defined_types"
-	accountCtxHash = "account_ctx_hash"
+	accountCtxHash = "account_context_hash"
 )
 
 func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
