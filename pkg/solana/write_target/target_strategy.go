@@ -148,6 +148,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	if err != nil {
 		return txID.String(), fmt.Errorf("invalid capability request: %w", err)
 	}
+	ts.lggr.Infof("Transmit Report report length: %d", len(r.Inputs.SignedReport.Report))
 
 	verifySignature(ts.lggr, r)
 

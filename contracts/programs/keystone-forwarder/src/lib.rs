@@ -196,7 +196,14 @@ pub mod keystone_forwarder {
         let signatures: &[u8] = &data[..total_signature_len];
         // raw_report | report context
         let data = &data[total_signature_len..];
-        let hashed_report = hash::hash(data).to_bytes();
+
+        // Build the preimage the same way the OCR3 keyring does:
+        // SHA256( [u8(len(raw_report))] || raw_report || ctx)
+        let mut preimage = Vec::with_capacity(1 + data.len());
+        preimage.push(raw_report.len() as u8);
+        preimage.extend_from_slice(data);
+        
+        let hashed_report = hash::hash(preimage).to_bytes();
 
         verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
