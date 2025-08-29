@@ -190,6 +190,9 @@ func verifySignature(lggr logger.Logger, r *targetRequest) {
 	raw = append(raw, r.Inputs.SignedReport.Report...)
 	raw = append(raw, r.Inputs.SignedReport.Context...)
 	h := sha256.Sum256(raw)
+	lggr.Debugf("signed blob: %x", h)
+	lggr.Debugf("ts report: %x", r.Inputs.SignedReport.Report)
+	lggr.Debugf("ts reportctx: %x", r.Inputs.SignedReport.Context)
 	for _, sig := range r.Inputs.SignedReport.Signatures {
 		s := make([]byte, 65)
 		copy(s, sig)
