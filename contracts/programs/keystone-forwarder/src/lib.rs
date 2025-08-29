@@ -200,7 +200,14 @@ pub mod keystone_forwarder {
         // Build the preimage the same way the OCR3 keyring does:
         // SHA256( [u8(len(raw_report))] || raw_report || ctx)
         let mut preimage = Vec::with_capacity(1 + data.len());
-        preimage.push(raw_report.len() as u8);
+        
+        let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
+        // guard against overflow into u8
+        let raw_report_len_u8: u8 = raw_report_len
+            .try_into()
+            .map_err(|_| ForwarderError::InvalidReport)?;
+
+        preimage.push(raw_report_len_u8);
         preimage.extend_from_slice(data);
         
         let hashed_report = hash::hash(preimage).to_bytes();
