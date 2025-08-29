@@ -149,7 +149,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return txID.String(), fmt.Errorf("invalid capability request: %w", err)
 	}
 
-	verifySignature(r)
+	verifySignature(ts.lggr, r)
 
 	blockhash, err := ts.client.LatestBlockhash(ctx)
 	if err != nil {
@@ -184,8 +184,8 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	return txID.String(), nil
 }
 
-func verifySignature(r *targetRequest) {
-	fmt.Println("verify signature")
+func verifySignature(lggr logger.Logger, r *targetRequest) {
+	lggr.Debug("verify signature")
 	var raw []byte
 	raw = append(raw, r.Inputs.SignedReport.Report...)
 	raw = append(raw, r.Inputs.SignedReport.Context...)
@@ -195,16 +195,16 @@ func verifySignature(r *targetRequest) {
 		s := new(big.Int).SetBytes(sig[32:])
 		v := sig[64]
 		if !crypto.ValidateSignatureValues(v, rb, s, true) {
-			fmt.Println("invalid signature values")
+			lggr.Debug("validate signature failed")
 		}
 
 		pubKey, err := crypto.SigToPub(h[:], sig)
 		if err != nil {
-			fmt.Printf("recovered pubkey failed: %s\n", err.Error())
+			lggr.Errorf("recovered pubkey failed: %w", err)
 			return
 		}
 		addr := crypto.PubkeyToAddress(*pubKey)
-		fmt.Printf("successfully recovered address: %x", addr)
+		lggr.Debugf("signer public address %x", addr.Bytes())
 	}
 
 }
