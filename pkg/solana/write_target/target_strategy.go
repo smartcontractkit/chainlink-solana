@@ -268,7 +268,7 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 
 	if err := signedReport.UnwrapTo(&r.Inputs.SignedReport); err != nil {
-		return r, err
+		return r, fmt.Errorf("failed to unwrap SignedReport: %w", err)
 	}
 
 	remaings, ok := rawRequest.Inputs.Underlying[remainingAccountsKey]
