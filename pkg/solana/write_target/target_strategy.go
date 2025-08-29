@@ -187,6 +187,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 func verifySignature(lggr logger.Logger, r *targetRequest) {
 	lggr.Debug("verify signature")
 	var raw []byte
+	raw = append(raw, uint8(len(r.Inputs.SignedReport.Report)))
 	raw = append(raw, r.Inputs.SignedReport.Report...)
 	raw = append(raw, r.Inputs.SignedReport.Context...)
 	h := sha256.Sum256(raw)
