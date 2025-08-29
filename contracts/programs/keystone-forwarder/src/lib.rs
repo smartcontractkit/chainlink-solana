@@ -210,7 +210,7 @@ pub mod keystone_forwarder {
         preimage.push(raw_report_len_u8);
         preimage.extend_from_slice(data);
         
-        let hashed_report = hash::hash(preimage).to_bytes();
+        let hashed_report = hash::hash(&preimage).to_bytes();
 
         verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
