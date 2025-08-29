@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
+use solana_program::msg;
 
 use common::{
     FORWARDER_METADATA_LENGTH, MAX_ORACLES, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR,
@@ -339,11 +340,14 @@ fn verify_signatures(
 
         let signer = secp256k1_recover(hashed_report, v, &sig[..64])
             .map_err(|_| ForwarderError::InvalidSignature)?;
-
+        
+        msg!("hashed_report: {}", hex(hashed_report));
+        msg!("recovered_pubkey: {}", hex(&signer.0));
         let signer_eth_address: [u8; 20] = keccak::hash(&signer.0).to_bytes()[12..32]
             .try_into()
             .map_err(|_| ForwarderError::UnauthorizedSigner)?;
 
+        msg!("recovered_eth_addr: 0x{}", hex(&signer_eth_address));
         let index = oracles_config
             .signer_addresses
             .as_slice()
@@ -400,4 +404,16 @@ fn set_oracles_config(
     oracles_config.signer_addresses.extend(&signer_addresses);
 
     Ok(())
+}
+
+use heapless::String;
+
+fn hex(bytes: &[u8]) -> String<128> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut s: String<128> = String::new();
+    for &b in bytes.iter().take(64) { // 128 chars cap
+        let _ = s.push(HEX[(b >> 4) as usize] as char);
+        let _ = s.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    s
 }
