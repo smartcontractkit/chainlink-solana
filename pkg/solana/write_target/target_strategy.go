@@ -191,18 +191,24 @@ func verifySignature(lggr logger.Logger, r *targetRequest) {
 	raw = append(raw, r.Inputs.SignedReport.Context...)
 	h := sha256.Sum256(raw)
 	for _, sig := range r.Inputs.SignedReport.Signatures {
-		rb := new(big.Int).SetBytes(sig[:32])
-		s := new(big.Int).SetBytes(sig[32:])
-		v := sig[64]
-		if !crypto.ValidateSignatureValues(v, rb, s, true) {
-			lggr.Debug("validate signature failed")
+		s := make([]byte, 65)
+		copy(s, sig)
+		// go-ethereum Ecrecover wants V in {27,28}
+		if s[64] < 27 {
+			s[64] += 27
 		}
 
-		pubKey, err := crypto.SigToPub(h[:], sig)
+		pb, err := crypto.Ecrecover(h[:], sig)
 		if err != nil {
-			lggr.Errorf("recovered pubkey failed: %w", err)
+			lggr.Errorf("recovered pubkey failed: %w R:%d, s:%d v%d", err)
 			return
 		}
+		pubKey, err := crypto.UnmarshalPubkey(pb)
+		if err != nil {
+			lggr.Errorf("failed to unmarshal pubkey: %w", err)
+			return
+		}
+
 		addr := crypto.PubkeyToAddress(*pubKey)
 		lggr.Debugf("signer public address %x", addr.Bytes())
 	}
