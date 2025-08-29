@@ -193,7 +193,7 @@ func (ts *targetStrategy) GetTransactionFee(ctx context.Context, transactionID s
 }
 
 type Config struct {
-	Address string
+	Address string `mapstructure:"address"`
 }
 
 type Acc struct {
@@ -248,7 +248,7 @@ func getRequest(rawRequest capabilities.CapabilityRequest) (*targetRequest, erro
 	}
 
 	if err := rawRequest.Config.UnwrapTo(&r.Config); err != nil {
-		return r, err
+		return r, fmt.Errorf("failed to unwrap config field: %w", err)
 	}
 
 	receiver, err := solana.PublicKeyFromBase58(r.Config.Address)
