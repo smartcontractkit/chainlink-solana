@@ -265,7 +265,7 @@ func (ts *targetRequest) toPayload() []byte {
 	}
 
 	// 3. add raw report len
-	ret = append(ret, uint8(len(report.Report))
+	ret = append(ret, byte(len(report.Report)))
 
 	// 4. add raw report
 	ret = append(ret, report.Report...)
