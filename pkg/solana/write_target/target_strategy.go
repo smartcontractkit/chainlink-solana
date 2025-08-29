@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	sol_binary "github.com/gagliardetto/binary"
 
 	"github.com/gagliardetto/solana-go/rpc"
@@ -148,6 +149,8 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return txID.String(), fmt.Errorf("invalid capability request: %w", err)
 	}
 
+	verifySignature(r)
+
 	blockhash, err := ts.client.LatestBlockhash(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest blockhash: %w", err)
@@ -179,6 +182,31 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 
 	return txID.String(), nil
+}
+
+func verifySignature(r *targetRequest) {
+	fmt.Println("verify signature")
+	var raw []byte
+	raw = append(raw, r.Inputs.SignedReport.Report...)
+	raw = append(raw, r.Inputs.SignedReport.Context...)
+	h := sha256.Sum256(raw)
+	for _, sig := range r.Inputs.SignedReport.Signatures {
+		rb := new(big.Int).SetBytes(sig[:32])
+		s := new(big.Int).SetBytes(sig[32:])
+		v := sig[64]
+		if !crypto.ValidateSignatureValues(v, rb, s, true) {
+			fmt.Println("invalid signature values")
+		}
+
+		pubKey, err := crypto.SigToPub(h[:], sig)
+		if err != nil {
+			fmt.Printf("recovered pubkey failed: %s\n", err.Error())
+			return
+		}
+		addr := crypto.PubkeyToAddress(*pubKey)
+		fmt.Printf("successfully recovered address: %x", addr)
+	}
+
 }
 
 // Wrapper around the ChainWriter to get the fee esimate
