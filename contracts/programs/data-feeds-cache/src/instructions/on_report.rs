@@ -13,21 +13,7 @@ use crate::{
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 type LegacyWriteEntry<'a> = (&'a LegacyFeedEntry, &'a ReceivedDecimalReport);
-
-extern crate alloc;
-use alloc::string::String;
-
-// Tiny hex helper (no extra crates)
-fn hex(bytes: &[u8]) -> String {
-    const LUT: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        s.push(LUT[(b >> 4) as usize] as char);
-        s.push(LUT[(b & 0x0f) as usize] as char);
-    }
-    s
-}
-
+use hex; 
 pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -104,7 +90,7 @@ pub fn handler<'info>(
             &crate::ID,
         );
         
-        msg!("report hash: (hex): {}", report_hash);
+        msg!("report hash: (hex): {}", hex::encode(report_hash));
         msg!("cache state: {}", ctx.accounts.cache_state.key());
         msg!("id: {}", &crate::ID);
         msg!("curr_flag: {}", curr_permission_flag);
