@@ -29,3 +29,6 @@
 
 # CI/CD
 /.github/** @smartcontractkit/data-growth @smartcontractkit/bix-build
+
+# SDK for feeds
+/ts/** @smartcontractkit/data-growth
