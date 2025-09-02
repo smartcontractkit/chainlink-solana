@@ -204,8 +204,8 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		if len(wfOwner) != 20 {
 			return nil, fmt.Errorf("workflow owner address size is invalid: %d, expected 20", len(wfOwner))
 		}
-		//wfName, err := hex.DecodeString(meta.WorkflowName)
-		wfName := getHashedWFName(meta.DecodedWorkflowName) // we hash WF name before passing it to CLD as well
+		var wfName [10]byte
+		copy(wfName[:], []byte(meta.DecodedWorkflowName))
 
 		// add to remaining accounts
 		reportHash := createReportHash(
