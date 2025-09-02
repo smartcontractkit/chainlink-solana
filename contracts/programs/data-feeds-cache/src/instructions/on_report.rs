@@ -104,8 +104,8 @@ pub fn handler<'info>(
             &crate::ID,
         );
         
-        msg!("report hash: (hex)", report_hash);
-        msg!("cache state: {}", ctx.accounts.cache_state.key().as_ref());
+        msg!("report hash: (hex): {}", report_hash);
+        msg!("cache state: {}", ctx.accounts.cache_state.key());
         msg!("id: {}", &crate::ID);
         msg!("curr_flag: {}", curr_permission_flag);
         msg!("passed_flag: {}", *permission_flag_account_infos[i].key);
