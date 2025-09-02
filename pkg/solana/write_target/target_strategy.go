@@ -352,7 +352,7 @@ func (ts *targetStrategy) newTransaction(r *targetRequest, oracleConfigPDA solan
 		solana.SystemProgramID,
 	)
 
-	// append remainings except for forwarderState + Authority
+	// append remainings except for forwarderState + Authority since they are already included
 	inst.AccountMetaSlice = append(inst.AccountMetaSlice, r.Inputs.RemainingAccounts[2:]...)
 	tx, err := inst.ValidateAndBuild()
 	if err != nil {
