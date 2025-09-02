@@ -150,6 +150,12 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 	ts.lggr.Infof("Transmit Report report length: %d", len(r.Inputs.SignedReport.Report))
 
+	reportMetadata, _, err := ocr3types.Decode(r.Inputs.SignedReport.Report)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode report metadata: %w", err)
+	}
+	ts.lggr.Infof("decoded report  metadata wf name %s meta wf name %s", reportMetadata.WorkflowName, request.Metadata.WorkflowName)
+
 	verifySignature(ts.lggr, r)
 
 	blockhash, err := ts.client.LatestBlockhash(ctx)
