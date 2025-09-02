@@ -79,7 +79,6 @@ pub fn verify_feed_admin(admin: &Signer, admin_list: &AccountList) -> Result<()>
 }
 extern crate alloc;
 use alloc::string::String;
-use solana_program::msg;
 
 pub fn create_report_hash(data_id: &[u8], sender: &Pubkey, owner: &[u8], name: &[u8]) -> [u8; 32] {
     // Log inputs (hex + a readable name when possible)
