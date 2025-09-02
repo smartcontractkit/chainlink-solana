@@ -31,4 +31,4 @@
 /.github/** @smartcontractkit/data-growth @smartcontractkit/bix-build
 
 # SDK for feeds
-/ts/** @smartcontractkit/data-growth
+/ts @smartcontractkit/data-growth
