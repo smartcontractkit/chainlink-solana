@@ -41,7 +41,7 @@ func ExtractEvents(logs []string, programIDBase58 string) []string {
 	return output
 }
 
-// Decode extracts an event from the the encoded event given as a string.
+// Decode extracts an event from the encoded event given as a string.
 func Decode(base64Encoded string) (interface{}, error) {
 	buf, err := base64.StdEncoding.DecodeString(base64Encoded)
 	if err != nil {
