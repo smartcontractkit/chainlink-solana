@@ -14,6 +14,20 @@ use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 type LegacyWriteEntry<'a> = (&'a LegacyFeedEntry, &'a ReceivedDecimalReport);
 
+extern crate alloc;
+use alloc::string::String;
+
+// Tiny hex helper (no extra crates)
+fn hex(bytes: &[u8]) -> String {
+    const LUT: &[u8; 16] = b"0123456789abcdef";
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        s.push(LUT[(b >> 4) as usize] as char);
+        s.push(LUT[(b & 0x0f) as usize] as char);
+    }
+    s
+}
+
 pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -81,7 +95,6 @@ pub fn handler<'info>(
             workflow_owner,
             workflow_name,
         );
-
         let (curr_permission_flag, _) = Pubkey::find_program_address(
             &[
                 b"permission_flag",
@@ -90,7 +103,12 @@ pub fn handler<'info>(
             ],
             &crate::ID,
         );
-
+        
+        msg!("report hash: (hex)", report_hash);
+        msg!("cache state: {}", ctx.accounts.cache_state.key().as_ref());
+        msg!("id: {}", &crate::ID);
+        msg!("curr_flag: {}", curr_permission_flag);
+        msg!("passed_flag: {}", *permission_flag_account_infos[i].key);
         require_keys_eq!(
             curr_permission_flag,
             *permission_flag_account_infos[i].key,

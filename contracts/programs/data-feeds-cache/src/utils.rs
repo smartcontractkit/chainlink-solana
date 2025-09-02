@@ -77,28 +77,10 @@ pub fn verify_feed_admin(admin: &Signer, admin_list: &AccountList) -> Result<()>
 
     Ok(())
 }
-extern crate alloc;
-use alloc::string::String;
 
 pub fn create_report_hash(data_id: &[u8], sender: &Pubkey, owner: &[u8], name: &[u8]) -> [u8; 32] {
     // Log inputs (hex + a readable name when possible)
-    msg!("create_report_hash()");
-    msg!("  data_id (hex): {}", hex(data_id));
-    msg!("  sender: {}", sender); // Pubkey implements Display (base58)
-    msg!("  owner  (hex): {}", hex(owner));
-    msg!("  owner  (hex): {}", hex(name));
     hash::hash(&[data_id, &sender.to_bytes(), owner, name].concat()).to_bytes()
-}
-
-// Tiny hex helper (no extra crates)
-fn hex(bytes: &[u8]) -> String {
-    const LUT: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        s.push(LUT[(b >> 4) as usize] as char);
-        s.push(LUT[(b & 0x0f) as usize] as char);
-    }
-    s
 }
 
 pub fn get_decimals(data_id: &[u8; 16]) -> u8 {

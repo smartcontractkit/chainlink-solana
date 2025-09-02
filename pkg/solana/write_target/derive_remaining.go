@@ -13,7 +13,6 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	workflowUtils "github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -228,6 +227,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 			return nil, fmt.Errorf("could not derive decimal report PDA for data id %v",
 				feedID)
 		}
+		dr.lggr.Debugf("write flag key %s, cacheProgram %s", writeFlagKey.String(), cacheProgram.String())
 
 		writeFlagAccount, err := dr.client.GetAccountInfoWithOpts(ctx, writeFlagKey, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
 		if err != nil {
@@ -245,13 +245,6 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 	ret = append(ret, derivedAccounts...)
 
 	return ret, nil
-}
-
-func getHashedWFName(name string) [10]byte {
-	nameHash := workflowUtils.HashTruncateName(name)
-	var result [10]byte
-	copy(result[:], nameHash)
-	return result
 }
 
 func (dr *deriver) RegisterToWorkflow(ctx context.Context, request capabilities.RegisterToWorkflowRequest) error {
