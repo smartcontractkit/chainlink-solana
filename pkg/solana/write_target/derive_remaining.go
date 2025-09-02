@@ -157,11 +157,6 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		PublicKey: cacheProgram,
 	})
 
-	// 6 system
-	ret = append(ret, &solana.AccountMeta{
-		PublicKey: solana.SystemProgramID,
-	})
-
 	derivedAccounts := make([]*solana.AccountMeta, 2*len(cd.FeedIDs))
 
 	// derive pdas and check existence on-chain
