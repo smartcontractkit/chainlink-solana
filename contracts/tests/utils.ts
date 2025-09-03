@@ -424,8 +424,14 @@ export class Forwarder {
     // just keep this zero-ed since we don't use it outside of the hash
     const reportContextBytes = Buffer.alloc(96);
 
+    // the msg to sign includes the prefix of u8(len(rawReportBytes))
+    const rawReportLenU8 = Buffer.alloc(1);
+    rawReportLenU8.writeUint8(rawReportBytes.length & 0xff);
+
     const msgHashToSign = createHash("sha256")
-      .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+      .update(
+        Buffer.concat([rawReportLenU8, rawReportBytes, reportContextBytes])
+      )
       .digest();
 
     const signaturesInfo = reportSigners.map((s) =>

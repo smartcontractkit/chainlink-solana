@@ -196,13 +196,24 @@ pub mod keystone_forwarder {
         let signatures: &[u8] = &data[..total_signature_len];
         // raw_report | report context
         let data = &data[total_signature_len..];
-        let hashed_report = hash::hash(data).to_bytes();
+
+        // Build the preimage the same way the OCR keyring does:
+        // SHA256( [u8(len(raw_report))] || raw_report || ctx)
+        let mut preimage = vec![0u8; 1 + data.len()];
+
+        let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
+        // OCR keyring also does not error on overflow
+        let raw_report_len_u8: u8 = raw_report_len as u8;
+
+        preimage[0] = raw_report_len_u8;
+        preimage[1..].copy_from_slice(data);
+
+        let hashed_report = hash::hash(&preimage).to_bytes();
 
         verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
-        let raw_report_end = data.len() - REPORT_CONTEXT_LEN;
-        let raw_report = &data[..raw_report_end];
+        let raw_report = &data[..raw_report_len];
 
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
