@@ -67,7 +67,6 @@ type CacheDetails struct {
 
 func (dr *deriver) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
 	var res capabilities.CapabilityResponse
-	dr.lggr.Debug("congrats!")
 	// Notice: error skipped as implementation always returns nil
 	capInfo, _ := dr.Info(ctx)
 
