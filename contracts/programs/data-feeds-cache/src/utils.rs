@@ -79,7 +79,6 @@ pub fn verify_feed_admin(admin: &Signer, admin_list: &AccountList) -> Result<()>
 }
 
 pub fn create_report_hash(data_id: &[u8], sender: &Pubkey, owner: &[u8], name: &[u8]) -> [u8; 32] {
-    // Log inputs (hex + a readable name when possible)
     hash::hash(&[data_id, &sender.to_bytes(), owner, name].concat()).to_bytes()
 }
 

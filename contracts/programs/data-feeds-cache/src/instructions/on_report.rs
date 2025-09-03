@@ -13,7 +13,7 @@ use crate::{
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 type LegacyWriteEntry<'a> = (&'a LegacyFeedEntry, &'a ReceivedDecimalReport);
-use hex; 
+
 pub fn handler<'info>(
     ctx: Context<'_, '_, '_, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -81,6 +81,7 @@ pub fn handler<'info>(
             workflow_owner,
             workflow_name,
         );
+
         let (curr_permission_flag, _) = Pubkey::find_program_address(
             &[
                 b"permission_flag",
@@ -89,12 +90,7 @@ pub fn handler<'info>(
             ],
             &crate::ID,
         );
-        
-        msg!("report hash: (hex): {}", hex::encode(report_hash));
-        msg!("cache state: {}", ctx.accounts.cache_state.key());
-        msg!("id: {}", &crate::ID);
-        msg!("curr_flag: {}", curr_permission_flag);
-        msg!("passed_flag: {}", *permission_flag_account_infos[i].key);
+
         require_keys_eq!(
             curr_permission_flag,
             *permission_flag_account_infos[i].key,

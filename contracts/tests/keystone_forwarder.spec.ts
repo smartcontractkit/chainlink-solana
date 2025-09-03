@@ -527,16 +527,6 @@ describe("keystone_storage", function () {
       program.programId
     );
 
-    // const actualState = await program.account.forwarderState.fetch(
-    //   forwarderState.publicKey
-    // );
-
-    // DELETE ME assert.equal(
-    //   actualState.authorityNonce,
-    //   forwarderAuthorityBump,
-    //   "forwarder authority PDA bumps should be equal"
-    // );
-
     // begin initializing the receiver program
 
     await receiverProgram.methods
@@ -582,7 +572,7 @@ describe("keystone_storage", function () {
       Buffer.from([255])
     );
 
-    // metadata length + actual report payload length (todo change)
+    // metadata length + actual report payload length
     const rawReportBytes = Buffer.alloc(109 + forwarderReportBuffer.length);
 
     // version                offset   0, size  1
@@ -613,15 +603,22 @@ describe("keystone_storage", function () {
     rawReportBytes.writeUint8(workflowOwner, 106);
     rawReportBytes.writeUint8(reportId, 108);
 
-    // payload todo (change to the wrapped forwarder report)
-    // rawReportBytes.writeUint8(255, 109);
+    // copies forwarderReportBytes into rawReportBytes
     forwarderReportBuffer.copy(rawReportBytes, 109);
 
     // just keep this zero-ed since we don't use it outside of the hash
     const reportContextBytes = Buffer.alloc(96);
 
+    // the msg to sign includes the prefix of u8(len(rawReportBytes))
+    const rawReportLenU8 = Buffer.alloc(1);
+    rawReportLenU8.writeUint8(rawReportBytes.length & 0xff);
+
+    console.log("raw report length", rawReportBytes.length);
+
     const msgHashToSign = createHash("sha256")
-      .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+      .update(
+        Buffer.concat([rawReportLenU8, rawReportBytes, reportContextBytes])
+      )
       .digest();
 
     const signaturesInfo = signers.map((s) =>
