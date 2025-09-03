@@ -16,7 +16,7 @@
 /integration-tests @smartcontractkit/bix-build @smartcontractkit/bix-framework
 
 # contracts
-/gauntlet @smartcontractkit/data-growth
+/contracts @smartcontractkit/data-growth
 
 # gauntlet ownership
 /gauntlet @smartcontractkit/data-growth
