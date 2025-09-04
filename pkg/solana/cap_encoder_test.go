@@ -55,7 +55,7 @@ func Test_capEncoder(t *testing.T) {
 	expDataID := [16]byte{1, 2, 3, 4}
 	expHash := [32]byte{7, 8, 9}
 	m := map[string]any{
-		"account_ctx_hash": expHash,
+		"account_context_hash": expHash,
 		"payload": []any{
 			map[string]any{
 				"Timestamp": expTS,
