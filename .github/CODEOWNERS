@@ -10,10 +10,10 @@
 * @smartcontractkit/bix-build @smartcontractkit/bix-framework @smartcontractkit/data-growth
 
 # offchain code ownership
-/pkg/solana @smartcontractkit/bix-framework @smartcontractkit/bix-build
+/pkg/solana @smartcontractkit/bix-framework @smartcontractkit/bix-build @smartcontractkit/data-growth
 
 # e2e test ownership
-/integration-tests @smartcontractkit/bix-build @smartcontractkit/bix-framework
+/integration-tests @smartcontractkit/bix-build @smartcontractkit/bix-framework @smartcontractkit/data-growth
 
 # contracts
 /contracts @smartcontractkit/data-growth
