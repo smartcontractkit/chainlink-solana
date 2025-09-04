@@ -13,10 +13,51 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { randomBytes, createHash } from "crypto";
 import * as secp256k1 from "secp256k1";
+import { array, struct, u8, vec } from "@coral-xyz/borsh";
 
 export type Signer = {
   provider: AnchorProvider;
   keypair: Keypair;
+};
+
+const ForwarderReportLayout = struct([
+  array(u8(), 32, "account_hash"),
+  vec(u8(), "payload"),
+]);
+
+export const generateAccountHash = (accounts: Buffer[]) => {
+  return createHash("sha256").update(Buffer.concat(accounts)).digest();
+};
+
+export const encodeForwarderReport = (
+  accountHash: Buffer,
+  payload: Buffer
+): Buffer => {
+  const sizeForwarderReport = 32 + 4 + payload.length;
+  const forwarderReportBuffer = Buffer.alloc(sizeForwarderReport);
+  ForwarderReportLayout.encode(
+    {
+      account_hash: Uint8Array.from(accountHash),
+      payload: Uint8Array.from(payload),
+    },
+    forwarderReportBuffer
+  );
+  return forwarderReportBuffer;
+};
+
+export const sendLamports = async (
+  conn: anchor.web3.Connection,
+  receiver: anchor.web3.PublicKey,
+  lamports: number
+) => {
+  const signature = await conn.requestAirdrop(receiver, lamports);
+
+  const latestBlockhash = await conn.getLatestBlockhash();
+
+  return await conn.confirmTransaction({
+    signature,
+    ...latestBlockhash,
+  });
 };
 
 export const newSigner = async (
@@ -29,18 +70,7 @@ export const newSigner = async (
   const wallet = new Wallet(keypair);
   const provider = new AnchorProvider(conn, wallet, {});
 
-  // fund account
-  const signature = await conn.requestAirdrop(
-    keypair.publicKey,
-    100 * LAMPORTS_PER_SOL // 100 SOL
-  );
-
-  const latestBlockhash = await conn.getLatestBlockhash();
-
-  await conn.confirmTransaction({
-    signature,
-    ...latestBlockhash,
-  });
+  await sendLamports(conn, keypair.publicKey, 100 * LAMPORTS_PER_SOL);
 
   return { provider, keypair };
 };
@@ -203,6 +233,21 @@ export const getEthereumAddress = (publicKey: Buffer) => {
   return keccak256(publicKey).slice(12);
 };
 
+export function calculateForwarderAuthorityBump(
+  forwarderStatePubkey: PublicKey,
+  receiverProgram: PublicKey,
+  programId: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+      forwarderStatePubkey.toBuffer(),
+      receiverProgram.toBuffer(),
+    ],
+    programId
+  );
+}
+
 // to be used by other program tests for forwarding data
 export class Forwarder {
   public f: number;
@@ -269,13 +314,13 @@ export class Forwarder {
       : this.provider.wallet.publicKey;
     const signers = ownerKeypair ? [this.state, ownerKeypair] : [this.state];
 
-    this.forwarderAuthority = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-        this.state.publicKey.toBuffer(),
-      ],
-      this.forwarderProgram.programId
-    );
+    // DELETE ME: this.forwarderAuthority = PublicKey.findProgramAddressSync(
+    //   [
+    //     Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
+    //     this.state.publicKey.toBuffer(),
+    //   ],
+    //   this.forwarderProgram.programId
+    // );
 
     return await this.forwarderProgram.methods
       .initialize()
@@ -379,8 +424,14 @@ export class Forwarder {
     // just keep this zero-ed since we don't use it outside of the hash
     const reportContextBytes = Buffer.alloc(96);
 
+    // the msg to sign includes the prefix of u8(len(rawReportBytes))
+    const rawReportLenU8 = Buffer.alloc(1);
+    rawReportLenU8.writeUint8(rawReportBytes.length & 0xff);
+
     const msgHashToSign = createHash("sha256")
-      .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+      .update(
+        Buffer.concat([rawReportLenU8, rawReportBytes, reportContextBytes])
+      )
       .digest();
 
     const signaturesInfo = reportSigners.map((s) =>
@@ -447,8 +498,25 @@ export class Forwarder {
 
     // increment this.nextReportInfo no matter what
 
+    const [forwarderAuthority, _] = calculateForwarderAuthorityBump(
+      this.state.publicKey,
+      receiverProgram,
+      this.forwarderProgram.programId
+    );
+
+    const accountHash = generateAccountHash([
+      this.state.publicKey.toBuffer(),
+      forwarderAuthority.toBuffer(),
+      ...remainingAccounts.map((r) => r.pubkey.toBuffer()),
+    ]);
+
+    const wrappedForwarderReportPayload = encodeForwarderReport(
+      accountHash,
+      payload
+    );
+
     const dataBytes = this.generateForwarderReport(
-      payload,
+      wrappedForwarderReportPayload,
       workflowName,
       workflowOwner
     );
@@ -460,7 +528,7 @@ export class Forwarder {
         state: this.state.publicKey,
         oraclesConfig: this.oraclesConfig[0],
         transmitter: this.provider.wallet.publicKey, // not used for anything besides payment
-        forwarderAuthority: this.forwarderAuthority[0],
+        forwarderAuthority: forwarderAuthority,
         executionState: executionStateStorage,
         receiverProgram: receiverProgram,
         systemProgram: anchor.web3.SystemProgram.programId,

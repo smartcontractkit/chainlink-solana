@@ -10,7 +10,14 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitLegacyFeedsConfig is the `initLegacyFeedsConfig` instruction.
+// Initializes the legacy feeds config account, which stores the legacy store program
+// and data id to legacy feed account mappings for double writing if enabled.
+// Write disabled flags are set to 0 by default (writes enabled), however if
+// optional legacy accounts are omitted in `on_report` context no legacy writes will occur
+// (see `on_report`).
+// Recommended limit of 15 legacy feeds can be initialized at once.
+// Instruction does not verify internally if data id and associated legacy feed account
+// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
 type InitLegacyFeedsConfig struct {
 	DataIds *[][16]uint8
 

@@ -4,33 +4,67 @@ package keystone_forwarder
 
 import ag_binary "github.com/gagliardetto/binary"
 
+type SignerAddressList struct {
+	Xs  [32][20]uint8
+	Len uint64
+}
+
+func (obj SignerAddressList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Xs` param:
+	err = encoder.Encode(obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SignerAddressList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Xs`:
+	err = decoder.Decode(&obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ForwarderError ag_binary.BorshEnum
 
 const (
-	ExcessSigners_ForwarderError ForwarderError = iota
+	InvalidProposedOwner_ForwarderError ForwarderError = iota
+	ExcessSigners_ForwarderError
 	SignersNotSortedInIncreasingOrder_ForwarderError
 	InvalidReport_ForwarderError
-	InvalidConfig_ForwarderError
 	InvalidSignatureCount_ForwarderError
 	InvalidSignature_ForwarderError
 	UnauthorizedSigner_ForwarderError
 	DuplicateSignatures_ForwarderError
 	ExecutionAlreadySucceded_ForwarderError
-	InvalidExecutionPDA_ForwarderError
 	FaultToleranceMustBePositive_ForwarderError
 	InsufficientSigners_ForwarderError
+	ForwarderReportExpected_ForwarderError
+	InvalidAccountHash_ForwarderError
 )
 
 func (value ForwarderError) String() string {
 	switch value {
+	case InvalidProposedOwner_ForwarderError:
+		return "InvalidProposedOwner"
 	case ExcessSigners_ForwarderError:
 		return "ExcessSigners"
 	case SignersNotSortedInIncreasingOrder_ForwarderError:
 		return "SignersNotSortedInIncreasingOrder"
 	case InvalidReport_ForwarderError:
 		return "InvalidReport"
-	case InvalidConfig_ForwarderError:
-		return "InvalidConfig"
 	case InvalidSignatureCount_ForwarderError:
 		return "InvalidSignatureCount"
 	case InvalidSignature_ForwarderError:
@@ -41,12 +75,14 @@ func (value ForwarderError) String() string {
 		return "DuplicateSignatures"
 	case ExecutionAlreadySucceded_ForwarderError:
 		return "ExecutionAlreadySucceded"
-	case InvalidExecutionPDA_ForwarderError:
-		return "InvalidExecutionPDA"
 	case FaultToleranceMustBePositive_ForwarderError:
 		return "FaultToleranceMustBePositive"
 	case InsufficientSigners_ForwarderError:
 		return "InsufficientSigners"
+	case ForwarderReportExpected_ForwarderError:
+		return "ForwarderReportExpected"
+	case InvalidAccountHash_ForwarderError:
+		return "InvalidAccountHash"
 	default:
 		return ""
 	}

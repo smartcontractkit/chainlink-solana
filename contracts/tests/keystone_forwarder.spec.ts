@@ -12,7 +12,14 @@ import {
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { assert } from "chai";
 import { createHash } from "crypto";
-import { generateEthKeypair, signMessage, waitForEvent } from "./utils";
+import {
+  calculateForwarderAuthorityBump,
+  encodeForwarderReport,
+  generateAccountHash,
+  generateEthKeypair,
+  signMessage,
+  waitForEvent,
+} from "./utils";
 import chaiAsPromised from "chai-as-promised";
 import { DummyReceiver } from "../target/types/dummy_receiver";
 
@@ -20,23 +27,10 @@ import { DummyReceiver } from "../target/types/dummy_receiver";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function calculateForwarderAuthorityBump(
-  forwarderStatePubkey: PublicKey,
-  programId: PublicKey
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(anchor.utils.bytes.utf8.encode("forwarder")),
-      forwarderStatePubkey.toBuffer(),
-    ],
-    programId
-  );
-}
-
 // Helper function to parse oracle config account data
 function parseOraclesConfigAccount(data: Buffer) {
   // Layout: discriminator(8) + config_id(8) + f(1) + padding(7) + signer_addresses
-  // SignerAddresses layout: xs(64*20) + len(1) + padding(7)
+  // SignerAddresses layout: xs(32*20) + len(1) + padding(7)
 
   let offset = 8; // Skip discriminator
 
@@ -52,8 +46,8 @@ function parseOraclesConfigAccount(data: Buffer) {
   offset += 7;
 
   // Read SignerAddresses structure
-  // Layout: xs (64*20 bytes) + len (1 byte) + padding (7 bytes)
-  const signerAddressesLen = data.readUInt8(offset + 64 * 20); // len is after xs array
+  // Layout: xs (32*20 bytes) + len (1 byte) + padding (7 bytes)
+  const signerAddressesLen = data.readUInt8(offset + 32 * 20); // len is after xs array
 
   // Extract the actual addresses from xs array
   const signerAddresses = [];
@@ -129,7 +123,7 @@ describe("keystone_storage", function () {
   it("Is initialized!", async () => {
     const eventPromise = waitForEvent(
       program,
-      "InitializeEmit",
+      "ForwarderInitialize",
       (event: any, slot) => {
         assert.isNotNull(event.authorityNonce);
         assert.isTrue(
@@ -389,7 +383,6 @@ describe("keystone_storage", function () {
         state: forwarderState.publicKey,
         oraclesConfig: oraclesConfigStorage,
         owner: provider.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
@@ -528,20 +521,10 @@ describe("keystone_storage", function () {
       )
       .digest();
 
-    const [forwarderAuthorityStorage, forwarderAuthorityBump] =
-      calculateForwarderAuthorityBump(
-        forwarderState.publicKey,
-        program.programId
-      );
-
-    const actualState = await program.account.forwarderState.fetch(
-      forwarderState.publicKey
-    );
-
-    assert.equal(
-      actualState.authorityNonce,
-      forwarderAuthorityBump,
-      "forwarder authority PDA bumps should be equal"
+    const [forwarderAuthorityStorage, _] = calculateForwarderAuthorityBump(
+      forwarderState.publicKey,
+      receiver,
+      program.programId
     );
 
     // begin initializing the receiver program
@@ -577,8 +560,20 @@ describe("keystone_storage", function () {
     const lenSignatureBytes = Buffer.alloc(1);
     lenSignatureBytes.writeUint8(signers.length);
 
+    // generate account hash
+    const accountHash = generateAccountHash([
+      forwarderState.publicKey.toBuffer(),
+      forwarderAuthorityStorage.toBuffer(),
+      latestReportState.publicKey.toBuffer(),
+    ]);
+
+    const forwarderReportBuffer = encodeForwarderReport(
+      accountHash,
+      Buffer.from([255])
+    );
+
     // metadata length + actual report payload length
-    const rawReportBytes = Buffer.alloc(109 + 1);
+    const rawReportBytes = Buffer.alloc(109 + forwarderReportBuffer.length);
 
     // version                offset   0, size  1
     // workflow_execution_id  offset   1, size 32
@@ -608,14 +603,22 @@ describe("keystone_storage", function () {
     rawReportBytes.writeUint8(workflowOwner, 106);
     rawReportBytes.writeUint8(reportId, 108);
 
-    // payload
-    rawReportBytes.writeUint8(255, 109);
+    // copies forwarderReportBytes into rawReportBytes
+    forwarderReportBuffer.copy(rawReportBytes, 109);
 
     // just keep this zero-ed since we don't use it outside of the hash
     const reportContextBytes = Buffer.alloc(96);
 
+    // the msg to sign includes the prefix of u8(len(rawReportBytes))
+    const rawReportLenU8 = Buffer.alloc(1);
+    rawReportLenU8.writeUint8(rawReportBytes.length & 0xff);
+
+    console.log("raw report length", rawReportBytes.length);
+
     const msgHashToSign = createHash("sha256")
-      .update(Buffer.concat([rawReportBytes, reportContextBytes]))
+      .update(
+        Buffer.concat([rawReportLenU8, rawReportBytes, reportContextBytes])
+      )
       .digest();
 
     const signaturesInfo = signers.map((s) =>

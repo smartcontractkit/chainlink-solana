@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// OnReport is the `onReport` instruction.
+// Receives the a forwarder report that contains a list of [`ReceivedDecimalReport`]
+// Maximum amount of 6 ReceivedDecimalReports can be included in the report before
+// the transaction limit will be exceeded.
+// For calculation look to ../../docs/data-feeds-cache/README.md#L579
+// There are three optional accounts, all related to legacy feed writing.
+// If you omit any of these or have write_disabled = 1 for all feeds
+// then we guarentee no legacy feeds will be written to.
 type OnReport struct {
 	Metadata *[]byte
 	Report   *[]byte
@@ -26,15 +32,13 @@ type OnReport struct {
 	// [4] = [] legacyFeedsConfig
 	//
 	// [5] = [] legacyWriter
-	//
-	// [6] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewOnReportInstructionBuilder creates a new `OnReport` instruction builder.
 func NewOnReportInstructionBuilder() *OnReport {
 	nd := &OnReport{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -117,17 +121,6 @@ func (inst *OnReport) GetLegacyWriterAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *OnReport) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *OnReport {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *OnReport) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[6]
-}
-
 func (inst OnReport) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -176,9 +169,6 @@ func (inst *OnReport) Validate() error {
 		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.LegacyWriter is not set")
 		}
-		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
 	}
 	return nil
 }
@@ -198,14 +188,13 @@ func (inst *OnReport) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=7]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("    forwarderState", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("forwarderAuthority", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("        cacheState", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("       legacyStore", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta(" legacyFeedsConfig", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("      legacyWriter", inst.AccountMetaSlice[5]))
-						accountsBranch.Child(ag_format.Meta("     systemProgram", inst.AccountMetaSlice[6]))
 					})
 				})
 		})
@@ -249,8 +238,7 @@ func NewOnReportInstruction(
 	cacheState ag_solanago.PublicKey,
 	legacyStore ag_solanago.PublicKey,
 	legacyFeedsConfig ag_solanago.PublicKey,
-	legacyWriter ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *OnReport {
+	legacyWriter ag_solanago.PublicKey) *OnReport {
 	return NewOnReportInstructionBuilder().
 		SetMetadata(metadata).
 		SetReport(report).
@@ -259,6 +247,5 @@ func NewOnReportInstruction(
 		SetCacheStateAccount(cacheState).
 		SetLegacyStoreAccount(legacyStore).
 		SetLegacyFeedsConfigAccount(legacyFeedsConfig).
-		SetLegacyWriterAccount(legacyWriter).
-		SetSystemProgramAccount(systemProgram)
+		SetLegacyWriterAccount(legacyWriter)
 }

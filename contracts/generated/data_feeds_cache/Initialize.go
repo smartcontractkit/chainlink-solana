@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Initialize is the `initialize` instruction.
+// Creates a new data cache instance with a dedicated state account.
+// Sets the initial feed admins and state configuration.
 type Initialize struct {
 	FeedAdmins *[]ag_solanago.PublicKey
 
@@ -18,14 +19,17 @@ type Initialize struct {
 	//
 	// [1] = [WRITE, SIGNER] state
 	//
-	// [2] = [] systemProgram
+	// [2] = [] forwarderProgram
+	// ··········· the actual program id on chain may have been generated through a different mechanism
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeInstructionBuilder creates a new `Initialize` instruction builder.
 func NewInitializeInstructionBuilder() *Initialize {
 	nd := &Initialize{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -58,15 +62,28 @@ func (inst *Initialize) GetStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetForwarderProgramAccount sets the "forwarderProgram" account.
+// the actual program id on chain may have been generated through a different mechanism
+func (inst *Initialize) SetForwarderProgramAccount(forwarderProgram ag_solanago.PublicKey) *Initialize {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(forwarderProgram)
+	return inst
+}
+
+// GetForwarderProgramAccount gets the "forwarderProgram" account.
+// the actual program id on chain may have been generated through a different mechanism
+func (inst *Initialize) GetForwarderProgramAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *Initialize) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *Initialize {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *Initialize) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst Initialize) Build() *Instruction {
@@ -103,6 +120,9 @@ func (inst *Initialize) Validate() error {
 			return errors.New("accounts.State is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.ForwarderProgram is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -123,10 +143,11 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        owner", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("           owner", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("           state", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("forwarderProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -156,10 +177,12 @@ func NewInitializeInstruction(
 	// Accounts:
 	owner ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
+	forwarderProgram ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetFeedAdmins(feedAdmins).
 		SetOwnerAccount(owner).
 		SetStateAccount(state).
+		SetForwarderProgramAccount(forwarderProgram).
 		SetSystemProgramAccount(systemProgram)
 }

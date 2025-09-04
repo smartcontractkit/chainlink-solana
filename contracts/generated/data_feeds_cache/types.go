@@ -118,7 +118,7 @@ func (obj *AccountList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 }
 
 type WorkflowMetadataList struct {
-	Xs  [64]WorkflowMetadata
+	Xs  [16]WorkflowMetadata
 	Len uint64
 }
 
@@ -277,11 +277,10 @@ const (
 	EmptyConfig_DataCacheError DataCacheError = iota
 	ArrayLengthMismatch_DataCacheError
 	InvalidDataId_DataCacheError
-	MissingAccounts_DataCacheError
+	InvalidAccountCount_DataCacheError
 	AccountMismatch_DataCacheError
 	InvalidAddress_DataCacheError
 	InvalidWorkflowName_DataCacheError
-	UnclosedPermissionFlags_DataCacheError
 	MaxWorkflowsExceeded_DataCacheError
 	AddressesMustStrictlyIncrease_DataCacheError
 	OutOfBounds_DataCacheError
@@ -291,6 +290,10 @@ const (
 	InvalidLength_DataCacheError
 	MalformedReport_DataCacheError
 	FailedLegacyWrite_DataCacheError
+	InvalidProposedOwner_DataCacheError
+	FeedConfigListNotEmpty_DataCacheError
+	EmptyDescriptionEnforced_DataCacheError
+	InvalidDescription_DataCacheError
 )
 
 func (value DataCacheError) String() string {
@@ -301,16 +304,14 @@ func (value DataCacheError) String() string {
 		return "ArrayLengthMismatch"
 	case InvalidDataId_DataCacheError:
 		return "InvalidDataId"
-	case MissingAccounts_DataCacheError:
-		return "MissingAccounts"
+	case InvalidAccountCount_DataCacheError:
+		return "InvalidAccountCount"
 	case AccountMismatch_DataCacheError:
 		return "AccountMismatch"
 	case InvalidAddress_DataCacheError:
 		return "InvalidAddress"
 	case InvalidWorkflowName_DataCacheError:
 		return "InvalidWorkflowName"
-	case UnclosedPermissionFlags_DataCacheError:
-		return "UnclosedPermissionFlags"
 	case MaxWorkflowsExceeded_DataCacheError:
 		return "MaxWorkflowsExceeded"
 	case AddressesMustStrictlyIncrease_DataCacheError:
@@ -329,6 +330,14 @@ func (value DataCacheError) String() string {
 		return "MalformedReport"
 	case FailedLegacyWrite_DataCacheError:
 		return "FailedLegacyWrite"
+	case InvalidProposedOwner_DataCacheError:
+		return "InvalidProposedOwner"
+	case FeedConfigListNotEmpty_DataCacheError:
+		return "FeedConfigListNotEmpty"
+	case EmptyDescriptionEnforced_DataCacheError:
+		return "EmptyDescriptionEnforced"
+	case InvalidDescription_DataCacheError:
+		return "InvalidDescription"
 	default:
 		return ""
 	}

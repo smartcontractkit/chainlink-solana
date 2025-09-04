@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// CloseOraclesConfig is the `closeOraclesConfig` instruction.
+// Closes oracle config account
 type CloseOraclesConfig struct {
 	DonId         *uint32
 	ConfigVersion *uint32
