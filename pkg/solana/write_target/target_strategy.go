@@ -17,15 +17,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	wt "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
+
 	ks_forwarder "github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	sol_binary "github.com/gagliardetto/binary"
 
 	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -156,8 +157,6 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 	ts.lggr.Infof("decoded report  metadata wf name %s meta wf name %s", reportMetadata.WorkflowName, request.Metadata.WorkflowName)
 
-	verifySignature(ts.lggr, r)
-
 	blockhash, err := ts.client.LatestBlockhash(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest blockhash: %w", err)
@@ -189,41 +188,6 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 
 	return txID.String(), nil
-}
-
-func verifySignature(lggr logger.Logger, r *targetRequest) {
-	lggr.Debug("verify signature")
-	var raw []byte
-	raw = append(raw, uint8(len(r.Inputs.SignedReport.Report)))
-	raw = append(raw, r.Inputs.SignedReport.Report...)
-	raw = append(raw, r.Inputs.SignedReport.Context...)
-	h := sha256.Sum256(raw)
-	lggr.Debugf("signed blob: %x", h)
-	lggr.Debugf("ts report: %x", r.Inputs.SignedReport.Report)
-	lggr.Debugf("ts reportctx: %x", r.Inputs.SignedReport.Context)
-	for _, sig := range r.Inputs.SignedReport.Signatures {
-		s := make([]byte, 65)
-		copy(s, sig)
-		// go-ethereum Ecrecover wants V in {27,28}
-		if s[64] < 27 {
-			s[64] += 27
-		}
-
-		pb, err := crypto.Ecrecover(h[:], sig)
-		if err != nil {
-			lggr.Errorf("recovered pubkey failed: %w R:%d, s:%d v%d", err)
-			return
-		}
-		pubKey, err := crypto.UnmarshalPubkey(pb)
-		if err != nil {
-			lggr.Errorf("failed to unmarshal pubkey: %w", err)
-			return
-		}
-
-		addr := crypto.PubkeyToAddress(*pubKey)
-		lggr.Debugf("signer public address %x", addr.Bytes())
-	}
-
 }
 
 // Wrapper around the ChainWriter to get the fee esimate
@@ -386,7 +350,6 @@ func (ts *targetStrategy) getOracleConfigPDA(ctx context.Context, workflowDonID,
 	}
 
 	return oracleConfigPDA, err
-
 }
 
 func getConfigPDA(statePubkey solana.PublicKey, donID uint32, configVersion uint32, programID solana.PublicKey) solana.PublicKey {

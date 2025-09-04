@@ -16,19 +16,16 @@ var (
 	workflowID       = "15c631d295ef5e32deb99a10ee6804bc4af1385568f9b3363f6552ac6dbb2cef"
 	workflowName     = "aabbccddeeaabbccddee"
 	donID            = uint32(2)
-	donIDHex         = "00000002"
 	executionID      = "8d4e66421db647dd916d3ec28d56188c8d7dae5f808e03d03339ed2562f13bb0"
 	workflowOwnerID  = "0000000000000000000000000000000000000000"
 	reportID         = "9988"
 	timestampInt     = uint32(1234567890)
-	timestampHex     = "499602d2"
 	configVersionInt = uint32(1)
-	configVersionHex = "00000001"
 )
 
 func Test_capEncoder(t *testing.T) {
 	cfg := map[string]any{
-		reportSchema: `{
+		reportSchemaKey: `{
       "kind": "struct",
       "fields": [
         { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }

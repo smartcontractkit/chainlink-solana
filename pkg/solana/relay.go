@@ -111,7 +111,8 @@ func (r *Relayer) Start(ctx context.Context) error {
 				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
 			}
 
-			if err := r.capabilitiesRegistry.Add(ctx, wt); err != nil {
+			err = r.capabilitiesRegistry.Add(ctx, wt)
+			if err != nil {
 				return fmt.Errorf("failed to register capability: %w", err)
 			}
 
@@ -121,11 +122,13 @@ func (r *Relayer) Start(ctx context.Context) error {
 			}
 
 			r.lggr.Infow("Registered write target", "chain_id", r.chain.ID(), "info", capInfo)
-			if err := r.capabilitiesRegistry.Add(ctx, dr); err != nil {
+
+			err = r.capabilitiesRegistry.Add(ctx, dr)
+			if err != nil {
 				return fmt.Errorf("failed to register capability: %w", err)
 			}
-			r.lggr.Infow("Registered derive remaining", "chain_id", r.chain.ID())
 
+			r.lggr.Infow("Registered derive remaining", "chain_id", r.chain.ID())
 		}
 
 		return nil

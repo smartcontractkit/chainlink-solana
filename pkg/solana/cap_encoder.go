@@ -12,14 +12,15 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 var (
-	encoderName    = "user"
-	reportSchema   = "report_schema"
-	definedTypes   = "defined_types"
-	accountCtxHash = "account_context_hash"
+	encoderName     = "user"
+	reportSchemaKey = "report_schema"
+	definedTypes    = "defined_types"
+	accountCtxHash  = "account_context_hash"
 )
 
 func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
@@ -32,7 +33,7 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	}
 	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, idl.Accounts[0].Name, idl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find definition: %w", err)
 	}
 
 	accountIDLDef, ok := idlDef.(codec.IdlTypeDef)
@@ -41,11 +42,15 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	}
 
 	cEntry, err := codec.CreateCodecEntry(accountIDLDef, idl.Accounts[0].Name, idl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create codec entry: %w", err)
+	}
 	itemType := codec.WrapItemType(true, encoderName, idl.Accounts[0].Name)
 	parsed.EncoderDefs[itemType] = cEntry
+
 	c, err := parsed.ToCodec()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create remote codec: %w", err)
 	}
 
 	return &capEncoder{codec: c, itemType: itemType}, err
@@ -53,10 +58,9 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 
 func getIDLFromConfig(config *values.Map) (codec.IDL, error) {
 	var idl codec.IDL
-	inputSchema, ok := config.Underlying[reportSchema]
+	inputSchema, ok := config.Underlying[reportSchemaKey]
 	if !ok {
 		return idl, errors.New("missing field report_schema")
-
 	}
 	var reportSchema string
 	err := inputSchema.UnwrapTo(&reportSchema)
