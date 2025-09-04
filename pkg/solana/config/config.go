@@ -7,6 +7,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // Global solana defaults.
@@ -76,6 +77,41 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+
+	// workflow
+	WF() Workflow
+}
+
+type Workflow interface {
+	AcceptanceTimeout() time.Duration
+	PollPeriod() time.Duration
+	ForwarderAddress() string
+	FromAddress() string
+	ForwarderState() string
+	GasLimitDefault() *uint64
+	TxAcceptanceState() *commontypes.TransactionStatus
+	Local() bool // shows if workflow is run against local network
+}
+
+type WorkflowConfig struct {
+	AcceptanceTimeout *config.Duration
+	PollPeriod        *config.Duration
+
+	ForwarderAddress  *string
+	FromAddress       *string
+	ForwarderState    *string
+	GasLimitDefault   *uint64
+	TxAcceptanceState *commontypes.TransactionStatus
+	Enabled           bool
+	Local             bool
+}
+
+func (w *WorkflowConfig) Validate() error {
+	if !w.Enabled {
+		return nil
+	}
+
+	return nil
 }
 
 type Chain struct {

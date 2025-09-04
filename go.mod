@@ -18,12 +18,14 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.62
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250627133416-1d85eec09097
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250804184440-c0506474fc44
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
+	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250818175541-3389ac08a563
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250717121125-2350c82883e2
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250729142306-508e798f6a5d
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
@@ -122,7 +124,6 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
