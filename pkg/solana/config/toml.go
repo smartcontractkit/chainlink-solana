@@ -119,7 +119,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	Workflow  WorkflowConfig
+	Workflow  WorkflowConfig `toml:",omitempty"`
 	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
