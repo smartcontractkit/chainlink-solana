@@ -120,6 +120,8 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 		return nil, fmt.Errorf("failed to unmarashal transmission info: %w", err)
 	}
 
+	// Currently if execution state exists it's guaranteed to have succeeded.
+	// We keep this check here in case if we support failed execution state update in the future
 	if transmissionInfo.Success {
 		ts.lggr.Infow("returning without a transmission attempt - report already onchain ", "executionID", request.Metadata.WorkflowExecutionID)
 		return &wt.TransmissionState{
@@ -138,6 +140,10 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 		Err:         errors.New("submitted transaction failed"),
 	}, nil
 }
+
+const (
+	defaultComputeUnit = 500_000 // estimated locally for 1 feedID
+)
 
 func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, reportContext []byte, signatures [][]byte, request capabilities.CapabilityRequest) (string, error) {
 	txID, err := uuid.NewUUID() // NOTE: CW expects us to generate an ID, rather than return one
@@ -182,7 +188,7 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 	}
 
 	transactionID := txID.String()
-	options := []utils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(false), txmutils.SetComputeUnitLimit(500_000)}
+	options := []utils.SetTxConfig{txmutils.SetEstimateComputeUnitLimit(false), txmutils.SetComputeUnitLimit(defaultComputeUnit)}
 	if err := ts.txm.Enqueue(ctx, ts.accounts.forwarderProgramID.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, options...); err != nil {
 		return "", fmt.Errorf("failed to submit transaction: %w", err)
 	}
@@ -400,6 +406,7 @@ var (
 	executionIDSize   = 32
 )
 
+// ref: extract_transmission_id from contracts/programs/keystone-forwarder/src/utils.rs
 func extractTransmissionID(receiver solana.PublicKey, rawReport []byte) ([32]byte, error) {
 	var data []byte
 

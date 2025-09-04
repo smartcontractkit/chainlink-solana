@@ -81,12 +81,12 @@ func (dr *deriver) Execute(ctx context.Context, request capabilities.CapabilityR
 
 	err := request.Config.UnwrapTo(&cd)
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("invalid config: %w", err)
 	}
 
 	remaining, err := dr.deriveRemaining(ctx, &cd, request.Metadata)
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("derive remaining failed: %w", err)
 	}
 
 	res.Value, err = values.NewMap(map[string]solana.AccountMetaSlice{
@@ -124,7 +124,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 
 	authority, err := deriveForwarderAuthority(dr.accounts.forwarderState, cacheProgram, dr.accounts.forwarderProgramID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed derive forwarder authority: %w", err)
 	}
 
 	// 0 forwarder state
@@ -196,7 +196,7 @@ func (dr *deriver) deriveRemaining(ctx context.Context, cd *CacheDetails, meta c
 		}
 
 		if len(wfOwner) != 20 {
-			return nil, fmt.Errorf("workflow owner address size is invalid: %d, expected 20", len(wfOwner))
+			return nil, fmt.Errorf("invalid workflow owner: %s", meta.WorkflowOwner)
 		}
 		var wfName [10]byte
 		copy(wfName[:], []byte(meta.DecodedWorkflowName))
