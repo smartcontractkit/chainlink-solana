@@ -33,8 +33,6 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 	id := GenerateWriteTargetName(chainID)
 	cfg := chain.Config().WF()
 
-	// TODO metrics used to initialize product processors
-
 	emitter := writetarget.NewMonitorEmitter(lggr)
 
 	processors, err := processor.NewPlatformProcessors(emitter)
@@ -42,10 +40,8 @@ func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainI
 		return nil, fmt.Errorf("failed to create solana platform processors: %w", err)
 	}
 
-	// TODO implement products processors
-	//processors["evm-data-feeds"] = dfProcessor
-	//processors["evm-data-feeds-ccip"] = ccipDfProcessor
-	//processors["evm-por-feeds"] = porProcessor
+	// TODO PLEX-297 implement products processors
+	//processors["solana_secure_mint"] = secureMintProcessor
 
 	beholder, err := writetarget.NewMonitor(writetarget.MonitorOpts{
 		Lggr:              lggr,
