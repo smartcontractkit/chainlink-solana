@@ -2,8 +2,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -102,16 +104,23 @@ type WorkflowConfig struct {
 	ForwarderState    *string
 	GasLimitDefault   *uint64
 	TxAcceptanceState *commontypes.TransactionStatus
-	Enabled           bool
 	Local             bool
 }
 
 func (w *WorkflowConfig) Validate() error {
-	if !w.Enabled {
-		return nil
+	var err error
+	addresses := map[string]string{
+		"ForwarderAddress": *w.ForwarderAddress,
+		"FromAddress":      *w.FromAddress,
+		"ForwarderState":   *w.ForwarderState,
+	}
+	for name, addr := range addresses {
+		if _, err2 := solana.PublicKeyFromBase58(addr); err2 != nil {
+			err = errors.Join(err, fmt.Errorf("%s invalid solana address: %w", name, err2))
+		}
 	}
 
-	return nil
+	return err
 }
 
 type Chain struct {
