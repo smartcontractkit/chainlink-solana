@@ -119,7 +119,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
-	Workflow  WorkflowConfig `toml:",omitempty"`
+	Workflow  *WorkflowConfig `toml:",omitempty"`
 	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
@@ -230,8 +230,8 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
 	}
 
-	if err2 := c.Workflow.Validate(); err != nil {
-		err = errors.Join(err, err2)
+	if c.Workflow != nil {
+		err = errors.Join(c.Workflow.Validate())
 	}
 
 	return
@@ -248,11 +248,13 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 var _ Config = &TOMLConfig{}
 
 func (c *TOMLConfig) WF() Workflow {
-	if !c.Workflow.Enabled {
-		return nil
+	if c.Workflow != nil {
+		return &workflowConfig{
+			conf: c.Workflow,
+		}
 	}
 
-	return c
+	return nil
 }
 
 func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
@@ -284,6 +286,35 @@ func (c *TOMLConfig) GasLimitDefault() *uint64 {
 }
 func (c *TOMLConfig) TxAcceptanceState() *commontypes.TransactionStatus {
 	return c.Workflow.TxAcceptanceState
+}
+
+type workflowConfig struct {
+	conf *WorkflowConfig
+}
+
+func (wc *workflowConfig) AcceptanceTimeout() time.Duration {
+	return wc.conf.AcceptanceTimeout.Duration()
+}
+func (wc *workflowConfig) PollPeriod() time.Duration {
+	return wc.conf.PollPeriod.Duration()
+}
+func (wc *workflowConfig) ForwarderAddress() string {
+	return *wc.conf.ForwarderAddress
+}
+func (wc *workflowConfig) FromAddress() string {
+	return *wc.conf.FromAddress
+}
+func (wc *workflowConfig) ForwarderState() string {
+	return *wc.conf.ForwarderState
+}
+func (wc *workflowConfig) GasLimitDefault() *uint64 {
+	return wc.conf.GasLimitDefault
+}
+func (wc *workflowConfig) TxAcceptanceState() *commontypes.TransactionStatus {
+	return wc.conf.TxAcceptanceState
+}
+func (wc *workflowConfig) Local() bool {
+	return wc.conf.Local
 }
 
 func (c *TOMLConfig) BlockTime() time.Duration {
