@@ -1021,11 +1021,15 @@ func (it *SolanaChainComponentsInterfaceTester[T]) GetContractReader(t T) types.
 	require.NoError(t, err)
 
 	orm := logpoller.NewORM(chainID.String(), it.Helper.Database(), it.Helper.Logger(t))
+	lp := logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient(), config.NewDefault())
+	t.Cleanup(func() {
+		_ = lp.Close
+	})
 	svc, err := chainreader.NewContractReaderService(
 		it.Helper.Logger(t),
 		it.Helper.RPCClient(),
 		contractReaderConfig,
-		logpoller.New(logger.Sugared(it.Helper.Logger(t)), orm, it.Helper.MultiClient(), config.NewDefault()))
+		lp)
 
 	require.NoError(t, err)
 	servicetest.Run(t, svc)

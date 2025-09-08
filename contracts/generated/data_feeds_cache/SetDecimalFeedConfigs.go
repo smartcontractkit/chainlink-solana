@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// SetDecimalFeedConfigs is the `setDecimalFeedConfigs` instruction.
+// Given N data ids and M workflows, configures N feed config accounts and N*M write permission accounts.
+// Creates feed config and permission accounts where they do not exist.
+// All feed config accounts and permission accounts are passed as ctx.remaining_accounts (see SetDecimalFeedConfigs context).
+// If you'd like to prepare the feed config account for closing by calling `close_decimal_report` you need to
+// set the data id's feed config to an empty workflow metadata and [0; 32] (empty) description.
+// Because there are two variables N and M which directly influence the size, the table in
+// docs/data-feeds-cache/README.md#L297 shows safe ranges for N and M as guidelines.
 type SetDecimalFeedConfigs struct {
 	DataIds           *[][16]uint8
 	Descriptions      *[][32]uint8

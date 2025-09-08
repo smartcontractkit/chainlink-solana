@@ -4,12 +4,18 @@ import { Program, getProvider, BN, BorshCoder } from "@coral-xyz/anchor";
 import { DataFeedsCache } from "../target/types/data_feeds_cache";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { DummyReceiver } from "../target/types/dummy_receiver";
-import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  AccountMeta,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
 // import chaiAsPromised from "chai-as-promised";
 import { assert, expect } from "chai";
 import {
   ArrayVec,
   arrayVecEquals,
+  calculateForwarderAuthorityBump,
   Feed,
   Forwarder,
   getReportHash,
@@ -19,6 +25,7 @@ import {
   newWorkflows,
   randomDescription,
   randomWorkflowMetadata,
+  sendLamports,
   Signer,
   waitForEvent,
   WorkflowMetadata,
@@ -138,6 +145,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -178,9 +186,9 @@ describe("data feeds cache", function () {
       );
 
       assert.equal(
-        actualCacheState.legacyWriterNonce,
+        actualCacheState.legacyWriterBump,
         bump,
-        "legacy writer nonces equal"
+        "legacy writer bump equal"
       );
     });
   });
@@ -200,6 +208,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -397,6 +406,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -415,6 +425,12 @@ describe("data feeds cache", function () {
       const feedCReportPDA = decimalReportPDA(
         cacheStateAccount.publicKey,
         feedC.dataId
+      );
+
+      await sendLamports(
+        defaultConnection,
+        feedAReportPDA,
+        3 * LAMPORTS_PER_SOL
       );
 
       // test initialization
@@ -489,11 +505,25 @@ describe("data feeds cache", function () {
         cacheStateAccount.publicKey,
         feedA.dataId
       );
+      const feedAConfig = feedConfigPDA(
+        cacheStateAccount.publicKey,
+        feedA.dataId
+      );
+
       const feedBReportPDA = decimalReportPDA(
         cacheStateAccount.publicKey,
         feedB.dataId
       );
+      const feedBConfig = feedConfigPDA(
+        cacheStateAccount.publicKey,
+        feedB.dataId
+      );
+
       const feedCReportPDA = decimalReportPDA(
+        cacheStateAccount.publicKey,
+        feedC.dataId
+      );
+      const feedCConfig = feedConfigPDA(
         cacheStateAccount.publicKey,
         feedC.dataId
       );
@@ -530,22 +560,30 @@ describe("data feeds cache", function () {
       await cacheProgram.account.decimalReport.fetch(feedBReportPDA);
       await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
 
-      // close them
-
       await cacheProgram.methods
-        .closeDecimalReports([feedA.dataId, feedB.dataId] as any)
+        .setDecimalFeedConfigs(
+          [feedA.dataId, feedB.dataId, feedC.dataId] as any,
+          [Buffer.alloc(32), Buffer.alloc(32), Buffer.alloc(32)] as any,
+          []
+        )
         .accounts({
-          feedAdmin: feedAdminA.keypair.publicKey,
+          feedAdmin: feedAdminA.provider.publicKey,
           state: cacheStateAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
         })
         .remainingAccounts([
           {
-            pubkey: feedAReportPDA,
+            pubkey: feedAConfig,
             isSigner: false,
             isWritable: true,
           },
           {
-            pubkey: feedBReportPDA,
+            pubkey: feedBConfig,
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: feedCConfig,
             isSigner: false,
             isWritable: true,
           },
@@ -553,9 +591,41 @@ describe("data feeds cache", function () {
         .signers([feedAdminA.keypair])
         .rpc();
 
+      await cacheProgram.methods
+        .closeDecimalReport(feedA.dataId as any)
+        .accounts({
+          feedAdmin: feedAdminA.keypair.publicKey,
+          state: cacheStateAccount.publicKey,
+          decimalReport: feedAReportPDA,
+          feedConfig: feedAConfig,
+        })
+        .signers([feedAdminA.keypair])
+        .rpc();
+
+      await cacheProgram.methods
+        .closeDecimalReport(feedB.dataId as any)
+        .accounts({
+          feedAdmin: feedAdminA.keypair.publicKey,
+          state: cacheStateAccount.publicKey,
+          decimalReport: feedBReportPDA,
+          feedConfig: feedBConfig,
+        })
+        .signers([feedAdminA.keypair])
+        .rpc();
+
       for (const reportAccount of [feedAReportPDA, feedBReportPDA]) {
         try {
-          await cacheProgram.account.writePermissionFlag.fetch(reportAccount);
+          await cacheProgram.account.decimalReport.fetch(reportAccount);
+          assert.fail("Account should not exist anymore");
+        } catch (err) {
+          if (!err.message.includes("Account does not exist")) {
+            assert.fail("Account should not exist anymore");
+          }
+        }
+      }
+      for (const configAccount of [feedAConfig, feedBConfig]) {
+        try {
+          await cacheProgram.account.feedConfig.fetch(configAccount);
           assert.fail("Account should not exist anymore");
         } catch (err) {
           if (!err.message.includes("Account does not exist")) {
@@ -565,6 +635,7 @@ describe("data feeds cache", function () {
       }
 
       await cacheProgram.account.decimalReport.fetch(feedCReportPDA);
+      await cacheProgram.account.feedConfig.fetch(feedCConfig);
     });
   });
 
@@ -579,6 +650,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -822,6 +894,30 @@ describe("data feeds cache", function () {
           }))
         );
 
+      // anchor discriminator size + feed config size
+      const rentExemptLamports =
+        await defaultConnection.getMinimumBalanceForRentExemption(8 + 1032);
+      const sentAmountLamports = rentExemptLamports - 100;
+
+      // send under rent exemption amount to check if remaining rent is covered by signer
+      await sendLamports(
+        defaultConnection,
+        initialFeedConfigAccounts[0],
+        sentAmountLamports
+      );
+
+      assert.equal(
+        await defaultConnection.getBalance(initialFeedConfigAccounts[0]),
+        sentAmountLamports,
+        "expected airdropped amount"
+      );
+
+      await sendLamports(
+        defaultConnection,
+        initialPermissionFlagAccounts[0],
+        1 * LAMPORTS_PER_SOL
+      );
+
       await cacheProgram.methods
         .setDecimalFeedConfigs(
           initialDataIds as any,
@@ -836,6 +932,13 @@ describe("data feeds cache", function () {
         .remainingAccounts(initialRemainingAccounts)
         .signers([feedAdminA.keypair])
         .rpc();
+
+      // check remaining rent has been paid
+      assert.equal(
+        await defaultConnection.getBalance(initialFeedConfigAccounts[0]),
+        rentExemptLamports,
+        "rent exempt amount"
+      );
 
       // 2. preview changes
       const dataIds2 = [feedA.dataId, feedB.dataId];
@@ -977,6 +1080,7 @@ describe("data feeds cache", function () {
     let cacheStateAccount: Keypair;
 
     let forwarder: Forwarder;
+    let forwarderAuthority: anchor.web3.PublicKey;
 
     let legacyFeeds: Feed[];
 
@@ -1002,6 +1106,13 @@ describe("data feeds cache", function () {
       await forwarder.initialize();
       await forwarder.initOraclesConfig();
 
+      let [authority, _] = calculateForwarderAuthorityBump(
+        forwarder.state.publicKey,
+        cacheProgram.programId,
+        forwarder.forwarderProgram.programId
+      );
+      forwarderAuthority = authority;
+
       cacheStateAccount = Keypair.generate();
       legacyFeedConfigAccount = legacyFeedsConfigPDA(
         cacheStateAccount.publicKey
@@ -1015,10 +1126,7 @@ describe("data feeds cache", function () {
         isWritable: true,
       }));
       legacyFeeds = [feedA, feedB].sort((a, b) => a.dataId.compare(b.dataId));
-      legacyWorkflowMetadatas = newWorkflows(
-        1,
-        forwarder.forwarderAuthority[0]
-      );
+      legacyWorkflowMetadatas = newWorkflows(1, forwarderAuthority);
       legacyReportHashes = legacyFeeds.map((f) => {
         return getReportHash(
           f.dataId,
@@ -1037,6 +1145,7 @@ describe("data feeds cache", function () {
         .accounts({
           state: cacheStateAccount.publicKey,
           owner: provider.publicKey,
+          forwarderProgram: forwarderProgram.programId,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([cacheStateAccount])
@@ -1180,11 +1289,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: decimalReportPDA(
               cacheStateAccount.publicKey,
               legacyFeeds[0].dataId
@@ -1238,8 +1342,6 @@ describe("data feeds cache", function () {
 
     it("Update feed A without legacy write + check query method", async () => {
       // first we must update the workflow metadata to work with the desired receiver
-
-      // const legacyWorkflowMetadatas = newWorkflows(1, forwarder.forwarderAuthority[0])
 
       const reportHash = getReportHash(
         feedA.dataId,
@@ -1296,11 +1398,6 @@ describe("data feeds cache", function () {
           },
           {
             pubkey: cacheProgram.programId, // legacy writer (omitted)
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: anchor.web3.SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },
@@ -1417,11 +1514,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1496,11 +1588,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1523,10 +1610,7 @@ describe("data feeds cache", function () {
     });
 
     it("Attempt feed A without correct permissions", async () => {
-      const unauthorizedWorkflow = newWorkflows(
-        1,
-        forwarder.forwarderAuthority[0]
-      );
+      const unauthorizedWorkflow = newWorkflows(1, forwarderAuthority);
 
       const reportHash = getReportHash(
         feedA.dataId,
@@ -1614,11 +1698,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1701,11 +1780,6 @@ describe("data feeds cache", function () {
             isWritable: false,
           },
           {
-            pubkey: anchor.web3.SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-          },
-          {
             pubkey: feedAReportPDA,
             isSigner: false,
             isWritable: true,
@@ -1763,11 +1837,6 @@ describe("data feeds cache", function () {
           },
           {
             pubkey: cacheProgram.programId, // legacy writer (omitted)
-            isSigner: false,
-            isWritable: false,
-          },
-          {
-            pubkey: anchor.web3.SystemProgram.programId,
             isSigner: false,
             isWritable: false,
           },

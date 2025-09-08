@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// CloseLegacyFeedsConfig is the `closeLegacyFeedsConfig` instruction.
+// Closes the legacy feeds config. Only to be used once all legacy feeds are
+// no longer used.
 type CloseLegacyFeedsConfig struct {
 
 	// [0] = [WRITE, SIGNER] owner

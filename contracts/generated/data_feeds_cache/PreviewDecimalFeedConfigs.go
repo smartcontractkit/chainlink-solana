@@ -10,7 +10,12 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// PreviewDecimalFeedConfigs is the `previewDecimalFeedConfigs` instruction.
+// An instruction which is only meant to be simulated off-chain. This instruction
+// does nothing beyond returning a list of permission accounts to be closed when
+// calling `set_decimal_feed_configs`. No account state changes in this function.
+// You should call this function before calling `set_decimal_feed_configs` in order
+// to know the write permission accounts that must be passed into the `set_decimal_feed_configs`
+// context to be closed.
 type PreviewDecimalFeedConfigs struct {
 	DataIds           *[][16]uint8
 	Descriptions      *[][32]uint8

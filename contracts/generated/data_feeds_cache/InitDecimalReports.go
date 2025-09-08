@@ -10,7 +10,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// InitDecimalReports is the `initDecimalReports` instruction.
+// Create decimal report accounts, where report data lives (i.e answer, timestamp, etc.)
+// Recommended limit of N = 20 data ids can be initialized at once.
+// The decimal report account and feed config account must exist before reports can
+// be received successfully in `on_report`
 type InitDecimalReports struct {
 	DataIds *[][16]uint8
 

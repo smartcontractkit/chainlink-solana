@@ -2,11 +2,14 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // Global solana defaults.
@@ -76,6 +79,48 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+
+	// workflow
+	WF() Workflow
+}
+
+type Workflow interface {
+	AcceptanceTimeout() time.Duration
+	PollPeriod() time.Duration
+	ForwarderAddress() string
+	FromAddress() string
+	ForwarderState() string
+	GasLimitDefault() *uint64
+	TxAcceptanceState() *commontypes.TransactionStatus
+	Local() bool // shows if workflow is run against local network
+}
+
+type WorkflowConfig struct {
+	AcceptanceTimeout *config.Duration
+	PollPeriod        *config.Duration
+
+	ForwarderAddress  *string
+	FromAddress       *string
+	ForwarderState    *string
+	GasLimitDefault   *uint64
+	TxAcceptanceState *commontypes.TransactionStatus
+	Local             bool
+}
+
+func (w *WorkflowConfig) Validate() error {
+	var err error
+	addresses := map[string]string{
+		"ForwarderAddress": *w.ForwarderAddress,
+		"FromAddress":      *w.FromAddress,
+		"ForwarderState":   *w.ForwarderState,
+	}
+	for name, addr := range addresses {
+		if _, err2 := solana.PublicKeyFromBase58(addr); err2 != nil {
+			err = errors.Join(err, fmt.Errorf("%s invalid solana address: %w", name, err2))
+		}
+	}
+
+	return err
 }
 
 type Chain struct {

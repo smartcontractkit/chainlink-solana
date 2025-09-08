@@ -41,7 +41,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, f: u8)]
+#[instruction(don_id: u32, config_version: u32)]
 pub struct InitOraclesConfig<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -61,7 +61,7 @@ pub struct InitOraclesConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>)]
+#[instruction(don_id: u32, config_version: u32)]
 pub struct UpdateOraclesConfig<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -74,8 +74,6 @@ pub struct UpdateOraclesConfig<'info> {
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -112,7 +110,7 @@ pub struct Report<'info> {
     pub transmitter: Signer<'info>,
 
     /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id

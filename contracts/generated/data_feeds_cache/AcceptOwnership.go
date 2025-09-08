@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// AcceptOwnership is the `acceptOwnership` instruction.
+// Step 2 of 2-step ownership process: accept ownership
 type AcceptOwnership struct {
 
 	// [0] = [SIGNER] newOwner

@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
@@ -118,6 +119,7 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
+	Workflow  *WorkflowConfig `toml:",omitempty"`
 	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
@@ -227,6 +229,11 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	if c.BlockTime() <= 0 {
 		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
 	}
+
+	if c.Workflow != nil {
+		err = errors.Join(c.Workflow.Validate())
+	}
+
 	return
 }
 
@@ -239,6 +246,76 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 var _ Config = &TOMLConfig{}
+
+func (c *TOMLConfig) WF() Workflow {
+	if c.Workflow != nil {
+		return &workflowConfig{
+			conf: c.Workflow,
+		}
+	}
+
+	return nil
+}
+
+func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
+	return c.Workflow.AcceptanceTimeout.Duration()
+}
+
+func (c *TOMLConfig) Local() bool {
+	return c.Workflow.Local
+}
+
+func (c *TOMLConfig) PollPeriod() time.Duration {
+	return c.Workflow.PollPeriod.Duration()
+}
+
+func (c *TOMLConfig) ForwarderAddress() string {
+	return *c.Workflow.ForwarderAddress
+}
+
+func (c *TOMLConfig) FromAddress() string {
+	return *c.Workflow.FromAddress
+}
+
+func (c *TOMLConfig) ForwarderState() string {
+	return *c.Workflow.ForwarderState
+}
+
+func (c *TOMLConfig) GasLimitDefault() *uint64 {
+	return c.Workflow.GasLimitDefault
+}
+func (c *TOMLConfig) TxAcceptanceState() *commontypes.TransactionStatus {
+	return c.Workflow.TxAcceptanceState
+}
+
+type workflowConfig struct {
+	conf *WorkflowConfig
+}
+
+func (wc *workflowConfig) AcceptanceTimeout() time.Duration {
+	return wc.conf.AcceptanceTimeout.Duration()
+}
+func (wc *workflowConfig) PollPeriod() time.Duration {
+	return wc.conf.PollPeriod.Duration()
+}
+func (wc *workflowConfig) ForwarderAddress() string {
+	return *wc.conf.ForwarderAddress
+}
+func (wc *workflowConfig) FromAddress() string {
+	return *wc.conf.FromAddress
+}
+func (wc *workflowConfig) ForwarderState() string {
+	return *wc.conf.ForwarderState
+}
+func (wc *workflowConfig) GasLimitDefault() *uint64 {
+	return wc.conf.GasLimitDefault
+}
+func (wc *workflowConfig) TxAcceptanceState() *commontypes.TransactionStatus {
+	return wc.conf.TxAcceptanceState
+}
+func (wc *workflowConfig) Local() bool {
+	return wc.conf.Local
+}
 
 func (c *TOMLConfig) BlockTime() time.Duration {
 	return c.Chain.BlockTime.Duration()
