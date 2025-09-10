@@ -72,7 +72,9 @@ type WorkflowConfig struct {
 }
 
 func (w *WorkflowConfig) IsEnabled() bool {
-	return w.ForwarderAddress != nil || w.ForwarderState != nil || w.FromAddress != nil
+	return (w.ForwarderAddress != nil && !w.ForwarderAddress.IsZero()) ||
+		(w.ForwarderState != nil && !w.ForwarderState.IsZero()) ||
+		(w.FromAddress != nil && !w.FromAddress.IsZero())
 }
 
 func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {

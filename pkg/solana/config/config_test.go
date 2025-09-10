@@ -3,8 +3,9 @@ package config
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -58,4 +59,9 @@ func TestValidateConfig(t *testing.T) {
 		}
 		require.NoError(t, node.ValidateConfig())
 	})
+}
+
+func TestWorkflowConfigSetEnabled(t *testing.T) {
+	var cfg WorkflowConfig
+	require.False(t, cfg.IsEnabled())
 }
