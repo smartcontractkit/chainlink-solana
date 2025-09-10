@@ -79,7 +79,6 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		//TODO only "enabled" check
 		if wfCfg := r.chain.Config().WF(); wfCfg.IsEnabled() {
 			if r.capabilitiesRegistry == nil {
 				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
@@ -102,7 +101,7 @@ func (r *Relayer) Start(ctx context.Context) error {
 				}
 			}
 
-			wt, err := writetarget.New(ctx, r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)
+			wt, err := writetarget.New(r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)
 			if err != nil {
 				return fmt.Errorf("failed to initialise write target capability: %w", err)
 			}

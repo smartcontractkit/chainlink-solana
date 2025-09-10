@@ -29,7 +29,7 @@ type Chain interface {
 	Config() config.Config
 }
 
-func New(ctx context.Context, chain Chain, reader client.Reader, txm Txm, chainInfo commontypes.ChainInfo, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
+func New(chain Chain, reader client.Reader, txm Txm, chainInfo commontypes.ChainInfo, lggr logger.Logger) (capabilities.ExecutableCapability, error) {
 	chainID := chain.ID()
 
 	id := GenerateWriteTargetName(chainID)
