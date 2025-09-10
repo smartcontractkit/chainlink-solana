@@ -3,15 +3,15 @@ package writetarget
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 
-	"encoding/binary"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -449,23 +449,21 @@ func createReportHash(dataID []byte, forwarderAuthority []byte, workflowOwner []
 	return sha256.Sum256(data)
 }
 
-func accountsFromConfig(cfg config.Workflow) (accounts, error) {
-	var ret accounts
-	var err error
-	ret.forwarderProgramID, err = solana.PublicKeyFromBase58(cfg.ForwarderAddress())
-	if err != nil {
-		return ret, err
+func accountsFromConfig(cfg config.Workflow) (ret accounts, err error) {
+	if addr := cfg.ForwarderAddress(); addr == nil {
+		err = errors.Join(err, errors.New("missing forwarder address"))
+	} else {
+		ret.forwarderProgramID = *addr
 	}
-
-	ret.forwarderState, err = solana.PublicKeyFromBase58(cfg.ForwarderState())
-	if err != nil {
-		return ret, err
+	if addr := cfg.ForwarderState(); addr == nil {
+		err = errors.Join(errors.New("missing forwarder address"))
+	} else {
+		ret.forwarderState = *addr
 	}
-
-	ret.transmitter, err = solana.PublicKeyFromBase58(cfg.FromAddress())
-	if err != nil {
-		return ret, err
+	if addr := cfg.FromAddress(); addr == nil {
+		err = errors.Join(errors.New("missing from address"))
+	} else {
+		ret.transmitter = *addr
 	}
-
-	return ret, nil
+	return
 }
