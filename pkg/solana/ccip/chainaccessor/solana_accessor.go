@@ -568,13 +568,13 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 	return results, nil
 }
 
-func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig {
+func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig, error) {
 	feeQuoterAddr, err := a.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to get fee quoter binding: %w", err)
 	}
 
-	feePriceUpdates := make(map[ccipocr3.ChainSelector]ccipocr3.TimestampedBig)
+	feePriceUpdates := make(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig)
 	// TODO: Leverage multi-account read to minimize RPC calls
 	for _, sel := range selectors {
 		destChainPDA, err := a.pdaCache.feeQuoterDestChain(uint64(sel), feeQuoterAddr)
@@ -586,28 +586,33 @@ func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors [
 		err = a.client.GetAccountDataBorshInto(ctx, destChainPDA, &destChain)
 		// The plugin is built with EVM behaviour in mind: if account is not found the zero value is returned
 		if errors.Is(err, rpc.ErrNotFound) {
-			feePriceUpdates[sel] = ccipocr3.TimestampedBig{
-				Value:     ccipocr3.NewBigIntFromInt64(0),
-				Timestamp: time.Time{},
+			feePriceUpdates[sel] = ccipocr3.TimestampedUnixBig{
+				Value:     big.NewInt(0),
+				Timestamp: 0,
 			}
 			continue
 		}
 		if err != nil {
 			a.lggr.Errorw("failed to batch get chain fee price updates", "err", err)
-			return nil
+			continue
+		}
+
+		if destChain.State.UsdPerUnitGas.Timestamp > math.MaxUint32 {
+			a.lggr.Errorw("gas price update timestamp exceeeds uint32 max", "timestamp", destChain.State.UsdPerUnitGas.Timestamp)
+			continue
 		}
 
 		value := new(big.Int).SetBytes(destChain.State.UsdPerUnitGas.Value[:])
-		feePriceUpdates[sel] = ccipocr3.TimestampedBig{
-			Value:     ccipocr3.NewBigInt(value),
-			Timestamp: time.Unix(destChain.State.UsdPerUnitGas.Timestamp, 0),
+		feePriceUpdates[sel] = ccipocr3.TimestampedUnixBig{
+			Value:     value,
+			Timestamp: uint32(destChain.State.UsdPerUnitGas.Timestamp), //nolint:gosec // timestamp validated to be within uint32 bounds above
 		}
 	}
 
-	return feePriceUpdates
+	return feePriceUpdates, nil
 }
 
-func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (ccipocr3.SeqNum, error) {
 	// Validate offramp binding exists
 	_, err := a.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
@@ -621,5 +626,29 @@ func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (uint64, error
 		return 0, fmt.Errorf("failed to get offramp reference addresses account: %w", err)
 	}
 
-	return state.LatestPriceSequenceNumber, nil
+	return ccipocr3.SeqNum(state.LatestPriceSequenceNumber), nil
+}
+
+func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
+	ctx context.Context,
+	tokens []ccipocr3.UnknownEncodedAddress,
+	chain ccipocr3.ChainSelector,
+) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (a *SolanaAccessor) GetFeedPricesUSD(
+	ctx context.Context,
+	tokens []ccipocr3.UnknownEncodedAddress,
+	tokenInfoMap map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenInfo,
+) (ccipocr3.TokenPriceMap, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (a *SolanaAccessor) MessagesByTokenID(
+	ctx context.Context,
+	source, dest ccipocr3.ChainSelector,
+	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
+) (map[ccipocr3.MessageTokenID]ccipocr3.Bytes, error) {
+	return nil, fmt.Errorf("not implemented")
 }
