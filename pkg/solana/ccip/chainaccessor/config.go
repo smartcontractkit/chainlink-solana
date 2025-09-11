@@ -154,7 +154,7 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 			continue
 		}
 		var sourceChain offramp.SourceChain
-		decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(sourceChain)
+		decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&sourceChain)
 		if decodeErr != nil {
 			a.lggr.Errorw("failed to decode source chain config", "selector", sourceChainSelectors[i], "offrampAddr", offrampAddr.String(), "error", decodeErr)
 			continue

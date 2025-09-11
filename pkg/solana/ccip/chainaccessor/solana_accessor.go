@@ -559,6 +559,8 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 				return nil, fmt.Errorf("failed to get nonce account for selector %d and address %s: %w", sel, addrStr, err)
 			}
 
+			a.lggr.Debugw("fetched nonce PDA", "selector", sel, "user", user, "routerAddr", routerAddr, "noncePDA", noncePDA.String(), "result", nonce)
+
 			results[sel][string(addrStr)] = nonce.OrderedNonce // TODO: Is this supposed to be ordered nonce or total nonce?
 		}
 	}
