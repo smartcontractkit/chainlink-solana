@@ -8,6 +8,7 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
@@ -125,9 +126,9 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 	// https://solana.com/docs/rpc/http/getmultipleaccounts
 	sourceChainPDAs := make([]solana.PublicKey, 0, len(sourceChainSelectors))
 	for _, selector := range sourceChainSelectors {
-		sourceChainPDA, err := a.pdaCache.offrampSourceChain(uint64(selector), offrampAddr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate offramp source chain config PDA: %w", err)
+		sourceChainPDA, pdaErr := a.pdaCache.offrampSourceChain(uint64(selector), offrampAddr)
+		if pdaErr != nil {
+			return nil, fmt.Errorf("failed to calculate offramp source chain config PDA: %w", pdaErr)
 		}
 		sourceChainPDAs = append(sourceChainPDAs, sourceChainPDA)
 	}
@@ -135,7 +136,7 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 	a.lggr.Debugw("fetching source chain configs", "sourceChainSelectors", sourceChainSelectors, "offramp", offrampAddr.String(), "sourceChainPDAs", sourceChainPDAs)
 
 	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
-	result, err := a.client.GetMultipleAccountsWithOpts(ctx, sourceChainPDAs, nil)
+	result, err := a.client.GetMultipleAccountsWithOpts(ctx, sourceChainPDAs, &rpc.GetMultipleAccountsOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch source chain configs: %w", err)
 	}
@@ -153,13 +154,17 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 			continue
 		}
 		var sourceChain offramp.SourceChain
-		bin.NewBorshDecoder(account.Data.GetBinary()).Decode(sourceChain)
+		decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(sourceChain)
+		if decodeErr != nil {
+			a.lggr.Errorw("failed to decode source chain config", "selector", sourceChainSelectors[i], "offrampAddr", offrampAddr.String(), "error", decodeErr)
+			continue
+		}
 		// Extra bytes are padded on the right. Trim extra bytes before setting source chain config
 		onRampBytes := sourceChain.Config.OnRamp.Bytes[:sourceChain.Config.OnRamp.Len]
 		sourceChainConfigs[sourceChainSelectors[i]] = ccipocr3.SourceChainConfig{
 			Router:                    offrampRefAddress.Router.Bytes(),
 			IsEnabled:                 sourceChain.Config.IsEnabled,
-			IsRMNVerificationDisabled: true,
+			IsRMNVerificationDisabled: true, // Always disabled for Solana
 			MinSeqNr:                  sourceChain.State.MinSeqNr,
 			OnRamp:                    ccipocr3.UnknownAddress(onRampBytes),
 		}
