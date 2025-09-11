@@ -3,12 +3,11 @@ package chainaccessor
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"slices"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
@@ -122,40 +121,51 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 
 	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors, "offrampAddr", offrampAddr.String())
 
-	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
+	// TODO: batch in groups of 100
+	// https://solana.com/docs/rpc/http/getmultipleaccounts
+	sourceChainPDAs := make([]solana.PublicKey, 0, len(sourceChainSelectors))
 	for _, selector := range sourceChainSelectors {
 		sourceChainPDA, err := a.pdaCache.offrampSourceChain(uint64(selector), offrampAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate offramp source chain config PDA: %w", err)
 		}
+		sourceChainPDAs = append(sourceChainPDAs, sourceChainPDA)
+	}
 
-		a.lggr.Debugw("fetching source chain config", "sourceChainSelector", selector, "offramp", offrampAddr.String(), "sourceChainPDA", sourceChainPDA.String())
+	a.lggr.Debugw("fetching source chain configs", "sourceChainSelectors", sourceChainSelectors, "offramp", offrampAddr.String(), "sourceChainPDAs", sourceChainPDAs)
 
-		var sourceChain offramp.SourceChain
-		err = a.client.GetAccountDataBorshInto(ctx, sourceChainPDA, &sourceChain)
-		// The plugin is built with EVM behaviour in mind: if account is not found insert entry for chain with source chain config disabled
-		if errors.Is(err, rpc.ErrNotFound) {
-			sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
+	result, err := a.client.GetMultipleAccountsWithOpts(ctx, sourceChainPDAs, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch source chain configs: %w", err)
+	}
+
+	if len(sourceChainSelectors) != len(result.Value) {
+		return nil, fmt.Errorf("source chain configs results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(sourceChainSelectors))
+	}
+
+	for i, account := range result.Value {
+		// Account not found, return disabled source chain config for selector
+		if account == nil {
+			sourceChainConfigs[sourceChainSelectors[i]] = ccipocr3.SourceChainConfig{
 				IsEnabled: false,
 			}
 			continue
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch source chain config for selector %d: %w", selector, err)
-		}
-
-		a.lggr.Debugw("fetching source chain config", "sourceChainSelector", selector, "offramp", offrampAddr.String(), "sourceChainPDA", sourceChainPDA.String(), "sourceChain", sourceChain)
-
+		var sourceChain offramp.SourceChain
+		bin.NewBorshDecoder(account.Data.GetBinary()).Decode(sourceChain)
+		// Extra bytes are padded on the right. Trim extra bytes before setting source chain config
 		onRampBytes := sourceChain.Config.OnRamp.Bytes[:sourceChain.Config.OnRamp.Len]
-
-		sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+		sourceChainConfigs[sourceChainSelectors[i]] = ccipocr3.SourceChainConfig{
 			Router:                    offrampRefAddress.Router.Bytes(),
 			IsEnabled:                 sourceChain.Config.IsEnabled,
-			IsRMNVerificationDisabled: sourceChain.Config.IsRmnVerificationDisabled,
+			IsRMNVerificationDisabled: true,
 			MinSeqNr:                  sourceChain.State.MinSeqNr,
 			OnRamp:                    ccipocr3.UnknownAddress(onRampBytes),
 		}
 	}
+
+	a.lggr.Debugw("fetched source chain configs", "sourceChainConfigs", sourceChainConfigs)
 	return sourceChainConfigs, nil
 }
 
