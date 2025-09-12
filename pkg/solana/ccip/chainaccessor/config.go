@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
 
 	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	router "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
@@ -23,7 +24,8 @@ var globalCurseValue = []byte{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 
 // getOffRampConfig retrieves static, dynamic, commitOCR3, and execOCR3 configurations for the off-ramp contract
 func (a *SolanaAccessor) getOffRampConfig(ctx context.Context) (ccipocr3.OfframpConfig, error) {
-	offrampAddr, err := a.getBinding(consts.ContractNameOffRamp)
+	// Validate offramp binding exists
+	_, err := a.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
 		return ccipocr3.OfframpConfig{}, fmt.Errorf("failed to get binding for offramp: %w", err)
 	}
@@ -33,7 +35,7 @@ func (a *SolanaAccessor) getOffRampConfig(ctx context.Context) (ccipocr3.Offramp
 		return ccipocr3.OfframpConfig{}, err
 	}
 
-	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx, offrampAddr)
+	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx)
 	if err != nil {
 		return ccipocr3.OfframpConfig{}, err
 	}
@@ -112,54 +114,57 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 		return nil, fmt.Errorf("failed to get binding for offramp: %w", err)
 	}
 
-	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx, offrampAddr)
+	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: batch in groups of 100
-	// https://solana.com/docs/rpc/http/getmultipleaccounts
-	sourceChainPDAs := make([]solana.PublicKey, 0, len(sourceChainSelectors))
+	pdaSelectorMap := make(map[solana.PublicKey]ccipocr3.ChainSelector)
 	for _, selector := range sourceChainSelectors {
 		sourceChainPDA, pdaErr := a.pdaCache.offrampSourceChain(uint64(selector), offrampAddr)
 		if pdaErr != nil {
 			return nil, fmt.Errorf("failed to calculate offramp source chain config PDA: %w", pdaErr)
 		}
-		sourceChainPDAs = append(sourceChainPDAs, sourceChainPDA)
+		pdaSelectorMap[sourceChainPDA] = selector
 	}
 
-	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
-	result, err := a.client.GetMultipleAccountsWithOpts(ctx, sourceChainPDAs, &rpc.GetMultipleAccountsOpts{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch source chain configs: %w", err)
-	}
+	batches := batchPDAs(maps.Keys(pdaSelectorMap))
 
-	if len(sourceChainSelectors) != len(result.Value) {
-		return nil, fmt.Errorf("source chain configs results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(sourceChainSelectors))
-	}
+	sourceChainConfigs := make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
+	for _, batch := range batches {
+		result, err := a.client.GetMultipleAccountsWithOpts(ctx, batch, &rpc.GetMultipleAccountsOpts{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch source chain configs: %w", err)
+		}
 
-	for i, account := range result.Value {
-		// Account not found, return disabled source chain config for selector
-		if account == nil {
-			sourceChainConfigs[sourceChainSelectors[i]] = ccipocr3.SourceChainConfig{
-				IsEnabled: false,
+		if len(batch) != len(result.Value) {
+			return nil, fmt.Errorf("source chain configs results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(batch))
+		}
+
+		for i, account := range result.Value {
+			selector := pdaSelectorMap[batch[i]]
+			// Account not found, return disabled source chain config for selector
+			if account == nil {
+				sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+					IsEnabled: false,
+				}
+				continue
 			}
-			continue
-		}
-		var sourceChain offramp.SourceChain
-		decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&sourceChain)
-		if decodeErr != nil {
-			a.lggr.Errorw("failed to decode source chain config", "selector", sourceChainSelectors[i], "offrampAddr", offrampAddr.String(), "error", decodeErr)
-			continue
-		}
-		// Extra bytes are padded on the right. Trim extra bytes before setting source chain config
-		onRampBytes := sourceChain.Config.OnRamp.Bytes[:sourceChain.Config.OnRamp.Len]
-		sourceChainConfigs[sourceChainSelectors[i]] = ccipocr3.SourceChainConfig{
-			Router:                    offrampRefAddress.Router.Bytes(),
-			IsEnabled:                 sourceChain.Config.IsEnabled,
-			IsRMNVerificationDisabled: true, // Always disabled for Solana
-			MinSeqNr:                  sourceChain.State.MinSeqNr,
-			OnRamp:                    ccipocr3.UnknownAddress(onRampBytes),
+			var sourceChain offramp.SourceChain
+			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&sourceChain)
+			if decodeErr != nil {
+				a.lggr.Errorw("failed to decode source chain config", "selector", selector, "offrampAddr", offrampAddr.String(), "error", decodeErr)
+				continue
+			}
+			// Extra bytes are padded on the right. Trim extra bytes before setting source chain config
+			onRampBytes := sourceChain.Config.OnRamp.Bytes[:sourceChain.Config.OnRamp.Len]
+			sourceChainConfigs[selector] = ccipocr3.SourceChainConfig{
+				Router:                    offrampRefAddress.Router.Bytes(),
+				IsEnabled:                 sourceChain.Config.IsEnabled,
+				IsRMNVerificationDisabled: true, // Always disabled for Solana
+				MinSeqNr:                  sourceChain.State.MinSeqNr,
+				OnRamp:                    ccipocr3.UnknownAddress(onRampBytes),
+			}
 		}
 	}
 
@@ -281,7 +286,7 @@ func (a *SolanaAccessor) getOfframpConfig(ctx context.Context) (offramp.Config, 
 	return config, nil
 }
 
-func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context, offrampAddr solana.PublicKey) (offramp.ReferenceAddresses, error) {
+func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context) (offramp.ReferenceAddresses, error) {
 	refAddrPDA := a.pdaCache.offrampRefAddresses()
 
 	var refAddreses offramp.ReferenceAddresses

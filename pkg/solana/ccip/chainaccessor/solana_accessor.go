@@ -9,8 +9,10 @@ import (
 	"sync"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -31,6 +33,9 @@ import (
 )
 
 var ErrNoBindings = errors.New("no bindings found")
+
+// https://solana.com/docs/rpc/http/getmultipleaccounts
+var getMultipleAccountsLimit = 100
 
 type AccessorLogPoller interface {
 	Ready() error
@@ -96,8 +101,6 @@ func (a *SolanaAccessor) GetContractAddress(contractName string) ([]byte, error)
 func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, error) {
 	// Match old behaviour: if a contract isn't bound, we return an empty value so the nodes can achieve consensus on partial config
 	// https://github.com/smartcontractkit/chainlink-ccip/blob/a8dbbdbf14a07593de2f0dbe608f8b64d893a6bd/pkg/contractreader/extended.go#L226-L231
-
-	// TODO: pass in addresses we fetched so subsequent fetches don't fail (offramp->feeQuoter etc)
 
 	var config ccipocr3.ChainConfigSnapshot
 	var sourceChainConfigs map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig
@@ -199,7 +202,6 @@ func (a *SolanaAccessor) GetChainFeeComponents(ctx context.Context) (ccipocr3.Ch
 //   - Sync() directly calls bindContractEvent() to register event filters with Solana logPoller
 //   - Both expose same Sync() interface to CCIPChainReader
 func (a *SolanaAccessor) Sync(ctx context.Context, contractName string, contractAddress ccipocr3.UnknownAddress) error {
-	// TODO: Add method to address codec to convert bytes to solana pub key and use here
 	if len(contractAddress) != solana.PublicKeyLength {
 		return fmt.Errorf("address is unexpected length to be solana public key %d, expect %d", len(contractAddress), solana.PublicKeyLength)
 	}
@@ -522,18 +524,15 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 		return nil, fmt.Errorf("failed to get binding for router: %w", err)
 	}
 
-	results := make(map[ccipocr3.ChainSelector]map[string]uint64)
-	// TODO: Leverage multi-account read to minimize RPC calls
-	for sel, addresses := range addressesMap {
-		if _, ok := results[sel]; !ok {
-			results[sel] = make(map[string]uint64)
-		}
-		for _, addrStr := range addresses {
-			// Nonce already fetched for address
-			if _, ok := results[sel][string(addrStr)]; ok {
-				continue
-			}
+	type meta struct {
+		selector ccipocr3.ChainSelector
+		user     solana.PublicKey
+	}
 
+	pdaMetaMap := make(map[solana.PublicKey]meta)
+
+	for sel, addresses := range addressesMap {
+		for _, addrStr := range addresses {
 			user, err := solana.PublicKeyFromBase58(string(addrStr))
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse sender address %s: %w", addrStr, err)
@@ -543,13 +542,43 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 				return nil, fmt.Errorf("failed to calculate nonce PDA for selector %d and address %s: %w", sel, addrStr, err)
 			}
 
-			var nonce router.Nonce
-			err = a.client.GetAccountDataBorshInto(ctx, noncePDA, &nonce)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get nonce account for selector %d and address %s: %w", sel, addrStr, err)
+			pdaMetaMap[noncePDA] = meta{
+				selector: sel,
+				user:     user,
 			}
+		}
+	}
 
-			results[sel][string(addrStr)] = nonce.OrderedNonce // TODO: Is this supposed to be ordered nonce or total nonce?
+	batches := batchPDAs(maps.Keys(pdaMetaMap))
+	results := make(map[ccipocr3.ChainSelector]map[string]uint64)
+
+	for _, batch := range batches {
+		result, err := a.client.GetMultipleAccountsWithOpts(ctx, batch, &rpc.GetMultipleAccountsOpts{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch nonce PDAs: %w", err)
+		}
+
+		if len(batch) != len(result.Value) {
+			return nil, fmt.Errorf("nonce results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(batch))
+		}
+
+		for i, account := range result.Value {
+			meta := pdaMetaMap[batch[i]]
+			if _, ok := results[meta.selector]; !ok {
+				results[meta.selector] = make(map[string]uint64)
+			}
+			// Account not found, continue to fetch data for other accounts
+			if account == nil {
+				a.lggr.Errorw("nonce PDA not found", "selector", meta.selector, "user", meta.user.String())
+				continue
+			}
+			var nonce router.Nonce
+			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&nonce)
+			if decodeErr != nil {
+				a.lggr.Errorw("failed to decode nonce", "selector", meta.selector, "user", meta.user, "error", decodeErr)
+				continue
+			}
+			results[meta.selector][meta.user.String()] = nonce.OrderedNonce
 		}
 	}
 
@@ -562,38 +591,57 @@ func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors [
 		return nil, fmt.Errorf("failed to get fee quoter binding: %w", err)
 	}
 
-	feePriceUpdates := make(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig)
-	// TODO: Leverage multi-account read to minimize RPC calls
+	pdaSelectorMap := make(map[solana.PublicKey]ccipocr3.ChainSelector)
 	for _, sel := range selectors {
 		destChainPDA, err := a.pdaCache.feeQuoterDestChain(uint64(sel), feeQuoterAddr)
 		if err != nil {
 			continue
 		}
 
-		var destChain feequoter.DestChain
-		err = a.client.GetAccountDataBorshInto(ctx, destChainPDA, &destChain)
-		// The plugin is built with EVM behaviour in mind: if account is not found the zero value is returned
-		if errors.Is(err, rpc.ErrNotFound) {
-			feePriceUpdates[sel] = ccipocr3.TimestampedUnixBig{
-				Value:     big.NewInt(0),
-				Timestamp: 0,
-			}
-			continue
-		}
+		pdaSelectorMap[destChainPDA] = sel
+	}
+
+	batches := batchPDAs(maps.Keys(pdaSelectorMap))
+	feePriceUpdates := make(map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig)
+
+	for _, batch := range batches {
+		result, err := a.client.GetMultipleAccountsWithOpts(ctx, batch, &rpc.GetMultipleAccountsOpts{})
 		if err != nil {
-			a.lggr.Errorw("failed to batch get chain fee price updates", "err", err)
-			continue
+			return nil, fmt.Errorf("failed to fetch fee quoter destination chain PDAs: %w", err)
 		}
 
-		if destChain.State.UsdPerUnitGas.Timestamp > math.MaxUint32 {
-			a.lggr.Errorw("gas price update timestamp exceeeds uint32 max", "timestamp", destChain.State.UsdPerUnitGas.Timestamp)
-			continue
+		if len(batch) != len(result.Value) {
+			return nil, fmt.Errorf("fee quoter destination chain results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(batch))
 		}
 
-		value := new(big.Int).SetBytes(destChain.State.UsdPerUnitGas.Value[:])
-		feePriceUpdates[sel] = ccipocr3.TimestampedUnixBig{
-			Value:     value,
-			Timestamp: uint32(destChain.State.UsdPerUnitGas.Timestamp), //nolint:gosec // timestamp validated to be within uint32 bounds above
+		for i, account := range result.Value {
+			selector := pdaSelectorMap[batch[i]]
+
+			// Account not found, return 0 fee price
+			if account == nil {
+				feePriceUpdates[selector] = ccipocr3.TimestampedUnixBig{
+					Value:     big.NewInt(0),
+					Timestamp: 0,
+				}
+				continue
+			}
+			var destChain feequoter.DestChain
+			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&destChain)
+			if decodeErr != nil {
+				a.lggr.Errorw("failed to decode fee quoter destination chain PDA", "selector", selector, "error", decodeErr)
+				continue
+			}
+
+			if destChain.State.UsdPerUnitGas.Timestamp > math.MaxUint32 {
+				a.lggr.Errorw("gas price update timestamp exceeeds uint32 max", "timestamp", destChain.State.UsdPerUnitGas.Timestamp)
+				continue
+			}
+
+			value := new(big.Int).SetBytes(destChain.State.UsdPerUnitGas.Value[:])
+			feePriceUpdates[selector] = ccipocr3.TimestampedUnixBig{
+				Value:     value,
+				Timestamp: uint32(destChain.State.UsdPerUnitGas.Timestamp), //nolint:gosec // timestamp validated to be within uint32 bounds above
+			}
 		}
 	}
 
@@ -639,4 +687,24 @@ func (a *SolanaAccessor) MessagesByTokenID(
 	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
 ) (map[ccipocr3.MessageTokenID]ccipocr3.Bytes, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// batchPDAs batches list of PDAs into groups of getMultipleAccountsLimit to be compatible with the getMultipleAccounts RPC limits
+func batchPDAs(addrs []solana.PublicKey) [][]solana.PublicKey {
+	if len(addrs) <= getMultipleAccountsLimit {
+		return [][]solana.PublicKey{addrs}
+	}
+
+	batches := len(addrs) / getMultipleAccountsLimit
+	if len(addrs)%getMultipleAccountsLimit == 0 {
+		batches++
+	}
+
+	batchAddrs := make([][]solana.PublicKey, 0, batches)
+	for i := 0; i < len(addrs); i += getMultipleAccountsLimit {
+		end := min(i+getMultipleAccountsLimit, len(addrs))
+		batchAddrs = append(batchAddrs, addrs[i:end])
+	}
+
+	return batchAddrs
 }
