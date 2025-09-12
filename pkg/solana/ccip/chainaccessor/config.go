@@ -107,20 +107,15 @@ func convertTransmittersType(transmitters [16][32]uint8, n uint8) [][]byte {
 
 // getOffRampSourceChainConfigs retrieves source chain configurations from the off-ramp contract
 func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourceChainSelectors []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, error) {
-	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors)
 	offrampAddr, err := a.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get binding for offramp: %w", err)
 	}
 
-	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors, "offrampAddr", offrampAddr.String())
-
 	offrampRefAddress, err := a.getOfframpReferenceAddresses(ctx, offrampAddr)
 	if err != nil {
 		return nil, err
 	}
-
-	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainSelectors", sourceChainSelectors, "offrampAddr", offrampAddr.String())
 
 	// TODO: batch in groups of 100
 	// https://solana.com/docs/rpc/http/getmultipleaccounts
@@ -132,8 +127,6 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 		}
 		sourceChainPDAs = append(sourceChainPDAs, sourceChainPDA)
 	}
-
-	a.lggr.Debugw("fetching source chain configs", "sourceChainSelectors", sourceChainSelectors, "offramp", offrampAddr.String(), "sourceChainPDAs", sourceChainPDAs)
 
 	var sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, len(sourceChainSelectors))
 	result, err := a.client.GetMultipleAccountsWithOpts(ctx, sourceChainPDAs, &rpc.GetMultipleAccountsOpts{})
@@ -170,7 +163,7 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 		}
 	}
 
-	a.lggr.Debugw("fetched source chain configs", "sourceChainConfigs", sourceChainConfigs)
+	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainConfigs", sourceChainConfigs)
 	return sourceChainConfigs, nil
 }
 
@@ -289,10 +282,7 @@ func (a *SolanaAccessor) getOfframpConfig(ctx context.Context) (offramp.Config, 
 }
 
 func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context, offrampAddr solana.PublicKey) (offramp.ReferenceAddresses, error) {
-	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String())
 	refAddrPDA := a.pdaCache.offrampRefAddresses()
-
-	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String(), "refAddrPDA", refAddrPDA.String())
 
 	var refAddreses offramp.ReferenceAddresses
 	err := a.client.GetAccountDataBorshInto(ctx, refAddrPDA, &refAddreses)
@@ -300,6 +290,6 @@ func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context, offra
 		return offramp.ReferenceAddresses{}, fmt.Errorf("failed to get offramp reference addresses account: %w", err)
 	}
 
-	a.lggr.Debugw("getOfframpReferenceAddresses", "offrampAddr", offrampAddr.String(), "refAddrPDA", refAddrPDA.String(), "refAddreses", refAddreses)
+	a.lggr.Debugw("getOfframpReferenceAddresses", "refAddreses", refAddreses)
 	return refAddreses, nil
 }

@@ -305,10 +305,6 @@ func (a *SolanaAccessor) processCommitReports(
 
 		unblessedMerkleRoots := a.processMerkleRoot(ev.Report)
 
-		if len(unblessedMerkleRoots) > 0 {
-			a.lggr.Debugw("found commit report with merkle root", "roots", unblessedMerkleRoots)
-		}
-
 		priceUpdates, err := a.processPriceUpdates(ev.PriceUpdates)
 		if err != nil {
 			a.lggr.Errorw("failed to process price updates", "err", err, "priceUpdates", ev.PriceUpdates)

@@ -102,10 +102,7 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 	var config ccipocr3.ChainConfigSnapshot
 	var sourceChainConfigs map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig
 
-	a.lggr.Debugw("GetAllConfigsLegacy", "chainSelector", a.chainSelector, "destChainSelector", destChainSelector, "sourceChainSelectors", sourceChainSelectors)
-
 	if a.chainSelector == destChainSelector {
-		a.lggr.Debug("cur selector == destChainSelector")
 		// we're fetching config on the destination chain (offramp + fee quoter static config + RMN)
 
 		// OffRamp
@@ -115,8 +112,6 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		}
 		config.Offramp = offrampConfig
 
-		a.lggr.Debugw("offrampConfig", "config", offrampConfig)
-
 		// FeeQuoter
 		feeQuoterStaticConfig, err := a.getFeeQuoterStaticConfig(ctx)
 		if !errors.Is(err, ErrNoBindings) && err != nil {
@@ -125,8 +120,6 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		config.FeeQuoter = ccipocr3.FeeQuoterConfig{
 			StaticConfig: feeQuoterStaticConfig,
 		}
-
-		a.lggr.Debugw("feeQuoterStaticConfig", "config", feeQuoterStaticConfig)
 
 		rmnRemoteProxyAddr, err := a.getBinding(consts.ContractNameRMNProxy)
 		if !errors.Is(err, ErrNoBindings) && err != nil {
@@ -140,7 +133,6 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 			// There is no proxy for Solana so is it right to just set the "proxy" address as the remote address here?
 			RemoteAddress: rmnRemoteProxyAddr.Bytes(),
 		}
-		a.lggr.Debugw("RMNProxyConfig", "config", config.RMNProxy)
 		config.RMNRemote = ccipocr3.RMNRemoteConfig{
 			// We don't support RMN so return an empty config
 		}
@@ -151,13 +143,11 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get curse info: %w", err)
 		}
 		config.CurseInfo = curseInfo
-		a.lggr.Debugw("curseInfo", "config", curseInfo)
 
 		sourceChainConfigs, err = a.getOffRampSourceChainConfigs(ctx, sourceChainSelectors)
 		if !errors.Is(err, ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get source chain configs: %w", err)
 		}
-		a.lggr.Debugw("sourceChainConfigs", "config", sourceChainConfigs)
 	} else {
 		// we're fetching config on the source chain (onramp + router config)
 
@@ -184,6 +174,7 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		// we'll return an empty map
 		sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, 0)
 	}
+	a.lggr.Debugw("GetAllConfigsLegacy", "accessorChainSelector", a.chainSelector, "destChainSelector", destChainSelector, "sourceChainSelectors", sourceChainSelectors, "config", config, "sourceChainConfigs", sourceChainConfigs)
 	return config, sourceChainConfigs, nil
 }
 
@@ -213,7 +204,6 @@ func (a *SolanaAccessor) Sync(ctx context.Context, contractName string, contract
 		return fmt.Errorf("address is unexpected length to be solana public key %d, expect %d", len(contractAddress), solana.PublicKeyLength)
 	}
 	addr := solana.PublicKeyFromBytes(contractAddress)
-	a.lggr.Debugw("sync address", "contractName", contractName, "contractAddress", addr.String())
 
 	if err := a.bindContractEvent(ctx, contractName, addr); err != nil {
 		return fmt.Errorf("failed to bind contract event: %w", err)
@@ -558,8 +548,6 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 			if err != nil {
 				return nil, fmt.Errorf("failed to get nonce account for selector %d and address %s: %w", sel, addrStr, err)
 			}
-
-			a.lggr.Debugw("fetched nonce PDA", "selector", sel, "user", user, "routerAddr", routerAddr, "noncePDA", noncePDA.String(), "result", nonce)
 
 			results[sel][string(addrStr)] = nonce.OrderedNonce // TODO: Is this supposed to be ordered nonce or total nonce?
 		}
