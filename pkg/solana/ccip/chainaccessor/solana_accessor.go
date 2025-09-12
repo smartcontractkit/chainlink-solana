@@ -670,7 +670,66 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
-	return nil, fmt.Errorf("not implemented")
+	feeQuoterAddr, err := a.getBinding(consts.ContractNameFeeQuoter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fee quoter binding: %w", err)
+	}
+
+	billinConfigPDAs := make([]solana.PublicKey, 0, len(tokens))
+	for _, token := range tokens {
+		tokenPubKey, err := solana.PublicKeyFromBase58(string(token))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse token address: %w", err)
+		}
+		tokenConfigPDA, err := a.pdaCache.feeQuoterBillingTokenConfig(tokenPubKey, feeQuoterAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch fee quoter billing token config PDA from cache: %w", err)
+		}
+		billinConfigPDAs = append(billinConfigPDAs, tokenConfigPDA)
+	}
+
+	batches := batchPDAs(billinConfigPDAs)
+	feePriceUpdates := make(map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig)
+
+	for _, batch := range batches {
+		result, err := a.client.GetMultipleAccountsWithOpts(ctx, batch, &rpc.GetMultipleAccountsOpts{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch fee quoter destination chain PDAs: %w", err)
+		}
+
+		if len(batch) != len(result.Value) {
+			return nil, fmt.Errorf("fee quoter destination chain results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(batch))
+		}
+
+		for i, account := range result.Value {
+			// Account not found, continue to other updates
+			if account == nil {
+				a.lggr.Errorw("token update PDA not found", "pda", batch[i].String())
+				continue
+			}
+
+			var billingConfig feequoter.BillingTokenConfig
+			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&billingConfig)
+			if decodeErr != nil {
+				a.lggr.Errorw("failed to decode fee billing token config PDA", "selector", chain, "error", decodeErr)
+				continue
+			}
+
+			if billingConfig.UsdPerToken.Timestamp > math.MaxUint32 {
+				a.lggr.Errorw("token update timestamp exceeeds uint32 max", "timestamp", billingConfig.UsdPerToken.Timestamp)
+				continue
+			}
+
+			token := ccipocr3.UnknownEncodedAddress(billingConfig.Mint.String())
+			value := new(big.Int).SetBytes( billingConfig.UsdPerToken.Value[:])
+			feePriceUpdates[token] = ccipocr3.TimestampedUnixBig{
+				Value: value,
+				Timestamp: uint32(billingConfig.UsdPerToken.Timestamp),
+			}
+		}
+	}
+
+	return feePriceUpdates, nil
 }
 
 func (a *SolanaAccessor) GetFeedPricesUSD(
