@@ -102,16 +102,16 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 
 // Map of event name to offchain attribute to its subkey index for querying the LogPoller
 // Corresponds to the indexed fields in the eventFilterConfigMap above
-var eventFilterSubkeyIndexMap = map[string]map[string]uint64 {
+var eventFilterSubkeyIndexMap = map[string]map[string]uint64{
 	consts.EventNameCCIPMessageSent: {
-		consts.EventAttributeSourceChain: 0,
-		consts.EventAttributeDestChain: 1,
+		consts.EventAttributeSourceChain:    0,
+		consts.EventAttributeDestChain:      1,
 		consts.EventAttributeSequenceNumber: 2,
 	},
 	consts.EventNameExecutionStateChanged: {
-		consts.EventAttributeSourceChain: 0,
+		consts.EventAttributeSourceChain:    0,
 		consts.EventAttributeSequenceNumber: 1,
-		consts.EventAttributeState: 2,
+		consts.EventAttributeState:          2,
 	},
 }
 
@@ -517,7 +517,7 @@ func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][
 	}
 	// We don't need to wait for an execute state changed event to be finalized
 	// before we optimistically mark a message as executed.
-	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(stateAttributeIndex, []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},)
+	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(stateAttributeIndex, []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}})
 	if err != nil {
 		return query.KeyFilter{}, 0, fmt.Errorf("failed to build event sub key filter for state attribute: %w", err)
 	}

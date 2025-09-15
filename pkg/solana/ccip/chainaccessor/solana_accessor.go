@@ -231,22 +231,24 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 	if !ok {
 		return nil, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeDestChain, consts.EventNameCCIPMessageSent)
 	}
-	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}},)
+	destChainSubKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}})
 	if err != nil {
 		return nil, fmt.Errorf("failed to build event sub key filter for dest chain attribute: %w", err)
+	}
+	seqNumAttributeIndex, ok := attributeIndexes[consts.EventAttributeSequenceNumber]
+	if !ok {
+		return nil, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeSequenceNumber, consts.EventNameCCIPMessageSent)
+	}
+	seqNumSubkeyFilter, err := logpoller.NewEventBySubKeyFilter(seqNumAttributeIndex, []primitives.ValueComparator{{Value: seqNumRange.Start(), Operator: primitives.Gte}, {Value: seqNumRange.End(), Operator: primitives.Lte}})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build event sub key filter for sequence number attribute: %w", err)
 	}
 
 	expressions := []query.Expression{
 		logpoller.NewAddressFilter(onrampAddr),
 		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCCIPMessageSent)),
-		subKeyFilter,
-		query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
-			Value:    seqNumRange.Start(),
-			Operator: primitives.Gte,
-		}, primitives.ValueComparator{
-			Value:    seqNumRange.End(),
-			Operator: primitives.Lte,
-		}),
+		destChainSubKeyFilter,
+		seqNumSubkeyFilter,
 		query.Confidence(primitives.Finalized),
 	}
 
@@ -303,7 +305,7 @@ func (a *SolanaAccessor) LatestMessageTo(ctx context.Context, dest ccipocr3.Chai
 	if !ok {
 		return 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeDestChain, consts.EventNameCCIPMessageSent)
 	}
-	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}},)
+	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}})
 	if err != nil {
 		return 0, fmt.Errorf("failed to build event sub key filter for dest chain attribute: %w", err)
 	}
@@ -744,10 +746,10 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 			}
 
 			token := ccipocr3.UnknownEncodedAddress(billingConfig.Mint.String())
-			value := new(big.Int).SetBytes( billingConfig.UsdPerToken.Value[:])
+			value := new(big.Int).SetBytes(billingConfig.UsdPerToken.Value[:])
 			feePriceUpdates[token] = ccipocr3.TimestampedUnixBig{
-				Value: value,
-				Timestamp: uint32(billingConfig.UsdPerToken.Timestamp),
+				Value:     value,
+				Timestamp: uint32(billingConfig.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
 			}
 		}
 	}
