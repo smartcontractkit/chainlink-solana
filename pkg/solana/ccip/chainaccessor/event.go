@@ -100,6 +100,21 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 	},
 }
 
+// Map of event name to offchain attribute to its subkey index for querying the LogPoller
+// Corresponds to the indexed fields in the eventFilterConfigMap above
+var eventFilterSubkeyIndexMap = map[string]map[string]uint64 {
+	consts.EventNameCCIPMessageSent: {
+		consts.EventAttributeSourceChain: 0,
+		consts.EventAttributeDestChain: 1,
+		consts.EventAttributeSequenceNumber: 2,
+	},
+	consts.EventNameExecutionStateChanged: {
+		consts.EventAttributeSourceChain: 0,
+		consts.EventAttributeSequenceNumber: 1,
+		consts.EventAttributeState: 2,
+	},
+}
+
 // bindContractEvent binds contract events to the logpoller for monitoring blockchain events.
 // This operation is idempotent - if the same address exists, it performs no operation;
 // if the address is changed, it updates to the new address, overwriting the existing one;
@@ -457,7 +472,7 @@ func (a *SolanaAccessor) processPriceUpdates(priceUpdates ccip_offramp.PriceUpda
 	return updates, nil
 }
 
-func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) (query.KeyFilter, uint64) {
+func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) (query.KeyFilter, uint64, error) {
 	var chainExpressions []query.Expression
 	var countSqNrs uint64
 	// final query should look like
@@ -492,20 +507,30 @@ func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][
 	}
 	extendedQuery := query.Or(chainExpressions...)
 
+	attributeIndexes, ok := eventFilterSubkeyIndexMap[consts.EventNameExecutionStateChanged]
+	if !ok {
+		return query.KeyFilter{}, 0, fmt.Errorf("failed to find attribute indexes for event %s", consts.EventNameExecutionStateChanged)
+	}
+	stateAttributeIndex, ok := attributeIndexes[consts.EventAttributeState]
+	if !ok {
+		return query.KeyFilter{}, 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeState, consts.EventNameExecutionStateChanged)
+	}
+	// We don't need to wait for an execute state changed event to be finalized
+	// before we optimistically mark a message as executed.
+	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(stateAttributeIndex, []primitives.ValueComparator{{Value: 0, Operator: primitives.Gt}},)
+	if err != nil {
+		return query.KeyFilter{}, 0, fmt.Errorf("failed to build event sub key filter for state attribute: %w", err)
+	}
+
 	keyFilter := query.KeyFilter{
 		Key: consts.EventNameExecutionStateChanged,
 		Expressions: []query.Expression{
 			extendedQuery,
-			// We don't need to wait for an execute state changed event to be finalized
-			// before we optimistically mark a message as executed.
-			query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
-				Value:    0, // > 0 corresponds to:  IN_PROGRESS, SUCCESS, FAILURE
-				Operator: primitives.Gt,
-			}),
+			subKeyFilter,
 			query.Confidence(primitives.Finalized),
 		},
 	}
-	return keyFilter, countSqNrs
+	return keyFilter, countSqNrs, nil
 }
 
 func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertypes.Log, nonEmptyRangesPerChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error) {

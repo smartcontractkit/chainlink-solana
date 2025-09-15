@@ -223,13 +223,23 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 		return nil, fmt.Errorf("OnRamp not bound: %w", err)
 	}
 
+	attributeIndexes, ok := eventFilterSubkeyIndexMap[consts.EventNameCCIPMessageSent]
+	if !ok {
+		return nil, fmt.Errorf("failed to find attribute indexes for event %s", consts.EventNameCCIPMessageSent)
+	}
+	destChainAttributeIndex, ok := attributeIndexes[consts.EventAttributeDestChain]
+	if !ok {
+		return nil, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeDestChain, consts.EventNameCCIPMessageSent)
+	}
+	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}},)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build event sub key filter for dest chain attribute: %w", err)
+	}
+
 	expressions := []query.Expression{
 		logpoller.NewAddressFilter(onrampAddr),
 		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCCIPMessageSent)),
-		query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
-			Value:    dest,
-			Operator: primitives.Eq,
-		}),
+		subKeyFilter,
 		query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
 			Value:    seqNumRange.Start(),
 			Operator: primitives.Gte,
@@ -285,13 +295,23 @@ func (a *SolanaAccessor) LatestMessageTo(ctx context.Context, dest ccipocr3.Chai
 		return 0, fmt.Errorf("OnRamp not bound: %w", err)
 	}
 
+	attributeIndexes, ok := eventFilterSubkeyIndexMap[consts.EventNameCCIPMessageSent]
+	if !ok {
+		return 0, fmt.Errorf("failed to find attribute indexes for event %s", consts.EventNameCCIPMessageSent)
+	}
+	destChainAttributeIndex, ok := attributeIndexes[consts.EventAttributeDestChain]
+	if !ok {
+		return 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeDestChain, consts.EventNameCCIPMessageSent)
+	}
+	subKeyFilter, err := logpoller.NewEventBySubKeyFilter(destChainAttributeIndex, []primitives.ValueComparator{{Value: dest, Operator: primitives.Eq}},)
+	if err != nil {
+		return 0, fmt.Errorf("failed to build event sub key filter for dest chain attribute: %w", err)
+	}
+
 	expressions := []query.Expression{
 		logpoller.NewAddressFilter(onrampAddr),
 		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCCIPMessageSent)),
-		query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
-			Value:    dest,
-			Operator: primitives.Eq,
-		}),
+		subKeyFilter,
 		query.Confidence(primitives.Finalized),
 	}
 
@@ -486,7 +506,10 @@ func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipoc
 		}
 	}
 
-	keyFilter, countSqNrs := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain)
+	keyFilter, countSqNrs, err := createExecutedMessagesKeyFilter(nonEmptyRangesPerChain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build key filter for executed messages: %w", err)
+	}
 	if countSqNrs == 0 {
 		a.lggr.Debugw("no sequence numbers to query", "nonEmptyRangesPerChain", nonEmptyRangesPerChain)
 		return nil, nil
