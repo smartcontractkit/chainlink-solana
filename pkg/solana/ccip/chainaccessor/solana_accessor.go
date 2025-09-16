@@ -283,7 +283,7 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 	for _, event := range events {
 		// validate event
 		if err := ccipchainaccessor.ValidateSendRequestedEvent(event, a.chainSelector, dest, seqNumRange); err != nil {
-			a.lggr.Errorw("validate send requested event", "err", err, "message", event)
+			a.lggr.Errorw("send requested event validation failed", "err", err, "message", event)
 			continue
 		}
 		msgs = append(msgs, event.Message)
@@ -398,19 +398,19 @@ func (a *SolanaAccessor) GetTokenPriceUSD(ctx context.Context, rawTokenAddress c
 		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("failed to fetch fee quoter billing token config PDA from cache: %w", err)
 	}
 
-	var billingTokenConfig feequoter.BillingTokenConfig
+	var billingTokenConfig feequoter.BillingTokenConfigWrapper
 	err = a.client.GetAccountDataBorshInto(ctx, tokenConfigPDA, &billingTokenConfig)
 	if err != nil {
 		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("failed to get fee quoter billing token config account: %w", err)
 	}
-	value := new(big.Int).SetBytes(billingTokenConfig.UsdPerToken.Value[:])
-	if billingTokenConfig.UsdPerToken.Timestamp > math.MaxUint32 {
-		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("billing token config timestamp exceeds uint32 max: %d", billingTokenConfig.UsdPerToken.Timestamp)
+	value := new(big.Int).SetBytes(billingTokenConfig.Config.UsdPerToken.Value[:])
+	if billingTokenConfig.Config.UsdPerToken.Timestamp > math.MaxUint32 {
+		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("billing token config timestamp exceeds uint32 max: %d", billingTokenConfig.Config.UsdPerToken.Timestamp)
 	}
 	return ccipocr3.TimestampedUnixBig{
 		Value: value,
 		// TODO: u64 -> u32? should we fix the onchain type?
-		Timestamp: uint32(billingTokenConfig.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
+		Timestamp: uint32(billingTokenConfig.Config.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
 	}, nil
 }
 
@@ -733,23 +733,23 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 				continue
 			}
 
-			var billingConfig feequoter.BillingTokenConfig
+			var billingConfig feequoter.BillingTokenConfigWrapper
 			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&billingConfig)
 			if decodeErr != nil {
 				a.lggr.Errorw("failed to decode fee billing token config PDA", "selector", chain, "error", decodeErr)
 				continue
 			}
 
-			if billingConfig.UsdPerToken.Timestamp > math.MaxUint32 {
-				a.lggr.Errorw("token update timestamp exceeeds uint32 max", "timestamp", billingConfig.UsdPerToken.Timestamp)
+			if billingConfig.Config.UsdPerToken.Timestamp > math.MaxUint32 {
+				a.lggr.Errorw("token update timestamp exceeeds uint32 max", "timestamp", billingConfig.Config.UsdPerToken.Timestamp)
 				continue
 			}
 
-			token := ccipocr3.UnknownEncodedAddress(billingConfig.Mint.String())
-			value := new(big.Int).SetBytes(billingConfig.UsdPerToken.Value[:])
+			token := ccipocr3.UnknownEncodedAddress(billingConfig.Config.Mint.String())
+			value := new(big.Int).SetBytes(billingConfig.Config.UsdPerToken.Value[:])
 			feePriceUpdates[token] = ccipocr3.TimestampedUnixBig{
 				Value:     value,
-				Timestamp: uint32(billingConfig.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
+				Timestamp: uint32(billingConfig.Config.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
 			}
 		}
 	}
