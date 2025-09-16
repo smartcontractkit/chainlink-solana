@@ -289,6 +289,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
+	s.lggr.Debugw("tx args", "args", args)
+
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
 	if err != nil {
@@ -301,6 +303,8 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
+
+	s.lggr.Debugw("tx account metas", "accounts", accounts)
 
 	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
 	if err != nil {
