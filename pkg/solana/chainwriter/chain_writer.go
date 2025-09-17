@@ -10,6 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/go-viper/mapstructure/v2"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -289,7 +290,14 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	s.lggr.Debugw("tx args", "args", args)
+	s.lggr.Debugf("tx args type: %T, method name: %s", args, method)
+
+	argMap := make(map[string]any)
+	err := mapstructure.Decode(args, &argMap)
+	if err != nil {
+		return fmt.Errorf("failed to parse arguments: %w", err)
+	}
+	s.lggr.Debugw("tx args", "method", method, "argMap", argMap)
 
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
