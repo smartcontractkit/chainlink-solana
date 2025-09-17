@@ -297,7 +297,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return fmt.Errorf("failed to parse arguments: %w", err)
 	}
-	s.lggr.Debugw("tx args", "method", method, "argMap", argMap)
+	s.lggr.Debugf("tx args %+v, method %s", argMap, method)
 
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
