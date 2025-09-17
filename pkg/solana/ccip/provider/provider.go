@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -36,7 +37,7 @@ type Provider struct {
 	services.StateMachine
 }
 
-func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, pluginType ccipocr3.PluginType, client client.MultiClient, logPoller chainaccessor.AccessorLogPoller, fee fees.Estimator, cw types.ContractWriter, offramp, transmitter string) (*Provider, error) {
+func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, pluginType ccipocr3.PluginType, client client.MultiClient, logPoller chainaccessor.AccessorLogPoller, fee fees.Estimator, cw types.ContractWriter, ccipArgs relaytypes.CCIPProviderArgs) (*Provider, error) {
 	foundSel := false
 	for _, solChain := range chainsel.SolanaALL {
 		if solChain.Selector == uint64(chainSelector) {
@@ -65,9 +66,9 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 	var ct ocr3types.ContractTransmitter[[]byte]
 	switch pluginType{
 	case ccipocr3.PluginTypeCCIPCommit:
-		ct = ocr.NewCommitTransmitter(lggr, cw, transmitter, offramp)
+		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress)
 	case ccipocr3.PluginTypeCCIPExec:
-		ct = ocr.NewExecTransmitter(lggr, cw, transmitter, offramp, nil) // TODO: Add extraDataCodec to exec transmitter
+		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress, ccipArgs.ExtraDataCodecBundle) // TODO: Add extraDataCodec to exec transmitter
 	default:
 		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
 	}

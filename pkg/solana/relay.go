@@ -452,5 +452,5 @@ func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPP
 		return nil, fmt.Errorf("failed to initialize chain writer: %w", err)
 	}
 
-	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), cw, ccipArgs.OffRampAddress, ccipArgs.Transmitter)
+	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), cw, ccipArgs)
 }
