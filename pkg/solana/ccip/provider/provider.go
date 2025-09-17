@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/chainaccessor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/ocr"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 
@@ -34,7 +36,7 @@ type Provider struct {
 	services.StateMachine
 }
 
-func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, client client.MultiClient, logPoller chainaccessor.AccessorLogPoller, fee fees.Estimator) (*Provider, error) {
+func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, pluginType ccipocr3.PluginType, client client.MultiClient, logPoller chainaccessor.AccessorLogPoller, fee fees.Estimator, cw types.ContractWriter, offramp, transmitter string) (*Provider, error) {
 	foundSel := false
 	for _, solChain := range chainsel.SolanaALL {
 		if solChain.Selector == uint64(chainSelector) {
@@ -60,10 +62,20 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, c
 		return nil, fmt.Errorf("failed to create Solana Chain Accessor: %w", err)
 	}
 
+	var ct ocr3types.ContractTransmitter[[]byte]
+	switch pluginType{
+	case ccipocr3.PluginTypeCCIPCommit:
+		ct = ocr.NewCommitTransmitter(lggr, cw, transmitter, offramp)
+	case ccipocr3.PluginTypeCCIPExec:
+		ct = ocr.NewExecTransmitter(lggr, cw, transmitter, offramp, nil) // TODO: Add extraDataCodec to exec transmitter
+	default:
+		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
+	}
+
 	return &Provider{
 		lggr:  logger.Named(lggr, CCIPProviderName),
 		ca:    ca,
-		ct:    nil, // TODO: unimplemented
+		ct:    ct,
 		codec: c,
 	}, nil
 }

@@ -442,5 +442,15 @@ func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPP
 		return nil, errors.New("chain multi client is not set")
 	}
 
-	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator())
+	chainWriterConfig, err := chainwriter.GetSolanaChainWriterConfig(ccipArgs.OffRampAddress, ccipArgs.Transmitter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build chain writer configs: %w", err)
+	}
+
+	cw, err := chainwriter.NewSolanaChainWriterService(r.lggr, *r.chain.MultiClient(), r.chain.TxManager(), r.chain.FeeEstimator(), chainWriterConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize chain writer: %w", err)
+	}
+
+	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), cw, ccipArgs.OffRampAddress, ccipArgs.Transmitter)
 }
