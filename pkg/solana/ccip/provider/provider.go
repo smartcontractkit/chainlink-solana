@@ -9,7 +9,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -18,9 +17,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/chainaccessor"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/ocr"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 )
@@ -39,7 +41,16 @@ type Provider struct {
 	services.StateMachine
 }
 
-func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, pluginType ccipocr3.PluginType, client client.MultiClient, logPoller chainaccessor.AccessorLogPoller, fee fees.Estimator, cw types.ContractWriter, ccipArgs relaytypes.CCIPProviderArgs) (*Provider, error) {
+func NewCCIPProvider(
+	lggr logger.Logger,
+	chainSelector ccipocr3.ChainSelector,
+	pluginType ccipocr3.PluginType,
+	client client.MultiClient,
+	logPoller chainaccessor.AccessorLogPoller,
+	fee fees.Estimator,
+	txm txm.TxManager,
+	ccipArgs relaytypes.CCIPProviderArgs,
+) (*Provider, error) {
 	foundSel := false
 	for _, solChain := range chainsel.SolanaALL {
 		if solChain.Selector == uint64(chainSelector) {
@@ -52,10 +63,11 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 	}
 
 	// Validate offramp address
-	offrampPubKey, err := solana.PublicKeyFromBase58(ccipArgs.OffRampAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse OffRampAddress (%s) into solana public key: %w", ccipArgs.OffRampAddress, err)
+	// Not using the address codec to convert directly to string to allow validating for zero address
+	if len(ccipArgs.OffRampAddress) != solana.PublicKeyLength {
+		return nil, fmt.Errorf("invalid offramp address bytes length, got %d, expected %d", len(ccipArgs.OffRampAddress), solana.PublicKeyLength)
 	}
+	offrampPubKey := solana.PublicKeyFromBytes(ccipArgs.OffRampAddress)
 	if offrampPubKey.IsZero() {
 		return nil, errors.New("offramp public key is zero address")
 	}
@@ -74,12 +86,22 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 		return nil, fmt.Errorf("failed to create Solana Chain Accessor: %w", err)
 	}
 
+	chainWriterConfig, err := config.GetSolanaChainWriterConfig(offrampPubKey.String(), ccipArgs.Transmitter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build chain writer configs: %w", err)
+	}
+
+	cw, err := chainwriter.NewSolanaChainWriterService(lggr, client, txm, fee, chainWriterConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize chain writer: %w", err)
+	}
+
 	var ct ocr3types.ContractTransmitter[[]byte]
 	switch pluginType {
 	case ccipocr3.PluginTypeCCIPCommit:
-		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress)
+		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String())
 	case ccipocr3.PluginTypeCCIPExec:
-		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress, ccipArgs.ExtraDataCodecBundle)
+		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String(), ccipArgs.ExtraDataCodecBundle)
 	default:
 		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
 	}
