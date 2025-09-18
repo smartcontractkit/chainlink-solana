@@ -62,6 +62,8 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 		return nil, nil, nil, nil, err
 	}
 
+	lggr.Debugw("execute transformed args", "args", argsTransformed)
+
 	computeUnits, err := calculateComputeUnitLimit(argsTransformed, computeUnitLimitOverhead)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to calculate compute unit limit: %w", err)

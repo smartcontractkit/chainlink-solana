@@ -10,7 +10,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/go-viper/mapstructure/v2"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -290,15 +289,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		}
 	}
 
-	s.lggr.Debugf("tx args type: %T, method name: %s", args, method)
-
-	argMap := make(map[string]any)
-	err := mapstructure.Decode(args, &argMap)
-	if err != nil {
-		return fmt.Errorf("failed to parse arguments: %w", err)
-	}
-	s.lggr.Debugf("tx args %+v, method %s", argMap, method)
-
 	// Fetch derived and static table maps
 	derivedTableMap, staticTableMap, err := s.ResolveLookupTables(ctx, args, methodConfig.LookupTables)
 	if err != nil {
@@ -311,8 +301,6 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error resolving account addresses: %w", err), debugID)
 	}
-
-	s.lggr.Debugw("tx account metas", "accounts", accounts)
 
 	feePayer, err := solana.PublicKeyFromBase58(methodConfig.FromAddress)
 	if err != nil {
