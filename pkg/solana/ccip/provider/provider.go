@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -63,13 +62,11 @@ func NewCCIPProvider(
 	}
 
 	// Validate offramp address
-	// Not using the address codec to convert directly to string to allow validating for zero address
-	if len(ccipArgs.OffRampAddress) != solana.PublicKeyLength {
-		return nil, fmt.Errorf("invalid offramp address bytes length, got %d, expected %d", len(ccipArgs.OffRampAddress), solana.PublicKeyLength)
-	}
-	offrampPubKey := solana.PublicKeyFromBytes(ccipArgs.OffRampAddress)
-	if offrampPubKey.IsZero() {
-		return nil, errors.New("offramp public key is zero address")
+	var offrampPubKey solana.PublicKey
+	// NOTE: provider can still be initialized with an EVM offramp address, and PublicKeyFromBytes will panic on addresses with len=20
+	// technically we only need the chainwriter to do fee estimation so this doesn't matter and we can use a zero address
+	if len(ccipArgs.OffRampAddress) == solana.PublicKeyLength {
+		offrampPubKey = solana.PublicKeyFromBytes(ccipArgs.OffRampAddress)
 	}
 
 	c := ccipocr3.Codec{
