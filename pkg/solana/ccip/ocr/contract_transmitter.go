@@ -32,16 +32,6 @@ type ToCalldataFunc func(
 	codec ccipocr3.ExtraDataCodecBundle,
 ) (contract string, method string, args any, err error)
 
-// ExtraDataDecoded contains a generic representation of chain specific message parameters. A
-// map from string to any is used to account for different parameters required for sending messages
-// to different destinations.
-type extraDataDecoded struct {
-	// ExtraArgsDecoded contain message specific extra args.
-	ExtraArgsDecoded map[string]any
-	// DestExecDataDecoded contain token transfer specific extra args.
-	DestExecDataDecoded []map[string]any
-}
-
 // commitCallArgs defines the calldata structure for an SVM commit transaction.
 // IMPORTANT: The names and types of the fields are critical because the chainwriter uses mapstructure
 // to map these fields to the contract's parameter names. Changing these names or types (or omitting the
@@ -63,7 +53,7 @@ type execCallArgs struct {
 	ReportContext [2][32]byte                `mapstructure:"ReportContext"`
 	Report        []byte                     `mapstructure:"Report"`
 	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
-	ExtraData     extraDataDecoded           `mapstructure:"ExtraData"`
+	ExtraData     ccipocr3.ExtraDataDecoded  `mapstructure:"ExtraData"`
 }
 
 var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
@@ -218,7 +208,7 @@ var execCalldataFunc = func(
 	extraDataCodec ccipocr3.ExtraDataCodecBundle,
 ) (contract string, method string, args any, err error) {
 	var info ccipocr3.ExecuteReportInfo
-	var extraData extraDataDecoded
+	var extraData ccipocr3.ExtraDataDecoded
 	if len(report.Info) != 0 {
 		info, err = ccipocr3.DecodeExecuteReportInfo(report.Info)
 		if err != nil {
@@ -280,28 +270,28 @@ var commitCalldataFunc = func(
 }
 
 // decodeExecData decodes the extra data from an execute report.
-func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodecBundle) (extraDataDecoded, error) {
+func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodecBundle) (ccipocr3.ExtraDataDecoded, error) {
 	// only one report one message, since this is a stop-gap solution for solana
 	if len(report.AbstractReports) != 1 {
-		return extraDataDecoded{}, fmt.Errorf("unexpected report length, expected 1, got %d", len(report.AbstractReports))
+		return ccipocr3.ExtraDataDecoded{}, fmt.Errorf("unexpected report length, expected 1, got %d", len(report.AbstractReports))
 	}
 	if len(report.AbstractReports[0].Messages) != 1 {
-		return extraDataDecoded{}, fmt.Errorf("unexpected message length, expected 1, got %d", len(report.AbstractReports[0].Messages))
+		return ccipocr3.ExtraDataDecoded{}, fmt.Errorf("unexpected message length, expected 1, got %d", len(report.AbstractReports[0].Messages))
 	}
 	message := report.AbstractReports[0].Messages[0]
-	extraData := extraDataDecoded{}
+	extraData := ccipocr3.ExtraDataDecoded{}
 
 	var err error
 	extraData.ExtraArgsDecoded, err = codec.DecodeExtraArgs(message.ExtraArgs, report.AbstractReports[0].SourceChainSelector)
 	if err != nil {
-		return extraDataDecoded{}, fmt.Errorf("failed to decode extra args: %w", err)
+		return ccipocr3.ExtraDataDecoded{}, fmt.Errorf("failed to decode extra args: %w", err)
 	}
 	// stopgap solution for missing extra args for Solana. To be replaced in the future.
 	destExecDataDecoded := make([]map[string]any, len(message.TokenAmounts))
 	for i, tokenAmount := range message.TokenAmounts {
 		destExecDataDecoded[i], err = codec.DecodeTokenAmountDestExecData(tokenAmount.DestExecData, report.AbstractReports[0].SourceChainSelector)
 		if err != nil {
-			return extraDataDecoded{}, fmt.Errorf("failed to decode token amount dest exec data: %w", err)
+			return ccipocr3.ExtraDataDecoded{}, fmt.Errorf("failed to decode token amount dest exec data: %w", err)
 		}
 	}
 	extraData.DestExecDataDecoded = destExecDataDecoded
