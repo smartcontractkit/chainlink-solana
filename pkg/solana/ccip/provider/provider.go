@@ -71,11 +71,10 @@ func NewCCIPProvider(
 
 	c := ccipocr3.Codec{
 		ChainSpecificAddressCodec: codec.NewAddressCodec(),
-		// TODO move from core repo
-		CommitPluginCodec:         nil,
-		ExecutePluginCodec:        nil,
-		TokenDataEncoder:          nil,
-		SourceChainExtraDataCodec: nil,
+		CommitPluginCodec:         codec.NewCommitPluginCodecV1(),
+		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(ccipArgs.ExtraDataCodecBundle),
+		TokenDataEncoder:          codec.NewSolanaTokenDataEncoder(),
+		SourceChainExtraDataCodec: codec.NewExtraDataDecoder(),
 	}
 
 	ca, err := chainaccessor.NewSolanaAccessor(lggr, chainSelector, client, logPoller, fee, c.ChainSpecificAddressCodec)
