@@ -1,7 +1,6 @@
 package chainwriter
 
 import (
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"

@@ -64,7 +64,7 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 	}
 
 	var ct ocr3types.ContractTransmitter[[]byte]
-	switch pluginType{
+	switch pluginType {
 	case ccipocr3.PluginTypeCCIPCommit:
 		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress)
 	case ccipocr3.PluginTypeCCIPExec:

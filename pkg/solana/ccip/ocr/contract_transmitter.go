@@ -42,7 +42,7 @@ type extraDataDecoded struct {
 	DestExecDataDecoded []map[string]any
 }
 
-// SVMCommitCallArgs defines the calldata structure for an SVM commit transaction.
+// commitCallArgs defines the calldata structure for an SVM commit transaction.
 // IMPORTANT: The names and types of the fields are critical because the chainwriter uses mapstructure
 // to map these fields to the contract's parameter names. Changing these names or types (or omitting the
 // mapstructure tags) may result in transactions being constructed with incorrect arguments.
@@ -55,7 +55,7 @@ type commitCallArgs struct {
 	Info          ccipocr3.CommitReportInfo `mapstructure:"Info"`
 }
 
-// SVMExecCallArgs defines the calldata structure for an SVM execute transaction.
+// execCallArgs defines the calldata structure for an SVM execute transaction.
 // IMPORTANT: The names and types of the fields are critical because the chainwriter uses mapstructure
 // to map these fields to the contract's parameter names. Changing these names or types (or omitting the
 // mapstructure tags) may result in transactions being constructed with incorrect arguments.
@@ -246,37 +246,37 @@ var execCalldataFunc = func(
 // The Solana on-chain contract has two methods, one for the default commit and one for the price-only commit.
 var commitCalldataFunc = func(
 	rawReportCtx [2][32]byte,
-		report ocr3types.ReportWithInfo[[]byte],
-		rs, ss [][32]byte,
-		vs [32]byte,
-		_ ccipocr3.ExtraDataCodecBundle,
+	report ocr3types.ReportWithInfo[[]byte],
+	rs, ss [][32]byte,
+	vs [32]byte,
+	_ ccipocr3.ExtraDataCodecBundle,
 ) (contract string, method string, args any, err error) {
-		var info ccipocr3.CommitReportInfo
-		if len(report.Info) != 0 {
-			var err error
-			info, err = ccipocr3.DecodeCommitReportInfo(report.Info)
-			if err != nil {
-				return "", "", nil, fmt.Errorf("failed to decode commit report info: %w", err)
-			}
+	var info ccipocr3.CommitReportInfo
+	if len(report.Info) != 0 {
+		var err error
+		info, err = ccipocr3.DecodeCommitReportInfo(report.Info)
+		if err != nil {
+			return "", "", nil, fmt.Errorf("failed to decode commit report info: %w", err)
 		}
+	}
 
-		method = consts.MethodCommit
-		// Switch to price-only method if no Merkle roots and there are token or gas price updates.
-		if len(info.MerkleRoots) == 0 && (len(info.TokenPriceUpdates) > 0 || len(info.GasPriceUpdates) > 0) {
-			method = consts.MethodCommitPriceOnly
-		}
+	method = consts.MethodCommit
+	// Switch to price-only method if no Merkle roots and there are token or gas price updates.
+	if len(info.MerkleRoots) == 0 && (len(info.TokenPriceUpdates) > 0 || len(info.GasPriceUpdates) > 0) {
+		method = consts.MethodCommitPriceOnly
+	}
 
-		return consts.ContractNameOffRamp,
-			method,
-			commitCallArgs{
-				ReportContext: rawReportCtx,
-				Report:        report.Report,
-				Rs:            rs,
-				Ss:            ss,
-				RawVs:         vs,
-				Info:          info,
-			},
-			nil
+	return consts.ContractNameOffRamp,
+		method,
+		commitCallArgs{
+			ReportContext: rawReportCtx,
+			Report:        report.Report,
+			Rs:            rs,
+			Ss:            ss,
+			RawVs:         vs,
+			Info:          info,
+		},
+		nil
 }
 
 // decodeExecData decodes the extra data from an execute report.
