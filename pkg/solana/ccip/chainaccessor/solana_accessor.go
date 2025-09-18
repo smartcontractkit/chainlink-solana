@@ -692,20 +692,19 @@ func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (ccipocr3.SeqN
 
 func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokens []ccipocr3.UnknownEncodedAddress,
-	chain ccipocr3.ChainSelector,
+	tokenBytes []ccipocr3.UnknownAddress,
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
 	feeQuoterAddr, err := a.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter binding: %w", err)
 	}
 
-	billinConfigPDAs := make([]solana.PublicKey, 0, len(tokens))
-	for _, token := range tokens {
-		tokenPubKey, err := solana.PublicKeyFromBase58(string(token))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse token address: %w", err)
+	billinConfigPDAs := make([]solana.PublicKey, 0, len(tokenBytes))
+	for _, token := range tokenBytes {
+		if len(token) != solana.PublicKeyLength {
+			return nil, fmt.Errorf("invalid token bytes length, got %d, expected %d", len(token), solana.PublicKeyLength)
 		}
+		tokenPubKey := solana.PublicKeyFromBytes(token)
 		tokenConfigPDA, err := a.pdaCache.feeQuoterBillingTokenConfig(tokenPubKey, feeQuoterAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch fee quoter billing token config PDA from cache: %w", err)
@@ -736,7 +735,7 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 			var billingConfig feequoter.BillingTokenConfigWrapper
 			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&billingConfig)
 			if decodeErr != nil {
-				a.lggr.Errorw("failed to decode fee billing token config PDA", "selector", chain, "error", decodeErr)
+				a.lggr.Errorw("failed to decode fee billing token config PDA", "selector", a.chainSelector, "error", decodeErr)
 				continue
 			}
 

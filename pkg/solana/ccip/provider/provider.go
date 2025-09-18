@@ -2,9 +2,11 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -47,6 +49,15 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 	}
 	if !foundSel {
 		return nil, fmt.Errorf("chain selector %d does not match and Solana chain selectors", chainSelector)
+	}
+
+	// Validate offramp address
+	offrampPubKey, err := solana.PublicKeyFromBase58(ccipArgs.OffRampAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse OffRampAddress (%s) into solana public key: %w", ccipArgs.OffRampAddress, err)
+	}
+	if offrampPubKey.IsZero() {
+		return nil, errors.New("offramp public key is zero address")
 	}
 
 	c := ccipocr3.Codec{
