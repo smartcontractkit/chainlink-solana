@@ -68,7 +68,7 @@ func NewCCIPProvider(lggr logger.Logger, chainSelector ccipocr3.ChainSelector, p
 	case ccipocr3.PluginTypeCCIPCommit:
 		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress)
 	case ccipocr3.PluginTypeCCIPExec:
-		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress, ccipArgs.ExtraDataCodecBundle) // TODO: Add extraDataCodec to exec transmitter
+		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, ccipArgs.OffRampAddress, ccipArgs.ExtraDataCodecBundle)
 	default:
 		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
 	}

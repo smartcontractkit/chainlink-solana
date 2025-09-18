@@ -49,10 +49,6 @@ var (
 	defaultCCIPLogsRetention = 30 * 24 * time.Hour // 30 days
 )
 
-type IndexedField struct {
-	OnChainPath string
-}
-
 type filterConfig struct {
 	idl             string
 	includeReverted bool
