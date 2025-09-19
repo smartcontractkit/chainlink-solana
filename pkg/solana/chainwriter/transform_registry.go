@@ -316,19 +316,23 @@ func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overh
 	if !ok {
 		return 0, errors.New("computeUnits not found in ExtraData ExtraArgsDecoded")
 	}
-	cuInt, ok := cu.(uint32)
+	cuInt, ok := cu.(int64)
 	if !ok {
-		return 0, fmt.Errorf("computeUnits is not expected type, expected uint32, got %T", cu)
+		return 0, fmt.Errorf("computeUnits is not expected type, expected int64, got %T", cu)
 	}
 
-	computeUnits := overhead + cuInt
+	computeUnits := overhead + uint32(cuInt)
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
-		destGasAmount, ok := execData["destGasAmount"].(uint32)
+		destGasAmount, ok := execData["destGasAmount"]
 		if !ok {
 			return 0, fmt.Errorf("DestGasAmount not found in ExtraData")
 		}
-		computeUnits += destGasAmount
+		destGasAmountInt, ok := destGasAmount.(int64)
+		if !ok {
+			return 0, fmt.Errorf("DestGasAmount is not expected type, expected int64, got %T", destGasAmount)
+		}
+		computeUnits += uint32(destGasAmountInt)
 	}
 	return computeUnits, nil
 }
