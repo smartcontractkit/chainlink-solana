@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/ocr"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -56,8 +55,20 @@ type commonTokenTransferAccounts struct {
 
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, unchanged static lookup tables map, and cu tx configs.
-func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, derivedLUTs map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
-	var argsTransformed ocr.ExecCallArgs
+func CCIPExecuteArgsTransform(ctx context.Context,
+	client client.MultiClient,
+	lggr logger.Logger,
+	args any,
+	accounts solana.AccountMetaSlice,
+	staticLUTs map[solana.PublicKey]solana.PublicKeySlice,
+	derivedLUTs map[string]map[string][]*solana.AccountMeta,
+	transmitter solana.PublicKey,
+	toAddress string,
+	computeUnitLimitOverhead uint32,
+	options []txmutils.SetTxConfig,
+	debugID string,
+) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -117,12 +128,25 @@ func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lg
 
 // CCIPExecuteArgsTransformV2 calculates required compute units and uses on-chain account derivation to determine the accounts required for the execute transaction
 // It tracks the token indexes for each token transfer and returns the transformed arguments, extended accounts slice, extended static lookup tables map, and cu tx configs.
-func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+func CCIPExecuteArgsTransformV2(
+	ctx context.Context,
+	client client.MultiClient,
+	lggr logger.Logger,
+	args any,
+	accounts solana.AccountMetaSlice,
+	staticLUTs map[solana.PublicKey]solana.PublicKeySlice,
+	_ map[string]map[string][]*solana.AccountMeta,
+	transmitter solana.PublicKey,
+	toAddress string,
+	computeUnitLimitOverhead uint32,
+	options []txmutils.SetTxConfig,
+	debugID string,
+) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	if len(accounts) != 0 {
 		return nil, nil, nil, nil, fmt.Errorf("expect accounts to be empty at start of CCIPExecuteArgsTransformV2, got %d", len(accounts))
 	}
 
-	var argsTransformed ocr.ExecCallArgs
+	var argsTransformed ccipsolana.SVMExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -253,7 +277,20 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 }
 
 // This Transform function trims off the GlobalState account from commit transactions if there are no token or gas price updates
-func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, _ map[string]map[string][]*solana.AccountMeta, _ solana.PublicKey, _ string, _ uint32, options []txmutils.SetTxConfig, _ string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
+func CCIPCommitAccountTransform(
+	ctx context.Context,
+	_ client.MultiClient,
+	_ logger.Logger,
+	args any,
+	accounts solana.AccountMetaSlice,
+	staticLUTs map[solana.PublicKey]solana.PublicKeySlice,
+	_ map[string]map[string][]*solana.AccountMeta,
+	_ solana.PublicKey,
+	_ string,
+	_ uint32,
+	options []txmutils.SetTxConfig,
+	_ string,
+) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
 	var argsDecoded ccipsolana.SVMCommitCallArgs
 	err := mapstructure.Decode(args, &argsDecoded)
 	if err != nil {
@@ -274,13 +311,17 @@ func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ log
 	return args, transformedAccounts, staticLUTs, options, nil
 }
 
-func calculateComputeUnitLimit(argsTransformed ocr.ExecCallArgs, overhead uint32) (uint32, error) {
-	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
+func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
+	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"]
 	if !ok {
-		return 0, fmt.Errorf("computeUnits not found in ExtraData")
+		return 0, errors.New("computeUnits not found in ExtraData ExtraArgsDecoded")
+	}
+	cuInt, ok := cu.(uint32)
+	if !ok {
+		return 0, fmt.Errorf("computeUnits is not expected type, expected uint32, got %T", cu)
 	}
 
-	computeUnits := overhead + cu
+	computeUnits := overhead + cuInt
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
 		destGasAmount, ok := execData["destGasAmount"].(uint32)
