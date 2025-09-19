@@ -8,16 +8,17 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // ToCalldataFunc is a function that takes in the OCR3 report and signature data and processes them.
@@ -32,6 +33,8 @@ type ToCalldataFunc func(
 	codec ccipocr3.ExtraDataCodecBundle,
 ) (contract string, method string, args any, err error)
 
+// TODO: Update type in chainlink-ccip and directly reference those
+// https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/solana/types.go
 // commitCallArgs defines the calldata structure for an SVM commit transaction.
 // IMPORTANT: The names and types of the fields are critical because the chainwriter uses mapstructure
 // to map these fields to the contract's parameter names. Changing these names or types (or omitting the
@@ -45,15 +48,18 @@ type commitCallArgs struct {
 	Info          ccipocr3.CommitReportInfo `mapstructure:"Info"`
 }
 
+// TODO: Update type in chainlink-ccip and directly reference those
+// https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/solana/types.go
 // execCallArgs defines the calldata structure for an SVM execute transaction.
 // IMPORTANT: The names and types of the fields are critical because the chainwriter uses mapstructure
 // to map these fields to the contract's parameter names. Changing these names or types (or omitting the
 // mapstructure tags) may result in transactions being constructed with incorrect arguments.
-type execCallArgs struct {
+type ExecCallArgs struct {
 	ReportContext [2][32]byte                `mapstructure:"ReportContext"`
 	Report        []byte                     `mapstructure:"Report"`
 	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
 	ExtraData     ccipocr3.ExtraDataDecoded  `mapstructure:"ExtraData"`
+	TokenIndexes  []byte                     `mapstructure:"TokenIndexes"`
 }
 
 var _ ocr3types.ContractTransmitter[[]byte] = &ccipTransmitter{}
@@ -224,7 +230,7 @@ var execCalldataFunc = func(
 
 	return consts.ContractNameOffRamp,
 		consts.MethodExecute,
-		execCallArgs{
+		ExecCallArgs{
 			ReportContext: rawReportCtx,
 			Report:        report.Report,
 			Info:          info,

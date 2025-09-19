@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/ocr"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -56,13 +57,11 @@ type commonTokenTransferAccounts struct {
 // CCIPExecuteArgsTransform calculates required compute units, and appends any needed accounts by fetching pool lookup table entries.
 // It then updates token indexes based on appended PDAs and returns the transformed arguments, extended accounts slice, unchanged static lookup tables map, and cu tx configs.
 func CCIPExecuteArgsTransform(ctx context.Context, client client.MultiClient, lggr logger.Logger, args any, accounts solana.AccountMetaSlice, staticLUTs map[solana.PublicKey]solana.PublicKeySlice, derivedLUTs map[string]map[string][]*solana.AccountMeta, transmitter solana.PublicKey, toAddress string, computeUnitLimitOverhead uint32, options []txmutils.SetTxConfig, debugID string) (any, solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []txmutils.SetTxConfig, error) {
-	var argsTransformed ccipsolana.SVMExecCallArgs
+	var argsTransformed ocr.ExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-
-	lggr.Debugw("execute transformed args", "args", argsTransformed)
 
 	computeUnits, err := calculateComputeUnitLimit(argsTransformed, computeUnitLimitOverhead)
 	if err != nil {
@@ -123,11 +122,13 @@ func CCIPExecuteArgsTransformV2(ctx context.Context, client client.MultiClient, 
 		return nil, nil, nil, nil, fmt.Errorf("expect accounts to be empty at start of CCIPExecuteArgsTransformV2, got %d", len(accounts))
 	}
 
-	var argsTransformed ccipsolana.SVMExecCallArgs
+	var argsTransformed ocr.ExecCallArgs
 	err := mapstructure.Decode(args, &argsTransformed)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+
+	lggr.Debugw("execute transformed args", "args", argsTransformed)
 
 	computeUnits, err := calculateComputeUnitLimit(argsTransformed, computeUnitLimitOverhead)
 	if err != nil {
@@ -273,7 +274,7 @@ func CCIPCommitAccountTransform(ctx context.Context, _ client.MultiClient, _ log
 	return args, transformedAccounts, staticLUTs, options, nil
 }
 
-func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
+func calculateComputeUnitLimit(argsTransformed ocr.ExecCallArgs, overhead uint32) (uint32, error) {
 	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"].(uint32)
 	if !ok {
 		return 0, fmt.Errorf("computeUnits not found in ExtraData")
