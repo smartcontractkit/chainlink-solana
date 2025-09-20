@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ var ErrNoBindings = errors.New("no bindings found")
 var getMultipleAccountsLimit = 100
 
 type AccessorLogPoller interface {
+	Start(ctx context.Context) error
 	Ready() error
 	HasFilter(context.Context, string) bool
 	RegisterFilter(context.Context, logpollertypes.Filter) error
@@ -63,6 +65,7 @@ type SolanaAccessor struct {
 var _ ccipocr3.ChainAccessor = (*SolanaAccessor)(nil)
 
 func NewSolanaAccessor(
+	ctx context.Context,
 	l logger.Logger,
 	chainSelector ccipocr3.ChainSelector,
 	client client.MultiClient,
@@ -73,7 +76,13 @@ func NewSolanaAccessor(
 	lggr := logger.Named(l, "SolanaAccessor")
 
 	if err := logPoller.Ready(); err != nil {
-		return nil, fmt.Errorf("log poller not ready: %w", err)
+		// Start LogPoller if it hasn't already been
+		// Lazily starting it here rather than earlier, since nodes running only ordinary DF jobs don't need it
+		err := logPoller.Start(ctx)
+		// in case another thread calls Start() after Ready() returns
+		if err != nil && !strings.Contains(err.Error(), "has already been started") {
+			return nil, fmt.Errorf("failed to start log poller: %w", err)
+		}
 	}
 
 	return &SolanaAccessor{

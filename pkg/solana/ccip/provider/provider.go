@@ -41,6 +41,7 @@ type Provider struct {
 }
 
 func NewCCIPProvider(
+	ctx context.Context,
 	lggr logger.Logger,
 	chainSelector ccipocr3.ChainSelector,
 	pluginType ccipocr3.PluginType,
@@ -77,7 +78,7 @@ func NewCCIPProvider(
 		SourceChainExtraDataCodec: codec.NewExtraDataDecoder(),
 	}
 
-	ca, err := chainaccessor.NewSolanaAccessor(lggr, chainSelector, client, logPoller, fee, c.ChainSpecificAddressCodec)
+	ca, err := chainaccessor.NewSolanaAccessor(ctx, lggr, chainSelector, client, logPoller, fee, c.ChainSpecificAddressCodec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Solana Chain Accessor: %w", err)
 	}

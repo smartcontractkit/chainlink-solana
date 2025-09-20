@@ -442,5 +442,5 @@ func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPP
 		return nil, errors.New("chain multi client is not set")
 	}
 
-	return provider.NewCCIPProvider(r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), r.chain.TxManager(), ccipArgs)
+	return provider.NewCCIPProvider(ctx, r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), r.chain.TxManager(), ccipArgs)
 }
