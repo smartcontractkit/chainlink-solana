@@ -219,6 +219,7 @@ func (a *SolanaAccessor) Sync(ctx context.Context, contractName string, contract
 	if err := a.bindContractEvent(ctx, contractName, addr); err != nil {
 		return fmt.Errorf("failed to bind contract event: %w", err)
 	}
+	a.lggr.Debugw("Sync: binding contract", "contract", contractName, "address", addr.String())
 	a.bindingsMu.Lock()
 	defer a.bindingsMu.Unlock()
 	a.bindings[contractName] = addr
