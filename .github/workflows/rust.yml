@@ -154,9 +154,6 @@ jobs:
           check-latest: true
           cache-dependency-path: "./integration-tests/go.sum"
 
-      - name: Install gotestloghelper
-        run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
-
       - name: Install Solana CLI
         run: ../scripts/install-solana-ci.sh
 
