@@ -74,7 +74,7 @@ func NewCCIPProvider(
 	c := ccipocr3.Codec{
 		ChainSpecificAddressCodec: codec.NewAddressCodec(),
 		CommitPluginCodec:         codec.NewCommitPluginCodecV1(),
-		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(ccipArgs.ExtraDataCodecBundle),
+		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(nil), // TODO: plugin in extra data codec bundle
 		TokenDataEncoder:          codec.NewSolanaTokenDataEncoder(),
 		SourceChainExtraDataCodec: codec.NewExtraDataDecoder(),
 	}
@@ -99,7 +99,7 @@ func NewCCIPProvider(
 	case ccipocr3.PluginTypeCCIPCommit:
 		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String())
 	case ccipocr3.PluginTypeCCIPExec:
-		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String(), ccipArgs.ExtraDataCodecBundle)
+		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String(), nil) // TODO: plugin in extra data codec bundle
 	default:
 		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
 	}

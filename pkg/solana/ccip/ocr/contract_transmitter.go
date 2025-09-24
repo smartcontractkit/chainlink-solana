@@ -30,7 +30,7 @@ type ToCalldataFunc func(
 	report ocr3types.ReportWithInfo[[]byte],
 	rs, ss [][32]byte,
 	vs [32]byte,
-	codec ccipocr3.ExtraDataCodecBundle,
+	codec ccipocr3.ExtraDataCodec,
 ) (contract string, method string, args any, err error)
 
 // TODO: Update type in chainlink-ccip and directly reference those
@@ -69,7 +69,7 @@ type ccipTransmitter struct {
 	fromAccount    string
 	offrampAddress string
 	toCalldataFn   ToCalldataFunc
-	extraDataCodec ccipocr3.ExtraDataCodecBundle
+	extraDataCodec ccipocr3.ExtraDataCodec
 	lggr           logger.Logger
 }
 
@@ -95,7 +95,7 @@ func NewExecTransmitter(
 	cw types.ContractWriter,
 	fromAccount string,
 	offrampAddress string,
-	extraDataCodec ccipocr3.ExtraDataCodecBundle,
+	extraDataCodec ccipocr3.ExtraDataCodec,
 ) ocr3types.ContractTransmitter[[]byte] {
 	return &ccipTransmitter{
 		lggr:           logger.Named(lggr, "SolanaExecTransmitter"),
@@ -120,7 +120,7 @@ func XXXNewContractTransmitterTestsOnly(
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
-		extraDataCodec ccipocr3.ExtraDataCodecBundle) (string, string, any, error) {
+		extraDataCodec ccipocr3.ExtraDataCodec) (string, string, any, error) {
 		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
 	}
@@ -211,7 +211,7 @@ var execCalldataFunc = func(
 	report ocr3types.ReportWithInfo[[]byte],
 	_, _ [][32]byte,
 	_ [32]byte,
-	extraDataCodec ccipocr3.ExtraDataCodecBundle,
+	extraDataCodec ccipocr3.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	var info ccipocr3.ExecuteReportInfo
 	var extraData ccipocr3.ExtraDataDecoded
@@ -245,7 +245,7 @@ var commitCalldataFunc = func(
 	report ocr3types.ReportWithInfo[[]byte],
 	rs, ss [][32]byte,
 	vs [32]byte,
-	_ ccipocr3.ExtraDataCodecBundle,
+	_ ccipocr3.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	var info ccipocr3.CommitReportInfo
 	if len(report.Info) != 0 {
@@ -276,7 +276,7 @@ var commitCalldataFunc = func(
 }
 
 // decodeExecData decodes the extra data from an execute report.
-func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodecBundle) (ccipocr3.ExtraDataDecoded, error) {
+func decodeExecData(report ccipocr3.ExecuteReportInfo, codec ccipocr3.ExtraDataCodec) (ccipocr3.ExtraDataDecoded, error) {
 	// only one report one message, since this is a stop-gap solution for solana
 	if len(report.AbstractReports) != 1 {
 		return ccipocr3.ExtraDataDecoded{}, fmt.Errorf("unexpected report length, expected 1, got %d", len(report.AbstractReports))
