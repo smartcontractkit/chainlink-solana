@@ -59,13 +59,14 @@ func NewCCIPProvider(
 		}
 	}
 	if !foundSel {
-		return nil, fmt.Errorf("chain selector %d does not match and Solana chain selectors", chainSelector)
+		return nil, fmt.Errorf("chain selector %d does not match any Solana chain selectors", chainSelector)
 	}
 
 	// Validate offramp address
 	var offrampPubKey solana.PublicKey
 	// NOTE: provider can still be initialized with an EVM offramp address, and PublicKeyFromBytes will panic on addresses with len=20
 	// technically we only need the chainwriter to do fee estimation so this doesn't matter and we can use a zero address
+	// TODO: Should we even build the rest of the provider? Or just initialize the accessor with just the estimator.
 	if len(ccipArgs.OffRampAddress) == solana.PublicKeyLength {
 		offrampPubKey = solana.PublicKeyFromBytes(ccipArgs.OffRampAddress)
 	}

@@ -26,14 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipchainaccessor "github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
-
-var ErrNoBindings = errors.New("no bindings found")
 
 // https://solana.com/docs/rpc/http/getmultipleaccounts
 var getMultipleAccountsLimit = 100
@@ -119,14 +118,14 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 
 		// OffRamp
 		offrampConfig, err := a.getOffRampConfig(ctx)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get current offramp static config: %w", err)
 		}
 		config.Offramp = offrampConfig
 
 		// FeeQuoter
 		feeQuoterStaticConfig, err := a.getFeeQuoterStaticConfig(ctx)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get current feequoter static config: %w", err)
 		}
 		config.FeeQuoter = ccipocr3.FeeQuoterConfig{
@@ -134,7 +133,7 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		}
 
 		rmnRemoteProxyAddr, err := a.getBinding(consts.ContractNameRMNProxy)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get binding for rmn remote proxy: %w", err)
 		}
 
@@ -151,13 +150,13 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 
 		// CurseInfo
 		curseInfo, err := a.getCurseInfo(ctx)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get curse info: %w", err)
 		}
 		config.CurseInfo = curseInfo
 
 		sourceChainConfigs, err = a.getOffRampSourceChainConfigs(ctx, sourceChainSelectors)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get source chain configs: %w", err)
 		}
 	} else {
@@ -165,11 +164,11 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 
 		// OnRamp
 		routerDynamicConfig, err := a.getOnRampDynamicConfig(ctx)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get current onramp dynamic config: %w", err)
 		}
 		onRampDestChainConfig, err := a.getOnRampDestChainConfig(ctx, destChainSelector)
-		if !errors.Is(err, ErrNoBindings) && err != nil {
+		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get current onramp dest chain config: %w", err)
 		}
 		config.OnRamp = ccipocr3.OnRampConfig{
@@ -378,7 +377,7 @@ func (a *SolanaAccessor) getBinding(contractName string) (solana.PublicKey, erro
 	defer a.bindingsMu.RUnlock()
 	addr, exists := a.bindings[contractName]
 	if !exists {
-		return solana.PublicKey{}, ErrNoBindings
+		return solana.PublicKey{}, contractreader.ErrNoBindings
 	}
 	return addr, nil
 }
@@ -616,6 +615,8 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 			results[meta.selector][meta.user.String()] = nonce.OrderedNonce
 		}
 	}
+
+	a.lggr.Debugw("Nonces", "results", results)
 
 	return results, nil
 }
