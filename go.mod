@@ -20,9 +20,9 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.67
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250922180238-ed8659d72c66
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250822092253-eb39ec4ff519
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250822092253-eb39ec4ff519
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250910210251-724af8ee41ad
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250910210251-724af8ee41ad
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250910210251-724af8ee41ad
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250924155255-91f3f788735b
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250818175541-3389ac08a563
