@@ -54,8 +54,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     let blockData: BlockData
     for (let i = 0; i < numberOfBlocks; i++) {
       const slot = latestSlot - i
-      const block = await this.provider.connection.getBlock(slot, {
-      })
+      const block = await this.provider.connection.getBlock(slot, {})
       blockData = parseBlockFees(block)
       prices = [...prices, ...blockData.prices]
     }
