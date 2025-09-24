@@ -74,7 +74,7 @@ func NewCCIPProvider(
 	c := ccipocr3.Codec{
 		ChainSpecificAddressCodec: codec.NewAddressCodec(),
 		CommitPluginCodec:         codec.NewCommitPluginCodecV1(),
-		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(nil), // TODO: plugin in extra data codec bundle
+		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(ccipArgs.ExtraDataCodecBundle),
 		TokenDataEncoder:          codec.NewSolanaTokenDataEncoder(),
 		SourceChainExtraDataCodec: codec.NewExtraDataDecoder(),
 	}
@@ -84,7 +84,7 @@ func NewCCIPProvider(
 		return nil, fmt.Errorf("failed to create Solana Chain Accessor: %w", err)
 	}
 
-	chainWriterConfig, err := config.GetSolanaChainWriterConfig(offrampPubKey.String(), ccipArgs.Transmitter)
+	chainWriterConfig, err := config.GetSolanaChainWriterConfig(offrampPubKey.String(), string(ccipArgs.TransmitterAddress))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build chain writer configs: %w", err)
 	}
@@ -97,9 +97,9 @@ func NewCCIPProvider(
 	var ct ocr3types.ContractTransmitter[[]byte]
 	switch pluginType {
 	case ccipocr3.PluginTypeCCIPCommit:
-		ct = ocr.NewCommitTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String())
+		ct = ocr.NewCommitTransmitter(lggr, cw, string(ccipArgs.TransmitterAddress), offrampPubKey.String())
 	case ccipocr3.PluginTypeCCIPExec:
-		ct = ocr.NewExecTransmitter(lggr, cw, ccipArgs.Transmitter, offrampPubKey.String(), nil) // TODO: plugin in extra data codec bundle
+		ct = ocr.NewExecTransmitter(lggr, cw, string(ccipArgs.TransmitterAddress), offrampPubKey.String(), ccipArgs.ExtraDataCodecBundle)
 	default:
 		return nil, fmt.Errorf("unsupported plugin type: %d", pluginType)
 	}

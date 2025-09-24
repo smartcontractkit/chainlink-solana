@@ -703,8 +703,7 @@ func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (ccipocr3.SeqN
 
 func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokenBytes []ccipocr3.UnknownEncodedAddress,
-	chainSel ccipocr3.ChainSelector,
+	tokenBytes []ccipocr3.UnknownAddress,
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
 	feeQuoterAddr, err := a.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
@@ -716,10 +715,7 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 		if len(token) != solana.PublicKeyLength {
 			return nil, fmt.Errorf("invalid token bytes length, got %d, expected %d", len(token), solana.PublicKeyLength)
 		}
-		tokenPubKey, err := solana.PublicKeyFromBase58(string(token))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse token address %s: %w", token, err)
-		}
+		tokenPubKey := solana.PublicKeyFromBytes(token)
 		tokenConfigPDA, err := a.pdaCache.feeQuoterBillingTokenConfig(tokenPubKey, feeQuoterAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch fee quoter billing token config PDA from cache: %w", err)
