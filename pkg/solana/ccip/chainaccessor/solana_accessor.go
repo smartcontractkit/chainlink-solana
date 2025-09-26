@@ -138,7 +138,6 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		}
 
 		// RMN
-		// TODO: RMNProxy should be an implementation detail hidden behind chainAccessor
 		config.RMNProxy = ccipocr3.RMNProxyConfig{
 			// TODO: point at a rmnremote address/router/offramp to allow fetching curseinfo
 			// There is no proxy for Solana so is it right to just set the "proxy" address as the remote address here?
@@ -417,8 +416,7 @@ func (a *SolanaAccessor) GetTokenPriceUSD(ctx context.Context, rawTokenAddress c
 		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("billing token config timestamp exceeds uint32 max: %d", billingTokenConfig.Config.UsdPerToken.Timestamp)
 	}
 	return ccipocr3.TimestampedUnixBig{
-		Value: value,
-		// TODO: u64 -> u32? should we fix the onchain type?
+		Value:     value,
 		Timestamp: uint32(billingTokenConfig.Config.UsdPerToken.Timestamp), //nolint:gosec // G115: validated to be within uint32 max above
 	}, nil
 }
@@ -547,23 +545,23 @@ func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipoc
 }
 
 func (a *SolanaAccessor) NextSeqNum(ctx context.Context, sources []ccipocr3.ChainSelector) (seqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum, err error) {
-	// TODO: not needed yet. CCIP reader extracts this info from GetAllConfigsLegacy for now
+	// Not needed yet. CCIP reader extracts this info from GetAllConfigsLegacy for now
 	// https://github.com/smartcontractkit/chainlink-ccip/blob/7cae1b8434dd376eb70f2ddaace43093982f3a57/pkg/reader/ccip.go#L936
 	return nil, errors.New("not implemented")
 }
 
 func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.ChainSelector][]ccipocr3.UnknownEncodedAddress) (map[ccipocr3.ChainSelector]map[string]uint64, error) {
-	routerAddr, err := a.getBinding(consts.ContractNameRouter)
+	routerAddr, err := a.getBinding(consts.ContractNameNonceManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get binding for router: %w", err)
 	}
 
-	type meta struct {
+	type userMeta struct {
 		selector ccipocr3.ChainSelector
 		user     solana.PublicKey
 	}
 
-	pdaMetaMap := make(map[solana.PublicKey]meta)
+	pdaMetaMap := make(map[solana.PublicKey]userMeta)
 
 	for sel, addresses := range addressesMap {
 		for _, addrStr := range addresses {
@@ -576,7 +574,7 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 				return nil, fmt.Errorf("failed to calculate nonce PDA for selector %d and address %s: %w", sel, addrStr, err)
 			}
 
-			pdaMetaMap[noncePDA] = meta{
+			pdaMetaMap[noncePDA] = userMeta{
 				selector: sel,
 				user:     user,
 			}

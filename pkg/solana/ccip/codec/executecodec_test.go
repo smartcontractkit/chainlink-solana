@@ -184,7 +184,6 @@ func TestExecutePluginCodecV1(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			report := tc.report(randomExecuteReport(t, tc.chainSelector))
 			bytes, err := cd.Encode(ctx, report)
 			if tc.expErr {
@@ -304,10 +303,10 @@ func Test_DecodingExecuteReport(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, originMsg.ExtraArgs, ccipocr3.Bytes(buf.Bytes()))
 
-			originTokenAmount := originMsg.TokenAmounts[0]
-			require.Equal(t, originTokenAmount.Amount, decodeLEToBigInt(executeReport.Message.TokenAmounts[0].Amount.LeBytes[:]))
-			require.Equal(t, originTokenAmount.DestTokenAddress, ccipocr3.UnknownAddress(executeReport.Message.TokenAmounts[0].DestTokenAddress.Bytes()))
-			require.Equal(t, binary.LittleEndian.Uint32(originTokenAmount.DestExecData), executeReport.Message.TokenAmounts[0].DestGasAmount)
-			require.Equal(t, originMsg.Sender, ccipocr3.UnknownAddress(executeReport.Message.Sender))
-		})
-	}
+		originTokenAmount := originMsg.TokenAmounts[0]
+		require.Equal(t, originTokenAmount.Amount, decodeLEToBigInt(executeReport.Message.TokenAmounts[0].Amount.LeBytes[:]))
+		require.Equal(t, originTokenAmount.DestTokenAddress, ccipocr3.UnknownAddress(executeReport.Message.TokenAmounts[0].DestTokenAddress.Bytes()))
+		require.Equal(t, binary.LittleEndian.Uint32(originTokenAmount.DestExecData), executeReport.Message.TokenAmounts[0].DestGasAmount)
+		require.Equal(t, originMsg.Sender, ccipocr3.UnknownAddress(executeReport.Message.Sender))
+	})
+}

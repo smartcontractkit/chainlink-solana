@@ -44,8 +44,8 @@ func (a *SolanaAccessor) getOffRampConfig(ctx context.Context) (ccipocr3.Offramp
 		ChainSelector:        ccipocr3.ChainSelector(config.SvmChainSelector),
 		GasForCallExactCheck: 0,
 		RmnRemote:            offrampRefAddress.RmnRemote.Bytes(),
-		TokenAdminRegistry:   []byte{}, // PDA dependent on the token address
-		NonceManager:         offrampRefAddress.Router.Bytes(),
+		TokenAdminRegistry:   []byte{},                         // PDA dependent on the token address
+		NonceManager:         offrampRefAddress.Router.Bytes(), // Nonces are PDAs on the Router contract
 	}
 
 	dynamicConfig := ccipocr3.OffRampDynamicChainConfig{
@@ -270,7 +270,7 @@ func (a *SolanaAccessor) getCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, 
 
 	return ccipocr3.CurseInfo{
 		CursedSourceChains: cursedChains,
-		CursedDestination:  false, // TODO: how do we read cursed subjects to determine this value?
+		CursedDestination:  false, // TODO: how do we read cursed subjects to determine this value? Or is destination curse not possible on Solana
 		GlobalCurse:        globalCurse,
 	}, nil
 }

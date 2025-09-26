@@ -240,11 +240,8 @@ func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overh
 	if !ok {
 		return 0, fmt.Errorf("computeUnits is not expected type, expected int64, got %T", cu)
 	}
-	if cuInt > math.MaxUint32 {
-		return 0, fmt.Errorf("computeUnits exceeds uint32 max, got %d", cuInt)
-	}
 
-	computeUnits := overhead + uint32(cuInt) //nolint:gosec // G115: validate value to be within uint32 max above
+	computeUnits := int64(overhead) + cuInt
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
 		destGasAmount, ok := execData["destGasAmount"]
@@ -258,9 +255,13 @@ func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overh
 		if destGasAmountInt > math.MaxUint32 {
 			return 0, fmt.Errorf("DestGasAmount exceeds uint32 max, got %d", destGasAmountInt)
 		}
-		computeUnits += uint32(destGasAmountInt) //nolint:gosec // G115: validate value to be within uint32 max above
+		computeUnits += destGasAmountInt
 	}
-	return computeUnits, nil
+	if computeUnits > math.MaxUint32 {
+		return 0, fmt.Errorf("computeUnits exceeds uint32 max, got %d", computeUnits)
+	}
+
+	return uint32(computeUnits), nil //nolint:gosec // G115: validate value to be within uint32 max above
 }
 
 func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp_v0_1_1.DeriveAccountsExecuteParams, messageTokenData [][]byte, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {

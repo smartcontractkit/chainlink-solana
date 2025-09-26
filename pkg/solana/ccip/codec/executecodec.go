@@ -291,7 +291,6 @@ func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 				return 0, errors.New("invalid type for destgasamount, expected uint32")
 			}
 		default:
-
 		}
 	}
 
