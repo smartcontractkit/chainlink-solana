@@ -237,29 +237,29 @@ func parseExtraDataMap(input map[string]any) (extraData, error) {
 		switch lowercase {
 		case "computeunits":
 			// Expect uint32
-			if v, ok := fieldValue.(uint32); ok {
-				extraArgs.ComputeUnits = v
-			} else {
+			v, ok := fieldValue.(uint32)
+			if !ok {
 				return out, errors.New("invalid type for ComputeUnits, expected uint32")
 			}
+			extraArgs.ComputeUnits = v
 		case "accountiswritablebitmap":
 			// Expect uint64
-			if v, ok := fieldValue.(uint64); ok {
-				extraArgs.IsWritableBitmap = v
-			} else {
+			v, ok := fieldValue.(uint64)
+			if !ok {
 				return out, errors.New("invalid type for IsWritableBitmap, expected uint64")
 			}
+			extraArgs.IsWritableBitmap = v
 		case "accounts":
 			// Expect [][32]byte
-			if v, ok := fieldValue.([][32]byte); ok {
-				a := make([]solana.PublicKey, len(v))
-				for i, val := range v {
-					a[i] = solana.PublicKeyFromBytes(val[:])
-				}
-				accounts = a
-			} else {
+			v, ok := fieldValue.([][32]byte)
+			if !ok {
 				return out, errors.New("invalid type for Accounts, expected [][32]byte")
 			}
+			a := make([]solana.PublicKey, len(v))
+			for i, val := range v {
+				a[i] = solana.PublicKeyFromBytes(val[:])
+			}
+			accounts = a
 		case "tokenreceiver":
 			// Expect [32]byte
 			v, ok := fieldValue.([32]byte)
@@ -285,11 +285,11 @@ func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 		switch lowercase {
 		case "destgasamount":
 			// Expect uint32
-			if v, ok := fieldValue.(uint32); ok {
-				return v, nil
-			} else {
+			v, ok := fieldValue.(uint32)
+			if !ok {
 				return 0, errors.New("invalid type for destgasamount, expected uint32")
 			}
+			return v, nil
 		default:
 		}
 	}

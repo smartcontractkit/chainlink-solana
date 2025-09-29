@@ -21,9 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
-	router "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	feequoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	ccipchainaccessor "github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -281,11 +279,14 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 		"destinationChainSelector", dest,
 		"seqNumRange", seqNumRange.String(),
 	)
+	a.lggr.Debugw("MsgsBetweenSeqNums", "logs", logs)
 
 	events, err := a.convertCCIPMessageSent(logs, onrampAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert solana message sent event to generic CCIP type: %w", err)
 	}
+
+	a.lggr.Debugw("MsgsBetweenSeqNums", "events", events)
 
 	msgs := make([]ccipocr3.Message, 0)
 	for _, event := range events {
@@ -338,18 +339,18 @@ func (a *SolanaAccessor) LatestMessageTo(ctx context.Context, dest ccipocr3.Chai
 		return 0, fmt.Errorf("failed to fetch logs from log poller: %w", err)
 	}
 
-	a.lggr.Infow("queried LatestMessageTo",
-		"numMsgs", len(logs),
-		"sourceChainSelector", a.chainSelector,
-		"destinationChainSelector", dest,
-	)
-
 	if len(logs) > 1 {
 		return 0, fmt.Errorf("more than one message found for the latest message query, found: %d", len(logs))
 	}
 	if len(logs) == 0 {
 		return 0, nil
 	}
+
+	a.lggr.Infow("queried LatestMessageTo",
+		"log", logs[0],
+		"sourceChainSelector", a.chainSelector,
+		"destinationChainSelector", dest,
+	)
 
 	// convert logs to generic CCIP events
 	events, err := a.convertCCIPMessageSent(logs, onrampAddr)
@@ -550,71 +551,20 @@ func (a *SolanaAccessor) NextSeqNum(ctx context.Context, sources []ccipocr3.Chai
 	return nil, errors.New("not implemented")
 }
 
+// Nonces is used to determine the inbound nonce of senders per lane when Solana is the destination
+// Since out-of-order execution is always enabled when Solana is destination, the nonce would always be 0
 func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.ChainSelector][]ccipocr3.UnknownEncodedAddress) (map[ccipocr3.ChainSelector]map[string]uint64, error) {
-	routerAddr, err := a.getBinding(consts.ContractNameNonceManager)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get binding for router: %w", err)
-	}
-
-	type userMeta struct {
-		selector ccipocr3.ChainSelector
-		user     solana.PublicKey
-	}
-
-	pdaMetaMap := make(map[solana.PublicKey]userMeta)
-
-	for sel, addresses := range addressesMap {
-		for _, addrStr := range addresses {
-			user, err := solana.PublicKeyFromBase58(string(addrStr))
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse sender address %s: %w", addrStr, err)
-			}
-			noncePDA, err := state.FindNoncePDA(uint64(sel), user, routerAddr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate nonce PDA for selector %d and address %s: %w", sel, addrStr, err)
-			}
-
-			pdaMetaMap[noncePDA] = userMeta{
-				selector: sel,
-				user:     user,
-			}
-		}
-	}
-
-	batches := batchPDAs(maps.Keys(pdaMetaMap))
 	results := make(map[ccipocr3.ChainSelector]map[string]uint64)
 
-	for _, batch := range batches {
-		result, err := a.client.GetMultipleAccountsWithOpts(ctx, batch, &rpc.GetMultipleAccountsOpts{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch nonce PDAs: %w", err)
+	// Populate results with 0 nonce for all selectors and senders
+	for chainSel, addresses := range addressesMap {
+		if _, ok := results[chainSel]; !ok {
+			results[chainSel] = make(map[string]uint64)
 		}
-
-		if len(batch) != len(result.Value) {
-			return nil, fmt.Errorf("nonce results contain unexpected number of accounts: %d, expected %d", len(result.Value), len(batch))
-		}
-
-		for i, account := range result.Value {
-			meta := pdaMetaMap[batch[i]]
-			if _, ok := results[meta.selector]; !ok {
-				results[meta.selector] = make(map[string]uint64)
-			}
-			// Account not found, continue to fetch data for other accounts
-			if account == nil {
-				a.lggr.Errorw("nonce PDA not found", "selector", meta.selector, "user", meta.user.String())
-				continue
-			}
-			var nonce router.Nonce
-			decodeErr := bin.NewBorshDecoder(account.Data.GetBinary()).Decode(&nonce)
-			if decodeErr != nil {
-				a.lggr.Errorw("failed to decode nonce", "selector", meta.selector, "user", meta.user, "error", decodeErr)
-				continue
-			}
-			results[meta.selector][meta.user.String()] = nonce.OrderedNonce
+		for _, addr := range addresses {
+			results[chainSel][string(addr)] = 0
 		}
 	}
-
-	a.lggr.Debugw("Nonces", "results", results)
 
 	return results, nil
 }
