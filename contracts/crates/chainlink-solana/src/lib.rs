@@ -127,7 +127,7 @@ impl Feed {
     }
 }
 
-/// doc
+/// todo: document
 pub fn read_feed_v2(account: AccountInfo) ->  std::result::Result<Feed, ReadError> {
     let data = account.try_borrow_data().map_err(|_| ReadError::InvalidAccount)?;
 
@@ -200,9 +200,8 @@ mod tests {
         #[constant]
         pub const T_END: usize = 8 + HEADER_SIZE + size_of::<Transmission>();
 
-        let alignment = std::mem::align_of::<Transmission>();
-
-        print!("alignment {:?}", alignment);
+        // let alignment = std::mem::align_of::<Transmission>();
+        // print!("alignment {:?}", alignment);
 
         let mut buffer = [0u8; 8 + HEADER_SIZE + size_of::<Transmission>()];
 
@@ -239,8 +238,6 @@ mod tests {
 
         let tx_bytes = bytemuck::bytes_of(&dummy_tx);
         buffer[T_START..T_END].copy_from_slice(tx_bytes);
-
-        // let data = RefCell::new(&mut buffer[..]);
 
         let key = Pubkey::new_unique();
         let owner = Pubkey::new_unique();
