@@ -1,7 +1,7 @@
 [package]
 name = "chainlink_solana"
 description = "Chainlink client for Solana"
-version = "2.31.1"
+version = "2.0.0"
 edition = "2018"
 license = "MIT"
 
@@ -15,8 +15,10 @@ name = "chainlink_solana"
 default = []
 
 [dependencies]
-anchor-lang  = {version = "0.31.1" }
+solana-program = "2.1.0"
 bytemuck = { version = "1.23.2", features = ["derive"] }
-# solana-program = "1.17.25"
-# borsh = "0.9.1"
-# borsh-derive = "0.9.1"
+borsh = "1.5.7"
+borsh-derive = "1.5.7"
+
+[dev-dependencies]
+anchor-lang = "0.31.1"

@@ -2,15 +2,16 @@
 #![deny(rustdoc::all)]
 #![allow(rustdoc::missing_doc_code_examples)]
 #![deny(missing_docs)]
-
-use anchor_lang::prelude::{borsh::{BorshDeserialize, BorshSerialize}, *};
-use std::{convert::TryInto, mem::size_of};
+use borsh::{BorshDeserialize, BorshSerialize};
+use std::{cell::Ref, convert::TryInto, mem::size_of};
 use bytemuck;
 
 use crate::data_feeds_v1_store::{Transmission, Transmissions, HEADER_SIZE, TRANSMISSIONS_DISCRIMINATOR};
 
 pub(crate) mod data_feeds_v1_store {
-    use anchor_lang::prelude::{borsh::{BorshDeserialize, BorshSerialize}, *};
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use solana_program::pubkey::Pubkey;
+
 
     pub(crate) const TRANSMISSIONS_DISCRIMINATOR: [u8; 8] = [96, 179, 69, 66, 128, 129, 73, 117];
 
@@ -32,7 +33,6 @@ pub(crate) mod data_feeds_v1_store {
         pub(crate) historical_cursor: u32,
     }
 
-    #[constant]
     pub(crate) const HEADER_SIZE: usize = 192;
 
     /// Internal representation of a single transmission
@@ -127,10 +127,9 @@ impl Feed {
     }
 }
 
-/// todo: document
-pub fn read_feed_v2(account: AccountInfo) ->  std::result::Result<Feed, ReadError> {
-    let data = account.try_borrow_data().map_err(|_| ReadError::InvalidAccount)?;
-
+/// Pass in the Feed AccountInfo data to read the feed
+/// Ex: read_feed_v2(account_info.try_borrow_data()?)
+pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) ->  std::result::Result<Feed, ReadError> {
      if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
         return Err(ReadError::InvalidDiscriminator);
     }
@@ -161,10 +160,11 @@ pub fn read_feed_v2(account: AccountInfo) ->  std::result::Result<Feed, ReadErro
 
 #[cfg(test)]
 mod tests {
+    use borsh::{BorshDeserialize, BorshSerialize};
     use std::convert::TryInto;
 
     use super::{data_feeds_v1_store::HEADER_SIZE, Transmission, Transmissions, read_feed_v2};
-    use anchor_lang::{solana_program::{hash}, prelude::{AccountInfo, AnchorSerialize, Pubkey, *}};
+    use anchor_lang::{solana_program::{hash}, prelude::{AccountInfo, AnchorSerialize, Pubkey}};
 
     fn mock_account_info<'a>(
         key: &'a Pubkey,
@@ -194,10 +194,8 @@ mod tests {
 
     #[test]
     fn test_feed_read() {
-        #[constant]
         pub const T_START: usize = 8 + HEADER_SIZE;
 
-        #[constant]
         pub const T_END: usize = 8 + HEADER_SIZE + size_of::<Transmission>();
 
         // let alignment = std::mem::align_of::<Transmission>();
@@ -252,7 +250,7 @@ mod tests {
             &owner,
         );
 
-        let feed = read_feed_v2(account).unwrap();
+        let feed = read_feed_v2(account.try_borrow_data().unwrap()).unwrap();
 
         let round = feed.latest_round_data().unwrap();
         assert_eq!(round.answer, 12);
