@@ -161,6 +161,7 @@ pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) ->  std::result::Result<Feed, R
 #[cfg(test)]
 mod tests {
     use borsh::{BorshSerialize};
+    use std::mem::size_of;
     use std::convert::TryInto;
 
     use super::{data_feeds_v1_store::HEADER_SIZE, Transmission, Transmissions, read_feed_v2};
