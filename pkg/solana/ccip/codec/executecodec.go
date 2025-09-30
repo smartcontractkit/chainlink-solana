@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 
@@ -82,12 +83,16 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 				return nil, err
 			}
 
+			if destGasAmount > math.MaxUint32 {
+				return nil, fmt.Errorf("destGasAmount exceeds uint32 max, got %d", destGasAmount)
+			}
+
 			tokenAmounts = append(tokenAmounts, ccip_offramp.Any2SVMTokenTransfer{
 				SourcePoolAddress: tokenAmount.SourcePoolAddress,
 				DestTokenAddress:  solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress),
 				ExtraData:         tokenAmount.ExtraData,
 				Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
-				DestGasAmount:     destGasAmount,
+				DestGasAmount:     uint32(destGasAmount), //nolint:gosec // G115: validated to be within uint32 max above
 			})
 		}
 
@@ -278,16 +283,16 @@ func parseExtraDataMap(input map[string]any) (extraData, error) {
 	return out, nil
 }
 
-func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
+func extractDestGasAmountFromMap(input map[string]any) (int64, error) {
 	// Search for the gas fields
 	for fieldName, fieldValue := range input {
 		lowercase := strings.ToLower(fieldName)
 		switch lowercase {
 		case "destgasamount":
 			// Expect uint32
-			v, ok := fieldValue.(uint32)
+			v, ok := fieldValue.(int64)
 			if !ok {
-				return 0, errors.New("invalid type for destgasamount, expected uint32")
+				return 0, errors.New("invalid type for destgasamount, expected int64")
 			}
 			return v, nil
 		default:

@@ -31,16 +31,6 @@ var (
 	evmExtraArgsV2Tag = "181dcf10"
 )
 
-// TODO: generate mocks in chainlink-common for interface
-// Temporarily copied from chainlink-common so mocks can be generated locally
-// https://github.com/smartcontractkit/chainlink-common/blob/04a897dcb3618fbfaa9d7309eee606597af5cd76/pkg/types/ccipocr3/plugincodec.go#L32
-type SourceChainExtraDataCodec interface {
-	// DecodeExtraArgsToMap reformat bytes into a chain agnostic map[string]any representation for extra args
-	DecodeExtraArgsToMap(extraArgs ccipocr3.Bytes) (map[string]any, error)
-	// DecodeDestExecDataToMap reformat bytes into a chain agnostic map[string]interface{} representation for dest exec data
-	DecodeDestExecDataToMap(destExecData ccipocr3.Bytes) (map[string]any, error)
-}
-
 // ExtraDataDecoder is a helper struct for decoding extra data
 type ExtraDataDecoder struct{}
 
