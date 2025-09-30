@@ -21,4 +21,4 @@ borsh = "1.5.7"
 borsh-derive = "1.5.7"
 
 [dev-dependencies]
-anchor-lang = "0.31.1"
+anchor-lang = "0.29.0"

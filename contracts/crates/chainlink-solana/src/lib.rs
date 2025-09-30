@@ -160,19 +160,20 @@ pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) ->  std::result::Result<Feed, R
 
 #[cfg(test)]
 mod tests {
-    use borsh::{BorshDeserialize, BorshSerialize};
+    use borsh::{BorshSerialize};
     use std::convert::TryInto;
 
     use super::{data_feeds_v1_store::HEADER_SIZE, Transmission, Transmissions, read_feed_v2};
-    use anchor_lang::{solana_program::{hash}, prelude::{AccountInfo, AnchorSerialize, Pubkey}};
+    use solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
+    use anchor_lang::{prelude::{AccountInfo, Pubkey as AnchorPubkey}};
 
     fn mock_account_info<'a>(
-        key: &'a Pubkey,
+        key: &'a AnchorPubkey,
         is_signer: bool,
         is_writable: bool,
         lamports: &'a mut u64,
         data: &'a mut [u8],
-        owner: &'a Pubkey,
+        owner: &'a AnchorPubkey,
     ) -> AccountInfo<'a> {
         AccountInfo::new(
             key,
@@ -206,9 +207,9 @@ mod tests {
         let header = Transmissions {
             version: 1,
             state: 0,
-            owner: Pubkey::default(),
-            proposed_owner: Pubkey::default(),
-            writer: Pubkey::default(),
+            owner: SolanaPubkey::default(),
+            proposed_owner: SolanaPubkey::default(),
+            writer: SolanaPubkey::default(),
             description: [0; 32],
             decimals: 8,
             flagging_threshold: 42,
@@ -237,8 +238,8 @@ mod tests {
         let tx_bytes = bytemuck::bytes_of(&dummy_tx);
         buffer[T_START..T_END].copy_from_slice(tx_bytes);
 
-        let key = Pubkey::new_unique();
-        let owner = Pubkey::new_unique();
+        let key = AnchorPubkey::new_unique();
+        let owner = AnchorPubkey::new_unique();
         let mut lamports = 0;
 
         let account = mock_account_info(
