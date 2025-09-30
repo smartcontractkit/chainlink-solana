@@ -713,6 +713,8 @@ dependencies = [
  "borsh-derive 1.5.7",
  "bytemuck",
  "solana-program 2.1.0",
+ "solana-pubkey",
+ "solana-sha256-hasher",
 ]
 
 [[package]]
