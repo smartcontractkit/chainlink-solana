@@ -130,16 +130,9 @@ func CCIPExecuteArgsTransformV2(
 		messageTokenData = report.OffchainTokenData[0]
 		for i, tokenAmount := range message.TokenAmounts {
 			destTokenAddress := solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress)
-			destGasAmount, ok := argsTransformed.ExtraData.DestExecDataDecoded[i]["destGasAmount"]
-			if !ok {
-				return nil, nil, nil, nil, fmt.Errorf("dest gas amount not found in ExtraData for token transfer: %s", destTokenAddress.String())
-			}
-			destGasAmountInt, ok := destGasAmount.(int64)
-			if !ok {
-				return nil, nil, nil, nil, fmt.Errorf("dest gas amount unexpected type, expected int64, got %T", destGasAmount)
-			}
-			if destGasAmountInt > math.MaxUint32 {
-				return nil, nil, nil, nil, fmt.Errorf("dest gas amount exceeds uint32 max, got %d", destGasAmountInt)
+			destGasAmount, extractErr := extractDestGasAmount(argsTransformed.ExtraData.DestExecDataDecoded[i])
+			if extractErr != nil {
+				return nil, nil, nil, nil, fmt.Errorf("failed to extract destGasAmount for %s token transfer: %w", destTokenAddress.String(), extractErr)
 			}
 			if tokenAmount.Amount.IsEmpty() {
 				return nil, nil, nil, nil, fmt.Errorf("token amount is empty for token transfer: %s", destTokenAddress.String())
@@ -153,7 +146,7 @@ func CCIPExecuteArgsTransformV2(
 					DestTokenAddress:  destTokenAddress,
 					Amount:            ccip_offramp_v0_1_1.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Amount.Int, 32))},
 					ExtraData:         tokenAmount.ExtraData,
-					DestGasAmount:     uint32(destGasAmountInt), //nolint // validated value is within uint32 max above
+					DestGasAmount:     destGasAmount,
 				},
 				Data: nil, // Set to nil to optimize tx size during user messaging account derivation. Field set after user message account derivation is complete.
 			})
@@ -232,36 +225,59 @@ func CCIPCommitAccountTransform(
 }
 
 func calculateComputeUnitLimit(argsTransformed ccipsolana.SVMExecCallArgs, overhead uint32) (uint32, error) {
-	cu, ok := argsTransformed.ExtraData.ExtraArgsDecoded["computeUnits"]
-	if !ok {
-		return 0, errors.New("computeUnits not found in ExtraData ExtraArgsDecoded")
-	}
-	cuInt, ok := cu.(int64)
-	if !ok {
-		return 0, fmt.Errorf("computeUnits is not expected type, expected int64, got %T", cu)
+	cu, err := extractComputeUnits(argsTransformed.ExtraData.ExtraArgsDecoded)
+	if err != nil {
+		return 0, fmt.Errorf("failed to extract compute units: %w", err)
 	}
 
-	computeUnits := int64(overhead) + cuInt
+	computeUnits := overhead + cu
 
 	for _, execData := range argsTransformed.ExtraData.DestExecDataDecoded {
-		destGasAmount, ok := execData["destGasAmount"]
-		if !ok {
-			return 0, fmt.Errorf("destGasAmount not found in ExtraData")
+		destGasAmount, extractErr := extractDestGasAmount(execData)
+		if extractErr != nil {
+			return 0, fmt.Errorf("failed to extract dest gas amount: %w", extractErr)
 		}
-		destGasAmountInt, ok := destGasAmount.(int64)
-		if !ok {
-			return 0, fmt.Errorf("destGasAmount is not expected type, expected int64, got %T", destGasAmount)
-		}
-		if destGasAmountInt > math.MaxUint32 {
-			return 0, fmt.Errorf("DestGasAmount exceeds uint32 max, got %d", destGasAmountInt)
-		}
-		computeUnits += destGasAmountInt
-	}
-	if computeUnits > math.MaxUint32 {
-		return 0, fmt.Errorf("computeUnits exceeds uint32 max, got %d", computeUnits)
+		computeUnits += destGasAmount
 	}
 
-	return uint32(computeUnits), nil //nolint:gosec // G115: validate value to be within uint32 max above
+	return computeUnits, nil
+}
+
+func extractDestGasAmount(destExecDataDecoded map[string]any) (uint32, error) {
+	destGasAmount, ok := destExecDataDecoded["destGasAmount"]
+	if !ok {
+		return 0, errors.New("destGasAmount not found in DestExecDataDecoded")
+	}
+	switch v := destGasAmount.(type) {
+	case uint32:
+		return v, nil
+	case int64:
+		if v > math.MaxUint32 {
+			return 0, fmt.Errorf("destGasAmount exceeds uint32 max, got %d", v)
+		}
+		return uint32(v), nil //nolint:gosec // G115: validate value to be within uint32 max above
+	default:
+		return 0, fmt.Errorf("destGasAmount unexpected type, expected uint32 or int64, got %T", v)
+	}
+}
+
+func extractComputeUnits(extraArgsDecoded map[string]any) (uint32, error) {
+	cu, ok := extraArgsDecoded["computeUnits"]
+	if !ok {
+		return 0, errors.New("computeUnits not found in ExtraArgsDecoded")
+	}
+
+	switch v := cu.(type) {
+	case uint32:
+		return v, nil
+	case int64:
+		if v > math.MaxUint32 {
+			return 0, fmt.Errorf("computeUnits exceeds uint32 max, got %d", v)
+		}
+		return uint32(v), nil //nolint:gosec // G115: validate value to be within uint32 max above
+	default:
+		return 0, fmt.Errorf("computeUnits is not expected type, expected uint32 or int64, got %T", v)
+	}
 }
 
 func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, params ccip_offramp_v0_1_1.DeriveAccountsExecuteParams, messageTokenData [][]byte, transmitter solana.PublicKey, offrampStr string, lggr logger.Logger) (solana.AccountMetaSlice, map[solana.PublicKey]solana.PublicKeySlice, []uint8, error) {
