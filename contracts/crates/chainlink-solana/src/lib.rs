@@ -3,15 +3,16 @@
 #![allow(rustdoc::missing_doc_code_examples)]
 #![deny(missing_docs)]
 use borsh::{BorshDeserialize, BorshSerialize};
-use std::{cell::Ref, convert::TryInto, mem::size_of};
 use bytemuck;
+use std::{cell::Ref, convert::TryInto, mem::size_of};
 
-use crate::data_feeds_v1_store::{Transmission, Transmissions, HEADER_SIZE, TRANSMISSIONS_DISCRIMINATOR};
+use crate::data_feeds_v1_store::{
+    Transmission, Transmissions, HEADER_SIZE, TRANSMISSIONS_DISCRIMINATOR,
+};
 
 pub(crate) mod data_feeds_v1_store {
     use borsh::{BorshDeserialize, BorshSerialize};
     use solana_program::pubkey::Pubkey;
-
 
     pub(crate) const TRANSMISSIONS_DISCRIMINATOR: [u8; 8] = [96, 179, 69, 66, 128, 129, 73, 117];
 
@@ -57,7 +58,6 @@ pub(crate) mod data_feeds_v1_store {
         pub(crate) _padding1: u64,
         pub(crate) _padding2: u64,
     }
-
 }
 
 /// Represents a single oracle round.
@@ -129,13 +129,13 @@ impl Feed {
 
 /// Pass in the Feed AccountInfo data to read the feed
 /// Ex: read_feed_v2(account_info.try_borrow_data()?)
-pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) ->  std::result::Result<Feed, ReadError> {
-     if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
+pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) -> std::result::Result<Feed, ReadError> {
+    if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
         return Err(ReadError::InvalidDiscriminator);
     }
 
-    let header = Transmissions::deserialize(&mut &data[8..])
-        .map_err(|_| ReadError::DeserializeFailed)?;
+    let header =
+        Transmissions::deserialize(&mut &data[8..]).map_err(|_| ReadError::DeserializeFailed)?;
 
     if header.live_length != 1 {
         return Err(ReadError::FeedLengthInvalid);
@@ -160,13 +160,13 @@ pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) ->  std::result::Result<Feed, R
 
 #[cfg(test)]
 mod tests {
-    use borsh::{BorshSerialize};
-    use std::mem::size_of;
+    use borsh::BorshSerialize;
     use std::convert::TryInto;
+    use std::mem::size_of;
 
-    use super::{data_feeds_v1_store::HEADER_SIZE, Transmission, Transmissions, read_feed_v2};
+    use super::{data_feeds_v1_store::HEADER_SIZE, read_feed_v2, Transmission, Transmissions};
+    use anchor_lang::prelude::{AccountInfo, Pubkey as AnchorPubkey};
     use solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
-    use anchor_lang::{prelude::{AccountInfo, Pubkey as AnchorPubkey}};
 
     fn mock_account_info<'a>(
         key: &'a AnchorPubkey,
@@ -243,22 +243,11 @@ mod tests {
         let owner = AnchorPubkey::new_unique();
         let mut lamports = 0;
 
-        let account = mock_account_info(
-            &key,
-            true,
-            true,
-            &mut lamports,
-            &mut buffer[..],
-            &owner,
-        );
+        let account = mock_account_info(&key, true, true, &mut lamports, &mut buffer[..], &owner);
 
         let feed = read_feed_v2(account.try_borrow_data().unwrap()).unwrap();
 
         let round = feed.latest_round_data().unwrap();
         assert_eq!(round.answer, 12);
     }
-
-
 }
-
-
