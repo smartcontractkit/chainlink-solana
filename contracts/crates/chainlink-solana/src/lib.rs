@@ -2,17 +2,13 @@
 #![deny(rustdoc::all)]
 #![allow(rustdoc::missing_doc_code_examples)]
 #![deny(missing_docs)]
-use borsh::{BorshDeserialize, BorshSerialize};
-use bytemuck;
-use std::{cell::Ref, convert::TryInto, mem::size_of};
 
-use crate::data_feeds_v1_store::{
-    Transmission, Transmissions, HEADER_SIZE, TRANSMISSIONS_DISCRIMINATOR,
-};
-
-pub(crate) mod data_feeds_v1_store {
+pub(crate) mod data_feeds_store_v1 {
     use borsh::{BorshDeserialize, BorshSerialize};
+    use solana_program;
     use solana_program::pubkey::Pubkey;
+
+    solana_program::declare_id!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
 
     pub(crate) const TRANSMISSIONS_DISCRIMINATOR: [u8; 8] = [96, 179, 69, 66, 128, 129, 73, 117];
 
@@ -60,102 +56,145 @@ pub(crate) mod data_feeds_v1_store {
     }
 }
 
-/// Represents a single oracle round.
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct Round {
-    /// The round id.
-    pub round_id: u32,
-    /// Slot at the time the report was received on chain.
-    pub slot: u64,
-    /// Round timestamp, as reported by the oracle.
-    pub timestamp: u32,
-    /// Current answer, formatted to `decimals` decimal places.
-    pub answer: i128,
-}
+/// Version 2 of SDK directly reads feed account data.
+/// SDK deserializes underlying account layout and returns a
+/// user-friendly `Feed` struct which can be used to return additional data.
+/// Deserializing or reading account layout or Borsh deserializing
+/// on your own by the client is highly discouraged and not supported by Chainlink
+/// (due to underlying data layout changes)
+/// You should rely on this SDK and deal with the `Feed` struct only.
+pub mod v2 {
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use bytemuck;
+    use std::fmt;
+    use std::{cell::Ref, convert::TryInto, mem::size_of};
 
-/// Potential Errors
-#[derive(Debug)]
-pub enum ReadError {
-    /// Invalid Discriminator
-    InvalidDiscriminator,
-    /// Account invalid
-    InvalidAccount,
-    /// Transmissions deserialization failed
-    DeserializeFailed,
-    /// Feed Length is not 1
-    FeedLengthInvalid,
-    /// Feed data missing
-    MalformedData,
-}
+    use super::data_feeds_store_v1::{
+        Transmission, Transmissions, HEADER_SIZE, ID, TRANSMISSIONS_DISCRIMINATOR,
+    };
+    /// Represents a single oracle round.
+    #[derive(BorshSerialize, BorshDeserialize)]
+    pub struct Round {
+        /// The round id.
+        pub round_id: u32,
+        /// Slot at the time the report was received on chain.
+        pub slot: u64,
+        /// Round timestamp, as reported by the oracle.
+        pub timestamp: u32,
+        /// Current answer, formatted to `decimals` decimal places.
+        pub answer: i128,
+    }
 
-/// Feed consists of metadata header and transmission
-pub struct Feed {
-    /// Header contains important metadata
-    _header: Transmissions,
-    /// Contains a single transmission
-    _live: Transmission,
-}
+    /// Read Errors
+    #[derive(Debug)]
+    pub enum ReadError {
+        /// Invalid Account Owner
+        InvalidOwner,
+        /// Invalid Discriminator
+        InvalidDiscriminator,
+        /// Account invalid
+        InvalidAccount,
+        /// Transmissions deserialization failed
+        DeserializeFailed,
+        /// Feed Length is not 1
+        FeedLengthInvalid,
+        /// Feed data missing
+        MalformedData,
+    }
 
-impl Feed {
-    /// Returns round data for the latest round.
-    pub fn latest_round_data(&self) -> Option<Round> {
-        if self._header.latest_round_id == 0 {
-            return None;
+    // Implement Display so it can be formatted nicely
+    impl fmt::Display for ReadError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                ReadError::InvalidOwner => write!(f, "Invalid account owner"),
+                ReadError::InvalidDiscriminator => write!(f, "Invalid discriminator"),
+                ReadError::InvalidAccount => write!(f, "Invalid account"),
+                ReadError::DeserializeFailed => write!(f, "Failed to deserialize transmissions"),
+                ReadError::FeedLengthInvalid => write!(f, "Feed length invalid"),
+                ReadError::MalformedData => write!(f, "Malformed feed data"),
+            }
+        }
+    }
+
+    // Implement std::error::Error so it works with `?` and libraries
+    impl std::error::Error for ReadError {}
+
+    /// Feed consists of metadata header and transmission
+    pub struct Feed {
+        /// Header contains important metadata
+        _header: Transmissions,
+        /// Contains a single transmission
+        _live: Transmission,
+    }
+
+    impl Feed {
+        /// Returns round data for the latest round.
+        pub fn latest_round_data(&self) -> Option<Round> {
+            if self._header.latest_round_id == 0 {
+                return None;
+            }
+
+            Some(Round {
+                round_id: self._header.latest_round_id,
+                slot: self._live.slot,
+                timestamp: self._live.timestamp,
+                answer: self._live.answer,
+            })
         }
 
-        Some(Round {
-            round_id: self._header.latest_round_id,
-            slot: self._live.slot,
-            timestamp: self._live.timestamp,
-            answer: self._live.answer,
-        })
+        /// Returns the feed description.
+        pub fn description(&self) -> [u8; 32] {
+            self._header.description
+        }
+
+        /// Returns the amount of decimal places.
+        pub fn decimals(&self) -> u8 {
+            self._header.decimals
+        }
+
+        /// Query the feed version.
+        pub fn version(&self) -> u8 {
+            self._header.version
+        }
     }
 
-    /// Returns the feed description.
-    pub fn description(&self) -> [u8; 32] {
-        self._header.description
+    /// Reads the feed account's data slice
+    /// ex: `read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes())`
+    pub fn read_feed_v2<'a>(
+        data: Ref<&'a mut [u8]>,
+        owner: [u8; 32],
+    ) -> std::result::Result<Feed, ReadError> {
+        if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
+            return Err(ReadError::InvalidDiscriminator);
+        }
+
+        if owner != ID.to_bytes() {
+            return Err(ReadError::InvalidOwner);
+        }
+
+        let header = Transmissions::deserialize(&mut &data[8..])
+            .map_err(|_| ReadError::DeserializeFailed)?;
+
+        if header.live_length != 1 {
+            return Err(ReadError::FeedLengthInvalid);
+        }
+
+        let (_header, rest) = data.split_at(8 + HEADER_SIZE);
+
+        let array: &[u8; 48] = rest
+            .get(..size_of::<Transmission>())
+            .and_then(|s| s.try_into().ok())
+            .ok_or(ReadError::MalformedData)?;
+
+        let live_transmission = *bytemuck::from_bytes::<Transmission>(array);
+
+        let feed = Feed {
+            _header: header,
+            _live: live_transmission,
+        };
+
+        Ok(feed)
     }
-
-    /// Returns the amount of decimal places.
-    pub fn decimals(&self) -> u8 {
-        self._header.decimals
-    }
-
-    /// Query the feed version.
-    pub fn version(&self) -> u8 {
-        self._header.version
-    }
-}
-
-/// Pass in the Feed AccountInfo data to read the feed
-/// Ex: read_feed_v2(account_info.try_borrow_data()?)
-pub fn read_feed_v2<'a>(data: Ref<&'a mut [u8]>) -> std::result::Result<Feed, ReadError> {
-    if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
-        return Err(ReadError::InvalidDiscriminator);
-    }
-
-    let header =
-        Transmissions::deserialize(&mut &data[8..]).map_err(|_| ReadError::DeserializeFailed)?;
-
-    if header.live_length != 1 {
-        return Err(ReadError::FeedLengthInvalid);
-    }
-
-    let (_header, rest) = data.split_at(8 + HEADER_SIZE);
-
-    let array: &[u8; 48] = rest
-        .get(..size_of::<Transmission>())
-        .and_then(|s| s.try_into().ok())
-        .ok_or(ReadError::MalformedData)?;
-
-    let live_transmission = *bytemuck::from_bytes::<Transmission>(array);
-
-    let feed = Feed {
-        _header: header,
-        _live: live_transmission,
-    };
-
-    Ok(feed)
 }
 
 #[cfg(test)]
@@ -164,7 +203,8 @@ mod tests {
     use std::convert::TryInto;
     use std::mem::size_of;
 
-    use super::{data_feeds_v1_store::HEADER_SIZE, read_feed_v2, Transmission, Transmissions};
+    use super::data_feeds_store_v1::{Transmission, Transmissions, HEADER_SIZE, ID};
+    use super::v2::read_feed_v2;
     use anchor_lang::prelude::{AccountInfo, Pubkey as AnchorPubkey};
     use solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
 
@@ -195,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn test_feed_read() {
+    fn test_feed_read() -> Result<(), Box<dyn std::error::Error>> {
         pub const T_START: usize = 8 + HEADER_SIZE;
 
         pub const T_END: usize = 8 + HEADER_SIZE + size_of::<Transmission>();
@@ -245,9 +285,11 @@ mod tests {
 
         let account = mock_account_info(&key, true, true, &mut lamports, &mut buffer[..], &owner);
 
-        let feed = read_feed_v2(account.try_borrow_data().unwrap()).unwrap();
+        let feed = read_feed_v2(account.try_borrow_data()?, ID.to_bytes())?;
 
         let round = feed.latest_round_data().unwrap();
         assert_eq!(round.answer, 12);
+
+        Ok(())
     }
 }
