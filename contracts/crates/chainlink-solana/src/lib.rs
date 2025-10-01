@@ -5,7 +5,6 @@
 
 pub(crate) mod data_feeds_store_v1 {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use solana_program;
     use solana_program::pubkey::Pubkey;
 
     solana_program::declare_id!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
@@ -160,8 +159,8 @@ pub mod v2 {
 
     /// Reads the feed account's data slice
     /// ex: `read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes())`
-    pub fn read_feed_v2<'a>(
-        data: Ref<&'a mut [u8]>,
+    pub fn read_feed_v2(
+        data: Ref<&mut [u8]>,
         owner: [u8; 32],
     ) -> std::result::Result<Feed, ReadError> {
         if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
