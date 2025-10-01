@@ -285,7 +285,7 @@ func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 		lowercase := strings.ToLower(fieldName)
 		switch lowercase {
 		case "destgasamount":
-			switch v := fieldValue.(type){
+			switch v := fieldValue.(type) {
 			case uint32:
 				return v, nil
 			case int64: // LOOP converts expected uint32 to int64

@@ -3,6 +3,7 @@ package chainaccessor
 import (
 	"context"
 	"crypto/sha3"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -35,8 +37,9 @@ import (
 )
 
 var (
-	ccipOffRampIDL = idl.FetchCCIPOfframpIDL()
-	ccipRouterIDL  = idl.FetchCCIPRouterIDL()
+	ccipOffRampIDL   = idl.FetchCCIPOfframpIDL()
+	ccipRouterIDL    = idl.FetchCCIPRouterIDL()
+	cctpTokenPoolIDL = idl.FetchCctpTokenPoolIDL()
 
 	// defaultCCIPLogsRetention defines the duration for which logs critical for Commit/Exec plugins processing are retained.
 	// Although Exec relies on permissionlessExecThreshold which is lower than 24hours for picking eligible CommitRoots,
@@ -68,6 +71,10 @@ var (
 	execStateChangedSrcChainPath = "SourceChainSelector"
 	execStateChangedSeqNumPath   = consts.EventAttributeSequenceNumber
 	execStateChangedStatePath    = consts.EventAttributeState
+
+	// On-chain paths for the CCTP Message sent event
+	cctpMsgSentNoncePath     = "CctpNonce"
+	cctpMsgSentSrcDomainPath = "SourceDomain"
 )
 
 // Map of relevant events and their metadata required to build the codec and bind program addresses
@@ -94,6 +101,14 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 			indexedField2:   &execStateChangedStatePath,
 		},
 	},
+	consts.ContractNameUSDCTokenPool: {
+		consts.EventNameCCTPMessageSent: {
+			idl:             cctpTokenPoolIDL,
+			includeReverted: false,
+			indexedField0:   &cctpMsgSentNoncePath,
+			indexedField1:   &cctpMsgSentSrcDomainPath,
+		},
+	},
 }
 
 // Map of event name to offchain attribute to its subkey index for querying the LogPoller
@@ -108,6 +123,11 @@ var eventFilterSubkeyIndexMap = map[string]map[string]uint64{
 		consts.EventAttributeSourceChain:    0,
 		consts.EventAttributeSequenceNumber: 1,
 		consts.EventAttributeState:          2,
+	},
+	// Event for USDC CCTP
+	consts.EventNameCCTPMessageSent: {
+		consts.EventAttributeCCTPNonce:    0,
+		consts.EventAttributeSourceDomain: 1,
 	},
 }
 
@@ -483,38 +503,51 @@ func createExecutedMessagesKeyFilter(rangesPerChain map[ccipocr3.ChainSelector][
 	// (chainA && (sqRange1 || sqRange2 || ...)) || (chainB && (sqRange1 || sqRange2 || ...))
 	sortedChains := maps.Keys(rangesPerChain)
 	slices.Sort(sortedChains)
-	for _, srcChain := range sortedChains {
-		seqNumRanges := rangesPerChain[srcChain]
-		var seqRangeExpressions []query.Expression
-		for _, seqNrRange := range seqNumRanges {
-			expr := query.Comparator(consts.EventAttributeSequenceNumber,
-				primitives.ValueComparator{
-					Value:    seqNrRange.Start(),
-					Operator: primitives.Gte,
-				},
-				primitives.ValueComparator{
-					Value:    seqNrRange.End(),
-					Operator: primitives.Lte,
-				})
-			seqRangeExpressions = append(seqRangeExpressions, expr)
-			countSqNrs += uint64(seqNrRange.End() - seqNrRange.Start() + 1)
-		}
-		combinedSeqNrs := query.Or(seqRangeExpressions...)
-
-		chainExpressions = append(chainExpressions, query.And(
-			combinedSeqNrs,
-			query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
-				Value:    srcChain,
-				Operator: primitives.Eq,
-			}),
-		))
-	}
-	extendedQuery := query.Or(chainExpressions...)
 
 	attributeIndexes, ok := eventFilterSubkeyIndexMap[consts.EventNameExecutionStateChanged]
 	if !ok {
 		return query.KeyFilter{}, 0, fmt.Errorf("failed to find attribute indexes for event %s", consts.EventNameExecutionStateChanged)
 	}
+	seqAttributeIndex, ok := attributeIndexes[consts.EventAttributeSequenceNumber]
+	if !ok {
+		return query.KeyFilter{}, 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeSequenceNumber, consts.EventNameExecutionStateChanged)
+	}
+	srcChainAttributeIndex, ok := attributeIndexes[consts.EventAttributeSourceChain]
+	if !ok {
+		return query.KeyFilter{}, 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeSourceChain, consts.EventNameExecutionStateChanged)
+	}
+
+	for _, srcChain := range sortedChains {
+		seqNumRanges := rangesPerChain[srcChain]
+		var seqRangeExpressions []query.Expression
+		for _, seqNrRange := range seqNumRanges {
+			expr, err := logpoller.NewEventBySubKeyFilter(seqAttributeIndex, []primitives.ValueComparator{{
+				Value:    seqNrRange.Start(),
+				Operator: primitives.Gte,
+			}, {
+				Value:    seqNrRange.End(),
+				Operator: primitives.Lte,
+			}})
+			if err != nil {
+				return query.KeyFilter{}, 0, fmt.Errorf("failed to build event sub key filter for sequence number attribute: %w", err)
+			}
+			seqRangeExpressions = append(seqRangeExpressions, expr)
+			countSqNrs += uint64(seqNrRange.End() - seqNrRange.Start() + 1)
+		}
+		combinedSeqNrs := query.Or(seqRangeExpressions...)
+
+		expr, err := logpoller.NewEventBySubKeyFilter(srcChainAttributeIndex, []primitives.ValueComparator{{Value: srcChain, Operator: primitives.Eq}})
+		if err != nil {
+			return query.KeyFilter{}, 0, fmt.Errorf("failed to build event sub key filter for source chain attribute: %w", err)
+		}
+
+		chainExpressions = append(chainExpressions, query.And(
+			combinedSeqNrs,
+			expr,
+		))
+	}
+	extendedQuery := query.Or(chainExpressions...)
+
 	stateAttributeIndex, ok := attributeIndexes[consts.EventAttributeState]
 	if !ok {
 		return query.KeyFilter{}, 0, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeState, consts.EventNameExecutionStateChanged)
@@ -551,7 +584,7 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 		}
 
 		if err := validateExecutionStateChangedEvent(stateChange, nonEmptyRangesPerChain); err != nil {
-			a.lggr.Errorw("failed validate execution state changed event",
+			a.lggr.Errorw("execution state changed event validation failed",
 				"err", err, "stateChange", stateChange)
 			continue
 		}
@@ -565,29 +598,167 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 func validateExecutionStateChangedEvent(
 	ev *ccip.EventExecutionStateChanged, rangesByChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) error {
 	if ev == nil {
-		return fmt.Errorf("execution state changed event is nil")
+		return errors.New("execution state changed event is nil")
 	}
 
 	if _, ok := rangesByChain[ccipocr3.ChainSelector(ev.SourceChainSelector)]; !ok {
-		return fmt.Errorf("source chain of messages was not queries")
+		return errors.New("source chain of messages was not queries")
 	}
 
 	if !ccipocr3.SeqNum(ev.SequenceNumber).IsWithinRanges(rangesByChain[ccipocr3.ChainSelector(ev.SourceChainSelector)]) {
-		return fmt.Errorf("execution state changed event sequence number is not in the expected range")
+		return errors.New("execution state changed event sequence number is not in the expected range")
 	}
 
 	if ev.MessageHash == [32]byte{} {
-		return fmt.Errorf("empty message hash")
+		return errors.New("empty message hash")
 	}
 
 	if ev.MessageID == [32]byte{} {
-		return fmt.Errorf("message ID is empty")
+		return errors.New("message ID is empty")
 	}
 
 	if ev.State == 0 {
-		return fmt.Errorf("state is zero")
+		return errors.New("state is zero")
 	}
 
+	return nil
+}
+
+func createCCTPMessageSentQueryExpressions(cctpData map[ccipocr3.MessageTokenID]reader.SourceTokenDataPayload) ([]query.Expression, error) {
+	attributeIndexes, ok := eventFilterSubkeyIndexMap[consts.EventNameCCTPMessageSent]
+	if !ok {
+		return nil, fmt.Errorf("failed to find attribute indexes for event %s", consts.EventNameCCTPMessageSent)
+	}
+	nonceAttributeIndex, ok := attributeIndexes[consts.EventAttributeCCTPNonce]
+	if !ok {
+		return nil, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeCCTPNonce, consts.EventNameCCTPMessageSent)
+	}
+	srcDomainAttributeIndex, ok := attributeIndexes[consts.EventAttributeSourceDomain]
+	if !ok {
+		return nil, fmt.Errorf("failed to find index for attribute %s for event %s", consts.EventAttributeSourceDomain, consts.EventNameCCTPMessageSent)
+	}
+
+	// Query the token pool contract for the MessageSent event data.
+	cctpExpressions := []query.Expression{}
+	for _, data := range cctpData {
+		// This is much more expensive than the EVM version. Rather than a
+		// single ANY expression, we have separate expressions for each
+		// nonce and source domain pair. This is because Solana doesn't have
+		// a combined ID like EVM does.
+		// TODO: optimize. CR modifier or a new field in our event.
+
+		nonceSubKeyFilter, err := logpoller.NewEventBySubKeyFilter(nonceAttributeIndex, []primitives.ValueComparator{{Value: data.Nonce, Operator: primitives.Eq}})
+		if err != nil {
+			return nil, fmt.Errorf("failed to build event sub key filter for cctp nonce attribute: %w", err)
+		}
+
+		srcDomainSubKeyFilter, err := logpoller.NewEventBySubKeyFilter(srcDomainAttributeIndex, []primitives.ValueComparator{{Value: data.SourceDomain, Operator: primitives.Eq}})
+		if err != nil {
+			return nil, fmt.Errorf("failed to build event sub key filter for cctp source domain attribute: %w", err)
+		}
+
+		cctpExpressions = append(cctpExpressions, query.And(
+			nonceSubKeyFilter,
+			srcDomainSubKeyFilter,
+		))
+	}
+
+	return cctpExpressions, nil
+}
+
+// getMessageTokenData extracts token data from the CCTP MessageSent event.
+func getMessageTokenData(
+	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
+) (map[ccipocr3.MessageTokenID]reader.SourceTokenDataPayload, error) {
+	messageTransmitterEvents := make(map[ccipocr3.MessageTokenID]reader.SourceTokenDataPayload)
+
+	for id, token := range tokens {
+		sourceTokenPayload, err := extractABIPayload(token.ExtraData)
+		if err != nil || sourceTokenPayload == nil {
+			return nil, err
+		}
+		messageTransmitterEvents[id] = *sourceTokenPayload
+	}
+	return messageTransmitterEvents, nil
+}
+
+// extractABIPayload manually parses the nonce and sourceDomain out of the extra data field.
+// The ABI format is used on EVM and Solana. There is no re-encoding between chains, so other new
+// chains should use manual formatting as well. This is specific to CCTPv1.
+func extractABIPayload(extraData ccipocr3.Bytes) (*reader.SourceTokenDataPayload, error) {
+	if len(extraData) < 64 {
+		return nil, fmt.Errorf("extraData is too short, expected at least 64 bytes, got %d", len(extraData))
+	}
+
+	// Extract the nonce (first 8 bytes), padded to 32 bytes
+	nonce := binary.BigEndian.Uint64(extraData[24:32])
+	// Extract the sourceDomain (next 4 bytes), padded to 32 bytes
+	sourceDomain := binary.BigEndian.Uint32(extraData[60:64])
+
+	return &reader.SourceTokenDataPayload{
+		Nonce:        nonce,
+		SourceDomain: sourceDomain,
+	}, nil
+}
+
+func (a *SolanaAccessor) processCCTPMessageSentEvents(
+	logs []logpollertypes.Log,
+	source ccipocr3.ChainSelector,
+	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
+	cctpData map[ccipocr3.MessageTokenID]reader.SourceTokenDataPayload,
+) (map[ccipocr3.MessageTokenID]ccipocr3.Bytes, error) {
+	iter, err := a.decodeLogsIntoSequences(consts.EventNameCCTPMessageSent, logs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
+	}
+
+	msgs := make(map[ccipocr3.MessageTokenID]ccipocr3.Bytes)
+	for _, item := range iter {
+		event, ok1 := item.Data.(*ccip.EventCcipCctpMessageSent)
+		if !ok1 {
+			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
+		}
+
+		if err := validateCCTPMessageSentEvent(event); err != nil {
+			a.lggr.Errorw("cctp message event validation failed", "error", err, "event", event)
+			continue
+		}
+
+		// This is O(n^2). We could optimize it by storing the cctpData in a map with a composite key.
+		for tokenID, metadata := range cctpData {
+			if metadata.Nonce == event.CctpNonce && metadata.SourceDomain == event.SourceDomain {
+				msgs[tokenID] = event.MessageSentBytes
+				a.lggr.Debugw("Found CCTP event", "tokenID", tokenID, "event", event)
+				break
+			}
+		}
+
+		a.lggr.Warnw("Found unexpected CCTP event", "event", event)
+	}
+
+	// Check if any were missed.
+	for tokenID := range tokens {
+		if _, ok := msgs[tokenID]; !ok {
+			// Token is not available in the source chain, it should never happen at this stage
+			a.lggr.Warnw("Message not found in the source chain",
+				"seqNr", tokenID.SeqNr,
+				"tokenIndex", tokenID.Index,
+				"chainSelector", source,
+				"data", cctpData[tokenID],
+			)
+		}
+	}
+
+	return msgs, nil
+}
+
+func validateCCTPMessageSentEvent(event *ccip.EventCcipCctpMessageSent) error {
+	if event == nil {
+		return errors.New("cctp message sent event is nil")
+	}
+	if event.MessageSentBytes == nil {
+		return errors.New("message sent bytes is empty")
+	}
 	return nil
 }
 
@@ -624,6 +795,12 @@ func (a *SolanaAccessor) decodeLogsIntoSequences(
 			sequences[idx].Data = e
 		case consts.EventNameExecutionStateChanged:
 			e := &ccip.EventExecutionStateChanged{}
+			if err := bin.UnmarshalBorsh(e, logs[idx].Data); err != nil {
+				return nil, err
+			}
+			sequences[idx].Data = e
+		case consts.EventNameCCTPMessageSent:
+			e := &ccip.EventCcipCctpMessageSent{}
 			if err := bin.UnmarshalBorsh(e, logs[idx].Data); err != nil {
 				return nil, err
 			}
