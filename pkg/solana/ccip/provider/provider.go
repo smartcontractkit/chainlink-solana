@@ -77,6 +77,7 @@ func NewCCIPProvider(
 		ExecutePluginCodec:        codec.NewExecutePluginCodecV1(ccipArgs.ExtraDataCodecBundle),
 		TokenDataEncoder:          codec.NewSolanaTokenDataEncoder(),
 		SourceChainExtraDataCodec: codec.NewExtraDataDecoder(),
+		MessageHasher:             codec.NewMessageHasherV1(lggr, ccipArgs.ExtraDataCodecBundle),
 	}
 
 	ca, err := chainaccessor.NewSolanaAccessor(ctx, lggr, chainSelector, client, logPoller, fee, c.ChainSpecificAddressCodec)
