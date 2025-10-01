@@ -251,7 +251,7 @@ func extractDestGasAmount(destExecDataDecoded map[string]any) (uint32, error) {
 	switch v := destGasAmount.(type) {
 	case uint32:
 		return v, nil
-	case int64:
+	case int64: // LOOP converts expected uint32 to int64
 		if v > math.MaxUint32 {
 			return 0, fmt.Errorf("destGasAmount exceeds uint32 max, got %d", v)
 		}
@@ -270,7 +270,7 @@ func extractComputeUnits(extraArgsDecoded map[string]any) (uint32, error) {
 	switch v := cu.(type) {
 	case uint32:
 		return v, nil
-	case int64:
+	case int64: // LOOP converts expected uint32 to int64
 		if v > math.MaxUint32 {
 			return 0, fmt.Errorf("computeUnits exceeds uint32 max, got %d", v)
 		}

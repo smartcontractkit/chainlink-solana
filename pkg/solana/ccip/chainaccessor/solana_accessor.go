@@ -192,6 +192,7 @@ func (a *SolanaAccessor) GetChainFeeComponents(ctx context.Context) (ccipocr3.Ch
 	}
 
 	fee := a.fee.BaseComputeUnitPrice()
+	a.lggr.Debugw("Fetched fee components", "executionFee", fee, "dataAvailabilityFee", 0)
 	return ccipocr3.ChainFeeComponents{
 		ExecutionFee:        new(big.Int).SetUint64(fee),
 		DataAvailabilityFee: big.NewInt(0), // required field so return 0 instead of nil
@@ -629,6 +630,7 @@ func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors [
 		}
 	}
 
+	a.lggr.Debugw("GetChainFeePriceUpdate", "updates", feePriceUpdates)
 	return feePriceUpdates, nil
 }
 
@@ -728,6 +730,43 @@ func (a *SolanaAccessor) MessagesByTokenID(
 	source, dest ccipocr3.ChainSelector,
 	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
 ) (map[ccipocr3.MessageTokenID]ccipocr3.Bytes, error) {
+	// usdcTokenPoolAddr, err := a.getBinding(consts.ContractNameUSDCTokenPool)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get USDC token pool binding: %w", err)
+	// }
+
+	// if len(tokens) == 0 {
+	// 	return map[ccipocr3.MessageTokenID]ccipocr3.Bytes{}, nil
+	// }
+	// a.lggr.Debugw("Searching for Solana CCTP USDC logs", "numExpected", len(tokens))
+
+	// cctpExpressions, err := createCCTPMessageSentQueryExpressions(tokens)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create CCTP message sent query expressions: %w", err)
+	// }
+
+	// // Parent expressions for the query.
+	// expressions := []query.Expression{
+	// 	logpoller.NewAddressFilter(usdcTokenPoolAddr),
+	// 	logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCCTPMessageSent)),
+	// 	query.Confidence(primitives.Finalized),             // solana log poller only operates with finalized confidence
+	// }
+	// expressions = append(expressions, query.Or(cctpExpressions...))
+
+	// limitSort := query.NewLimitAndSort(
+	// 	query.Limit{Count: uint64(len(cctpExpressions))},
+	// 	query.NewSortBySequence(query.Asc),
+	// )
+	// // query solana logs
+	// logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to fetch cctp message sent logs from log poller: %w", err)
+	// }
+
+	// a.lggr.Debugw("queried MessagesByTokenID", "numLogs", len(logs),
+	// 	"destinationChainSelector", a.chainSelector,
+	// 	"limit", len(cctpExpressions))
+
 	return nil, fmt.Errorf("not implemented")
 }
 
