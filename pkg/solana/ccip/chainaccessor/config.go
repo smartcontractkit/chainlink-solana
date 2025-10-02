@@ -197,7 +197,7 @@ func (a *SolanaAccessor) getFeeQuoterStaticConfig(ctx context.Context) (ccipocr3
 // getOnRampDynamicConfig retrieves dynamic configuration from the on-ramp contract
 func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.OnRampDynamicConfig, error) {
 	// Validate router binding exists
-	_, err := a.pdaCache.getBinding(consts.ContractNameRouter)
+	_, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
 		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
 	}
@@ -219,7 +219,7 @@ func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.O
 
 // getOnRampDestChainConfig retrieves destination chain configuration from the on-ramp contract
 func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccipocr3.ChainSelector) (ccipocr3.OnRampDestChainConfig, error) {
-	routerAddr, err := a.pdaCache.getBinding(consts.ContractNameRouter)
+	routerAddr, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
 		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
 	}

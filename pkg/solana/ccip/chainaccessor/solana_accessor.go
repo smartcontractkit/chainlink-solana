@@ -100,7 +100,7 @@ func (a *SolanaAccessor) GetContractAddress(contractName string) ([]byte, error)
 func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, error) {
 	// Match old behaviour: if a contract isn't bound, we return an empty value so the nodes can achieve consensus on partial config
 	// https://github.com/smartcontractkit/chainlink-ccip/blob/a8dbbdbf14a07593de2f0dbe608f8b64d893a6bd/pkg/contractreader/extended.go#L226-L231
-
+	a.lggr.Debugw("bindings GetAllConfigsLegacy", "bindings", a.pdaCache.getAllBindings())
 	var config ccipocr3.ChainConfigSnapshot
 	var sourceChainConfigs map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig
 
