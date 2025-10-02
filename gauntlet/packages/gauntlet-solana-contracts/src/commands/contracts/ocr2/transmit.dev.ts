@@ -3,7 +3,7 @@ import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { parseIdlErrors, ProgramError, utils } from '@coral-xyz/anchor'
 import { Keypair, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js'
 import { createHash } from 'crypto'
-import * as secp from "@noble/secp256k1";
+import * as secp from '@noble/secp256k1'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
 export default class Transmit extends SolanaCommand {
@@ -58,7 +58,7 @@ export default class Transmit extends SolanaCommand {
     const OPERATORS: any[] = []
     const rawSignatures: any[] = []
     for (let oracle of OPERATORS.slice(0, 3 * info.config.f + 1)) {
-    const [sig, rid] = secp.signSync(hash, Buffer.from(oracle.signer.secretKey), { recovered: true, der: false });
+      const [sig, rid] = secp.signSync(hash, Buffer.from(oracle.signer.secretKey), { recovered: true, der: false })
       rawSignatures.push(...sig)
       rawSignatures.push(rid)
     }
