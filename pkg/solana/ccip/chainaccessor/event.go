@@ -53,12 +53,13 @@ var (
 )
 
 type filterConfig struct {
-	idl             string
-	includeReverted bool
-	indexedField0   *string
-	indexedField1   *string
-	indexedField2   *string
-	indexedField3   *string
+	idl               string
+	chainSpecificName string
+	includeReverted   bool
+	indexedField0     *string
+	indexedField1     *string
+	indexedField2     *string
+	indexedField3     *string
 }
 
 var (
@@ -81,32 +82,36 @@ var (
 var eventFilterConfigMap = map[string]map[string]filterConfig{
 	consts.ContractNameOnRamp: {
 		consts.EventNameCCIPMessageSent: {
-			idl:             ccipRouterIDL,
-			includeReverted: false,
-			indexedField0:   &msgSentSrcChainPath,
-			indexedField1:   &msgSentDestChainPath,
-			indexedField2:   &msgSentSeqNumPath,
+			idl:               ccipRouterIDL,
+			chainSpecificName: consts.EventNameCCIPMessageSent,
+			includeReverted:   false,
+			indexedField0:     &msgSentSrcChainPath,
+			indexedField1:     &msgSentDestChainPath,
+			indexedField2:     &msgSentSeqNumPath,
 		},
 	},
 	consts.ContractNameOffRamp: {
 		consts.EventNameCommitReportAccepted: {
-			idl:             ccipOffRampIDL,
-			includeReverted: false,
+			idl:               ccipOffRampIDL,
+			chainSpecificName: consts.EventNameCommitReportAccepted,
+			includeReverted:   false,
 		},
 		consts.EventNameExecutionStateChanged: {
-			idl:             ccipOffRampIDL,
-			includeReverted: true,
-			indexedField0:   &execStateChangedSrcChainPath,
-			indexedField1:   &execStateChangedSeqNumPath,
-			indexedField2:   &execStateChangedStatePath,
+			idl:               ccipOffRampIDL,
+			chainSpecificName: consts.EventNameExecutionStateChanged,
+			includeReverted:   true,
+			indexedField0:     &execStateChangedSrcChainPath,
+			indexedField1:     &execStateChangedSeqNumPath,
+			indexedField2:     &execStateChangedStatePath,
 		},
 	},
 	consts.ContractNameUSDCTokenPool: {
 		consts.EventNameCCTPMessageSent: {
-			idl:             cctpTokenPoolIDL,
-			includeReverted: false,
-			indexedField0:   &cctpMsgSentNoncePath,
-			indexedField1:   &cctpMsgSentSrcDomainPath,
+			idl:               cctpTokenPoolIDL,
+			chainSpecificName: "CcipCctpMessageSentEvent",
+			includeReverted:   false,
+			indexedField0:     &cctpMsgSentNoncePath,
+			indexedField1:     &cctpMsgSentSrcDomainPath,
 		},
 	},
 }
