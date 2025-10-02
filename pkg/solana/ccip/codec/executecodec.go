@@ -294,7 +294,7 @@ func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 				}
 				return uint32(v), nil //nolint:gosec // G115: validated to be within uint32 max above
 			default:
-				return 0, errors.New("invalid type for destgasamount, expected uint32 or int64")
+				return 0, fmt.Errorf("invalid type for destgasamount, expected uint32 or int64, got %T", v)
 			}
 		default:
 		}

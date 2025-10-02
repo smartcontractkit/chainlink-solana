@@ -28,11 +28,30 @@ import (
 )
 
 func TestMessageHasher_EVM2SVM(t *testing.T) {
+	any2AnyMsg, any2SolanaMsg, msgAccounts := createEVM2SolanaMessages(t)
+	mockExtraDataCodec := mocks.NewSourceChainExtraDataCodec(t)
+	for _, ta := range any2SolanaMsg.TokenAmounts {
+		mockExtraDataCodec.On("DecodeDestExecDataToMap", mock.Anything).Return(map[string]any{
+			"destGasAmount": ta.DestGasAmount, // All dest gas amounts are the same so use one
+		}, nil).Once()
+	}
+	accountBytes := make([][32]byte, 0, len(msgAccounts))
+	// Skip first account since it's the message receiver that's prepended in the hasher
+	for i := 1; i < len(msgAccounts); i++ {
+		accountBytes = append(accountBytes, [32]byte(msgAccounts[i].Bytes()))
+	}
+	mockExtraDataCodec.On("DecodeExtraArgsToMap", mock.Anything).Return(map[string]any{
+		"ComputeUnits":            any2SolanaMsg.ExtraArgs.ComputeUnits,
+		"AccountIsWritableBitmap": any2SolanaMsg.ExtraArgs.IsWritableBitmap,
+		"TokenReceiver":           [32]byte(any2SolanaMsg.TokenReceiver.Bytes()),
+		"Accounts":                accountBytes,
+	}, nil).Once()
+
 	registeredExtraDataCodecMap := map[string]ccipocr3.SourceChainExtraDataCodec{
 		chainsel.FamilySolana: ExtraDataDecoder{},
+		chainsel.FamilyEVM:    mockExtraDataCodec,
 	}
 	var extraDataCodec = ccipocr3.ExtraDataCodecMap(registeredExtraDataCodecMap)
-	any2AnyMsg, any2SolanaMsg, msgAccounts := createEVM2SolanaMessages(t)
 	msgHasher := NewMessageHasherV1(logger.Test(t), extraDataCodec)
 	actualHash, err := msgHasher.Hash(t.Context(), any2AnyMsg)
 	require.NoError(t, err)
@@ -112,8 +131,10 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 	require.NoError(t, err)
 
 	sender := abiEncodedAddress(t)
-	receiver := solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-	tokenReceiver := solana.MustPublicKeyFromBase58("42Gia5bGsh8R2S44e37t9fsucap1qsgjr6GjBmWotgdF")
+	receiver := getRandomPubKey(t)
+	tokenReceiver := getRandomPubKey(t)
+	sourcePoolAddr := getRandomPubKey(t)
+	msgAccount := getRandomPubKey(t)
 	extraArgs := ccip_offramp.Any2SVMRampExtraArgs{
 		ComputeUnits:     uint32(10000),
 		IsWritableBitmap: uint64(4),
@@ -124,9 +145,9 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 	require.NoError(t, err)
 
 	ccipTokenAmounts := make([]ccipocr3.RampTokenAmount, 5)
-	for z := 0; z < 5; z++ {
+	for z := range 5 {
 		ccipTokenAmounts[z] = ccipocr3.RampTokenAmount{
-			SourcePoolAddress: ccipocr3.UnknownAddress("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
+			SourcePoolAddress: ccipocr3.UnknownAddress(sourcePoolAddr.Bytes()),
 			DestTokenAddress:  receiver.Bytes(),
 			Amount:            tokenAmount,
 			DestExecData:      destGasAmount,
@@ -134,9 +155,9 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 	}
 
 	solTokenAmounts := make([]ccip_offramp.Any2SVMTokenTransfer, 5)
-	for z := 0; z < 5; z++ {
+	for z := range 5 {
 		solTokenAmounts[z] = ccip_offramp.Any2SVMTokenTransfer{
-			SourcePoolAddress: ccipocr3.UnknownAddress("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
+			SourcePoolAddress: ccipocr3.UnknownAddress(sourcePoolAddr.Bytes()),
 			DestTokenAddress:  receiver,
 			Amount:            ccip_offramp.CrossChainAmount{LeBytes: [32]uint8(encodeBigIntToFixedLengthLE(tokenAmount.Int, 32))},
 			DestGasAmount:     uint32(10),
@@ -175,16 +196,12 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 		ExtraArgs:      abiEncodedExtraArgs,
 	}
 
-	msgAccounts := []solana.PublicKey{
-		receiver,
-		solana.MustPublicKeyFromBase58("42Gia5bGsh8R2S44e37t9fsucap1qsgjr6GjBmWotgdF"),
-	}
+	msgAccounts := []solana.PublicKey{receiver, msgAccount}
 	return any2AnyMsg, any2SolanaMsg, msgAccounts
 }
 
 func abiEncodedAddress(t *testing.T) []byte {
-	addr := randomAddress()
-	encoded, err := abiEncode(`[{"type": "address"}]`, addr)
+	encoded, err := abiEncode(`[{"type": "address"}]`, randomAddress())
 	require.NoError(t, err)
 	return encoded
 }
@@ -244,4 +261,11 @@ func abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return res[4:], nil
+}
+
+func getRandomPubKey(t *testing.T) solana.PublicKey {
+	t.Helper()
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	return privKey.PublicKey()
 }

@@ -436,7 +436,7 @@ func Test_CCIPExecuteArgsTransform(t *testing.T) {
 			Info:          ccipocr3.ExecuteReportInfo{},
 		}
 		_, _, _, _, err := chainwriter.CCIPExecuteArgsTransformV2(ctx, mc, lggr, args, nil, nil, nil, solana.PublicKey{}, offrampAddress.String(), 0, []txmutils.SetTxConfig{}, "")
-		require.Contains(t, err.Error(), "computeUnits not found in ExtraData")
+		require.Contains(t, err.Error(), "computeUnits not found in ExtraArgsDecoded")
 	})
 
 	t.Run("ArgsTransform fails with unexpected number of reports, messages, or merkle roots", func(t *testing.T) {
