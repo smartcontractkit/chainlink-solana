@@ -149,7 +149,7 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 	}
 
 	for eventName, config := range eventsMap {
-		if err := a.registerFilterIfNotExists(ctx, eventName, address, config); err != nil {
+		if err := a.registerFilterIfNotExists(ctx, config.chainSpecificName, address, config); err != nil {
 			return fmt.Errorf("failed to register filter for event %s: %w", eventName, err)
 		}
 	}
