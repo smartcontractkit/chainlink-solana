@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 type pdaCache struct {
@@ -18,6 +19,7 @@ type pdaCache struct {
 	routerCache    routerPDACache
 	rmnRemoteCache rmnRemotePDACache
 	cacheMu        sync.RWMutex
+	lggr           logger.Logger
 }
 
 type offrampPDACache struct {
@@ -44,6 +46,7 @@ type rmnRemotePDACache struct {
 }
 
 func newPDACache() pdaCache {
+	lggr, _ := logger.New()
 	return pdaCache{
 		bindings:       make(map[string]solana.PublicKey),
 		offrampCache:   newOfframpPDACache(),
@@ -51,6 +54,7 @@ func newPDACache() pdaCache {
 		routerCache:    newRouterPDACache(),
 		rmnRemoteCache: newRMNRemotePDACache(),
 		cacheMu:        sync.RWMutex{},
+		lggr:           lggr,
 	}
 }
 
@@ -326,6 +330,7 @@ func (c *pdaCache) routerDestChain(sel uint64, routerAddr solana.PublicKey) (sol
 func (c *pdaCache) getBinding(contractName string) (solana.PublicKey, error) {
 	c.cacheMu.RLock()
 	defer c.cacheMu.RUnlock()
+	c.lggr.Debugw("existing bindings", "bindings", c.bindings)
 	addr, exists := c.bindings[contractName]
 	if !exists {
 		return solana.PublicKey{}, contractreader.ErrNoBindings
