@@ -733,7 +733,7 @@ func (a *SolanaAccessor) MessagesByTokenID(
 	// Parent expressions for the query.
 	expressions := []query.Expression{
 		logpoller.NewAddressFilter(usdcTokenPoolAddr),
-		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCCTPMessageSent)),
+		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(ccipCCTPMessageSentEventName)),
 		query.Confidence(primitives.Finalized), // solana log poller only operates with finalized confidence
 		query.Or(cctpExpressions...),
 	}

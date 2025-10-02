@@ -76,6 +76,8 @@ var (
 	// On-chain paths for the CCTP Message sent event
 	cctpMsgSentNoncePath     = "CctpNonce"
 	cctpMsgSentSrcDomainPath = "SourceDomain"
+
+	ccipCCTPMessageSentEventName = "CcipCctpMessageSentEvent"
 )
 
 // Map of relevant events and their metadata required to build the codec and bind program addresses
@@ -108,7 +110,7 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 	consts.ContractNameUSDCTokenPool: {
 		consts.EventNameCCTPMessageSent: {
 			idl:               cctpTokenPoolIDL,
-			chainSpecificName: "CcipCctpMessageSentEvent",
+			chainSpecificName: ccipCCTPMessageSentEventName,
 			includeReverted:   false,
 			indexedField0:     &cctpMsgSentNoncePath,
 			indexedField1:     &cctpMsgSentSrcDomainPath,
