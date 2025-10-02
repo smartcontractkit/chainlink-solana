@@ -84,7 +84,7 @@ func NewSolanaAccessor(
 		logPoller:     logPoller,
 		fee:           fee,
 		addrCodec:     addrCodec,
-		pdaCache:      newPDACache(),
+		pdaCache:      newPDACache(lggr),
 	}, nil
 }
 

@@ -9,10 +9,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 func Test_PDACache(t *testing.T) {
-	cache := newPDACache()
+	cache := newPDACache(logger.Test(t))
 	chainSelector1 := uint64(100)
 	chainSelector2 := uint64(101)
 	billingToken1 := getRandomPubKey(t)

@@ -45,8 +45,7 @@ type rmnRemotePDACache struct {
 	curse solana.PublicKey
 }
 
-func newPDACache() pdaCache {
-	lggr, _ := logger.New()
+func newPDACache(lggr logger.Logger) pdaCache {
 	return pdaCache{
 		bindings:       make(map[string]solana.PublicKey),
 		offrampCache:   newOfframpPDACache(),
