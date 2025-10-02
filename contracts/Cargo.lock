@@ -668,16 +668,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chainlink_solana"
-version = "2.0.0"
-dependencies = [
- "anchor-lang",
- "borsh 0.10.3",
- "bytemuck",
- "solana-program",
-]
-
-[[package]]
 name = "chainlink_solana_data_feeds_cache"
 version = "0.0.1"
 dependencies = [
