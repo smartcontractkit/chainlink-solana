@@ -199,14 +199,15 @@ func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.O
 	// Validate router binding exists
 	_, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
-		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
+		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get binding for onramp: %w", err)
 	}
 	configPDA := a.pdaCache.routerConfig()
+	a.lggr.Debugw("getOnRampDynamicConfig", "configPDA", configPDA.String())
 
 	var cfg router.Config
 	err = a.client.GetAccountDataBorshInto(ctx, configPDA, &cfg)
 	if err != nil {
-		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get fee quoter config account: %w", err)
+		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get onramp config account: %w", err)
 	}
 	return ccipocr3.OnRampDynamicConfig{
 		FeeQuoter:              cfg.FeeQuoter.Bytes(),
@@ -221,7 +222,7 @@ func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.O
 func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccipocr3.ChainSelector) (ccipocr3.OnRampDestChainConfig, error) {
 	routerAddr, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
-		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get binding for router: %w", err)
+		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get binding for onramp: %w", err)
 	}
 
 	destChainStatePDA, err := a.pdaCache.routerDestChain(uint64(dest), routerAddr)
@@ -229,10 +230,12 @@ func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccip
 		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to fetch dest chain state PDA from cache: %w", err)
 	}
 
+	a.lggr.Debugw("getOnRampDestChainConfig", "destChainStatePDA", destChainStatePDA.String())
+
 	var destChain router.DestChain
 	err = a.client.GetAccountDataBorshInto(ctx, destChainStatePDA, &destChain)
 	if err != nil {
-		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get destination chain config account: %w", err)
+		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to get onramp destination chain config account: %w", err)
 	}
 
 	return ccipocr3.OnRampDestChainConfig{

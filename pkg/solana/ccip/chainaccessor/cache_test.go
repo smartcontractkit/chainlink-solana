@@ -85,6 +85,33 @@ func Test_PDACache(t *testing.T) {
 		}
 	})
 
+	t.Run("update onramp address", func(t *testing.T) {
+		// Should successfully update the router PDAs
+		for _, onramp := range testAddrs {
+			onrampConfig, _, err := state.FindConfigPDA(onramp)
+			require.NoError(t, err)
+			onrampDestChainState1, err := state.FindDestChainStatePDA(chainSelector1, onramp)
+			require.NoError(t, err)
+			onrampDestChainState2, err := state.FindDestChainStatePDA(chainSelector2, onramp)
+			require.NoError(t, err)
+
+			err = cache.updateCache(consts.ContractNameOnRamp, onramp)
+			require.NoError(t, err)
+			destChainStatePDA1, err := cache.routerDestChain(chainSelector1, onramp)
+			require.NoError(t, err)
+			destChainStatePDA2, err := cache.routerDestChain(chainSelector2, onramp)
+			require.NoError(t, err)
+
+			onrampBinding, err := cache.getBinding(consts.ContractNameOnRamp)
+			require.NoError(t, err)
+
+			require.Equal(t, onramp, onrampBinding)
+			require.Equal(t, onrampConfig, cache.routerConfig())
+			require.Equal(t, onrampDestChainState1, destChainStatePDA1)
+			require.Equal(t, onrampDestChainState2, destChainStatePDA2)
+		}
+	})
+
 	t.Run("update fee quoter address", func(t *testing.T) {
 		for _, feequoter := range testAddrs {
 			fqConfig, _, err := state.FindFqConfigPDA(feequoter)

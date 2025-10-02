@@ -89,7 +89,7 @@ func (c *pdaCache) updateCache(contractName string, addr solana.PublicKey) error
 	switch contractName {
 	case consts.ContractNameOffRamp:
 		return c.updateOfframpPDA(addr)
-	case consts.ContractNameRouter:
+	case consts.ContractNameRouter, consts.ContractNameOnRamp: // Router and OnRamp are the same program in Solana
 		return c.updateRouterPDA(addr)
 	case consts.ContractNameFeeQuoter:
 		return c.updateFeeQuoterPDA(addr)
