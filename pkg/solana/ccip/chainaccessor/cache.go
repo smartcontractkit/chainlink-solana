@@ -329,10 +329,15 @@ func (c *pdaCache) routerDestChain(sel uint64, routerAddr solana.PublicKey) (sol
 func (c *pdaCache) getBinding(contractName string) (solana.PublicKey, error) {
 	c.cacheMu.RLock()
 	defer c.cacheMu.RUnlock()
-	c.lggr.Debugw("existing bindings", "bindings", c.bindings)
 	addr, exists := c.bindings[contractName]
 	if !exists {
 		return solana.PublicKey{}, contractreader.ErrNoBindings
 	}
 	return addr, nil
+}
+
+func (c *pdaCache) getAllBindings() map[string]solana.PublicKey {
+	c.cacheMu.RLock()
+	defer c.cacheMu.RUnlock()
+	return c.bindings
 }
