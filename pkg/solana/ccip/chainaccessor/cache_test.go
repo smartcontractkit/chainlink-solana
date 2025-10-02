@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 func Test_PDACache(t *testing.T) {
@@ -45,6 +46,10 @@ func Test_PDACache(t *testing.T) {
 			sourceChainPDA2, err := cache.offrampSourceChain(chainSelector2, offramp)
 			require.NoError(t, err)
 
+			offrampBinding, err := cache.getBinding(consts.ContractNameOffRamp)
+			require.NoError(t, err)
+
+			require.Equal(t, offramp, offrampBinding)
 			require.Equal(t, offrampState, cache.offampStatePDA())
 			require.Equal(t, offrampConfig, cache.offampConfigPDA())
 			require.Equal(t, offrampRefAddress, cache.offrampRefAddresses())
@@ -69,6 +74,10 @@ func Test_PDACache(t *testing.T) {
 			destChainStatePDA2, err := cache.routerDestChain(chainSelector2, router)
 			require.NoError(t, err)
 
+			routerBinding, err := cache.getBinding(consts.ContractNameRouter)
+			require.NoError(t, err)
+
+			require.Equal(t, router, routerBinding)
 			require.Equal(t, routerConfig, cache.routerConfig())
 			require.Equal(t, routerDestChainState1, destChainStatePDA1)
 			require.Equal(t, routerDestChainState2, destChainStatePDA2)
@@ -99,6 +108,10 @@ func Test_PDACache(t *testing.T) {
 			destChainPDA2, err := cache.feeQuoterDestChain(chainSelector2, feequoter)
 			require.NoError(t, err)
 
+			feeQuoterBinding, err := cache.getBinding(consts.ContractNameFeeQuoter)
+			require.NoError(t, err)
+
+			require.Equal(t, feequoter, feeQuoterBinding)
 			require.Equal(t, fqConfig, cache.feeQuoterConfig())
 			require.Equal(t, billingTokenConfig1, billingTokenConfigPDA1)
 			require.Equal(t, billingTokenConfig2, billingTokenConfigPDA2)
@@ -115,6 +128,10 @@ func Test_PDACache(t *testing.T) {
 			err = cache.updateCache(consts.ContractNameRMNRemote, rmnremote)
 			require.NoError(t, err)
 
+			rmnRemoteBinding, err := cache.getBinding(consts.ContractNameRMNRemote)
+			require.NoError(t, err)
+
+			require.Equal(t, rmnremote, rmnRemoteBinding)
 			require.Equal(t, curse, cache.rmnRemoteCurse())
 		}
 	})
@@ -123,6 +140,11 @@ func Test_PDACache(t *testing.T) {
 		rmnHome := getRandomPubKey(t)
 		err := cache.updateCache(consts.ContractNameRMNHome, rmnHome)
 		require.NoError(t, err)
+	})
+
+	t.Run("fail to fetch unbound contract", func(t *testing.T) {
+		_, err := cache.getBinding(consts.ContractNameRMNProxy)
+		require.ErrorIs(t, err, contractreader.ErrNoBindings)
 	})
 }
 

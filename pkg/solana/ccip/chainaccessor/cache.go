@@ -6,9 +6,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 type pdaCache struct {
+	// Note: we might need to update this in the future to map[string][]address.Address
+	// to support multi-bind addresses for the price aggregator contract: smartcontractkit/chainlink-ccip@main/pkg/contractreader/extended.go#L77-L79
+	bindings       map[string]solana.PublicKey
 	offrampCache   offrampPDACache
 	feeQuoterCache feeQuoterPDACache
 	routerCache    routerPDACache
@@ -41,6 +45,7 @@ type rmnRemotePDACache struct {
 
 func newPDACache() pdaCache {
 	return pdaCache{
+		bindings:       make(map[string]solana.PublicKey),
 		offrampCache:   newOfframpPDACache(),
 		feeQuoterCache: newFeeQuoterPDACache(),
 		routerCache:    newRouterPDACache(),
@@ -75,6 +80,8 @@ func newRMNRemotePDACache() rmnRemotePDACache {
 func (c *pdaCache) updateCache(contractName string, addr solana.PublicKey) error {
 	c.cacheMu.Lock()
 	defer c.cacheMu.Unlock()
+
+	c.bindings[contractName] = addr
 
 	switch contractName {
 	case consts.ContractNameOffRamp:
@@ -314,4 +321,14 @@ func (c *pdaCache) routerDestChain(sel uint64, routerAddr solana.PublicKey) (sol
 	}
 	c.routerCache.destChainState[sel] = destChain
 	return destChain, nil
+}
+
+func (c *pdaCache) getBinding(contractName string) (solana.PublicKey, error) {
+	c.cacheMu.RLock()
+	defer c.cacheMu.RUnlock()
+	addr, exists := c.bindings[contractName]
+	if !exists {
+		return solana.PublicKey{}, contractreader.ErrNoBindings
+	}
+	return addr, nil
 }
