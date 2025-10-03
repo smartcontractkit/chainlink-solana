@@ -32,9 +32,6 @@ importers:
       '@types/node':
         specifier: ^14.14.37
         version: 14.18.63
-      '@types/secp256k1':
-        specifier: ^4.0.3
-        version: 4.0.6
       bn.js:
         specifier: ^5.2.0
         version: 5.2.1
@@ -56,9 +53,6 @@ importers:
       rpc-websockets:
         specifier: <=7.10.0
         version: 7.10.0
-      secp256k1:
-        specifier: ^4.0.2
-        version: 4.0.3
       ts-mocha:
         specifier: ^8.0.0
         version: 8.0.0(mocha@11.1.0)
