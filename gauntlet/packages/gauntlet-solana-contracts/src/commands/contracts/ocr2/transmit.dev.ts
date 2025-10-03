@@ -58,7 +58,7 @@ export default class Transmit extends SolanaCommand {
     const OPERATORS: any[] = []
     const rawSignatures: any[] = []
     for (let oracle of OPERATORS.slice(0, 3 * info.config.f + 1)) {
-      const [sig, rid] = secp.signSync(hash, Buffer.from(oracle.signer.secretKey), { recovered: true, der: false })
+      const [sig, rid] = await secp.sign(hash, Buffer.from(oracle.signer.secretKey), { recovered: true, der: false })
       rawSignatures.push(...sig)
       rawSignatures.push(rid)
     }

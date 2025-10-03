@@ -146,10 +146,10 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     logger.loading('Sending tx...')
     try {
       return await sendAndConfirmRawTransaction(
-        this.provider.connection, 
+        this.provider.connection,
         signedTx.serialize(),
-        { signature: signedTx.signature.toString(), blockhash, lastValidBlockHeight},
-        { commitment: 'finalized', preflightCommitment: 'finalized' }
+        { signature: signedTx.signature.toString(), blockhash, lastValidBlockHeight },
+        { commitment: 'finalized', preflightCommitment: 'finalized' },
       )
     } catch (error) {
       // Retry mechanism with greater priority fees
