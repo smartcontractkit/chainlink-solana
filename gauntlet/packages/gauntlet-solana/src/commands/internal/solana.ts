@@ -148,7 +148,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
       return await sendAndConfirmRawTransaction(
         this.provider.connection,
         signedTx.serialize(),
-        { signature: signedTx.signature.toString(), blockhash, lastValidBlockHeight },
+        { signature: signedTx.signature.toString('base64'), blockhash, lastValidBlockHeight },
         { commitment: 'finalized', preflightCommitment: 'finalized' },
       )
     } catch (error) {
