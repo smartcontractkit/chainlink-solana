@@ -145,7 +145,12 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
     try {
-      return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+      return await sendAndConfirmRawTransaction(
+        this.provider.connection, 
+        signedTx.serialize(),
+        { signature: signedTx.signature.toString(), blockhash, lastValidBlockHeight},
+        { commitment: 'finalized', preflightCommitment: 'finalized' }
+      )
     } catch (error) {
       // Retry mechanism with greater priority fees
       if (error instanceof SendTransactionError && error.message.includes('congestion')) {

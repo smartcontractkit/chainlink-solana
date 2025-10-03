@@ -23,12 +23,7 @@ export default class SendRawTx extends SolanaCommand {
     const transaction = Transaction.populate(msg, [signature])
 
     await prompt('Continue sending transaction?')
-    const txHash = await sendAndConfirmRawTransaction(
-      this.provider.connection,
-      transaction.serialize(),
-      { signature, blockhash: transaction.recentBlockhash, lastValidBlockHeight: transaction.lastValidBlockHeight },
-      { commitment: 'finalized', preflightCommitment: 'finalized' },
-    )
+    const txHash = await sendAndConfirmRawTransaction(this.provider.connection, transaction.serialize())
 
     logger.success(`Transaction sent with tx hash: ${txHash}`)
 
