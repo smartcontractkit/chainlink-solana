@@ -882,8 +882,8 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		tokens = x
 	default:
 		return nil, fmt.Errorf(
-			"for contract %q read %q: 'Tokens' field is neither *[][32]uint8 nor [][]uint8",
-			values.contract, values.reads[0].readName,
+			"for contract %q read %q: 'Tokens' field is neither *[][32]uint8 nor [][]uint8, got %T",
+			values.contract, values.reads[0].readName, x,
 		)
 	}
 
