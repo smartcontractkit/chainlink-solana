@@ -335,9 +335,3 @@ func (c *pdaCache) getBinding(contractName string) (solana.PublicKey, error) {
 	}
 	return addr, nil
 }
-
-func (c *pdaCache) getAllBindings() map[string]solana.PublicKey {
-	c.cacheMu.RLock()
-	defer c.cacheMu.RUnlock()
-	return c.bindings
-}

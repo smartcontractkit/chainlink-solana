@@ -100,7 +100,6 @@ func (a *SolanaAccessor) GetContractAddress(contractName string) ([]byte, error)
 func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector) (ccipocr3.ChainConfigSnapshot, map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, error) {
 	// Match old behaviour: if a contract isn't bound, we return an empty value so the nodes can achieve consensus on partial config
 	// https://github.com/smartcontractkit/chainlink-ccip/blob/a8dbbdbf14a07593de2f0dbe608f8b64d893a6bd/pkg/contractreader/extended.go#L226-L231
-	a.lggr.Debugw("bindings GetAllConfigsLegacy", "bindings", a.pdaCache.getAllBindings())
 	var config ccipocr3.ChainConfigSnapshot
 	var sourceChainConfigs map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig
 
@@ -175,7 +174,7 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		// we'll return an empty map
 		sourceChainConfigs = make(map[ccipocr3.ChainSelector]ccipocr3.SourceChainConfig, 0)
 	}
-	a.lggr.Debugw("GetAllConfigsLegacy", "accessorChainSelector", a.chainSelector, "destChainSelector", destChainSelector, "sourceChainSelectors", sourceChainSelectors, "config", config, "sourceChainConfigs", sourceChainConfigs)
+	a.lggr.Debugw("GetAllConfigsLegacy results", "accessorChainSelector", a.chainSelector, "destChainSelector", destChainSelector, "sourceChainSelectors", sourceChainSelectors, "config", config, "sourceChainConfigs", sourceChainConfigs)
 	return config, sourceChainConfigs, nil
 }
 
@@ -214,7 +213,6 @@ func (a *SolanaAccessor) Sync(ctx context.Context, contractName string, contract
 
 // Solana as source chain methods
 func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.Message, error) {
-	a.lggr.Debugw("bindings MsgsBetweenSeqNums", "bindings", a.pdaCache.getAllBindings())
 	onrampAddr, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameOnRamp, err)
@@ -270,14 +268,11 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 		"destinationChainSelector", dest,
 		"seqNumRange", seqNumRange.String(),
 	)
-	a.lggr.Debugw("MsgsBetweenSeqNums", "logs", logs)
 
 	events, err := a.convertCCIPMessageSent(logs, onrampAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert solana message sent event to generic CCIP type: %w", err)
 	}
-
-	a.lggr.Debugw("MsgsBetweenSeqNums", "events", events)
 
 	msgs := make([]ccipocr3.Message, 0)
 	for _, event := range events {
@@ -292,7 +287,6 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 }
 
 func (a *SolanaAccessor) LatestMessageTo(ctx context.Context, dest ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
-	a.lggr.Debugw("bindings LatestMessageTo", "bindings", a.pdaCache.getAllBindings())
 	onrampAddr, err := a.pdaCache.getBinding(consts.ContractNameOnRamp)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameOnRamp, err)
@@ -374,7 +368,6 @@ func (a *SolanaAccessor) GetExpectedNextSequenceNumber(ctx context.Context, dest
 }
 
 func (a *SolanaAccessor) GetTokenPriceUSD(ctx context.Context, rawTokenAddress ccipocr3.UnknownAddress) (ccipocr3.TimestampedUnixBig, error) {
-	a.lggr.Debugw("bindings GetTokenPriceUSD", "bindings", a.pdaCache.getAllBindings())
 	feeQuoterAddr, err := a.pdaCache.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return ccipocr3.TimestampedUnixBig{}, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameFeeQuoter, err)
@@ -406,7 +399,6 @@ func (a *SolanaAccessor) GetTokenPriceUSD(ctx context.Context, rawTokenAddress c
 }
 
 func (a *SolanaAccessor) GetFeeQuoterDestChainConfig(ctx context.Context, dest ccipocr3.ChainSelector) (ccipocr3.FeeQuoterDestChainConfig, error) {
-	a.lggr.Debugw("bindings GetFeeQuoterDestChainConfig", "bindings", a.pdaCache.getAllBindings())
 	feeQuoterAddr, err := a.pdaCache.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return ccipocr3.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameFeeQuoter, err)
@@ -448,7 +440,6 @@ func (a *SolanaAccessor) GetFeeQuoterDestChainConfig(ctx context.Context, dest c
 
 // Solana as destination chain methods
 func (a *SolanaAccessor) CommitReportsGTETimestamp(ctx context.Context, ts time.Time, _ primitives.ConfidenceLevel, limit int) ([]ccipocr3.CommitPluginReportWithMeta, error) {
-	a.lggr.Debugw("bindings CommitReportsGTETimestamp", "bindings", a.pdaCache.getAllBindings())
 	offrampAddr, err := a.pdaCache.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameOffRamp, err)
@@ -487,7 +478,6 @@ func (a *SolanaAccessor) CommitReportsGTETimestamp(ctx context.Context, ts time.
 }
 
 func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange, confidence primitives.ConfidenceLevel) (map[ccipocr3.ChainSelector][]ccipocr3.SeqNum, error) {
-	a.lggr.Debugw("bindings ExecutedMessages", "bindings", a.pdaCache.getAllBindings())
 	offrampAddr, err := a.pdaCache.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameOffRamp, err)
@@ -556,7 +546,6 @@ func (a *SolanaAccessor) Nonces(ctx context.Context, addressesMap map[ccipocr3.C
 }
 
 func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.TimestampedUnixBig, error) {
-	a.lggr.Debugw("bindings GetChainFeePriceUpdate", "bindings", a.pdaCache.getAllBindings())
 	feeQuoterAddr, err := a.pdaCache.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameFeeQuoter, err)
@@ -621,7 +610,6 @@ func (a *SolanaAccessor) GetChainFeePriceUpdate(ctx context.Context, selectors [
 }
 
 func (a *SolanaAccessor) GetLatestPriceSeqNr(ctx context.Context) (ccipocr3.SeqNum, error) {
-	a.lggr.Debugw("bindings GetLatestPriceSeqNr", "bindings", a.pdaCache.getAllBindings())
 	// Validate offramp binding exists
 	_, err := a.pdaCache.getBinding(consts.ContractNameOffRamp)
 	if err != nil {
@@ -642,7 +630,6 @@ func (a *SolanaAccessor) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokenBytes []ccipocr3.UnknownAddress,
 ) (map[ccipocr3.UnknownEncodedAddress]ccipocr3.TimestampedUnixBig, error) {
-	a.lggr.Debugw("bindings GetFeeQuoterTokenUpdates", "bindings", a.pdaCache.getAllBindings())
 	feeQuoterAddr, err := a.pdaCache.getBinding(consts.ContractNameFeeQuoter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameFeeQuoter, err)
@@ -718,7 +705,6 @@ func (a *SolanaAccessor) MessagesByTokenID(
 	source, dest ccipocr3.ChainSelector,
 	tokens map[ccipocr3.MessageTokenID]ccipocr3.RampTokenAmount,
 ) (map[ccipocr3.MessageTokenID]ccipocr3.Bytes, error) {
-	a.lggr.Debugw("bindings MessagesByTokenID", "bindings", a.pdaCache.getAllBindings())
 	usdcTokenPoolAddr, err := a.pdaCache.getBinding(consts.ContractNameUSDCTokenPool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get %s binding: %w", consts.ContractNameUSDCTokenPool, err)

@@ -168,7 +168,7 @@ func (a *SolanaAccessor) getOffRampSourceChainConfigs(ctx context.Context, sourc
 		}
 	}
 
-	a.lggr.Debugw("getOffRampSourceChainConfigs", "sourceChainConfigs", sourceChainConfigs)
+	a.lggr.Debugw("getOffRampSourceChainConfigs results", "sourceChainConfigs", sourceChainConfigs)
 	return sourceChainConfigs, nil
 }
 
@@ -202,7 +202,6 @@ func (a *SolanaAccessor) getOnRampDynamicConfig(ctx context.Context) (ccipocr3.O
 		return ccipocr3.OnRampDynamicConfig{}, fmt.Errorf("failed to get binding for onramp: %w", err)
 	}
 	configPDA := a.pdaCache.routerConfig()
-	a.lggr.Debugw("getOnRampDynamicConfig", "configPDA", configPDA.String())
 
 	var cfg router.Config
 	err = a.client.GetAccountDataBorshInto(ctx, configPDA, &cfg)
@@ -229,8 +228,6 @@ func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccip
 	if err != nil {
 		return ccipocr3.OnRampDestChainConfig{}, fmt.Errorf("failed to fetch dest chain state PDA from cache: %w", err)
 	}
-
-	a.lggr.Debugw("getOnRampDestChainConfig", "destChainStatePDA", destChainStatePDA.String())
 
 	var destChain router.DestChain
 	err = a.client.GetAccountDataBorshInto(ctx, destChainStatePDA, &destChain)
@@ -303,6 +300,5 @@ func (a *SolanaAccessor) getOfframpReferenceAddresses(ctx context.Context) (offr
 		return offramp.ReferenceAddresses{}, fmt.Errorf("failed to get offramp reference addresses account: %w", err)
 	}
 
-	a.lggr.Debugw("getOfframpReferenceAddresses", "refAddreses", refAddreses)
 	return refAddreses, nil
 }
