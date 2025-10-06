@@ -139,7 +139,7 @@ func (a *SolanaAccessor) GetAllConfigsLegacy(ctx context.Context, destChainSelec
 		}
 
 		// CurseInfo
-		curseInfo, err := a.getCurseInfo(ctx)
+		curseInfo, err := a.getCurseInfo(ctx, destChainSelector)
 		if !errors.Is(err, contractreader.ErrNoBindings) && err != nil {
 			return ccipocr3.ChainConfigSnapshot{}, nil, fmt.Errorf("failed to get curse info: %w", err)
 		}

@@ -246,7 +246,7 @@ func (a *SolanaAccessor) getOnRampDestChainConfig(ctx context.Context, dest ccip
 }
 
 // getCurseInfo retrieves curse information for RMN verification
-func (a *SolanaAccessor) getCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, error) {
+func (a *SolanaAccessor) getCurseInfo(ctx context.Context, destChainSelector ccipocr3.ChainSelector) (ccipocr3.CurseInfo, error) {
 	// Validate the RMN Remote contract binding exists
 	_, err := a.pdaCache.getBinding(consts.ContractNameRMNRemote)
 	if err != nil {
@@ -262,18 +262,23 @@ func (a *SolanaAccessor) getCurseInfo(ctx context.Context) (ccipocr3.CurseInfo, 
 
 	cursedChains := make(map[ccipocr3.ChainSelector]bool)
 	globalCurse := false
+	destinationCurse := false
 	for _, curse := range curses.CursedSubjects {
 		if slices.Equal(curse.Value[:], globalCurseValue) {
 			globalCurse = true
 			continue
 		}
 		chainSel := binary.LittleEndian.Uint64(curse.Value[:])
+		if chainSel == uint64(destChainSelector) {
+			destinationCurse = true
+			continue
+		}
 		cursedChains[ccipocr3.ChainSelector(chainSel)] = true
 	}
 
 	return ccipocr3.CurseInfo{
 		CursedSourceChains: cursedChains,
-		CursedDestination:  false, // TODO: how do we read cursed subjects to determine this value? Or is destination curse not possible on Solana
+		CursedDestination:  destinationCurse,
 		GlobalCurse:        globalCurse,
 	}, nil
 }
