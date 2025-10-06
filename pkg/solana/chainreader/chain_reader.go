@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
@@ -877,9 +878,15 @@ func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values read
 		for _, arr := range *x {
 			tokens = append(tokens, arr[:]) // Slice [32]uint8 → []uint8
 		}
-		// this is the expected type when CR is called directly
+	// this is the previously expected type when CR is called directly
 	case [][]uint8:
 		tokens = x
+	// this is the expected type when CR is called directly
+	case []ccipocr3.UnknownAddress:
+		tokens = make([][]uint8, 0, len(x))
+		for _, arr := range x {
+			tokens = append(tokens, []uint8(arr)) // Cast ccipocr3.UnknownAddress → []uint8
+		}
 	default:
 		return nil, fmt.Errorf(
 			"for contract %q read %q: 'Tokens' field is neither *[][32]uint8 nor [][]uint8",
