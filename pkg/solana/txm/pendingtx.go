@@ -78,7 +78,7 @@ type pendingTx struct {
 type finishedTx struct {
 	retentionTs time.Time
 	state       utils.TxState
-	signatures  []solana.Signature
+	sig         solana.Signature
 }
 
 type txInfo struct {
@@ -473,7 +473,7 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 		finalizedTx := finishedTx{
 			state:       utils.Finalized,
 			retentionTs: time.Now().Add(retentionTimeout),
-			signatures:  tx.signatures,
+			sig:         sig,
 		}
 		// move transaction from confirmed to finalized map
 		c.finalizedErroredTxs[info.id] = finalizedTx
@@ -518,7 +518,6 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 		erroredTx := finishedTx{
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
-			signatures:  tx.signatures,
 		}
 		// add transaction to error map
 		c.finalizedErroredTxs[id] = erroredTx
@@ -586,7 +585,6 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 		erroredTx := finishedTx{
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
-			signatures:  tx.signatures,
 		}
 		// move transaction from broadcasted to error map
 		c.finalizedErroredTxs[info.id] = erroredTx
@@ -690,7 +688,11 @@ func (c *pendingTxContext) GetTransactionSig(id string) (solana.Signature, error
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if tx, exists := c.finalizedErroredTxs[id]; exists {
-		return tx.signatures[0], nil
+		if !tx.sig.IsZero() {
+			return tx.sig, nil
+		} else {
+			return solana.Signature{}, ErrTransactionNotFound
+		}
 	}
 	return solana.Signature{}, ErrTransactionNotFound
 }
