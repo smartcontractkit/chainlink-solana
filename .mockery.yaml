@@ -64,3 +64,8 @@ packages:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader:
     interfaces:
       EventsReader:
+  github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3:
+    config:
+      dir: pkg/solana/ccip/codec/mocks
+    interfaces:
+      SourceChainExtraDataCodec:
