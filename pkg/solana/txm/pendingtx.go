@@ -3,6 +3,7 @@ package txm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -687,14 +688,14 @@ func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 func (c *pendingTxContext) GetTransactionSig(id string) (solana.Signature, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	if tx, exists := c.finalizedErroredTxs[id]; exists {
-		if !tx.sig.IsZero() {
-			return tx.sig, nil
-		} else {
-			return solana.Signature{}, ErrTransactionNotFound
-		}
+	tx, exists := c.finalizedErroredTxs[id]
+	if !exists {
+		return solana.Signature{}, ErrTransactionNotFound
 	}
-	return solana.Signature{}, ErrTransactionNotFound
+	if tx.sig.IsZero() {
+		return solana.Signature{}, fmt.Errorf("signature is zero, txState: %s", tx.state)
+	}
+	return tx.sig, nil
 }
 
 func (c *pendingTxContext) withReadLock(fn func() error) error {
