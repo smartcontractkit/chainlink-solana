@@ -943,6 +943,16 @@ func (txm *Txm) GetTransactionStatus(ctx context.Context, transactionID string) 
 	}
 }
 
+// GetTransactionSig returns a signature of a transaction
+func (txm *Txm) GetTransactionSig(transactionID string) (solanaGo.Signature, error) {
+	sig, err := txm.txs.GetTransactionSig(transactionID)
+	if err != nil {
+		return solanaGo.Signature{}, fmt.Errorf("failed to find transaction with id %s: %w", transactionID, err)
+	}
+
+	return sig, nil
+}
+
 // EstimateComputeUnitLimit estimates the compute unit limit needed for a transaction.
 // It simulates the provided transaction to determine the used compute and applies a buffer to it.
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
