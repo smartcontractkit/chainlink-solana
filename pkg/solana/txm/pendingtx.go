@@ -59,6 +59,8 @@ type PendingTxContext interface {
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
+	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
+	GetTransactionSig(id string) (solana.Signature, error)
 }
 
 // finishedTx is used to store info required to track transactions to finality or error
@@ -76,6 +78,7 @@ type pendingTx struct {
 type finishedTx struct {
 	retentionTs time.Time
 	state       utils.TxState
+	signatures  []solana.Signature
 }
 
 type txInfo struct {
@@ -470,6 +473,7 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 		finalizedTx := finishedTx{
 			state:       utils.Finalized,
 			retentionTs: time.Now().Add(retentionTimeout),
+			signatures:  tx.signatures,
 		}
 		// move transaction from confirmed to finalized map
 		c.finalizedErroredTxs[info.id] = finalizedTx
@@ -514,6 +518,7 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 		erroredTx := finishedTx{
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
+			signatures:  tx.signatures,
 		}
 		// add transaction to error map
 		c.finalizedErroredTxs[id] = erroredTx
@@ -581,6 +586,7 @@ func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.D
 		erroredTx := finishedTx{
 			state:       txState,
 			retentionTs: time.Now().Add(retentionTimeout),
+			signatures:  tx.signatures,
 		}
 		// move transaction from broadcasted to error map
 		c.finalizedErroredTxs[info.id] = erroredTx
@@ -678,6 +684,15 @@ func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 		return pendingTx{}, ErrTransactionNotFound
 	}
 	return tx, nil
+}
+
+func (c *pendingTxContext) GetTransactionSig(id string) (solana.Signature, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if tx, exists := c.finalizedErroredTxs[id]; exists {
+		return tx.signatures[0], nil
+	}
+	return solana.Signature{}, ErrTransactionNotFound
 }
 
 func (c *pendingTxContext) withReadLock(fn func() error) error {
@@ -820,4 +835,8 @@ func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigS
 
 func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 	return c.pendingTx.GetPendingTx(id)
+}
+
+func (c *pendingTxContextWithProm) GetTransactionSig(id string) (solana.Signature, error) {
+	return c.pendingTx.GetTransactionSig(id)
 }
