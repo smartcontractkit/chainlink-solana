@@ -3,6 +3,7 @@ package txm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -59,6 +60,8 @@ type PendingTxContext interface {
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
+	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
+	GetTransactionSig(id string) (solana.Signature, error)
 }
 
 // finishedTx is used to store info required to track transactions to finality or error
@@ -76,6 +79,7 @@ type pendingTx struct {
 type finishedTx struct {
 	retentionTs time.Time
 	state       utils.TxState
+	sig         solana.Signature
 }
 
 type txInfo struct {
@@ -470,6 +474,7 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 		finalizedTx := finishedTx{
 			state:       utils.Finalized,
 			retentionTs: time.Now().Add(retentionTimeout),
+			sig:         sig,
 		}
 		// move transaction from confirmed to finalized map
 		c.finalizedErroredTxs[info.id] = finalizedTx
@@ -680,6 +685,19 @@ func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 	return tx, nil
 }
 
+func (c *pendingTxContext) GetTransactionSig(id string) (solana.Signature, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	tx, exists := c.finalizedErroredTxs[id]
+	if !exists {
+		return solana.Signature{}, ErrTransactionNotFound
+	}
+	if tx.sig.IsZero() {
+		return solana.Signature{}, fmt.Errorf("signature is zero, txState: %s", tx.state)
+	}
+	return tx.sig, nil
+}
+
 func (c *pendingTxContext) withReadLock(fn func() error) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -820,4 +838,8 @@ func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigS
 
 func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 	return c.pendingTx.GetPendingTx(id)
+}
+
+func (c *pendingTxContextWithProm) GetTransactionSig(id string) (solana.Signature, error) {
+	return c.pendingTx.GetTransactionSig(id)
 }

@@ -106,8 +106,6 @@ linters-settings:
         deny:
           - pkg: "cosmossdk.io/errors"
             desc: Use the standard library instead
-          - pkg: "github.com/ethereum/go-ethereum"
-            desc: This is chain must be isolated from ethereum
           - pkg: "github.com/go-gorm/gorm"
             desc: Use github.com/jmoiron/sqlx directly instead
           - pkg: "github.com/gofrs/uuid"
