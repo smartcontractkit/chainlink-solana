@@ -98,6 +98,10 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
 	return txm.StartOnce("Txm", func() error {
+		metricsErr := txm.txs.SetMetrics()
+		if metricsErr != nil {
+			return metricsErr
+		}
 		// determine estimator type
 		var estimator fees.Estimator
 		var err error
