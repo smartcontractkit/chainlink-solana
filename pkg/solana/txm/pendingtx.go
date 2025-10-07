@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -847,11 +846,7 @@ func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 }
 
 func (c *pendingTxContextWithProm) SetMetrics() error {
-	chainIDBig, ok := new(big.Int).SetString(c.chainID, 10)
-	if !ok {
-		return fmt.Errorf("failed to set metrics: invalid chain ID: %s", c.chainID)
-	}
-	m, err := NewSolTxmMetrics(chainIDBig)
+	m, err := NewSolTxmMetrics(c.chainID)
 	if err != nil {
 		return fmt.Errorf("failed to set metrics: %w", err)
 	}

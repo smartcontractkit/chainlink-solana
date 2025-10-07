@@ -3,7 +3,6 @@ package txm
 import (
 	"context"
 	"fmt"
-	"math/big"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -63,7 +62,7 @@ var (
 
 type solTxmMetrics struct {
 	metrics.Labeler
-	chainID *big.Int
+	chainID string
 
 	// successful transactions
 	successTxs   metric.Int64Counter
@@ -82,7 +81,7 @@ type solTxmMetrics struct {
 	dependencyFailTxs metric.Int64Counter
 }
 
-func NewSolTxmMetrics(chainID *big.Int) (*solTxmMetrics, error) {
+func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 	m := beholder.GetMeter()
 	var err error
 
@@ -138,7 +137,7 @@ func NewSolTxmMetrics(chainID *big.Int) (*solTxmMetrics, error) {
 
 	return &solTxmMetrics{
 		chainID: chainID,
-		Labeler: metrics.NewLabeler().With("chainID", chainID.String()),
+		Labeler: metrics.NewLabeler().With("chainID", chainID),
 
 		successTxs:        successTxs,
 		finalizedTxs:      finalizedTxs,
@@ -154,51 +153,51 @@ func NewSolTxmMetrics(chainID *big.Int) (*solTxmMetrics, error) {
 }
 
 func (m *solTxmMetrics) IncrementSuccessTxs(ctx context.Context) {
-	promSolTxmSuccessTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmSuccessTxs.WithLabelValues(m.chainID).Add(1)
 	m.successTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementFinalizedTxs(ctx context.Context) {
-	promSolTxmFinalizedTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmFinalizedTxs.WithLabelValues(m.chainID).Add(1)
 	m.finalizedTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) SetPendingTxs(ctx context.Context, count int) {
-	promSolTxmPendingTxs.WithLabelValues(m.chainID.String()).Set(float64(count))
+	promSolTxmPendingTxs.WithLabelValues(m.chainID).Set(float64(count))
 	m.pendingTxs.Record(ctx, int64(count))
 }
 
 func (m *solTxmMetrics) IncrementErrorTxs(ctx context.Context) {
-	promSolTxmErrorTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmErrorTxs.WithLabelValues(m.chainID).Add(1)
 	m.errorTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementRevertTxs(ctx context.Context) {
-	promSolTxmRevertTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmRevertTxs.WithLabelValues(m.chainID).Add(1)
 	m.revertTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementRejectTxs(ctx context.Context) {
-	promSolTxmRejectTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmRejectTxs.WithLabelValues(m.chainID).Add(1)
 	m.rejectTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementDropTxs(ctx context.Context) {
-	promSolTxmDropTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmDropTxs.WithLabelValues(m.chainID).Add(1)
 	m.dropTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementSimRevertTxs(ctx context.Context) {
-	promSolTxmSimRevertTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmSimRevertTxs.WithLabelValues(m.chainID).Add(1)
 	m.simRevertTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementSimOtherTxs(ctx context.Context) {
-	promSolTxmSimOtherTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmSimOtherTxs.WithLabelValues(m.chainID).Add(1)
 	m.simOtherTxs.Add(ctx, 1)
 }
 
 func (m *solTxmMetrics) IncrementDependencyFailTxs(ctx context.Context) {
-	promSolTxmDependencyFailTxs.WithLabelValues(m.chainID.String()).Add(1)
+	promSolTxmDependencyFailTxs.WithLabelValues(m.chainID).Add(1)
 	m.dependencyFailTxs.Add(ctx, 1)
 }
