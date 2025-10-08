@@ -12,7 +12,7 @@ import {
 } from "@solana/web3.js";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { randomBytes, createHash } from "crypto";
-import * as secp256k1 from "secp256k1";
+import * as secp from "@noble/secp256k1";
 import { array, struct, u8, vec } from "@coral-xyz/borsh";
 
 export type Signer = {
@@ -201,14 +201,15 @@ export function waitForEvent<T>(
 
 // initializes it, sets oracle config, and returns enough information to create a message
 
-export function signMessage(message: Buffer, secretKey: Buffer) {
-  const { signature, recid: recovery } = secp256k1.ecdsaSign(
-    message,
-    secretKey
-  );
+export async function signMessage(message: Buffer, secretKey: Buffer) {
+  const [signature, recid] = await secp.sign(message, secretKey, {
+    recovered: true,
+    der: false,
+  });
+
   return {
     signature: Buffer.from(signature),
-    recovery, // useful for pubkey recovery
+    recovery: recid, // useful for pubkey recovery
   };
 }
 
@@ -220,7 +221,7 @@ export type EthKeypairInfo = {
 
 export const generateEthKeypair = () => {
   let secretKey = randomBytes(32);
-  let publicKey = secp256k1.publicKeyCreate(secretKey, false).slice(1);
+  let publicKey = secp.getPublicKey(secretKey, false).slice(1);
   let ethereumAddress = getEthereumAddress(Buffer.from(publicKey));
   return {
     secretKey,
@@ -359,7 +360,7 @@ export class Forwarder {
       .rpc();
   }
 
-  private generateForwarderReport(
+  private async generateForwarderReport(
     payload: Buffer,
     workflowName: Buffer,
     workflowOwner: Buffer
@@ -434,8 +435,8 @@ export class Forwarder {
       )
       .digest();
 
-    const signaturesInfo = reportSigners.map((s) =>
-      signMessage(msgHashToSign, s.secretKey)
+    const signaturesInfo = await Promise.all(
+      reportSigners.map((s) => signMessage(msgHashToSign, s.secretKey))
     );
 
     const signaturesBytes = signaturesInfo.map((s) => {
@@ -515,7 +516,7 @@ export class Forwarder {
       payload
     );
 
-    const dataBytes = this.generateForwarderReport(
+    const dataBytes = await this.generateForwarderReport(
       wrappedForwarderReportPayload,
       workflowName,
       workflowOwner
