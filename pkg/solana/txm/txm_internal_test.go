@@ -1816,6 +1816,8 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	msg := pendingTx{id: uuid.NewString()}
 
