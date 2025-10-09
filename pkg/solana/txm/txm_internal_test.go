@@ -1,3 +1,5 @@
+//go:build integration
+
 package txm
 
 import (
@@ -1119,13 +1121,6 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
-}
-
-func GetRandomPubKey(t *testing.T) solana.PublicKey {
-	t.Helper()
-	privKey, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
-	return privKey.PublicKey()
 }
 
 func TestTxm_Enqueue(t *testing.T) {
