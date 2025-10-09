@@ -1123,6 +1123,13 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	})
 }
 
+// func GetRandomPubKey(t *testing.T) solana.PublicKey {
+// 	t.Helper()
+// 	privKey, err := solana.NewRandomPrivateKey()
+// 	require.NoError(t, err)
+// 	return privKey.PublicKey()
+// }
+
 func TestTxm_Enqueue(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
@@ -1810,6 +1817,14 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	// Enable retention timeout to keep transactions after finality or error
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
 	mc := mocks.NewReaderWriter(t)
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := 0; i < len(sigs); i++ {
+				out = append(out, &rpc.SignatureStatusesResult{})
+			}
+			return out
+		}, nil,
+	).Maybe()
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
