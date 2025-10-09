@@ -97,7 +97,7 @@ func getTx(t *testing.T, val uint64, keystore core.Keystore) (*solana.Transactio
 
 // check if cached transaction is cleared
 func empty(t *testing.T, txm *Txm, prom soltxmProm) bool {
-	count := txm.InflightTxs()
+	count := txm.InflightTxs(nil)
 	assert.Equal(t, float64(count), prom.getInflight()) // validate prom metric and txs length
 	return count == 0
 }

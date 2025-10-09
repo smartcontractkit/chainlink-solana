@@ -124,7 +124,7 @@ func TestTxm_Integration(t *testing.T) {
 
 			// check to make sure all txs are closed out from inflight list (longest should last MaxConfirmTimeout)
 			require.Eventually(t, func() bool {
-				txs := txm.InflightTxs()
+				txs := txm.InflightTxs(ctx)
 				t.Logf("Inflight txs: %d", txs)
 				return txs == 0
 			}, tests.WaitTimeout(t), time.Second)
