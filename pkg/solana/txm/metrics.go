@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
@@ -152,52 +153,57 @@ func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 	}, nil
 }
 
+func (m *solTxmMetrics) GetOtelAttributes() []attribute.KeyValue {
+	otelLabels := beholder.OtelAttributes(m.Labels).AsStringAttributes()
+	return otelLabels
+}
+
 func (m *solTxmMetrics) IncrementSuccessTxs(ctx context.Context) {
 	promSolTxmSuccessTxs.WithLabelValues(m.chainID).Add(1)
-	m.successTxs.Add(ctx, 1)
+	m.successTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementFinalizedTxs(ctx context.Context) {
 	promSolTxmFinalizedTxs.WithLabelValues(m.chainID).Add(1)
-	m.finalizedTxs.Add(ctx, 1)
+	m.finalizedTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) SetPendingTxs(ctx context.Context, count int) {
 	promSolTxmPendingTxs.WithLabelValues(m.chainID).Set(float64(count))
-	m.pendingTxs.Record(ctx, int64(count))
+	m.pendingTxs.Record(ctx, int64(count), metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementErrorTxs(ctx context.Context) {
 	promSolTxmErrorTxs.WithLabelValues(m.chainID).Add(1)
-	m.errorTxs.Add(ctx, 1)
+	m.errorTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementRevertTxs(ctx context.Context) {
 	promSolTxmRevertTxs.WithLabelValues(m.chainID).Add(1)
-	m.revertTxs.Add(ctx, 1)
+	m.revertTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementRejectTxs(ctx context.Context) {
 	promSolTxmRejectTxs.WithLabelValues(m.chainID).Add(1)
-	m.rejectTxs.Add(ctx, 1)
+	m.rejectTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementDropTxs(ctx context.Context) {
 	promSolTxmDropTxs.WithLabelValues(m.chainID).Add(1)
-	m.dropTxs.Add(ctx, 1)
+	m.dropTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementSimRevertTxs(ctx context.Context) {
 	promSolTxmSimRevertTxs.WithLabelValues(m.chainID).Add(1)
-	m.simRevertTxs.Add(ctx, 1)
+	m.simRevertTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementSimOtherTxs(ctx context.Context) {
 	promSolTxmSimOtherTxs.WithLabelValues(m.chainID).Add(1)
-	m.simOtherTxs.Add(ctx, 1)
+	m.simOtherTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solTxmMetrics) IncrementDependencyFailTxs(ctx context.Context) {
 	promSolTxmDependencyFailTxs.WithLabelValues(m.chainID).Add(1)
-	m.dependencyFailTxs.Add(ctx, 1)
+	m.dependencyFailTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
