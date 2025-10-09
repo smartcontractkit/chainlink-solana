@@ -23,7 +23,7 @@ import {
 import { assert } from "chai";
 
 import { randomBytes, createHash } from "crypto";
-import * as secp256k1 from "secp256k1";
+import * as secp from "@noble/secp256k1";
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { Round as OCRRound, OCR2Feed } from "@chainlink/solana-sdk";
 import { Ocr2 } from "../target/types/ocr_2";
@@ -203,10 +203,13 @@ describe("ocr2", () => {
     let raw_signatures = [];
     for (let oracle of oracles.slice(0, f + 1)) {
       // sign with `f` + 1 oracles
-      let { signature, recid } = secp256k1.ecdsaSign(
+
+      const [signature, recid] = await secp.sign(
         hash,
-        oracle.signer.secretKey
+        oracle.signer.secretKey,
+        { recovered: true, der: false }
       );
+
       raw_signatures.push(...signature);
       raw_signatures.push(recid);
     }
@@ -475,10 +478,11 @@ describe("ocr2", () => {
   let generateOracle = async () => {
     let secretKey = randomBytes(32);
     let transmitter = Keypair.generate();
+
     return {
       signer: {
         secretKey,
-        publicKey: secp256k1.publicKeyCreate(secretKey, false).slice(1), // compressed = false, skip first byte (0x04)
+        publicKey: secp.getPublicKey(secretKey, false).slice(1), // compressed = false, skip first byte (0x04)
       },
       transmitter,
       // Initialize a token account
