@@ -154,8 +154,7 @@ func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 }
 
 func (m *solTxmMetrics) GetOtelAttributes() []attribute.KeyValue {
-	otelLabels := beholder.OtelAttributes(m.Labels).AsStringAttributes()
-	return otelLabels
+	return beholder.OtelAttributes(m.Labels).AsStringAttributes()
 }
 
 func (m *solTxmMetrics) IncrementSuccessTxs(ctx context.Context) {
