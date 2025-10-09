@@ -905,7 +905,7 @@ func TestPendingTxContext_on_prebroadcast_error(t *testing.T) {
 
 func TestPendingTxContext_RevertToAwaitingBroadcast(t *testing.T) {
 	t.Parallel()
-	_, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	txs := newPendingTxContext()
 	retentionTimeout := 5 * time.Second
@@ -1017,7 +1017,7 @@ func TestPendingTxContext_RevertToAwaitingBroadcast(t *testing.T) {
 	require.Error(t, err)
 
 	// Check sig list is empty after all removals
-	require.Empty(t, txs.ListAllSigs())
+	require.Empty(t, txs.ListAllSigs(ctx))
 }
 func TestPendingTxContext_trim_finalized_errored_txs(t *testing.T) {
 	t.Parallel()

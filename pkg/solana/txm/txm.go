@@ -98,7 +98,7 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
 	return txm.StartOnce("Txm", func() error {
-		metricsErr := txm.txs.SetMetrics()
+		metricsErr := txm.txs.InitMetrics()
 		if metricsErr != nil {
 			return metricsErr
 		}
@@ -384,7 +384,7 @@ func (txm *Txm) confirm() {
 			return
 		case <-ticker.C:
 			// If no signatures to confirm, we can break loop as there's nothing to process.
-			if txm.InflightTxs() == 0 {
+			if txm.InflightTxs(ctx) == 0 {
 				break
 			}
 
@@ -407,7 +407,7 @@ func (txm *Txm) confirm() {
 // It handles various scenarios including expirations, errors, and state transitions (broadcasted, processed, confirmed, finalized).
 // Additionally, it detects and manages re-orgs by removing or rebroadcasting transactions as necessary and determines when to end polling cancelling retry loops.
 func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWriter) {
-	sigsBatch, err := commonutils.BatchSplit(txm.txs.ListAllSigs(), MaxSigsToConfirm)
+	sigsBatch, err := commonutils.BatchSplit(txm.txs.ListAllSigs(ctx), MaxSigsToConfirm)
 	if err != nil { // this should never happen
 		txm.lggr.Fatalw("failed to batch signatures", "error", err)
 		return
@@ -1127,8 +1127,8 @@ func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr
 }
 
 // InflightTxs returns the number of signatures being tracked for all transactions not yet finalized or errored
-func (txm *Txm) InflightTxs() int {
-	return len(txm.txs.ListAllSigs())
+func (txm *Txm) InflightTxs(ctx context.Context) int {
+	return len(txm.txs.ListAllSigs(ctx))
 }
 
 // rebroadcastWithGivenBlockhash attempts to rebroadcast a pending tx with a new blockhash.

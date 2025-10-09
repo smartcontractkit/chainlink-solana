@@ -30,7 +30,7 @@ type PendingTxContext interface {
 	// RevertToAwaitingBroadcast reverts the transaction's status to AwaitingBroadcast. It also removes context and related signatures from storage associated to given tx id if not in finalized or errored state
 	RevertToAwaitingBroadcast(id string) error
 	// ListAllSigs returns all of the signatures being tracked for all transactions not yet finalized or errored
-	ListAllSigs() []solana.Signature
+	ListAllSigs(ctx context.Context) []solana.Signature
 	// ListAllExpiredBroadcastedTxs returns all the txes that are in broadcasted state and have expired for given block number compared against lastValidBlockHeight (last valid block number)
 	// Passing maxUint64 as currBlockNumber will return all broadcasted txes.
 	ListAllExpiredBroadcastedTxs(currBlockNumber uint64) []pendingTx
@@ -61,7 +61,7 @@ type PendingTxContext interface {
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
 	// SetMetrics sets the metrics for the pending transaction context
-	SetMetrics() error
+	InitMetrics() error
 	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
 	GetTransactionSig(id string) (solana.Signature, error)
 }
@@ -102,8 +102,7 @@ type pendingTxContext struct {
 	confirmedTxs            map[string]pendingTx  // transactions that require monitoring for re-org
 	finalizedErroredTxs     map[string]finishedTx // finalized and errored transactions held onto for status
 
-	lock    sync.RWMutex
-	metrics *solTxmMetrics
+	lock sync.RWMutex
 }
 
 func newPendingTxContext() *pendingTxContext {
@@ -291,7 +290,7 @@ func (c *pendingTxContext) RevertToAwaitingBroadcast(id string) error {
 	return err
 }
 
-func (c *pendingTxContext) ListAllSigs() []solana.Signature {
+func (c *pendingTxContext) ListAllSigs(ctx context.Context) []solana.Signature {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return maps.Keys(c.sigToTxInfo)
@@ -713,7 +712,7 @@ func (c *pendingTxContext) withWriteLock(fn func() (string, error)) (string, err
 	return fn()
 }
 
-func (c *pendingTxContext) SetMetrics() error {
+func (c *pendingTxContext) InitMetrics() error {
 	return nil
 }
 
@@ -722,6 +721,7 @@ var _ PendingTxContext = &pendingTxContextWithProm{}
 type pendingTxContextWithProm struct {
 	pendingTx *pendingTxContext
 	chainID   string
+	metrics   *solTxmMetrics
 }
 
 type TxErrType int
@@ -762,7 +762,7 @@ func (c *pendingTxContextWithProm) OnProcessed(sig solana.Signature) (string, er
 func (c *pendingTxContextWithProm) OnConfirmed(sig solana.Signature) (string, error) {
 	id, err := c.pendingTx.OnConfirmed(sig) // empty ID indicates already previously removed
 	if id != "" && err == nil {             // increment if tx was not removed
-		c.pendingTx.metrics.IncrementSuccessTxs(context.Background())
+		c.metrics.IncrementSuccessTxs(context.Background())
 	}
 	return id, err
 }
@@ -771,9 +771,9 @@ func (c *pendingTxContextWithProm) RevertToAwaitingBroadcast(id string) error {
 	return c.pendingTx.RevertToAwaitingBroadcast(id)
 }
 
-func (c *pendingTxContextWithProm) ListAllSigs() []solana.Signature {
-	sigs := c.pendingTx.ListAllSigs()
-	c.pendingTx.metrics.SetPendingTxs(context.Background(), len(sigs))
+func (c *pendingTxContextWithProm) ListAllSigs(ctx context.Context) []solana.Signature {
+	sigs := c.pendingTx.ListAllSigs(ctx)
+	c.metrics.SetPendingTxs(ctx, len(sigs))
 	return sigs
 }
 
@@ -789,7 +789,7 @@ func (c *pendingTxContextWithProm) Expired(sig solana.Signature, lifespan time.D
 func (c *pendingTxContextWithProm) OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error) {
 	id, err := c.pendingTx.OnFinalized(sig, retentionTimeout) // empty ID indicates already previously removed
 	if id != "" && err == nil {                               // increment if tx was not removed
-		c.pendingTx.metrics.IncrementFinalizedTxs(context.Background())
+		c.metrics.IncrementFinalizedTxs(context.Background())
 	}
 	return id, err
 }
@@ -797,7 +797,7 @@ func (c *pendingTxContextWithProm) OnFinalized(sig solana.Signature, retentionTi
 func (c *pendingTxContextWithProm) OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error) {
 	id, err := c.pendingTx.OnError(sig, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
 	if err == nil {
-		incrementErrorMetrics(errType, c.chainID, c.pendingTx.metrics)
+		incrementErrorMetrics(errType, c.chainID, c.metrics)
 	}
 	return id, err
 }
@@ -805,7 +805,7 @@ func (c *pendingTxContextWithProm) OnError(sig solana.Signature, retentionTimeou
 func (c *pendingTxContextWithProm) OnPrebroadcastError(id string, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) error {
 	err := c.pendingTx.OnPrebroadcastError(id, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
 	if err == nil {
-		incrementErrorMetrics(errType, c.chainID, c.pendingTx.metrics)
+		incrementErrorMetrics(errType, c.chainID, c.metrics)
 	}
 	return err
 }
@@ -847,12 +847,12 @@ func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 	return c.pendingTx.GetPendingTx(id)
 }
 
-func (c *pendingTxContextWithProm) SetMetrics() error {
+func (c *pendingTxContextWithProm) InitMetrics() error {
 	m, err := NewSolTxmMetrics(c.chainID)
 	if err != nil {
 		return fmt.Errorf("failed to set metrics: %w", err)
 	}
-	c.pendingTx.metrics = m
+	c.metrics = m
 
 	return nil
 }
