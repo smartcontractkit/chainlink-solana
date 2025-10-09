@@ -60,7 +60,7 @@ type PendingTxContext interface {
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
-	// SetMetrics sets the metrics for the pending transaction context
+	// InitMetrics sets the metrics for the pending transaction context
 	InitMetrics() error
 	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
 	GetTransactionSig(id string) (solana.Signature, error)
