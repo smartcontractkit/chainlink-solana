@@ -161,7 +161,7 @@ pub mod v2 {
     }
 
     /// Reads the feed account’s data slice.
-    /// 
+    ///
     /// Example:
     /// ```ignore
     /// read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes());
@@ -172,7 +172,7 @@ pub mod v2 {
     /// - the account’s **owner** (via `AccountInfo::owner.to_bytes()`).
     ///
     /// Ensure these values come from the same feed account.
-    /// 
+    ///
     // DEV: Method does not expose `AccountInfo` to avoid
     // dependency from `anchor-lang` or `solana-program` version
     pub fn read_feed_v2(
@@ -304,7 +304,7 @@ mod tests {
         let account = mock_account_info(&key, true, true, &mut lamports, &mut buffer[..], &owner);
 
         // We pass in the owner program ID this way for testing purposes only.
-        // For ordinary usage in production applications you must pass in owner (as bytes) 
+        // For ordinary usage in production applications you must pass in owner (as bytes)
         // from the AccountInfo struct. See `read_feed_v2` comments for more detail.
         let feed = read_feed_v2(account.try_borrow_data()?, ID.to_bytes())?;
 
