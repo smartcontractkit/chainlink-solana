@@ -3,18 +3,34 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	mn "github.com/smartcontractkit/chainlink-framework/multinode"
+	"github.com/smartcontractkit/chainlink-common/pkg/config/configtest"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 )
+
+var defaults TOMLConfig
+
+func init() {
+	if err := configtest.DocDefaultsOnly(strings.NewReader(docsTOML), &defaults, config.DecodeTOML); err != nil {
+		log.Fatalf("Failed to initialize defaults from docs: %v", err)
+	}
+}
+
+func Defaults() (c TOMLConfig) {
+	c.SetFrom(&defaults)
+	return
+}
 
 type TOMLConfigs []*TOMLConfig
 
@@ -72,13 +88,13 @@ func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
 	return
 }
 
-func NodeStatus(n *Node, id string) (relaytypes.NodeStatus, error) {
-	var s relaytypes.NodeStatus
+func NodeStatus(n *Node, id string) (types.NodeStatus, error) {
+	var s types.NodeStatus
 	s.ChainID = id
 	s.Name = *n.Name
 	b, err := toml.Marshal(n)
 	if err != nil {
-		return relaytypes.NodeStatus{}, err
+		return types.NodeStatus{}, err
 	}
 	s.Config = string(b)
 	return s, nil
@@ -95,12 +111,12 @@ func (ns *Nodes) SetFrom(fs *Nodes) {
 		}); i == -1 {
 			*ns = append(*ns, f)
 		} else {
-			setFromNode((*ns)[i], f)
+			(*ns)[i].SetFrom(f)
 		}
 	}
 }
 
-func setFromNode(n, f *Node) {
+func (n *Node) SetFrom(f *Node) {
 	if f.Name != nil {
 		n.Name = f.Name
 	}
@@ -118,12 +134,19 @@ type TOMLConfig struct {
 	// Do not access directly, use [IsEnabled]
 	Enabled *bool
 	Chain
+	Workflow  WorkflowConfig `toml:",omitempty"`
 	MultiNode mnCfg.MultiNodeConfig
 	Nodes     Nodes
 }
 
 func (c *TOMLConfig) IsEnabled() bool {
 	return c.Enabled == nil || *c.Enabled
+}
+
+func (c *TOMLConfig) SetDefaults() {
+	d := Defaults()
+	d.SetFrom(c)
+	*c = d
 }
 
 func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
@@ -133,12 +156,13 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 	if f.Enabled != nil {
 		c.Enabled = f.Enabled
 	}
-	setFromChain(&c.Chain, &f.Chain)
-	c.Nodes.SetFrom(&f.Nodes)
+	c.Chain.SetFrom(&f.Chain)
 	c.MultiNode.SetFrom(&f.MultiNode)
+	c.Workflow.SetFrom(&f.Workflow)
+	c.Nodes.SetFrom(&f.Nodes)
 }
 
-func setFromChain(c, f *Chain) {
+func (c *Chain) SetFrom(f *Chain) {
 	if f.BlockTime != nil {
 		c.BlockTime = f.BlockTime
 	}
@@ -199,9 +223,6 @@ func setFromChain(c, f *Chain) {
 	if f.BlockHistorySize != nil {
 		c.BlockHistorySize = f.BlockHistorySize
 	}
-	if f.LogPollerStartingLookback != nil {
-		c.LogPollerStartingLookback = f.LogPollerStartingLookback
-	}
 	if f.BlockHistoryBatchLoadSize != nil {
 		c.BlockHistoryBatchLoadSize = f.BlockHistoryBatchLoadSize
 	}
@@ -210,6 +231,9 @@ func setFromChain(c, f *Chain) {
 	}
 	if f.EstimateComputeUnitLimit != nil {
 		c.EstimateComputeUnitLimit = f.EstimateComputeUnitLimit
+	}
+	if f.LogPollerStartingLookback != nil {
+		c.LogPollerStartingLookback = f.LogPollerStartingLookback
 	}
 }
 
@@ -227,6 +251,7 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	if c.BlockTime() <= 0 {
 		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
 	}
+
 	return
 }
 
@@ -239,6 +264,76 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 var _ Config = &TOMLConfig{}
+
+func (c *TOMLConfig) WF() Workflow {
+	return &workflowConfig{
+		conf: c.Workflow,
+	}
+}
+
+func (c *TOMLConfig) AcceptanceTimeout() time.Duration {
+	return c.Workflow.AcceptanceTimeout.Duration()
+}
+
+func (c *TOMLConfig) Local() bool {
+	return *c.Workflow.Local
+}
+
+func (c *TOMLConfig) PollPeriod() time.Duration {
+	return c.Workflow.PollPeriod.Duration()
+}
+
+func (c *TOMLConfig) ForwarderAddress() *solana.PublicKey {
+	return c.Workflow.ForwarderAddress
+}
+
+func (c *TOMLConfig) FromAddress() *solana.PublicKey {
+	return c.Workflow.FromAddress
+}
+
+func (c *TOMLConfig) ForwarderState() *solana.PublicKey {
+	return c.Workflow.ForwarderState
+}
+
+func (c *TOMLConfig) GasLimitDefault() *uint64 {
+	return c.Workflow.GasLimitDefault
+}
+func (c *TOMLConfig) TxAcceptanceState() *types.TransactionStatus {
+	return c.Workflow.TxAcceptanceState
+}
+
+type workflowConfig struct {
+	conf WorkflowConfig
+}
+
+func (wc *workflowConfig) IsEnabled() bool {
+	return wc.conf.IsEnabled()
+}
+
+func (wc *workflowConfig) AcceptanceTimeout() time.Duration {
+	return wc.conf.AcceptanceTimeout.Duration()
+}
+func (wc *workflowConfig) PollPeriod() time.Duration {
+	return wc.conf.PollPeriod.Duration()
+}
+func (wc *workflowConfig) ForwarderAddress() *solana.PublicKey {
+	return wc.conf.ForwarderAddress
+}
+func (wc *workflowConfig) FromAddress() *solana.PublicKey {
+	return wc.conf.FromAddress
+}
+func (wc *workflowConfig) ForwarderState() *solana.PublicKey {
+	return wc.conf.ForwarderState
+}
+func (wc *workflowConfig) GasLimitDefault() *uint64 {
+	return wc.conf.GasLimitDefault
+}
+func (wc *workflowConfig) TxAcceptanceState() *types.TransactionStatus {
+	return wc.conf.TxAcceptanceState
+}
+func (wc *workflowConfig) Local() bool {
+	return *wc.conf.Local
+}
 
 func (c *TOMLConfig) BlockTime() time.Duration {
 	return c.Chain.BlockTime.Duration()
@@ -346,61 +441,12 @@ func (c *TOMLConfig) ListNodes() Nodes {
 	return c.Nodes
 }
 
-func (c *TOMLConfig) SetDefaults() {
-	c.Chain.SetDefaults()
-	c.MultiNode.SetFrom(defaultMultiNodeConfig)
-}
-
 func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
-	cfg.Chain.SetDefaults()
-	cfg.MultiNode.SetFrom(defaultMultiNodeConfig)
+	cfg.SetDefaults()
 	return cfg
-}
-
-var defaultMultiNodeConfig = &mnCfg.MultiNodeConfig{
-	MultiNode: mnCfg.MultiNode{
-		// Have multinode disabled by default
-		Enabled: ptr(false),
-		/* Node Configs */
-		// Failure threshold for polling set to 5 to tolerate some polling failures before taking action.
-		PollFailureThreshold: ptr(uint32(5)),
-		// Poll interval is set to 15 seconds to ensure timely updates while minimizing resource usage.
-		PollInterval: config.MustNewDuration(15 * time.Second),
-		// Selection mode defaults to priority level to enable using node priorities
-		SelectionMode: ptr(mn.NodeSelectionModePriorityLevel),
-		// The sync threshold is set to 10 to allow for some flexibility in node synchronization before considering it out of sync.
-		SyncThreshold: ptr(uint32(10)),
-		// Lease duration is set to 1 minute by default to allow node locks for a reasonable amount of time.
-		LeaseDuration: config.MustNewDuration(time.Minute),
-		// Node syncing is not relevant for Solana and is disabled by default.
-		NodeIsSyncingEnabled: ptr(false),
-		// The new heads polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
-		NewHeadsPollInterval: config.MustNewDuration(5 * time.Second),
-		// The finalized block polling interval is set to 5 seconds to ensure timely updates while minimizing resource usage.
-		FinalizedBlockPollInterval: config.MustNewDuration(5 * time.Second),
-		// Repeatable read guarantee should be enforced by default.
-		EnforceRepeatableRead: ptr(true),
-		// The delay before declaring a node dead is set to 20 seconds to give nodes time to recover from temporary issues.
-		DeathDeclarationDelay: config.MustNewDuration(20 * time.Second),
-		// If set to true nodes will verify configured the ChainID against RPC Client ChainID
-		VerifyChainID: ptr(true),
-		/* Chain Configs */
-		// Threshold for no new heads is set to 20 seconds, assuming that heads should update at a reasonable pace.
-		NodeNoNewHeadsThreshold: config.MustNewDuration(20 * time.Second),
-		// Similar to heads, finalized heads should be updated within 20 seconds.
-		NoNewFinalizedHeadsThreshold: config.MustNewDuration(20 * time.Second),
-		// Finality tags are used in Solana and enabled by default.
-		FinalityTagEnabled: ptr(true),
-		// Finality depth will not be used since finality tags are enabled.
-		FinalityDepth: ptr(uint32(0)),
-		// Finalized block offset allows for RPCs to be slightly behind the finalized block.
-		FinalizedBlockOffset: ptr(uint32(50)),
-	},
 }
 
 func NewDefaultMultiNodeConfig() mnCfg.MultiNodeConfig {
-	cfg := mnCfg.MultiNodeConfig{}
-	cfg.SetFrom(defaultMultiNodeConfig)
-	return cfg
+	return NewDefault().MultiNode
 }

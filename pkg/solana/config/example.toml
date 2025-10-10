@@ -1,0 +1,6 @@
+[[Solana]]
+ChainID = "mainnet"
+
+[[Solana.Nodes]]
+Name = 'primary'
+URL = 'http://solana.web'

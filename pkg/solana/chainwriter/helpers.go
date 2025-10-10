@@ -12,7 +12,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type TestArgs struct {
@@ -88,6 +88,10 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 		case uint64:
 			buf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, value)
+			vals = append(vals, buf)
+		case uint8:
+			buf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(buf, uint64(value)) // convert up and encode
 			vals = append(vals, buf)
 		case ccipocr3.ChainSelector:
 			buf := make([]byte, 8)

@@ -164,6 +164,10 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 			outputs.Events[i] = event
 		}
 
+		if outputs.Truncated {
+			j.lggr.Warnw("Encountered truncated logs", "program", outputs.Program, "detail", detail)
+		}
+
 		events = append(events, outputs.Events...)
 	}
 

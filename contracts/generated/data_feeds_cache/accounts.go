@@ -9,11 +9,12 @@ import (
 )
 
 type CacheState struct {
-	Owner             ag_solanago.PublicKey
-	ProposedOwner     ag_solanago.PublicKey
-	FeedAdmins        AccountList
-	LegacyWriterNonce uint8
-	Padding           [7]uint8
+	Owner            ag_solanago.PublicKey
+	ProposedOwner    ag_solanago.PublicKey
+	FeedAdmins       AccountList
+	ForwarderId      ag_solanago.PublicKey
+	LegacyWriterBump uint8
+	Padding          [7]uint8
 }
 
 var CacheStateDiscriminator = [8]byte{50, 155, 248, 164, 94, 213, 5, 207}
@@ -39,8 +40,13 @@ func (obj CacheState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `LegacyWriterNonce` param:
-	err = encoder.Encode(obj.LegacyWriterNonce)
+	// Serialize `ForwarderId` param:
+	err = encoder.Encode(obj.ForwarderId)
+	if err != nil {
+		return err
+	}
+	// Serialize `LegacyWriterBump` param:
+	err = encoder.Encode(obj.LegacyWriterBump)
 	if err != nil {
 		return err
 	}
@@ -81,8 +87,13 @@ func (obj *CacheState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `LegacyWriterNonce`:
-	err = decoder.Decode(&obj.LegacyWriterNonce)
+	// Deserialize `ForwarderId`:
+	err = decoder.Decode(&obj.ForwarderId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `LegacyWriterBump`:
+	err = decoder.Decode(&obj.LegacyWriterBump)
 	if err != nil {
 		return err
 	}

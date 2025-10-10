@@ -31,8 +31,8 @@ pub enum DataCacheError {
     #[msg("invalid data id")]
     InvalidDataId,
 
-    #[msg("missing accounts")]
-    MissingAccounts,
+    #[msg("invalid number of accounts")]
+    InvalidAccountCount,
 
     #[msg("account mismatch")]
     AccountMismatch,
@@ -42,9 +42,6 @@ pub enum DataCacheError {
 
     #[msg("invalid workflow name")]
     InvalidWorkflowName,
-
-    #[msg("unclosed permission flags")]
-    UnclosedPermissionFlags,
 
     #[msg("exceeded max amount allowed")]
     MaxWorkflowsExceeded,
@@ -72,4 +69,16 @@ pub enum DataCacheError {
 
     #[msg("failed legacy write")]
     FailedLegacyWrite,
+
+    #[msg("Invalid proposed owner")]
+    InvalidProposedOwner,
+
+    #[msg("feed config workflow list not empty")]
+    FeedConfigListNotEmpty,
+
+    #[msg("empty description enforced")]
+    EmptyDescriptionEnforced,
+
+    #[msg("invalid description")]
+    InvalidDescription,
 }

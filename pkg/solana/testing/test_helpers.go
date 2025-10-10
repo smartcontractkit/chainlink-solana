@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	fundingTimeout    = 30 * time.Second
 	fundingTimestep   = 500 * time.Millisecond
 	fundingMaxRetries = 5
 )
@@ -44,7 +43,6 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
 	// args1 := []string{"--version"}
-	t.Logf("test log")
 
 	args := append([]string{
 		"--reset",
@@ -119,7 +117,7 @@ func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string
 		if attempts <= 0 {
 			return fmt.Errorf("failed to fund solana accounts")
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(fundingTimestep)
 		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
 	}
 

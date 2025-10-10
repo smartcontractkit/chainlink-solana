@@ -10,7 +10,7 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Initialize is the `initialize` instruction.
+// Initializes a new Forwarder instance and stores data in its state account
 type Initialize struct {
 
 	// [0] = [WRITE, SIGNER] state

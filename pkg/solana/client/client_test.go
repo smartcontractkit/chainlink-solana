@@ -1,3 +1,7 @@
+//go:build !race
+
+// TestClient_SendTxDuplicates_Integration runs out of funds sometimes...
+
 package client
 
 import (

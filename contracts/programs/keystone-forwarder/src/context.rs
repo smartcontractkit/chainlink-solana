@@ -1,7 +1,10 @@
 use crate::common::ANCHOR_DISCRIMINATOR;
 use crate::error::AuthError;
 use crate::state::{ExecutionState, ForwarderState, OraclesConfig};
-use crate::utils::{extract_config_id, extract_raw_report, extract_transmission_id, get_config_id};
+use crate::utils::{
+    extract_config_id, extract_raw_report, extract_transmission_id, get_config_id, report_size_ok,
+};
+use crate::ForwarderError;
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -38,7 +41,7 @@ pub struct AcceptOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, f: u8)]
+#[instruction(don_id: u32, config_version: u32)]
 pub struct InitOraclesConfig<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -58,7 +61,7 @@ pub struct InitOraclesConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(don_id: u32, config_version: u32, f: u8, signer_addresses: Vec<[u8; 20]>)]
+#[instruction(don_id: u32, config_version: u32)]
 pub struct UpdateOraclesConfig<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -71,8 +74,6 @@ pub struct UpdateOraclesConfig<'info> {
 
     #[account(mut, address = state.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -99,6 +100,7 @@ pub struct Report<'info> {
 
     #[account(
         mut,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
@@ -108,12 +110,13 @@ pub struct Report<'info> {
     pub transmitter: Signer<'info>,
 
     /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
     #[account(
         init_if_needed,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         payer = transmitter,
         space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [

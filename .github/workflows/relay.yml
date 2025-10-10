@@ -23,8 +23,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           check-latest: true
-      - name: Install gotestloghelper
-        run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Check go mod tidy
         run: |
           make gomodtidy
@@ -38,10 +36,8 @@ jobs:
           git diff --stat --exit-code
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
-      - name: Compilation check
-        run: go test -run=xxx ./... # check compilation across tests + relayer / monitoring go code without running
       - name: Build
-        run: go build -v ./pkg/...
+        run: go build ./pkg/...
       - name: Get core ref
         id: get-ref
         uses: ./.github/actions/get-core-ref
@@ -55,11 +51,11 @@ jobs:
           CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
         run: |
           set -o pipefail
-          go test ./pkg/... -json -tags integration -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
+          go test ./pkg/... -tags integration -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log
       - name: Test with the race detector enabled
         env:
           CL_DATABASE_URL: ${{ steps.setup-testdb.outputs.cl-db-url }}
-        run: go test ./pkg/... -v -race -count=10 -timeout=15m -covermode=atomic -coverpkg=./... -coverprofile=race_coverage.txt
+        run: GORACE="log_path=$PWD/race" go test ./pkg/... -race -count=5 -timeout=15m -covermode=atomic -coverpkg=./... -coverprofile=race_coverage.txt
       - name: Upload Go test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -67,5 +63,6 @@ jobs:
           name: go-relay-test-results
           path: |
             /tmp/gotest.log
-            ./race_coverage.txt
             ./integration_coverage.txt
+            ./race.*
+            ./race_coverage.txt

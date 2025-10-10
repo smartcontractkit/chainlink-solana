@@ -61,11 +61,8 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
 	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr("devnet"),
-		Chain:   ch,
 	}
 	cfg.SetDefaults()
 	testChain := chain{
@@ -171,11 +168,8 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			}))
 			defer mockServer.Close()
 
-			ch := solcfg.Chain{}
-			ch.SetDefaults()
 			cfg := &solcfg.TOMLConfig{
 				ChainID: ptr(tc.chainID),
-				Chain:   ch,
 			}
 			cfg.SetDefaults()
 
@@ -222,12 +216,9 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
 	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr("devnet"),
 		Enabled: ptr(true),
-		Chain:   ch,
 	}
 	cfg.SetDefaults()
 	testChain := chain{
@@ -358,16 +349,11 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	ch := solcfg.Chain{}
-	ch.SetDefaults()
-	mnCfg := solcfg.NewDefaultMultiNodeConfig()
-	mnCfg.MultiNode.Enabled = ptr(true)
-
 	cfg := &solcfg.TOMLConfig{
-		ChainID:   ptr(client.DevnetGenesisHash),
-		Chain:     ch,
-		MultiNode: mnCfg,
+		ChainID: ptr(client.DevnetGenesisHash),
 	}
+	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.SetDefaults()
 	cfg.Nodes = []*solcfg.Node{
 		{
 			Name:  ptr("devnet"),
@@ -623,10 +609,10 @@ loop:
 	for {
 		select {
 		case <-ctx.Done():
-			assert.Equal(t, 0, testChain.txm.InflightTxs())
+			assert.Equal(t, 0, testChain.txm.InflightTxs(ctx))
 			break loop
 		case <-ticker.C:
-			if testChain.txm.InflightTxs() == 0 {
+			if testChain.txm.InflightTxs(ctx) == 0 {
 				cancel() // exit for loop
 			}
 		}
