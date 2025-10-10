@@ -99,6 +99,8 @@ pub mod v2 {
         FeedLengthInvalid,
         /// Feed data missing
         MalformedData,
+        /// No transmission found
+        TransmissionNotFound,
     }
 
     // Implement Display so it can be formatted nicely
@@ -111,6 +113,7 @@ pub mod v2 {
                 ReadError::DeserializeFailed => write!(f, "Failed to deserialize transmissions"),
                 ReadError::FeedLengthInvalid => write!(f, "Feed length invalid"),
                 ReadError::MalformedData => write!(f, "Malformed feed data"),
+                ReadError::TransmissionNotFound => write!(f, "No transmission found"),
             }
         }
     }
@@ -157,8 +160,21 @@ pub mod v2 {
         }
     }
 
-    /// Reads the feed account's data slice
-    /// ex: `read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes())`
+    /// Reads the feed account’s data slice.
+    /// 
+    /// Example:
+    /// ```ignore
+    /// read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes());
+    /// ```
+    ///
+    /// The caller is responsible for providing both:
+    /// - the account’s **data** (via `AccountInfo::try_borrow_data()`), and  
+    /// - the account’s **owner** (via `AccountInfo::owner.to_bytes()`).
+    ///
+    /// Ensure these values come from the same feed account.
+    /// 
+    // DEV: Method does not expose `AccountInfo` to avoid
+    // dependency from `anchor-lang` or `solana-program` version
     pub fn read_feed_v2(
         data: Ref<&mut [u8]>,
         owner: [u8; 32],
@@ -174,8 +190,14 @@ pub mod v2 {
         let header = Transmissions::deserialize(&mut &data[8..])
             .map_err(|_| ReadError::DeserializeFailed)?;
 
+        // Validate that only one transmission is present. The SDK previously supported
+        // multiple transmissions but is now restricted to single transmission feeds.// multiple transmissions but is now restricted to single transmission feeds.
         if header.live_length != 1 {
             return Err(ReadError::FeedLengthInvalid);
+        }
+
+        if header.latest_round_id == 0 {
+            return Err(ReadError::TransmissionNotFound);
         }
 
         let (_header, rest) = data.split_at(8 + HEADER_SIZE);
@@ -239,9 +261,6 @@ mod tests {
 
         pub const T_END: usize = 8 + HEADER_SIZE + size_of::<Transmission>();
 
-        // let alignment = std::mem::align_of::<Transmission>();
-        // print!("alignment {:?}", alignment);
-
         let mut buffer = [0u8; 8 + HEADER_SIZE + size_of::<Transmission>()];
 
         let header = Transmissions {
@@ -284,6 +303,9 @@ mod tests {
 
         let account = mock_account_info(&key, true, true, &mut lamports, &mut buffer[..], &owner);
 
+        // We pass in the owner program ID this way for testing purposes only.
+        // For ordinary usage in production applications you must pass in owner (as bytes) 
+        // from the AccountInfo struct. See `read_feed_v2` comments for more detail.
         let feed = read_feed_v2(account.try_borrow_data()?, ID.to_bytes())?;
 
         let round = feed.latest_round_data().unwrap();
