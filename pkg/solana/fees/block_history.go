@@ -7,12 +7,24 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+)
+
+var (
+	promBHEAvgComputeUnitPrice = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "solana_bhe_avg_compute_unit_price",
+		Help: "The average compute unit price determined by the Solana block history estimator",
+	}, []string{"chainID"})
 )
 
 var _ Estimator = &blockHistoryEstimator{}
@@ -33,6 +45,10 @@ type blockHistoryEstimator struct {
 
 	cache   blockMedianCache
 	cacheMu sync.RWMutex
+
+	// metrics
+	avgComputeUnitPrice metric.Int64Gauge
+	chainID             string
 }
 
 type blockMedianCache struct {
@@ -43,18 +59,25 @@ type blockMedianCache struct {
 // NewBlockHistoryEstimator creates a new fee estimator that parses historical fees from a fetched block
 // Note: getRecentPrioritizationFees is not used because it provides the lowest prioritization fee for an included tx in the block
 // which is not effective enough for increasing the chances of block inclusion
-func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, error), cfg config.Config, lgr logger.Logger) (*blockHistoryEstimator, error) {
+func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, error), cfg config.Config, lgr logger.Logger, chainID string) (*blockHistoryEstimator, error) {
 	if cfg.BlockHistorySize() < 1 {
 		return nil, fmt.Errorf("invalid block history depth: %d", cfg.BlockHistorySize())
 	}
 
+	avgComputeUnitPrice, err := beholder.GetMeter().Int64Gauge("solana_bhe_avg_compute_unit_price")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register solana block history estimator average compute unit price metric: %w", err)
+	}
+
 	return &blockHistoryEstimator{
-		chStop: make(chan struct{}),
-		client: c,
-		cfg:    cfg,
-		lgr:    lgr,
-		price:  cfg.ComputeUnitPriceDefault(), // use default value
-		cache:  blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
+		chStop:              make(chan struct{}),
+		client:              c,
+		cfg:                 cfg,
+		lgr:                 lgr,
+		price:               cfg.ComputeUnitPriceDefault(), // use default value
+		cache:               blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
+		avgComputeUnitPrice: avgComputeUnitPrice,
+		chainID:             chainID,
 	}, nil
 }
 
@@ -120,7 +143,7 @@ func (bhe *blockHistoryEstimator) calculatePrice(ctx context.Context) error {
 		if err := bhe.populateCache(ctx, bhe.cfg.BlockHistoryBatchLoadSize(), bhe.cfg.BlockHistorySize()); err != nil {
 			return fmt.Errorf("failed to populate cache: %w", err)
 		}
-		return bhe.calculatePriceFromMultipleBlocks(bhe.cfg.BlockHistorySize())
+		return bhe.calculatePriceFromMultipleBlocks(ctx, bhe.cfg.BlockHistorySize())
 	default:
 		return bhe.calculatePriceFromLatestBlock(ctx)
 	}
@@ -169,7 +192,7 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 	return nil
 }
 
-func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(desiredBlockCount uint64) error {
+func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(ctx context.Context, desiredBlockCount uint64) error {
 	bhe.cacheMu.RLock()
 	defer bhe.cacheMu.RUnlock()
 	blockMedians := make([]ComputeUnitPrice, 0, desiredBlockCount)
@@ -198,6 +221,9 @@ func (bhe *blockHistoryEstimator) calculatePriceFromMultipleBlocks(desiredBlockC
 		"computeUnitPriceAvg", avgOfMedians,
 		"numBlocks", len(blockMedians),
 	)
+
+	// Record the average compute unit price for prometheus and beholder metrics
+	bhe.recordAvgComputeUnitPrice(ctx, avgOfMedians)
 
 	return nil
 }
@@ -309,4 +335,9 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 	}
 	bhe.cache.storedBlockRange = bhe.cache.storedBlockRange[excessBlocks:]
 	return nil
+}
+
+func (bhe *blockHistoryEstimator) recordAvgComputeUnitPrice(ctx context.Context, avgOfMedians ComputeUnitPrice) {
+	promBHEAvgComputeUnitPrice.WithLabelValues(bhe.chainID).Set(float64(avgOfMedians))
+	bhe.avgComputeUnitPrice.Record(ctx, int64(avgOfMedians), metric.WithAttributes(attribute.String("chainID", bhe.chainID))) //nolint:gosec // compute unit prices cannot exceed int64 max
 }

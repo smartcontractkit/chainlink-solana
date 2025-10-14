@@ -61,7 +61,8 @@ type Txm struct {
 	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
-	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
+	sendTx  func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
+	chainID string
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
@@ -83,15 +84,16 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 	}
 
 	return &Txm{
-		lggr:   logger.Named(lggr, "Txm"),
-		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop: make(chan struct{}),
-		cfg:    cfg,
-		txs:    newPendingTxContextWithProm(chainID),
-		ks:     ks,
-		client: client,
-		sendTx: sendTx,
+		lggr:    logger.Named(lggr, "Txm"),
+		chSend:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:   make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop:  make(chan struct{}),
+		cfg:     cfg,
+		txs:     newPendingTxContextWithProm(chainID),
+		ks:      ks,
+		client:  client,
+		sendTx:  sendTx,
+		chainID: chainID,
 	}
 }
 
@@ -109,7 +111,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
 		case "blockhistory":
-			estimator, err = fees.NewBlockHistoryEstimator(txm.client.Get, txm.cfg, txm.lggr)
+			estimator, err = fees.NewBlockHistoryEstimator(txm.client.Get, txm.cfg, txm.lggr, txm.chainID)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
 		}
