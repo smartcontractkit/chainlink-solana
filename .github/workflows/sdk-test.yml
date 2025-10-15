@@ -1,0 +1,57 @@
+name: SDK Tests and Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/chainlink-solana/**'
+      - '.github/workflows/sdk-test.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'sdk/chainlink-solana/**'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@351f82a4dc29e4159746a068ed925da17341219f
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          sdk/chainlink-solana/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('sdk/chainlink-solana/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Check formatting
+      run: cargo fmt --check
+      working-directory: sdk/chainlink-solana
+
+    - name: Run Clippy
+      run: cargo clippy -- -D warnings
+      working-directory: sdk/chainlink-solana
+
+    - name: Run tests
+      run: cargo test --verbose
+      working-directory: sdk/chainlink-solana
+
+    - name: Build release
+      run: cargo build --release
+      working-directory: sdk/chainlink-solana
