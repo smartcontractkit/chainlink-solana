@@ -349,7 +349,7 @@ func (s *logSender) sendInstruction(
 	}
 
 	sig, err := s.client.SendTransactionWithOpts(
-		context.Background(),
+		ctx,
 		tx,
 		rpc.TransactionOpts{
 			PreflightCommitment: rpc.CommitmentConfirmed,

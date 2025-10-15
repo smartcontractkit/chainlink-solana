@@ -272,7 +272,7 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 	orm1 := NewORM(uuid.NewString(), dbx, lggr)
 	createLogsForBlocks(t.Context(), orm1, 10, 11, 12)
 	orm2 := NewORM(uuid.NewString(), dbx, lggr)
-	createLogsForBlocks(context.Background(), orm2, 100, 110, 120)
+	createLogsForBlocks(t.Context(), orm2, 100, 110, 120)
 	latestBlockChain1, err := orm1.GetLatestBlock(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(12), latestBlockChain1)

@@ -36,19 +36,20 @@ import (
 )
 
 type soltxmProm struct {
-	id                                                                     string
-	confirmed, error, revert, reject, drop, simRevert, simOther, finalized float64
+	id                                                                              string
+	confirmed, err, revert, reject, drop, simRevert, simOther, finalized, feeBumped float64
 }
 
 func (p soltxmProm) assertEqual(t *testing.T) {
 	assert.Equal(t, p.confirmed, testutil.ToFloat64(promSolTxmSuccessTxs.WithLabelValues(p.id)), "mismatch: confirmed")
-	assert.Equal(t, p.error, testutil.ToFloat64(promSolTxmErrorTxs.WithLabelValues(p.id)), "mismatch: error")
+	assert.Equal(t, p.err, testutil.ToFloat64(promSolTxmErrorTxs.WithLabelValues(p.id)), "mismatch: error")
 	assert.Equal(t, p.revert, testutil.ToFloat64(promSolTxmRevertTxs.WithLabelValues(p.id)), "mismatch: revert")
 	assert.Equal(t, p.reject, testutil.ToFloat64(promSolTxmRejectTxs.WithLabelValues(p.id)), "mismatch: reject")
 	assert.Equal(t, p.drop, testutil.ToFloat64(promSolTxmDropTxs.WithLabelValues(p.id)), "mismatch: drop")
 	assert.Equal(t, p.simRevert, testutil.ToFloat64(promSolTxmSimRevertTxs.WithLabelValues(p.id)), "mismatch: simRevert")
 	assert.Equal(t, p.simOther, testutil.ToFloat64(promSolTxmSimOtherTxs.WithLabelValues(p.id)), "mismatch: simOther")
 	assert.Equal(t, p.finalized, testutil.ToFloat64(promSolTxmFinalizedTxs.WithLabelValues(p.id)), "mismatch: finalized")
+	assert.Equal(t, p.feeBumped, testutil.ToFloat64(promSolTxmFeeBumps.WithLabelValues(p.id)), "mismatch: fee bumped")
 }
 
 func (p soltxmProm) getInflight() float64 {
@@ -86,7 +87,7 @@ func getTx(t *testing.T, val uint64, keystore core.Keystore) (*solana.Transactio
 		// sign tx
 		txMsg, err := tx.Message.MarshalBinary()
 		require.NoError(t, err)
-		sigBytes, err := keystore.Sign(context.Background(), pubkey.String(), txMsg)
+		sigBytes, err := keystore.Sign(t.Context(), pubkey.String(), txMsg)
 		require.NoError(t, err)
 		var finalSig [64]byte
 		copy(finalSig[:], sigBytes)
@@ -132,7 +133,8 @@ func TestTxm(t *testing.T) {
 			mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 			loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-			txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+			txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+			require.NoError(t, err)
 			require.NoError(t, txm.Start(ctx))
 			t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -245,7 +247,7 @@ func TestTxm(t *testing.T) {
 				waitFor(t, waitDuration, txm, prom, empty)
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.reject++
 				prom.assertEqual(t)
 
@@ -276,7 +278,7 @@ func TestTxm(t *testing.T) {
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared quickly
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.simOther++
 				prom.assertEqual(t)
 
@@ -288,18 +290,10 @@ func TestTxm(t *testing.T) {
 			t.Run("fail_simulation_confirmNil", func(t *testing.T) {
 				tx, signed := getTx(t, 3, mkey)
 				sig := randomSignature(t)
-				retry0 := randomSignature(t)
-				retry1 := randomSignature(t)
-				retry2 := randomSignature(t)
-				retry3 := randomSignature(t)
 				var wg sync.WaitGroup
 				wg.Add(1)
 
 				mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2, true, computeUnitLimitDefault)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3, true, computeUnitLimitDefault)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4, true, computeUnitLimitDefault)).Return(retry3, nil).Maybe()
 				mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, errors.New("FAIL")).Once()
@@ -308,12 +302,13 @@ func TestTxm(t *testing.T) {
 				// tx should be able to queue
 				testTxID := uuid.New().String()
 				lastValidBlockHeight := uint64(100)
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+				// disable fee bump to avoid undeterministic metric changes
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight, txmutils.SetFeeBumpPeriod(0)))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.drop++
 				prom.assertEqual(t)
 
@@ -354,7 +349,7 @@ func TestTxm(t *testing.T) {
 				waitFor(t, waitDuration, txm, prom, empty) // txs cleared after timeout
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.simRevert++
 				prom.assertEqual(t)
 
@@ -450,7 +445,7 @@ func TestTxm(t *testing.T) {
 
 				// check prom metric
 				prom.revert++
-				prom.error++
+				prom.err++
 				prom.assertEqual(t)
 
 				_, err := txm.GetTransactionStatus(ctx, testTxID)
@@ -464,18 +459,10 @@ func TestTxm(t *testing.T) {
 			t.Run("fail_confirm_processed", func(t *testing.T) {
 				tx, signed := getTx(t, 7, mkey)
 				sig := randomSignature(t)
-				retry0 := randomSignature(t)
-				retry1 := randomSignature(t)
-				retry2 := randomSignature(t)
-				retry3 := randomSignature(t)
 				var wg sync.WaitGroup
 				wg.Add(1)
 
 				mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2, true, computeUnitLimitDefault)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3, true, computeUnitLimitDefault)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4, true, computeUnitLimitDefault)).Return(retry3, nil).Maybe()
 				mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
@@ -490,12 +477,13 @@ func TestTxm(t *testing.T) {
 				// tx should be able to queue
 				testTxID := uuid.New().String()
 				lastValidBlockHeight := uint64(100)
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+				// disable fee bump to avoid undeterministic metric changes
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight, txmutils.SetFeeBumpPeriod(0)))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.drop++
 				prom.assertEqual(t)
 
@@ -510,18 +498,10 @@ func TestTxm(t *testing.T) {
 			t.Run("reorged_tx_stucked_on_processed_is_eventually_cleaned_up", func(t *testing.T) {
 				tx, signed := getTx(t, 8, mkey)
 				sig := randomSignature(t)
-				retry0 := randomSignature(t)
-				retry1 := randomSignature(t)
-				retry2 := randomSignature(t)
-				retry3 := randomSignature(t)
 				var wg sync.WaitGroup
 				wg.Add(1)
 
 				mc.On("SendTx", mock.Anything, signed(0, true, computeUnitLimitDefault)).Return(sig, nil)
-				mc.On("SendTx", mock.Anything, signed(1, true, computeUnitLimitDefault)).Return(retry0, nil)
-				mc.On("SendTx", mock.Anything, signed(2, true, computeUnitLimitDefault)).Return(retry1, nil)
-				mc.On("SendTx", mock.Anything, signed(3, true, computeUnitLimitDefault)).Return(retry2, nil).Maybe()
-				mc.On("SendTx", mock.Anything, signed(4, true, computeUnitLimitDefault)).Return(retry3, nil).Maybe()
 				mc.On("SimulateTx", mock.Anything, signed(0, true, computeUnitLimitDefault), mock.Anything).Run(func(mock.Arguments) {
 					wg.Done()
 				}).Return(&rpc.SimulateTransactionResult{}, nil).Once()
@@ -554,12 +534,13 @@ func TestTxm(t *testing.T) {
 				// tx should be able to queue
 				testTxID := uuid.New().String()
 				lastValidBlockHeight := uint64(100)
-				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight))
+				// disable fee bump to avoid undeterministic metric changes
+				assert.NoError(t, txm.Enqueue(ctx, t.Name(), tx, &testTxID, lastValidBlockHeight, txmutils.SetFeeBumpPeriod(0)))
 				wg.Wait()                                  // wait to be picked up and processed
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.drop++
 				prom.assertEqual(t)
 
@@ -598,7 +579,7 @@ func TestTxm(t *testing.T) {
 				waitFor(t, waitDuration, txm, prom, empty) // inflight txs cleared after timeout
 
 				// check prom metric
-				prom.error++
+				prom.err++
 				prom.revert++
 				prom.assertEqual(t)
 
@@ -651,6 +632,7 @@ func TestTxm(t *testing.T) {
 
 				// check prom metric
 				prom.finalized++
+				prom.feeBumped+=2 // bumped twice before it made it on-chain
 				prom.assertEqual(t)
 
 				_, err := txm.GetTransactionStatus(ctx, testTxID)
@@ -795,7 +777,8 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -904,7 +887,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 		// check prom metric
-		prom.error++
+		prom.err++
 		prom.reject++
 		prom.assertEqual(t)
 
@@ -955,7 +938,7 @@ func TestTxm_disabled_confirm_timeout_with_retention(t *testing.T) {
 		mc.On("SendTx", mock.Anything, tx).Panic("SendTx should not be called anymore").Maybe()
 
 		// check prom metric
-		prom.error++
+		prom.err++
 		prom.revert++
 		prom.assertEqual(t)
 
@@ -999,7 +982,8 @@ func TestTxm_compute_unit_limit_estimation(t *testing.T) {
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -1176,7 +1160,8 @@ func TestTxm_Enqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-	txm := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
+	txm, err := NewTxm("enqueue_test", loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 
 	require.ErrorContains(t, txm.Enqueue(ctx, "txmUnstarted", &solana.Transaction{}, nil, lastValidBlockHeight), "not started")
 	require.NoError(t, txm.Start(ctx))
@@ -1218,7 +1203,7 @@ func addSigAndLimitToTx(t *testing.T, keystore core.Keystore, pubkey solana.Publ
 	// sign tx
 	txMsg, err := tx.Message.MarshalBinary()
 	require.NoError(t, err)
-	sigBytes, err := keystore.Sign(context.Background(), pubkey.String(), txMsg)
+	sigBytes, err := keystore.Sign(t.Context(), pubkey.String(), txMsg)
 	require.NoError(t, err)
 	var sig [64]byte
 	copy(sig[:], sigBytes)
@@ -1293,7 +1278,8 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 		loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-		txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+		txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+		require.NoError(t, err)
 		require.NoError(t, txm.Start(ctx))
 		t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -1409,7 +1395,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 
 		// check prom metric
 		prom.drop++
-		prom.error++
+		prom.err++
 		prom.assertEqual(t)
 
 		// Check that transaction for txID has not been finalized and has not been rebroadcasted
@@ -1607,7 +1593,7 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 
 		// check prom metric
 		prom.drop++
-		prom.error++
+		prom.err++
 		prom.assertEqual(t)
 
 		// Transaction should be moved to failed after trying to rebroadcast 1 time.
@@ -1678,7 +1664,8 @@ func TestTxm_OnReorg(t *testing.T) {
 		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
 
 		loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-		txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+		txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+		require.NoError(t, err)
 		require.NoError(t, txm.Start(ctx))
 		t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
@@ -1823,14 +1810,15 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
-	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	msg := pendingTx{id: uuid.NewString()}
 
 	// Create new tx in pending state
-	err := txm.txs.New(msg)
+	err = txm.txs.New(msg)
 	require.NoError(t, err)
 	state, err := txm.GetTransactionStatus(ctx, msg.id)
 	require.NoError(t, err)
@@ -1910,7 +1898,8 @@ func TestTxm_DependencyTx(t *testing.T) {
 	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{1}, nil)
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 
-	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	txm, err := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 

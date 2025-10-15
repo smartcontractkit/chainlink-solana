@@ -66,7 +66,8 @@ func Test_BufferPayload(t *testing.T) {
 	}, nil).Maybe()
 
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
-	txmgr := txm.NewTxm("localnet", loader, nil, cfg, mkey, lgr)
+	txmgr, err := txm.NewTxm("localnet", loader, nil, cfg, mkey, lgr)
+	require.NoError(t, err)
 	err = txmgr.Start(t.Context())
 	require.NoError(t, err)
 
