@@ -609,10 +609,10 @@ loop:
 	for {
 		select {
 		case <-ctx.Done():
-			assert.Equal(t, 0, testChain.txm.InflightTxs())
+			assert.Equal(t, 0, testChain.txm.InflightTxs(ctx))
 			break loop
 		case <-ticker.C:
-			if testChain.txm.InflightTxs() == 0 {
+			if testChain.txm.InflightTxs(ctx) == 0 {
 				cancel() // exit for loop
 			}
 		}

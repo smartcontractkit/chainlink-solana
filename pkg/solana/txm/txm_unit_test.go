@@ -49,6 +49,8 @@ func TestTxm_EstimateComputeUnitLimit(t *testing.T) {
 	client := clientmocks.NewReaderWriter(t)
 	loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
 	txm := solanatxm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	t.Run("successfully sets estimated compute unit limit", func(t *testing.T) {
 		usedCompute := uint64(100)

@@ -621,8 +621,8 @@ describe("keystone_storage", function () {
       )
       .digest();
 
-    const signaturesInfo = signers.map((s) =>
-      signMessage(msgHashToSign, s.secretKey)
+    const signaturesInfo = await Promise.all(
+      signers.map((s) => signMessage(msgHashToSign, s.secretKey))
     );
 
     const signaturesBytes = signaturesInfo.map((s) => {

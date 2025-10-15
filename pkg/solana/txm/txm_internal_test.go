@@ -97,7 +97,7 @@ func getTx(t *testing.T, val uint64, keystore core.Keystore) (*solana.Transactio
 
 // check if cached transaction is cleared
 func empty(t *testing.T, txm *Txm, prom soltxmProm) bool {
-	count := txm.InflightTxs()
+	count := txm.InflightTxs(nil)
 	assert.Equal(t, float64(count), prom.getInflight()) // validate prom metric and txs length
 	return count == 0
 }
@@ -1799,7 +1799,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	// set up configs needed in txm
 	lggr := logger.Test(t)
 	ctx := t.Context()
-	_, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	// set up configs needed in txm
 	estimator := "fixed"
@@ -1810,12 +1810,22 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	// Enable retention timeout to keep transactions after finality or error
 	cfg.Chain.TxRetentionTimeout = relayconfig.MustNewDuration(5 * time.Second)
 	mc := mocks.NewReaderWriter(t)
+	mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+		func(_ context.Context, sigs []solana.Signature) (out []*rpc.SignatureStatusesResult) {
+			for i := 0; i < len(sigs); i++ {
+				out = append(out, &rpc.SignatureStatusesResult{})
+			}
+			return out
+		}, nil,
+	).Maybe()
 
 	// mock solana keystore
 	mkey := keyMocks.NewSimpleKeystore(t)
 
 	loader := utils.NewStaticLoader[client.ReaderWriter](mc)
 	txm := NewTxm(id, loader, nil, cfg, mkey, lggr)
+	require.NoError(t, txm.Start(ctx))
+	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	msg := pendingTx{id: uuid.NewString()}
 
@@ -1845,7 +1855,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, types.Pending, state)
 
 	// Move tx to confirmed state
-	msgId, err = txm.txs.OnConfirmed(sig)
+	msgId, err = txm.txs.OnConfirmed(ctx, sig)
 	require.NoError(t, err)
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
@@ -1853,7 +1863,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	require.Equal(t, types.Unconfirmed, state)
 
 	// Move tx to finalized state
-	msgId, err = txm.txs.OnFinalized(sig, 1*time.Second)
+	msgId, err = txm.txs.OnFinalized(ctx, sig, 1*time.Second)
 	require.NoError(t, err)
 	require.Equal(t, msg.id, msgId)
 	state, err = txm.GetTransactionStatus(ctx, msg.id)
@@ -1862,7 +1872,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 
 	// Add errored tx
 	errMsg := pendingTx{id: uuid.NewString()}
-	err = txm.txs.OnPrebroadcastError(errMsg.id, 1*time.Second, txmutils.Errored, TxFailReject)
+	err = txm.txs.OnPrebroadcastError(ctx, errMsg.id, 1*time.Second, txmutils.Errored, TxFailReject)
 	require.NoError(t, err)
 	state, err = txm.GetTransactionStatus(ctx, errMsg.id)
 	require.NoError(t, err)
@@ -1870,7 +1880,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 
 	// Add fatally errored tx
 	fatalMsg := pendingTx{id: uuid.NewString()}
-	err = txm.txs.OnPrebroadcastError(fatalMsg.id, 1*time.Second, txmutils.FatallyErrored, TxFailReject)
+	err = txm.txs.OnPrebroadcastError(ctx, fatalMsg.id, 1*time.Second, txmutils.FatallyErrored, TxFailReject)
 	require.NoError(t, err)
 	state, err = txm.GetTransactionStatus(ctx, fatalMsg.id)
 	require.NoError(t, err)
@@ -1925,9 +1935,9 @@ func TestTxm_DependencyTx(t *testing.T) {
 		err := txm.txs.OnBroadcasted(depMsg)
 		require.NoError(t, err)
 		require.NoError(t, txm.txs.AddSignature(dummyCancel, depID, depSig))
-		_, err = txm.txs.OnConfirmed(depSig)
+		_, err = txm.txs.OnConfirmed(ctx, depSig)
 		require.NoError(t, err)
-		_, err = txm.txs.OnFinalized(depSig, 1*time.Second)
+		_, err = txm.txs.OnFinalized(ctx, depSig, 1*time.Second)
 		require.NoError(t, err)
 
 		mainTx, _ := getTx(t, 100, mkey)
@@ -1947,7 +1957,7 @@ func TestTxm_DependencyTx(t *testing.T) {
 		depID := "dep-tx-failure"
 		depMsg := pendingTx{id: depID}
 		require.NoError(t, txm.txs.New(depMsg))
-		require.NoError(t, txm.txs.OnPrebroadcastError(depID, 1*time.Second, txmutils.Errored, TxFailReject))
+		require.NoError(t, txm.txs.OnPrebroadcastError(ctx, depID, 1*time.Second, txmutils.Errored, TxFailReject))
 
 		mainTx, _ := getTx(t, 200, mkey)
 		mainTxID := uuid.NewString()

@@ -54,9 +54,7 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     let blockData: BlockData
     for (let i = 0; i < numberOfBlocks; i++) {
       const slot = latestSlot - i
-      const block = await this.provider.connection.getBlock(slot, {
-        maxSupportedTransactionVersion: 0,
-      })
+      const block = await this.provider.connection.getBlock(slot, {})
       blockData = parseBlockFees(block)
       prices = [...prices, ...blockData.prices]
     }
@@ -147,7 +145,16 @@ export default abstract class SolanaCommand extends WriteCommand<TransactionResp
     const signedTx = await this.wallet.signTransaction(tx)
     logger.loading('Sending tx...')
     try {
-      return await sendAndConfirmRawTransaction(this.provider.connection, signedTx.serialize())
+      const sig = await this.provider.connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 5,
+      })
+
+      await this.provider.connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        'finalized',
+      )
     } catch (error) {
       // Retry mechanism with greater priority fees
       if (error instanceof SendTransactionError && error.message.includes('congestion')) {
