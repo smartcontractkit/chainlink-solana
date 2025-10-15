@@ -48,7 +48,7 @@ type blockHistoryEstimator struct {
 
 	// metrics
 	computeUnitPrice metric.Int64Gauge
-	chainID             string
+	chainID          string
 }
 
 type blockMedianCache struct {
@@ -70,14 +70,14 @@ func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, erro
 	}
 
 	return &blockHistoryEstimator{
-		chStop:              make(chan struct{}),
-		client:              c,
-		cfg:                 cfg,
-		lgr:                 lgr,
-		price:               cfg.ComputeUnitPriceDefault(), // use default value
-		cache:               blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
-		computeUnitPrice:    computeUnitPrice,
-		chainID:             chainID,
+		chStop:           make(chan struct{}),
+		client:           c,
+		cfg:              cfg,
+		lgr:              lgr,
+		price:            cfg.ComputeUnitPriceDefault(), // use default value
+		cache:            blockMedianCache{storedBlockRange: make([]uint64, 0, cfg.BlockHistorySize()), medianMap: make(map[uint64]ComputeUnitPrice, cfg.BlockHistorySize())},
+		computeUnitPrice: computeUnitPrice,
+		chainID:          chainID,
 	}, nil
 }
 
