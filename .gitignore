@@ -9,6 +9,7 @@ pkg/bin
 
 v1/target
 
+sdk/*/target
 contracts/target
 contracts/programs/*/target
 contracts/.anchor
