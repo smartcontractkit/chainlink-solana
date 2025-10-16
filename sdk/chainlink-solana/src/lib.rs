@@ -64,7 +64,7 @@ pub(crate) mod data_feeds_store_v1 {
 /// You should rely on this SDK and deal with the `Feed` struct only.
 pub mod v2 {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use bytemuck;
+    use bytemuck::pod_read_unaligned;
     use std::fmt;
     use std::{cell::Ref, convert::TryInto, mem::size_of};
 
@@ -207,7 +207,7 @@ pub mod v2 {
             .and_then(|s| s.try_into().ok())
             .ok_or(ReadError::MalformedData)?;
 
-        let live_transmission = *bytemuck::from_bytes::<Transmission>(array);
+        let live_transmission:Transmission = pod_read_unaligned(array);
 
         let feed = Feed {
             _header: header,
