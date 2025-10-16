@@ -207,7 +207,7 @@ pub mod v2 {
             .and_then(|s| s.try_into().ok())
             .ok_or(ReadError::MalformedData)?;
 
-        let live_transmission:Transmission = pod_read_unaligned(array);
+        let live_transmission: Transmission = pod_read_unaligned(array);
 
         let feed = Feed {
             _header: header,
