@@ -7,12 +7,11 @@ on:
         description: "Version to publish (e.g., 2.0.8)"
         required: true
 
-permissions:
-  contents: read
-
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     environment: publish-cargo
 
     steps:
@@ -22,7 +21,9 @@ jobs:
           ref: develop
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@6d653acede28d24f02e3cd41383119e8b1b35921
+        uses: dtolnay/rust-toolchain@2ae36166d3d3fcc53eaa7b030a26ca5ac4739e8c #v1.70.0
+        with:
+          toolchain: 1.90.0
 
       - name: Verify tag matches version
         run: |
