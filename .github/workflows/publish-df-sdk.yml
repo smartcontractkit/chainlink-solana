@@ -22,7 +22,7 @@ jobs:
           ref: develop
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6d653acede28d24f02e3cd41383119e8b1b35921
 
       - name: Verify tag matches version
         run: |
