@@ -367,7 +367,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 
 	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), orm, ch.multiClient, cfg)
 	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+	ch.balanceMonitor, err = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+	if err != nil {
+		return nil, err
+	}
 	return &ch, nil
 }
 

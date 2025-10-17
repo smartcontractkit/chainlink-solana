@@ -2,9 +2,11 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-framework/metrics"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -28,31 +30,38 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the SOL balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) services.Service {
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) (services.Service, error) {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader utils.Loader[BalanceClient]) (*balanceMonitor, error) {
+	balanceMetrics, err := metrics.NewGenericBalanceMetrics(metrics.Solana, chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create balance metrics: %w", err)
+	}
+
 	b := balanceMonitor{
-		chainID: chainID,
-		cfg:     cfg,
-		lggr:    logger.Named(lggr, "BalanceMonitor"),
-		ks:      ks,
-		reader:  reader,
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		chainID:        chainID,
+		balanceMetrics: balanceMetrics,
+		cfg:            cfg,
+		lggr:           logger.Named(lggr, "BalanceMonitor"),
+		ks:             ks,
+		reader:         reader,
+		stop:           make(chan struct{}),
+		done:           make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
-	return &b
+	return &b, nil
 }
 
 type balanceMonitor struct {
 	services.StateMachine
-	chainID  string
-	cfg      Config
-	lggr     logger.Logger
-	ks       Keystore
-	updateFn func(acc solana.PublicKey, lamports uint64) // overridable for testing
+	chainID        string
+	balanceMetrics metrics.GenericBalanceMetrics
+	cfg            Config
+	lggr           logger.Logger
+	ks             Keystore
+	updateFn       func(ctx context.Context, acc solana.PublicKey, lamports uint64) // overridable for testing
 
 	reader utils.Loader[BalanceClient]
 
@@ -137,7 +146,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			continue
 		}
 		gotSomeBals = true
-		b.updateFn(pubKey, lamports)
+		b.updateFn(ctx, pubKey, lamports)
 	}
 	if !gotSomeBals {
 		// Try a new client next time.

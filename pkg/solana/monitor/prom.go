@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -30,9 +31,9 @@ var (
 	)
 )
 
-func (b *balanceMonitor) updateProm(acc solana.PublicKey, lamports uint64) {
+func (b *balanceMonitor) updateProm(ctx context.Context, acc solana.PublicKey, lamports uint64) {
 	v := internal.LamportsToSol(lamports) // convert from lamports to SOL
-	metrics.NodeBalance.WithLabelValues(acc.String(), b.chainID, metrics.Solana).Set(v)
+	b.balanceMetrics.RecordNodeBalance(ctx, acc.String(), v)
 	promSolanaBalance.WithLabelValues(acc.String(), b.chainID, "solana", "SOL").Set(v)
 }
 
