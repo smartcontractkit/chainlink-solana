@@ -1,0 +1,45 @@
+name: Publish Chainlink Data Feeds SDK Crate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 2.0.8)"
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment: publish-cargo
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@2ae36166d3d3fcc53eaa7b030a26ca5ac4739e8c #v1.70.0
+        with:
+          toolchain: 1.90.0
+
+      - name: Verify tag matches version
+        run: |
+          VERSION=$(grep '^version = "' sdk/chainlink-solana/Cargo.toml | cut -d '"' -f2)
+          TAG_VERSION=${{ github.event.inputs.version }}
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: Cargo.toml ($VERSION) != expected version ($TAG_VERSION)"
+            exit 1
+          fi
+
+      - name: Publish chainlink-data-streams-sdk
+        run: |
+          cd sdk/chainlink-solana
+          cargo publish --token "${CARGO_CHAINLINK_SOLANA_SDK}"
+          if ! cargo owner --list | grep -q "github:smartcontractkit:RustCrates"; then
+            cargo owner --add github:smartcontractkit:RustCrates
+          fi
+        env:
+          CARGO_CHAINLINK_SOLANA_SDK: ${{ secrets.CARGO_CHAINLINK_SOLANA }}
