@@ -47,7 +47,7 @@ type blockHistoryEstimator struct {
 	cacheMu sync.RWMutex
 
 	// metrics
-	computeUnitPrice metric.Int64Gauge
+	computeUnitPrice metric.Float64Gauge
 	chainID          string
 }
 
@@ -64,7 +64,7 @@ func NewBlockHistoryEstimator(c func(context.Context) (client.ReaderWriter, erro
 		return nil, fmt.Errorf("invalid block history depth: %d", cfg.BlockHistorySize())
 	}
 
-	computeUnitPrice, err := beholder.GetMeter().Int64Gauge("solana_bhe_compute_unit_price")
+	computeUnitPrice, err := beholder.GetMeter().Float64Gauge("solana_bhe_compute_unit_price")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register solana block history estimator average compute unit price metric: %w", err)
 	}
@@ -342,5 +342,5 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 
 func (bhe *blockHistoryEstimator) recordComputeUnitPrice(ctx context.Context, avgOfMedians ComputeUnitPrice) {
 	promBHEComputeUnitPrice.WithLabelValues(bhe.chainID).Set(float64(avgOfMedians))
-	bhe.computeUnitPrice.Record(ctx, int64(avgOfMedians), metric.WithAttributes(attribute.String("chainID", bhe.chainID))) //nolint:gosec // compute unit prices cannot exceed int64 max
+	bhe.computeUnitPrice.Record(ctx, float64(avgOfMedians), metric.WithAttributes(attribute.String("chainID", bhe.chainID)))
 }
