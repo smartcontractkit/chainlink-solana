@@ -37,9 +37,9 @@ jobs:
       - name: Publish chainlink-solana-sdk
         run: |
           cd sdk/chainlink-solana
-          cargo publish --token "${CARGO_CHAINLINK_SOLANA_SDK}"
+          cargo publish
           if ! cargo owner --list | grep -q "github:smartcontractkit:RustCrates"; then
             cargo owner --add github:smartcontractkit:RustCrates
           fi
         env:
-          CARGO_CHAINLINK_SOLANA_SDK: ${{ secrets.CARGO_CHAINLINK_SOLANA }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_CHAINLINK_SOLANA }}
