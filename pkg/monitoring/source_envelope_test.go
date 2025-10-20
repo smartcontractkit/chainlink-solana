@@ -1,6 +1,7 @@
 package monitoring
 
 import (
+	"context"
 	"encoding/binary"
 	"math/big"
 	"testing"
@@ -161,7 +162,7 @@ func TestEnvelopeSource(t *testing.T) {
 	factory := NewEnvelopeSourceFactory(chainReader, lgr)
 	source, err := factory.NewSource(chainConfig, feedConfig)
 	require.NoError(t, err)
-	rawEnvelope, err := source.Fetch(t.Context())
+	rawEnvelope, err := source.Fetch(context.Background())
 	require.NoError(t, err)
 	envelope, ok := rawEnvelope.(commonMonitoring.Envelope)
 	require.True(t, ok)

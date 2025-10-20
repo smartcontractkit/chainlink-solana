@@ -20,7 +20,7 @@ func TestFeedBalances(t *testing.T) {
 	t.Parallel()
 
 	t.Run("it should export balance updates then clean up", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		mockMetrics := mocks.NewFeedBalances(t)
 		factory := NewFeedBalancesFactory(testutils.NewNullLogger(), mockMetrics)
