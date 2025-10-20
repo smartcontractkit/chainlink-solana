@@ -64,7 +64,7 @@ pub(crate) mod data_feeds_store_v1 {
 /// You should rely on this SDK and deal with the `Feed` struct only.
 pub mod v2 {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use bytemuck;
+    use bytemuck::pod_read_unaligned;
     use std::fmt;
     use std::{cell::Ref, convert::TryInto, mem::size_of};
 
@@ -207,7 +207,7 @@ pub mod v2 {
             .and_then(|s| s.try_into().ok())
             .ok_or(ReadError::MalformedData)?;
 
-        let live_transmission = *bytemuck::from_bytes::<Transmission>(array);
+        let live_transmission: Transmission = pod_read_unaligned(array);
 
         let feed = Feed {
             _header: header,
@@ -297,11 +297,18 @@ mod tests {
         let tx_bytes = bytemuck::bytes_of(&dummy_tx);
         buffer[T_START..T_END].copy_from_slice(tx_bytes);
 
+        let mut new_buffer = [0u8; 8 + HEADER_SIZE + size_of::<Transmission>()];
+
+        // copy to new buffer to make the data unaligned intentionally
+        new_buffer.copy_from_slice(&buffer);
+
         let key = AnchorPubkey::new_unique();
         let owner = AnchorPubkey::new_unique();
         let mut lamports = 0;
 
-        let account = mock_account_info(&key, true, true, &mut lamports, &mut buffer[..], &owner);
+        // test unaligned data
+        let account =
+            mock_account_info(&key, true, true, &mut lamports, &mut new_buffer[..], &owner);
 
         // We pass in the owner program ID this way for testing purposes only.
         // For ordinary usage in production applications you must pass in owner (as bytes)
@@ -310,6 +317,13 @@ mod tests {
 
         let round = feed.latest_round_data().unwrap();
         assert_eq!(round.answer, 12);
+
+        // test aligned data
+        let other_account = mock_account_info(&key, true, true, &mut lamports, &mut buffer, &owner);
+        let other_feed = read_feed_v2(other_account.try_borrow_data()?, ID.to_bytes())?;
+
+        let other_round = other_feed.latest_round_data().unwrap();
+        assert_eq!(other_round.answer, 12);
 
         Ok(())
     }
