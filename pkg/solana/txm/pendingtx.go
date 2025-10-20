@@ -60,8 +60,6 @@ type PendingTxContext interface {
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
-	// InitMetrics sets the metrics for the pending transaction context
-	InitMetrics() error
 	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
 	GetTransactionSig(id string) (solana.Signature, error)
 }
@@ -712,10 +710,6 @@ func (c *pendingTxContext) withWriteLock(fn func() (string, error)) (string, err
 	return fn()
 }
 
-func (c *pendingTxContext) InitMetrics() error {
-	return nil
-}
-
 var _ PendingTxContext = &pendingTxContextWithProm{}
 
 type pendingTxContextWithProm struct {
@@ -736,10 +730,11 @@ const (
 	TxDependencyFail
 )
 
-func newPendingTxContextWithProm(id string) *pendingTxContextWithProm {
+func newPendingTxContextWithProm(id string, metrics *solTxmMetrics) *pendingTxContextWithProm {
 	return &pendingTxContextWithProm{
 		chainID:   id,
 		pendingTx: newPendingTxContext(),
+		metrics:   metrics,
 	}
 }
 
@@ -847,15 +842,6 @@ func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 	return c.pendingTx.GetPendingTx(id)
 }
 
-func (c *pendingTxContextWithProm) InitMetrics() error {
-	m, err := NewSolTxmMetrics(c.chainID)
-	if err != nil {
-		return fmt.Errorf("failed to set metrics: %w", err)
-	}
-	c.metrics = m
-
-	return nil
-}
 func (c *pendingTxContextWithProm) GetTransactionSig(id string) (solana.Signature, error) {
 	return c.pendingTx.GetTransactionSig(id)
 }

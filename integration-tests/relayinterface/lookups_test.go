@@ -571,7 +571,8 @@ func TestLookupTables(t *testing.T) {
 	mkey := keyMocks.NewSimpleKeystore(t)
 	lggr := logger.Test(t)
 
-	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	txm, err := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 
 	cw, err := chainwriter.NewSolanaChainWriterService(logger.Test(t), multiClient, txm, nil, chainwriter.ChainWriterConfig{})
 	require.NoError(t, err)

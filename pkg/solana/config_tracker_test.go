@@ -1,7 +1,6 @@
 package solana
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,7 +18,7 @@ func TestLatestBlockHeight(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	c := &ConfigTracker{
 		getReader: func() (client.Reader, error) { return testSetupReader(t, mockServer.URL), nil },
 	}

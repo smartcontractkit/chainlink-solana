@@ -61,13 +61,20 @@ type Txm struct {
 	fee    fees.Estimator
 	// sendTx is an override for sending transactions rather than using a single client
 	// Enabling MultiNode uses this function to send transactions to all RPCs
-	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
+	sendTx  func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error)
+	chainID string
+	metrics *solTxmMetrics
 }
 
 // NewTxm creates a txm. Uses simulation so should only be used to send txes to trusted contracts i.e. OCR.
-func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
+func NewTxm(
+	chainID string,
+	client utils.Loader[client.ReaderWriter],
 	sendTx func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error),
-	cfg config.Config, ks core.Keystore, lggr logger.Logger) *Txm {
+	cfg config.Config,
+	ks core.Keystore,
+	lggr logger.Logger,
+) (*Txm, error) {
 	if sendTx == nil {
 		// default sendTx using a single RPC
 		sendTx = func(ctx context.Context, tx *solanaGo.Transaction) (solanaGo.Signature, error) {
@@ -82,26 +89,29 @@ func NewTxm(chainID string, client utils.Loader[client.ReaderWriter],
 		}
 	}
 
-	return &Txm{
-		lggr:   logger.Named(lggr, "Txm"),
-		chSend: make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chSim:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
-		chStop: make(chan struct{}),
-		cfg:    cfg,
-		txs:    newPendingTxContextWithProm(chainID),
-		ks:     ks,
-		client: client,
-		sendTx: sendTx,
+	metrics, err := newSolTxmMetrics(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 	}
+
+	return &Txm{
+		lggr:    logger.Named(lggr, "Txm"),
+		chSend:  make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chSim:   make(chan pendingTx, MaxQueueLen), // queue can support 1000 pending txs
+		chStop:  make(chan struct{}),
+		cfg:     cfg,
+		txs:     newPendingTxContextWithProm(chainID, metrics),
+		ks:      ks,
+		client:  client,
+		sendTx:  sendTx,
+		chainID: chainID,
+		metrics: metrics,
+	}, nil
 }
 
 // Start subscribes to queuing channel and processes them.
 func (txm *Txm) Start(ctx context.Context) error {
 	return txm.StartOnce("Txm", func() error {
-		metricsErr := txm.txs.InitMetrics()
-		if metricsErr != nil {
-			return metricsErr
-		}
 		// determine estimator type
 		var estimator fees.Estimator
 		var err error
@@ -109,7 +119,7 @@ func (txm *Txm) Start(ctx context.Context) error {
 		case "fixed":
 			estimator, err = fees.NewFixedPriceEstimator(txm.cfg)
 		case "blockhistory":
-			estimator, err = fees.NewBlockHistoryEstimator(txm.client.Get, txm.cfg, txm.lggr)
+			estimator, err = fees.NewBlockHistoryEstimator(txm.client.Get, txm.cfg, txm.lggr, txm.chainID)
 		default:
 			err = fmt.Errorf("unknown solana fee estimator type: %s", txm.cfg.FeeEstimatorMode())
 		}
@@ -349,6 +359,9 @@ func (txm *Txm) handleRetry(ctx context.Context, cancel context.CancelFunc, msg 
 			return
 		}
 		txm.lggr.Debugw("tx rebroadcast with bumped fee", "id", msg.id, "retryCount", count, "fee", msg.cfg.BaseComputeUnitPrice, "signatures", sigs.List())
+
+		// Increment metric to track total number of fee bumps made by the TXM
+		txm.metrics.IncrementFeeBumps(ctx)
 	}
 
 	// prevent locking on waitgroup when ctx is closed

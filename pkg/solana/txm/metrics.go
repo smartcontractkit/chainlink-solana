@@ -59,6 +59,12 @@ var (
 		Name: "solana_txm_tx_error_dependency",
 		Help: "Number of transactions that failed due to a dependency tx failing.",
 	}, []string{"chainID"})
+
+	// transaction fees
+	promSolTxmFeeBumps = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "solana_txm_fee_bumps",
+		Help: "Number of fee bumps made to get transactions included on-chain",
+	}, []string{"chainID"})
 )
 
 type solTxmMetrics struct {
@@ -80,9 +86,12 @@ type solTxmMetrics struct {
 	simRevertTxs      metric.Int64Counter
 	simOtherTxs       metric.Int64Counter
 	dependencyFailTxs metric.Int64Counter
+
+	// transaction fees
+	feeBumps metric.Int64Counter
 }
 
-func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
+func newSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 	m := beholder.GetMeter()
 	var err error
 
@@ -136,6 +145,11 @@ func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 		return nil, fmt.Errorf("failed to register solana dependency fail txs: %w", err)
 	}
 
+	feeBumps, err := m.Int64Counter("solana_txm_fee_bumps")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register solana fee bumps counter: %w", err)
+	}
+
 	return &solTxmMetrics{
 		chainID: chainID,
 		Labeler: metrics.NewLabeler().With("chainID", chainID),
@@ -150,6 +164,7 @@ func NewSolTxmMetrics(chainID string) (*solTxmMetrics, error) {
 		simRevertTxs:      simRevertTxs,
 		simOtherTxs:       simOtherTxs,
 		dependencyFailTxs: dependencyFailTxs,
+		feeBumps:          feeBumps,
 	}, nil
 }
 
@@ -205,4 +220,9 @@ func (m *solTxmMetrics) IncrementSimOtherTxs(ctx context.Context) {
 func (m *solTxmMetrics) IncrementDependencyFailTxs(ctx context.Context) {
 	promSolTxmDependencyFailTxs.WithLabelValues(m.chainID).Add(1)
 	m.dependencyFailTxs.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
+}
+
+func (m *solTxmMetrics) IncrementFeeBumps(ctx context.Context) {
+	promSolTxmFeeBumps.WithLabelValues(m.chainID).Add(1)
+	m.feeBumps.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
