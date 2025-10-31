@@ -225,10 +225,9 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 					g.lggr.Criticalf("job %s exceeded max retry count %d. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, g.maxRetryCount, errors.Join(retry.errs...))
 					// Continue to avoid adding job back to retry map
 					continue
-				} else {
-					g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 				}
 
+				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 				retry.when = time.Now().Add(wait)
 			default:
 				// first retry
@@ -237,11 +236,11 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
 				retry = retryableJob{
-					name: createRandomString(12),
-					job:  failedAttempt.Job,
-					errs: []error{failedAttempt.Err},
-					when: time.Now().Add(wait),
-					count: 1, 
+					name:  createRandomString(12),
+					job:   failedAttempt.Job,
+					errs:  []error{failedAttempt.Err},
+					when:  time.Now().Add(wait),
+					count: 1,
 				}
 			}
 
