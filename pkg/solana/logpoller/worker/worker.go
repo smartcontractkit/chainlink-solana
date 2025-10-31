@@ -21,7 +21,7 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 6 // start logging crit after 12m48s
+	DefaultMaxRetryCount = 6
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
 	DefaultNotifyRetryDepth = 200
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
@@ -222,14 +222,17 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 
 				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
 				if retry.count > g.maxRetryCount {
-					g.lggr.Criticalf("job %s failed %d times in a row, next retry in %s. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, retry.count, wait, errors.Join(retry.errs...))
+					g.lggr.Criticalf("job %s exceeded max retry count %d. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, g.maxRetryCount, errors.Join(retry.errs...))
+					// Continue to avoid adding job back to retry map
+					continue
 				} else {
 					g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 				}
 
 				retry.when = time.Now().Add(wait)
 			default:
-				wait := calculateExponentialBackoff(0)
+				// first retry
+				wait := calculateExponentialBackoff(1)
 
 				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
@@ -238,6 +241,7 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 					job:  failedAttempt.Job,
 					errs: []error{failedAttempt.Err},
 					when: time.Now().Add(wait),
+					count: 1, 
 				}
 			}
 
