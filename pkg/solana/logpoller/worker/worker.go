@@ -241,10 +241,10 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
 				retry = retryableJob{
-					name:  createRandomString(12),
-					job:   failedAttempt.Job,
-					errs:  []error{failedAttempt.Err},
-					when:  time.Now().Add(wait),
+					name: createRandomString(12),
+					job:  failedAttempt.Job,
+					errs: []error{failedAttempt.Err},
+					when: time.Now().Add(wait),
 				}
 			}
 
