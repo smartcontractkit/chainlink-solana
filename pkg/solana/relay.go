@@ -48,6 +48,7 @@ type TxManager interface {
 }
 
 var _ relaytypes.Relayer = &Relayer{}
+var _ relaytypes.SolanaService = &Relayer{}
 
 type Relayer struct {
 	relaytypes.UnimplementedRelayer
@@ -56,6 +57,7 @@ type Relayer struct {
 	chain                Chain
 	stopCh               services.StopChan
 	capabilitiesRegistry core.CapabilitiesRegistry
+	solanaService
 }
 
 // Note: constructed in core
@@ -65,6 +67,10 @@ func NewRelayer(lggr logger.Logger, chain Chain, capReg core.CapabilitiesRegistr
 		chain:                chain,
 		stopCh:               make(services.StopChan),
 		capabilitiesRegistry: capReg,
+		solanaService: solanaService{
+			chain:  chain,
+			logger: lggr,
+		},
 	}
 }
 
@@ -443,4 +449,8 @@ func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPP
 	}
 
 	return provider.NewCCIPProvider(ctx, r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), r.chain.TxManager(), ccipArgs)
+}
+
+func (r *Relayer) Solana() (relaytypes.SolanaService, error) {
+	return r, nil
 }
