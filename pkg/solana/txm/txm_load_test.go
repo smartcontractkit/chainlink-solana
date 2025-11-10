@@ -73,7 +73,8 @@ func TestTxm_Integration(t *testing.T) {
 			client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 			require.NoError(t, err)
 			loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
-			txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+			txm, err := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+			require.NoError(t, err)
 
 			// track initial balance
 			initBal, err := client.Balance(ctx, pubKey)

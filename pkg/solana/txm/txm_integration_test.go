@@ -146,7 +146,8 @@ func setup(t *testing.T, url string, txExpirationRebroadcast bool) (context.Cont
 	client, err := solanaclient.NewClient(url, cfg, 2*time.Second, lggr)
 	require.NoError(t, err)
 	loader := utils.NewStaticLoader[solanaclient.ReaderWriter](client)
-	txmInstance := NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	txmInstance, err := NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	servicetest.Run(t, txmInstance)
 
 	return ctx, client, txmInstance, senderPubKey, receiverPubKey, obs
@@ -364,7 +365,7 @@ func startValidator(
 	// Wait until it's healthy
 	client := rpc.New(url)
 	require.Eventually(t, func() bool {
-		out, err := client.GetHealth(context.Background())
+		out, err := client.GetHealth(t.Context())
 		return err == nil && out == rpc.HealthOk
 	}, 30*time.Second, 1*time.Second, "Validator should become healthy")
 

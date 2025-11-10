@@ -366,7 +366,11 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 	}
 
 	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), orm, ch.multiClient, cfg)
-	ch.txm = txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
+	solTxm, err := txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize solana txm: %w", err)
+	}
+	ch.txm = solTxm
 	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
 	return &ch, nil
 }
