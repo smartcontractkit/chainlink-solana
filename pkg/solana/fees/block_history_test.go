@@ -215,8 +215,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
-		waitForCacheSize(t, estimator, int(depth), pollPeriod)
+		waitForEstimation(t, estimator, depth, pollPeriod)
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth))
 		assert.Equal(t, uint64(multipleBlocksAvg), estimator.BaseComputeUnitPrice())
@@ -246,8 +245,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, partialCacheRWLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
-		waitForCacheSize(t, estimator, int(depth-1), pollPeriod)
+		waitForEstimation(t, estimator, depth-1, pollPeriod)
 
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth))
@@ -266,8 +264,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
-		waitForCacheSize(t, estimator, int(depth), pollPeriod)
+		waitForEstimation(t, estimator, depth, pollPeriod)
 		// Compute unit price should be floored at min
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Failed to calculate price with price below min")
 		assert.Equal(t, tmpMin, estimator.BaseComputeUnitPrice(), "Price should be floored at min")
@@ -283,9 +280,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
+		waitForEstimation(t, estimator, depth, pollPeriod)
 
-		waitForCacheSize(t, estimator, int(depth), pollPeriod)
 		// Compute unit price should be capped at max
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Failed to calculate price with price above max")
 		assert.Equal(t, tmpMax, estimator.BaseComputeUnitPrice(), "Price should be capped at max")
@@ -304,7 +300,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwFailLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
+		waitForEstimation(t, estimator, 0, pollPeriod)
 
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when getting client fails")
@@ -322,8 +318,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
-
+		waitForEstimation(t, estimator, 0, pollPeriod)
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when getting current slot fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
@@ -340,7 +335,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
+		waitForEstimation(t, estimator, 0, pollPeriod)
 
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when current slot is less than desired block count")
@@ -360,7 +355,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
+		waitForEstimation(t, estimator, 0, pollPeriod)
 
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when getting blocks with limit fails")
@@ -381,7 +376,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Wait for estimator to populate the cache and calculate the latest price
-		waitForEstimation(t, estimator, pollPeriod)
+		waitForEstimation(t, estimator, 0, pollPeriod)
 
 		// Price should remain unchanged
 		require.EqualError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
@@ -477,19 +472,12 @@ func readMultipleBlocksFromFile(t *testing.T, filePath string) []*rpc.GetBlockRe
 	return testBlocks
 }
 
-func waitForCacheSize(t *testing.T, est *blockHistoryEstimator, want int, timeout time.Duration) {
-	t.Helper()
-	require.Eventually(t, func() bool {
-		est.cacheMu.RLock()
-		n := len(est.cache.medianMap)
-		est.cacheMu.RUnlock()
-		return n >= want
-	}, timeout, 50*time.Millisecond)
-}
-
-func waitForEstimation(t *testing.T, estimator *blockHistoryEstimator, pollPeriod time.Duration) {
+func waitForEstimation(t *testing.T, estimator *blockHistoryEstimator, cacheSize uint64, pollPeriod time.Duration) {
 	// Wait for estimator to populate the cache and calculate the latest price
 	require.Eventually(t, func() bool {
-		return estimator.BaseComputeUnitPrice() != 0
+		estimator.cacheMu.RLock()
+		n := uint64(len(estimator.cache.medianMap))
+		estimator.cacheMu.RUnlock()
+		return estimator.BaseComputeUnitPrice() != 0 && n >= cacheSize
 	}, 2*pollPeriod, 1*time.Second)
 }
