@@ -216,7 +216,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, pollPeriod)
-
+		waitForCacheSize(t, estimator, int(depth), pollPeriod)
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth))
 		assert.Equal(t, uint64(multipleBlocksAvg), estimator.BaseComputeUnitPrice())
@@ -247,6 +247,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, pollPeriod)
+		waitForCacheSize(t, estimator, int(depth-1), pollPeriod)
 
 		// Calculated avg price should be equal to the one extracted manually from the blocks.
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth))
@@ -266,7 +267,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, pollPeriod)
-
+		waitForCacheSize(t, estimator, int(depth), pollPeriod)
 		// Compute unit price should be floored at min
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Failed to calculate price with price below min")
 		assert.Equal(t, tmpMin, estimator.BaseComputeUnitPrice(), "Price should be floored at min")
@@ -284,6 +285,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, pollPeriod)
 
+		waitForCacheSize(t, estimator, int(depth), pollPeriod)
 		// Compute unit price should be capped at max
 		require.NoError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Failed to calculate price with price above max")
 		assert.Equal(t, tmpMax, estimator.BaseComputeUnitPrice(), "Price should be capped at max")
@@ -473,6 +475,16 @@ func readMultipleBlocksFromFile(t *testing.T, filePath string) []*rpc.GetBlockRe
 	var testBlocks []*rpc.GetBlockResult
 	require.NoError(t, json.Unmarshal(testBlocksData, &testBlocks))
 	return testBlocks
+}
+
+func waitForCacheSize(t *testing.T, est *blockHistoryEstimator, want int, timeout time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		est.cacheMu.RLock()
+		n := len(est.cache.medianMap)
+		est.cacheMu.RUnlock()
+		return n >= want
+	}, timeout, 50*time.Millisecond)
 }
 
 func waitForEstimation(t *testing.T, estimator *blockHistoryEstimator, pollPeriod time.Duration) {
