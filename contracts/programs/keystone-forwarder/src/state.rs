@@ -46,4 +46,7 @@ pub struct ExecutionState {
     pub transmission_id: [u8; 32],
     // until failure states are reported by the write target, success will always be true
     pub success: bool,
+    // having an explicit failure state allows us to differentiate between a failed transmission and one
+    // not yet initiated
+    pub failure: bool,
 }

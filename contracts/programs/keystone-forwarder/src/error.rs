@@ -49,6 +49,9 @@ pub enum ForwarderError {
     #[msg("Execution already succeded")]
     ExecutionAlreadySucceded,
 
+    #[msg("Execution already marked failed")]
+    ExecutionAlreadyMarkedFailed,
+
     #[msg("Fault tolerance must be positive")]
     FaultToleranceMustBePositive,
 

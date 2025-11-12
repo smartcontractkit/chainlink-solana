@@ -31,7 +31,10 @@ pub mod keystone_forwarder {
 
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::utils::{report_size_ok, ForwarderReport};
+    use crate::{
+        // instruction::ReportFailure,
+        utils::{report_size_ok, ForwarderReport},
+    };
 
     use super::*;
 
@@ -59,6 +62,12 @@ pub mod keystone_forwarder {
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
         state.owner = ctx.accounts.owner.key();
+        msg!(
+            "Hello World {:?} {:?} {:?}",
+            state.owner,
+            state.key(),
+            ctx.accounts.owner.key()
+        );
 
         emit!(ForwarderInitialize {
             state: state.key(),
@@ -318,6 +327,8 @@ pub mod keystone_forwarder {
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
+        // if invoke_signed fails, the execution state will not be updated
+        // and the log should not be emitted
 
         // update execution state
 
@@ -330,6 +341,104 @@ pub mod keystone_forwarder {
             receiver: ctx.accounts.receiver_program.key(),
             transmission_id,
             result: true,
+        });
+
+        Ok(())
+    }
+
+    pub fn report_failure<'info>(
+        ctx: Context<'_, '_, '_, 'info, ReportFailure<'info>>,
+        data: Vec<u8>,
+    ) -> Result<()> {
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
+
+        let num_signatures = data[0] as usize;
+
+        // get config
+        let oracles_config = ctx.accounts.oracles_config.load()?;
+        require_gte!(
+            num_signatures,
+            (oracles_config.f + 1) as usize,
+            ForwarderError::InvalidSignatureCount
+        );
+
+        // extract signatures
+        let data = &data[1..];
+        let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
+
+        let signatures: &[u8] = &data[..total_signature_len];
+        // raw_report | report context
+        let data = &data[total_signature_len..];
+
+        // Build the preimage the same way the OCR keyring does:
+        // SHA256( [u8(len(raw_report))] || raw_report || ctx)
+        let mut preimage = vec![0u8; 1 + data.len()];
+
+        let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
+        // OCR keyring also does not error on overflow
+        let raw_report_len_u8: u8 = raw_report_len as u8;
+
+        preimage[0] = raw_report_len_u8;
+        preimage[1..].copy_from_slice(data);
+
+        let hashed_report = hash::hash(&preimage).to_bytes();
+
+        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
+
+        // slice raw_report from the report context
+        let raw_report = &data[..raw_report_len];
+
+        let transmission_id =
+            extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
+
+        let execution_state = &mut ctx.accounts.execution_state;
+
+        require!(
+            !execution_state.success,
+            ForwarderError::ExecutionAlreadySucceded
+        );
+
+        require!(
+            !execution_state.failure,
+            ForwarderError::ExecutionAlreadyMarkedFailed // change this
+        );
+
+        let account_infos: Vec<AccountInfo> = std::iter::once(ctx.accounts.state.to_account_info())
+            .chain(std::iter::once(
+                ctx.accounts.forwarder_authority.to_account_info(),
+            ))
+            .chain(ctx.remaining_accounts.iter().cloned())
+            .collect();
+
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
+        // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...remaining accounts)
+        let account_key_bytes = account_infos.iter().fold(
+            Vec::with_capacity(account_infos.len() * 32),
+            |mut buf, x| {
+                buf.extend_from_slice(&x.key().to_bytes());
+                buf
+            },
+        );
+        let computed_account_hash = hash::hash(&account_key_bytes);
+
+        require_eq!(
+            computed_account_hash,
+            Hash::from(forwarder_report.account_hash),
+            ForwarderError::InvalidAccountHash
+        );
+
+        // update execution state
+        execution_state.failure = true;
+        execution_state.transmitter = ctx.accounts.transmitter.key();
+        execution_state.transmission_id = transmission_id;
+
+        emit!(ReportProcessed {
+            state: ctx.accounts.state.key(),
+            receiver: ctx.accounts.receiver_program.key(),
+            transmission_id,
+            result: false,
         });
 
         Ok(())

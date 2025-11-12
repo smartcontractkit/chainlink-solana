@@ -49,6 +49,7 @@ const (
 	UnauthorizedSigner_ForwarderError
 	DuplicateSignatures_ForwarderError
 	ExecutionAlreadySucceded_ForwarderError
+	ExecutionAlreadyMarkedFailed_ForwarderError
 	FaultToleranceMustBePositive_ForwarderError
 	InsufficientSigners_ForwarderError
 	ForwarderReportExpected_ForwarderError
@@ -75,6 +76,8 @@ func (value ForwarderError) String() string {
 		return "DuplicateSignatures"
 	case ExecutionAlreadySucceded_ForwarderError:
 		return "ExecutionAlreadySucceded"
+	case ExecutionAlreadyMarkedFailed_ForwarderError:
+		return "ExecutionAlreadyMarkedFailed"
 	case FaultToleranceMustBePositive_ForwarderError:
 		return "FaultToleranceMustBePositive"
 	case InsufficientSigners_ForwarderError:

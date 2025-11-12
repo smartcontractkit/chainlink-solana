@@ -32,6 +32,8 @@ var (
 	// Initializes a new Forwarder instance and stores data in its state account
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
+	Instruction_HelloWorld = ag_binary.TypeID([8]byte{11, 235, 52, 244, 76, 66, 25, 71})
+
 	// Step 1 of 2-step ownership process: propose a new owner
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
@@ -59,6 +61,8 @@ var (
 	// this number including adding more accounts in the ctx.remaining_accounts and/or using address
 	// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
 	Instruction_Report = ag_binary.TypeID([8]byte{96, 121, 245, 84, 178, 45, 48, 91})
+
+	Instruction_ReportFailure = ag_binary.TypeID([8]byte{136, 97, 248, 125, 193, 230, 192, 171})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -66,6 +70,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
+	case Instruction_HelloWorld:
+		return "HelloWorld"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -78,6 +84,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "CloseOraclesConfig"
 	case Instruction_Report:
 		return "Report"
+	case Instruction_ReportFailure:
+		return "ReportFailure"
 	default:
 		return ""
 	}
@@ -102,6 +110,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			"initialize", (*Initialize)(nil),
 		},
 		{
+			"hello_world", (*HelloWorld)(nil),
+		},
+		{
 			"transfer_ownership", (*TransferOwnership)(nil),
 		},
 		{
@@ -118,6 +129,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"report", (*Report)(nil),
+		},
+		{
+			"report_failure", (*ReportFailure)(nil),
 		},
 	},
 )
