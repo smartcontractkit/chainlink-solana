@@ -211,7 +211,7 @@ jobs:
         run: |
           docker load --input docker-build.tar
       - name: Setup go
-        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
           check-latest: true
@@ -228,7 +228,9 @@ jobs:
           # compile artifacts
           docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
           set -eoux pipefail &&\
-          RUSTUP_HOME=\"/root/.rustup\" &&\
-          FORCE_COLOR=1 &&\
-          cd /repo/contracts/gotests &&\
-          go test -v ./..."
+          RUSTUP_HOME=\"/root/.rustup\" && \
+          FORCE_COLOR=1 && \
+          cd /repo/contracts && \
+          anchor build"
+          cd gotests
+          go test -v ./...
