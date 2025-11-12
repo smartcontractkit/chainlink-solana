@@ -32,8 +32,6 @@ var (
 	// Initializes a new Forwarder instance and stores data in its state account
 	Instruction_Initialize = ag_binary.TypeID([8]byte{175, 175, 109, 31, 13, 152, 155, 237})
 
-	Instruction_HelloWorld = ag_binary.TypeID([8]byte{11, 235, 52, 244, 76, 66, 25, 71})
-
 	// Step 1 of 2-step ownership process: propose a new owner
 	Instruction_TransferOwnership = ag_binary.TypeID([8]byte{65, 177, 215, 73, 53, 45, 99, 47})
 
@@ -70,8 +68,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 	switch id {
 	case Instruction_Initialize:
 		return "Initialize"
-	case Instruction_HelloWorld:
-		return "HelloWorld"
 	case Instruction_TransferOwnership:
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
@@ -108,9 +104,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 	[]ag_binary.VariantType{
 		{
 			"initialize", (*Initialize)(nil),
-		},
-		{
-			"hello_world", (*HelloWorld)(nil),
 		},
 		{
 			"transfer_ownership", (*TransferOwnership)(nil),

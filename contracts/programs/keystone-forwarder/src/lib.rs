@@ -31,10 +31,7 @@ pub mod keystone_forwarder {
 
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::{
-        // instruction::ReportFailure,
-        utils::{report_size_ok, ForwarderReport},
-    };
+    use crate::utils::{report_size_ok, ForwarderReport};
 
     use super::*;
 
@@ -62,12 +59,6 @@ pub mod keystone_forwarder {
         let state = &mut ctx.accounts.state;
         state.version = STATE_VERSION;
         state.owner = ctx.accounts.owner.key();
-        msg!(
-            "Hello World {:?} {:?} {:?}",
-            state.owner,
-            state.key(),
-            ctx.accounts.owner.key()
-        );
 
         emit!(ForwarderInitialize {
             state: state.key(),
