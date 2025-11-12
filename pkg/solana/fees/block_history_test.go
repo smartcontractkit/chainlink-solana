@@ -316,9 +316,10 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
 		rw.On("SlotHeight", mock.Anything).Return(uint64(0), fmt.Errorf("failed to get current slot")) // Mock SlotHeight returning error
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
-
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, 0, pollPeriod)
+		// wait for populate cache to run
+		time.Sleep(time.Millisecond * 50)
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when getting current slot fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
@@ -336,7 +337,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, 0, pollPeriod)
-
+		// wait for populate cache to run
+		time.Sleep(time.Millisecond * 50)
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when current slot is less than desired block count")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
@@ -357,6 +359,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, 0, pollPeriod)
 
+		// wait for populate cache to run
+		time.Sleep(time.Millisecond * 50)
 		// Price should remain unchanged
 		require.Error(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), "Expected error when getting blocks with limit fails")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
@@ -378,6 +382,8 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		// Wait for estimator to populate the cache and calculate the latest price
 		waitForEstimation(t, estimator, 0, pollPeriod)
 
+		// wait for populate cache to run
+		time.Sleep(time.Millisecond * 50)
 		// Price should remain unchanged
 		require.EqualError(t, estimator.calculatePriceFromMultipleBlocks(t.Context(), depth), errNoComputeUnitPriceCollected.Error(), "Expected error when no compute unit prices are collected")
 		assert.Equal(t, defaultPrice, estimator.BaseComputeUnitPrice())
