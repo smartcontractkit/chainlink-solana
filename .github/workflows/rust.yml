@@ -189,9 +189,10 @@ jobs:
           make test_relay_integration
 
   go:
-    # needs: [ changes, get_anchor_version, build_solana ]
-    # if: ${{ needs.changes.outputs.solana_changes == 'true' }}
-    name: go tests
+    name: Go tests for contracts
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
@@ -216,13 +217,9 @@ jobs:
           go-version-file: "./go.mod"
           check-latest: true
           cache-dependency-path: "./go.sum"
-      - name: Install gotestloghelper
-        run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
       - name: Install Solana CLI
-        run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" # always use latest stable release from solana
-          echo "PATH=$HOME/.local/share/solana/install/active_release/bin:$PATH" >> $GITHUB_ENV
-      - name: build + test
+        run: ../scripts/install-solana-ci.sh
+      - name: Build contracts + Test
         run: |
           set -eoux pipefail
           # compile artifacts
