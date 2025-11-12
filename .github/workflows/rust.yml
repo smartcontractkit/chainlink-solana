@@ -209,7 +209,7 @@ jobs:
           key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: load cached image
         run: |
-          docker load --input contracts/docker-build.tar
+          docker load --input docker-build.tar
       - name: Setup go
         uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
