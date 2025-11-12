@@ -128,7 +128,7 @@ func TestWorkerGroup_CriticalErrorOnFailingJob(t *testing.T) {
 	err := group.Do(t.Context(), failingJob)
 	require.NoError(t, err)
 
-	tests.AssertLogEventually(t, observed, "job testJob failed 3 times in a row, next retry in 800ms. Resolution most likely requires manual intervention. Errors: RPC error 1\nRPC error 2\nRPC error 3")
+	tests.AssertLogEventually(t, observed, "job testJob exceeded max retry count 2. Resolution most likely requires manual intervention. Errors: RPC error 1\nRPC error 2\nRPC error 3")
 }
 
 func TestWorkerGroup_PanicRecovery(t *testing.T) {
@@ -152,7 +152,7 @@ func TestWorkerGroup_PanicRecovery(t *testing.T) {
 	err := group.Do(t.Context(), panicJob)
 	require.NoError(t, err)
 
-	tests.AssertLogEventually(t, observed, "job testJob failed 3 times in a row, next retry in 800ms. Resolution most likely requires manual intervention. Errors: job panicked: RPC error 1\njob panicked: RPC error 2\njob panicked: RPC error 3\njob panicked: RPC error 4")
+	tests.AssertLogEventually(t, observed, "job testJob exceeded max retry count 2. Resolution most likely requires manual intervention. Errors: job panicked: RPC error 1\njob panicked: RPC error 2\njob panicked: RPC error 3")
 }
 
 func TestWorkerGroup_Close(t *testing.T) {

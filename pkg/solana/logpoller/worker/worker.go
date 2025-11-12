@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/timeutil"
 )
 
 var (
@@ -21,13 +22,19 @@ var (
 
 const (
 	// DefaultMaxRetryCount is the number of times a job will be retried before being dropped.
-	DefaultMaxRetryCount = 6 // start logging crit after 12m48s
+	// The max retry was chosen intentionally with the exponential backoff cap to allow jobs to live for ~8h in the retry loop
+	// but also limit the average req/s to a reasonable load that RPCs can handle
+	DefaultMaxRetryCount = 46
 	// DefaultNotifyRetryDepth is the retry queue depth at which the worker group will log a warning.
 	DefaultNotifyRetryDepth = 200
 	// DefaultNotifyQueueDepth is the queue depth at which the worker group will log a warning.
 	DefaultNotifyQueueDepth = 100
 	// DefaultWorkerCount is the default number of workers in a Group.
 	DefaultWorkerCount = 10
+	// exponentialBackoffCap is the number of retries before the backoff wait is capped. The current value would cap it at 13m39.2s.
+	exponentialBackoffCap = 12
+	// jitterPct is the plus/minus percent jitter applied to the exponential backoff wait for each retry attempt
+	jitterPct = timeutil.JitterPct(0.1)
 )
 
 type worker struct {
@@ -219,17 +226,20 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 				retry = typedJob
 				retry.count++
 				retry.errs = append(retry.errs, failedAttempt.Err)
+				wait := calculateExponentialBackoffWithJitter(min(retry.count, exponentialBackoffCap))
 
-				wait := calculateExponentialBackoff(min(retry.count, g.maxRetryCount))
-				if retry.count > g.maxRetryCount {
-					g.lggr.Criticalf("job %s failed %d times in a row, next retry in %s. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, retry.count, wait, errors.Join(retry.errs...))
-				} else {
-					g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
+				// retry count starts at 0 so check if it equals max retry count to determine if it has reached the threshold
+				if retry.count >= g.maxRetryCount {
+					g.lggr.Criticalf("job %s exceeded max retry count %d. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, g.maxRetryCount, errors.Join(retry.errs...))
+					// Continue to avoid adding job back to retry map
+					continue
 				}
 
+				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 				retry.when = time.Now().Add(wait)
 			default:
-				wait := calculateExponentialBackoff(0)
+				// first retry
+				wait := calculateExponentialBackoffWithJitter(0)
 
 				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
 
@@ -387,6 +397,10 @@ func createRandomString(length int) string {
 
 func calculateExponentialBackoff(retries uint8) time.Duration {
 	retries = min(retries, 36) // 36 is the maximum amount of bit shifts before the duration (int64) overflows with a 100ms multiplier
-	// 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s
+	// 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s, 12.8s, 25.6s, 51.2s, 1m42.4s, 3m24.8s, 6m49.6s, 13m39.2s
 	return time.Duration(2<<retries) * 100 * time.Millisecond
+}
+
+func calculateExponentialBackoffWithJitter(retries uint8) time.Duration {
+	return jitterPct.Apply(calculateExponentialBackoff(retries))
 }
