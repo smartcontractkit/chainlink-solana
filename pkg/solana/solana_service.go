@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 type solanaService struct {
@@ -18,7 +18,6 @@ type solanaService struct {
 	logger logger.Logger
 }
 
-// DONE
 func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockRequest) (*commonsol.GetBlockReply, error) {
 	reader, err := ss.chain.Reader()
 	if err != nil {
@@ -36,7 +35,7 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
 
-	return convertBlock(result), nil
+	return convertBlock(result, req.Opts.Encoding), nil
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
@@ -50,18 +49,16 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccount(account), nil
+	return convertAccountResult(account), nil
 }
 
-// TODO
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
 	reader, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
-	// TODO pass commitment from req
-	balance, err := reader.Balance(ctx, solana.PublicKey(req.Addr))
+	balance, err := reader.BalanceWithCommitment(ctx, solana.PublicKey(req.Addr), rpc.CommitmentType(req.Commitment))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get balance: %w", err)
 	}
@@ -71,6 +68,107 @@ func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanc
 	}, nil
 }
 
+func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateTXRequest) (*commonsol.SimulateTXReply, error) {
+	tx, err := solana.TransactionFromBase64(req.EncodedTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode transaction: %w", err)
+	}
+	accounts := &rpc.SimulateTransactionAccountsOpts{
+		Encoding:  solana.EncodingType(req.Opts.Accounts.Encoding),
+		Addresses: make([]solana.PublicKey, len(req.Opts.Accounts.Addresses)),
+	}
+	for _, addr := range req.Opts.Accounts.Addresses {
+		accounts.Addresses = append(accounts.Addresses, solana.PublicKey(addr))
+	}
+
+	res, err := ss.chain.MultiClient().SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{
+		SigVerify:              req.Opts.SigVerify,
+		Commitment:             rpc.CommitmentType(req.Opts.Commitment),
+		ReplaceRecentBlockhash: req.Opts.ReplaceRecentBlockhash,
+		Accounts:               accounts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("simulate tx failed")
+	}
+	var simErr string
+	if res.Err != nil {
+		simErr = fmt.Sprintf("%v", res.Err)
+	}
+	return &commonsol.SimulateTXReply{
+		Err:           simErr,
+		Logs:          res.Logs,
+		Accounts:      convertAccounts(res.Accounts),
+		UnitsConsumed: res.UnitsConsumed,
+	}, nil
+}
+
+func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
+	lp := ss.chain.LogPoller()
+	if lp.HasFilter(ctx, req.Name) {
+		return nil
+	}
+
+	f, err := convertFilter(req)
+	if err != nil {
+		return err
+	}
+
+	err = lp.RegisterFilter(ctx, f)
+	if err != nil {
+		return fmt.Errorf("failed to register fitler: %w", err)
+	}
+
+	return nil
+}
+
+func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName string) error {
+	lp := ss.chain.LogPoller()
+	if !lp.HasFilter(ctx, filterName) {
+		return nil
+	}
+
+	return lp.UnregisterFilter(ctx, filterName)
+}
+
+func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
+	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
+	lp := ss.chain.LogPoller()
+	// TODO derive query name from filterQuery
+	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter logs: %w", err)
+	}
+
+	res := make([]*commonsol.Log, len(logs))
+	for _, l := range logs {
+		res = append(res, &commonsol.Log{
+
+			ChainID:        l.ChainID,
+			LogIndex:       l.LogIndex,
+			BlockHash:      commonsol.Hash(l.BlockHash),
+			BlockNumber:    l.BlockNumber,
+			BlockTimestamp: l.BlockTimestamp,
+			Address:        commonsol.PublicKey(l.Address),
+			EventSig:       commonsol.EventSignature(l.EventSig),
+			TxHash:         commonsol.Signature(l.TxHash),
+			Data:           l.Data,
+			SequenceNum:    l.SequenceNum,
+			Error:          l.Error,
+		})
+	}
+
+	return res, nil
+}
+
+// TODO
+func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol.GetSignatureStatusesRequest) (*commonsol.GetSignatureStatusesReply, error) {
+	return nil, nil
+}
+
+func (ss *solanaService) GetLatestBlockhash(ctx context.Context, req commonsol.GetLatestBlockhashRequest) (*commonsol.GetLatestBlockhashReply, error) {
+	return nil, nil
+}
+
 func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlotHeightRequest) (*commonsol.GetSlotHeightReply, error) {
 	return nil, nil
 }
@@ -78,16 +176,7 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	return nil, nil
 }
-func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
-	return nil
-}
-func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName string) error {
-	return nil
-}
-func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
-	limitAndSort query.LimitAndSort, confidenceLevel primitives.ConfidenceLevel) ([]*commonsol.Log, error) {
-	return nil, nil
-}
+
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
 	return nil, nil
 }
@@ -98,7 +187,45 @@ func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.Get
 	return nil, nil
 }
 
-func convertAccount(acc *rpc.GetAccountInfoResult) *commonsol.GetAccountInfoReply {
+// converters
+func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
+	var idl logpollertypes.EventIdl
+	err := json.Unmarshal(f.EventIdlJSON, &idl)
+	if err != nil {
+		return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
+	}
+
+	return logpollertypes.Filter{
+		Name:            f.Name,
+		Address:         logpollertypes.PublicKey(f.Address),
+		EventName:       f.EventName,
+		EventSig:        logpollertypes.EventSignature(f.EventSig),
+		StartingBlock:   f.StartingBlock,
+		EventIdl:        idl,
+		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
+		Retention:       f.Retention,
+		MaxLogsKept:     f.MaxLogsKept,
+		IncludeReverted: f.IncludeReverted,
+	}, nil
+}
+
+func convertAccounts(accs []*rpc.Account) []*commonsol.Account {
+	ret := make([]*commonsol.Account, len(accs))
+	for _, acc := range accs {
+		ret = append(ret, &commonsol.Account{
+			Lamports:   acc.Lamports,
+			Owner:      commonsol.PublicKey(acc.Owner),
+			Data:       convertDataBytesOrJSON(acc.Data, ""),
+			Executable: acc.Executable,
+			RentEpoch:  acc.RentEpoch,
+			Space:      acc.Space,
+		})
+	}
+
+	return ret
+}
+
+func convertAccountResult(acc *rpc.GetAccountInfoResult) *commonsol.GetAccountInfoReply {
 	if acc == nil {
 		return nil
 	}
@@ -139,7 +266,27 @@ func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountI
 	}
 }
 
-func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {
+func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, enc commonsol.EncodingType) *commonsol.DataBytesOrJSON {
+	if obj == nil {
+		return nil
+	}
+	if enc == "" {
+		enc = commonsol.EncodingJSON // default
+	}
+	var txJSON []byte
+	if b, err := json.Marshal(obj); err == nil {
+		txJSON = b
+	}
+	txBytes := obj.GetBinary()
+
+	return &commonsol.DataBytesOrJSON{
+		RawDataEncoding: enc,
+		AsDecodedBinary: txBytes,
+		AsJSON:          txJSON,
+	}
+}
+
+func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) *commonsol.GetBlockReply {
 	if block == nil {
 		return nil
 	}
@@ -166,12 +313,6 @@ func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {
 				t := commonsol.UnixTimeSeconds(int64(*block.BlockTime))
 				perTxBT = &t
 			}
-			var txJSON []byte
-			if tx.Transaction != nil {
-				if b, err := json.Marshal(tx.Transaction); err == nil {
-					txJSON = b
-				}
-			}
 
 			var metaJSON []byte
 			if tx.Meta != nil {
@@ -180,20 +321,11 @@ func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {
 				}
 			}
 
-			var txBytes []byte
-			if tx.Transaction != nil {
-				// DataBytesOrJSON.GetBinary() returns the decoded bytes for base encodings;
-				// for json/jsonParsed it returns nil.
-				txBytes = tx.Transaction.GetBinary()
-			}
-
 			txs[i] = commonsol.TransactionWithMeta{
-				// Slot is unknown from getBlock response; leave at zero.
-				BlockTime:       perTxBT,
-				Version:         commonsol.TransactionVersion(tx.Version),
-				TransactionJSON: txJSON,
-				MetaJSON:        metaJSON,
-				TxBytes:         txBytes,
+				BlockTime:   perTxBT,
+				Version:     commonsol.TransactionVersion(tx.Version),
+				Transaction: convertDataBytesOrJSON(tx.Transaction, enc),
+				MetaJSON:    metaJSON,
 			}
 		}
 	}
