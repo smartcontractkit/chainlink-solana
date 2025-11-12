@@ -25,11 +25,10 @@ jobs:
         if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
         uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/3.0.0
         env:
-          GOLANGCI_LINT_CONFIG: ${{ github.workspace }}/.golangci.yml
-        with:
           checkout-repo: false
           golangci-lint-version: v${{ steps.get-version.outputs.version }}
           go-directory: integration-tests
+          golangci-lint-config:  ${{ github.workspace }}/.golangci.yml
   golang_lint_relay:
     name: Golang Lint Relay tests
     runs-on: ubuntu-latest
