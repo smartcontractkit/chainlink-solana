@@ -6,8 +6,6 @@ jobs:
   golang_lint_integration_tests:
     name: Golang Lint Integration Tests
     runs-on: ubuntu-latest
-    env:
-      GOLANGCI_LINT_CONFIG: config-path=${{ github.workspace }}/.golangci.yml
     permissions:
       id-token: write
       contents: read
@@ -23,10 +21,11 @@ jobs:
         run: |
           version=$(grep '^golangci-lint ' .tool-versions | awk '{print $2}')
           echo "version=${version}" | tee -a "$GITHUB_OUTPUT"
-
       - name: Run golangci-lint (integration-tests)
         if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
         uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/3.0.0
+        env:
+          GOLANGCI_LINT_CONFIG: ${{ github.workspace }}/.golangci.yml
         with:
           checkout-repo: false
           golangci-lint-version: v${{ steps.get-version.outputs.version }}
