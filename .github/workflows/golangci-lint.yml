@@ -6,6 +6,8 @@ jobs:
   golang_lint_integration_tests:
     name: Golang Lint Integration Tests
     runs-on: ubuntu-latest
+    env:
+      GOLANGCI_LINT_CONFIG: config-path=${{ github.workspace }}/.golangci.yml
     permissions:
       id-token: write
       contents: read
