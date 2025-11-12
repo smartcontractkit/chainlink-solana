@@ -197,13 +197,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cache cargo target dir
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: contracts/target
           key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: cache docker build image
         id: cache-image
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: contracts/docker-build.tar
           key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
