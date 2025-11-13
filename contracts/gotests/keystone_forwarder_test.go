@@ -594,8 +594,3 @@ func getOraclesConfigAddress(t *testing.T, state solana.PublicKey, donId uint32,
 	)
 	return oraclesConfigAddress
 }
-
-// TODO:
-// add comments (ideally link onchain code or something)
-// get this test file polished
-// write data feeds cache test

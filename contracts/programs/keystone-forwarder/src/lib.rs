@@ -31,10 +31,7 @@ pub mod keystone_forwarder {
 
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::utils::{
-        extract_and_verify_signatures, extract_transmission_id, report_size_ok,
-        verify_account_hash, ForwarderReport,
-    };
+    use crate::utils::{extract_transmission_id, report_size_ok, ForwarderReport};
 
     use super::*;
 
