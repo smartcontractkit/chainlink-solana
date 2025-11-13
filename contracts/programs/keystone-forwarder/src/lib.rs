@@ -13,7 +13,7 @@ use events::{
 use context::*;
 pub use error::*;
 pub use state::{ExecutionState, ForwarderState, OraclesConfig};
-use utils::{extract_transmission_id, get_config_id};
+use utils::get_config_id;
 
 mod common;
 mod context;
@@ -31,7 +31,10 @@ pub mod keystone_forwarder {
 
     use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
-    use crate::utils::{report_size_ok, ForwarderReport};
+    use crate::utils::{
+        extract_and_verify_signatures, extract_transmission_id, report_size_ok,
+        verify_account_hash, ForwarderReport,
+    };
 
     use super::*;
 
@@ -183,6 +186,7 @@ pub mod keystone_forwarder {
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
+
         require_gte!(
             num_signatures,
             (oracles_config.f + 1) as usize,
@@ -247,6 +251,10 @@ pub mod keystone_forwarder {
         }))
         .collect();
 
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
+
         let account_infos: Vec<AccountInfo> = std::iter::once(ctx.accounts.state.to_account_info())
             .chain(std::iter::once(
                 ctx.accounts.forwarder_authority.to_account_info(),
@@ -254,9 +262,6 @@ pub mod keystone_forwarder {
             .chain(ctx.remaining_accounts.iter().cloned())
             .collect();
 
-        // report should always be of type ForwarderReport because the account hash needs to be verified
-        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
-            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
         // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...remaining accounts)
         let account_key_bytes = account_infos.iter().fold(
             Vec::with_capacity(account_infos.len() * 32),
@@ -318,8 +323,6 @@ pub mod keystone_forwarder {
         ];
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
-        // if invoke_signed fails, the execution state will not be updated
-        // and the log should not be emitted
 
         // update execution state
 
@@ -338,7 +341,7 @@ pub mod keystone_forwarder {
     }
 
     pub fn report_failure<'info>(
-        ctx: Context<'_, '_, '_, 'info, ReportFailure<'info>>,
+        ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
         require!(report_size_ok(&data), ForwarderError::InvalidReport);
@@ -347,6 +350,7 @@ pub mod keystone_forwarder {
 
         // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
+
         require_gte!(
             num_signatures,
             (oracles_config.f + 1) as usize,
@@ -391,8 +395,12 @@ pub mod keystone_forwarder {
 
         require!(
             !execution_state.failure,
-            ForwarderError::ExecutionAlreadyMarkedFailed // change this
+            ForwarderError::ExecutionAlreadyMarkedFailed
         );
+
+        // report should always be of type ForwarderReport because the account hash needs to be verified
+        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
+            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
 
         let account_infos: Vec<AccountInfo> = std::iter::once(ctx.accounts.state.to_account_info())
             .chain(std::iter::once(
@@ -401,9 +409,6 @@ pub mod keystone_forwarder {
             .chain(ctx.remaining_accounts.iter().cloned())
             .collect();
 
-        // report should always be of type ForwarderReport because the account hash needs to be verified
-        let forwarder_report = ForwarderReport::try_from_slice(&raw_report[METADATA_LENGTH..])
-            .map_err(|_| ForwarderError::ForwarderReportExpected)?;
         // verify the hash of all accounts in the OnReport context (forwarder_state, forwarder_authority, ...remaining accounts)
         let account_key_bytes = account_infos.iter().fold(
             Vec::with_capacity(account_infos.len() * 32),
