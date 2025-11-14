@@ -180,10 +180,36 @@ pub mod keystone_forwarder {
         require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
         let oracles_config = ctx.accounts.oracles_config.load()?;
+        let num_signatures = data[0] as usize;
+        require_gte!(
+            num_signatures,
+            (oracles_config.f + 1) as usize,
+            ForwarderError::InvalidSignatureCount
+        );
 
-        verify_report_signatures(&data, &oracles_config)?;
+        // extract signatures
+        let data = &data[1..];
+        let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
+
+        let signatures: &[u8] = &data[..total_signature_len];
+        // raw_report | report context
+        let data = &data[total_signature_len..];
+
+        // Build the preimage the same way the OCR keyring does:
+        // SHA256( [u8(len(raw_report))] || raw_report || ctx)
+        let mut preimage = vec![0u8; 1 + data.len()];
 
         let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
+        // OCR keyring also does not error on overflow
+        let raw_report_len_u8: u8 = raw_report_len as u8;
+
+        preimage[0] = raw_report_len_u8;
+        preimage[1..].copy_from_slice(data);
+
+        let hashed_report = hash::hash(&preimage).to_bytes();
+
+        // Verify signatures using the existing verify_signatures function
+        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
         let raw_report = &data[..raw_report_len];
@@ -301,12 +327,37 @@ pub mod keystone_forwarder {
     ) -> Result<()> {
         require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
-        // get config
         let oracles_config = ctx.accounts.oracles_config.load()?;
+        let num_signatures = data[0] as usize;
+        require_gte!(
+            num_signatures,
+            (oracles_config.f + 1) as usize,
+            ForwarderError::InvalidSignatureCount
+        );
 
-        verify_report_signatures(&data, &oracles_config)?;
+        // extract signatures
+        let data = &data[1..];
+        let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
+
+        let signatures: &[u8] = &data[..total_signature_len];
+        // raw_report | report context
+        let data = &data[total_signature_len..];
+
+        // Build the preimage the same way the OCR keyring does:
+        // SHA256( [u8(len(raw_report))] || raw_report || ctx)
+        let mut preimage = vec![0u8; 1 + data.len()];
 
         let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
+        // OCR keyring also does not error on overflow
+        let raw_report_len_u8: u8 = raw_report_len as u8;
+
+        preimage[0] = raw_report_len_u8;
+        preimage[1..].copy_from_slice(data);
+
+        let hashed_report = hash::hash(&preimage).to_bytes();
+
+        // Verify signatures using the existing verify_signatures function
+        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
 
         // slice raw_report from the report context
         let raw_report = &data[..raw_report_len];
@@ -353,44 +404,6 @@ pub mod keystone_forwarder {
 
         Ok(())
     }
-}
-
-/// Verifies that the report has valid signatures from the configured oracles
-#[inline(never)]
-pub fn verify_report_signatures(data: &[u8], oracles_config: &OraclesConfig) -> Result<()> {
-    let num_signatures = data[0] as usize;
-
-    require_gte!(
-        num_signatures,
-        (oracles_config.f + 1) as usize,
-        ForwarderError::InvalidSignatureCount
-    );
-
-    // extract signatures
-    let data = &data[1..];
-    let total_signature_len: usize = SIGNATURE_LEN * num_signatures;
-
-    let signatures: &[u8] = &data[..total_signature_len];
-    // raw_report | report context
-    let data = &data[total_signature_len..];
-
-    // Build the preimage the same way the OCR keyring does:
-    // SHA256( [u8(len(raw_report))] || raw_report || ctx)
-    let mut preimage = vec![0u8; 1 + data.len()];
-
-    let raw_report_len = data.len() - REPORT_CONTEXT_LEN;
-    // OCR keyring also does not error on overflow
-    let raw_report_len_u8: u8 = raw_report_len as u8;
-
-    preimage[0] = raw_report_len_u8;
-    preimage[1..].copy_from_slice(data);
-
-    let hashed_report = hash::hash(&preimage).to_bytes();
-
-    // Verify signatures using the existing verify_signatures function
-    crate::verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
-
-    Ok(())
 }
 
 #[inline(never)]

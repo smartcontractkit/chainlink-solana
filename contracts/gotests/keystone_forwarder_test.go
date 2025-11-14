@@ -270,11 +270,17 @@ func TestKeystoneForwarder(t *testing.T) {
 	t.Run("Report", func(t *testing.T) {
 		reportState, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
+
 		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
 
 		// Define remaining accounts that will be passed to the receiver program
 		remainingAccounts := []solana.PublicKey{
 			reportState.PublicKey(),
+		}
+		for i := 0; i < 2; i++ {
+			remainingAccount, err := solana.NewRandomPrivateKey()
+			require.NoError(t, err)
+			remainingAccounts = append(remainingAccounts, remainingAccount.PublicKey())
 		}
 
 		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
@@ -473,6 +479,95 @@ func TestKeystoneForwarder(t *testing.T) {
 		)
 		require.NoError(t, err)
 	})
+
+	t.Run("Report with Lookup Table", func(t *testing.T) {
+		reportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Create lookup table with random accounts
+		numLookupAccounts := 10
+		lookupAccounts := make([]solana.PublicKey, numLookupAccounts)
+		for i := 0; i < numLookupAccounts; i++ {
+			privKey, keyErr := solana.NewRandomPrivateKey()
+			require.NoError(t, keyErr)
+			lookupAccounts[i] = privKey.PublicKey()
+		}
+
+		// Setup the lookup table on-chain
+		lookupTableAddress, err := common.SetupLookupTable(context.Background(), solanaClient, deployerKey, lookupAccounts)
+		require.NoError(t, err)
+
+		// Define remaining accounts - reportState first, then some accounts from lookup table
+		remainingAccounts := []solana.PublicKey{
+			reportState.PublicKey(),
+		}
+		// Add first 3 accounts from lookup table to remaining accounts
+		remainingAccounts = append(remainingAccounts, lookupAccounts[:3]...)
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
+		lookupReportId := reportId + 1
+		transmissionId := getTransmissionId(workflowExecutionId, lookupReportId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{255}
+		dataBytes, rawReportBytes := getDataBytes(t, accountHash, payload, lookupReportId, signers)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			deployerKey.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		// Create lookup tables map
+		lookupTablesMap := make(map[solana.PublicKey]solana.PublicKeySlice)
+		lookupTablesMap[lookupTableAddress] = lookupAccounts
+
+		// Send transaction using lookup tables
+		res, err := common.SendAndConfirmWithLookupTables(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			deployerKey,
+			rpc.CommitmentConfirmed,
+			lookupTablesMap, // Include our lookup table map
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
+
+		err = common.ParseEvent(res.Meta.LogMessages, "ReportProcessed", &reportProcessedEvent)
+		require.NoError(t, err)
+		require.Equal(t, forwarderStateAddress, reportProcessedEvent.State)
+		require.Equal(t, receiver_program_id, reportProcessedEvent.Receiver)
+		require.Equal(t, [32]byte(transmissionId), reportProcessedEvent.TransmissionId)
+		require.Equal(t, true, reportProcessedEvent.Result)
+
+		var executionState keystone_forwarder.ExecutionState
+		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
+		require.NoError(t, err)
+		require.Equal(t, true, executionState.Success)
+
+		// Verify the payload was received correctly
+		var latestReportAccount receiver_program.LatestReport
+		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, reportState.PublicKey(), rpc.CommitmentConfirmed, &latestReportAccount)
+		require.NoError(t, err)
+		require.Equal(t, payload, latestReportAccount.Report)
+		require.Equal(t, rawReportBytes[45:109], latestReportAccount.Metadata)
+	})
 }
 
 func packDataWithSignatures(rawReportBytes, msgHash32, reportContext96 []byte, signers []Signer) ([]byte, error) {
@@ -656,6 +751,7 @@ func encodeForwarderReport(accountHash32 []byte, payload []byte) []byte {
 // workflow_name          offset  77, size 10
 // workflow_owner         offset  87, size 20
 // report_id              offset 107, size  2
+// this function is very very dumb, any large values will break this byte placement.
 func buildRawReportBytes(reportId uint16) []byte {
 	raw := make([]byte, 109)
 	raw[0] = 1
