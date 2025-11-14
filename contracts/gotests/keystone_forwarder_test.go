@@ -80,8 +80,10 @@ const (
 )
 
 func TestKeystoneForwarder(t *testing.T) {
+	// comment
 	var solanaClient *rpc.Client
 	var deployerKey solana.PrivateKey
+	// comment
 
 	// forwarder state
 	var forwarderStateKey solana.PrivateKey
@@ -94,7 +96,7 @@ func TestKeystoneForwarder(t *testing.T) {
 	// oracles config data for the forwarder
 	var oraclesConfigData keystone_forwarder.OraclesConfig
 
-	// events
+	// event
 	var configSetEvent ConfigSetEvent
 	var reportProcessedEvent ReportProcessedEvent
 
@@ -271,7 +273,13 @@ func TestKeystoneForwarder(t *testing.T) {
 		reportState, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
 		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
-		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, reportState.PublicKey())
+
+		// Define remaining accounts that will be passed to the receiver program
+		remainingAccounts := []solana.PublicKey{
+			reportState.PublicKey(),
+		}
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
 		transmissionId := getTransmissionId(workflowExecutionId, reportId, receiver_program_id)
 		executionStateStorage, _, err := solana.FindProgramAddress(
 			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
@@ -293,11 +301,7 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		fwdOnReportIx.Append(&solana.AccountMeta{
-			PublicKey:  reportState.PublicKey(),
-			IsWritable: true,
-			IsSigner:   false,
-		})
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
 		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
 		require.NoError(t, err)
 
@@ -351,7 +355,13 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.NoError(t, err)
 
 		initializeReceiverProgram(t, failedReportState, deployerKey, forwarderAuthorityStorage, solanaClient)
-		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, failedReportState.PublicKey())
+
+		// Define remaining accounts that will be passed to the receiver program
+		remainingAccounts := []solana.PublicKey{
+			failedReportState.PublicKey(),
+		}
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
 		failReportId := reportId + 1
 		transmissionId := getTransmissionId(workflowExecutionId, failReportId, receiver_program_id)
 		executionStateStorage, _, err := solana.FindProgramAddress(
@@ -374,11 +384,7 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		fwdOnReportFailureIx.Append(&solana.AccountMeta{
-			PublicKey:  failedReportState.PublicKey(),
-			IsWritable: true,
-			IsSigner:   false,
-		})
+		appendRemainingAccountsForFailure(fwdOnReportFailureIx, remainingAccounts)
 		fwdOnReportFailureIxWithRemainingAccounts, err := fwdOnReportFailureIx.ValidateAndBuild()
 		require.NoError(t, err)
 
@@ -405,6 +411,126 @@ func TestKeystoneForwarder(t *testing.T) {
 		res, err = common.SendAndFailWith(
 			context.Background(),
 			solanaClient, []solana.Instruction{fwdOnReportFailureIxWithRemainingAccounts}, deployerKey, rpc.CommitmentConfirmed, []string{"Execution already marked failed"}, common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
+		require.NoError(t, err)
+	})
+
+	t.Run("Report with Invalid Account Hash", func(t *testing.T) {
+		invalidHashReportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, invalidHashReportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Define remaining accounts
+		remainingAccounts := []solana.PublicKey{
+			invalidHashReportState.PublicKey(),
+		}
+
+		// Generate CORRECT account hash
+		correctAccountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
+
+		// But let's tamper with it to make it invalid
+		invalidAccountHash := make([]byte, 32)
+		copy(invalidAccountHash, correctAccountHash)
+		invalidAccountHash[0] ^= 0xFF // flip bits to corrupt the hash
+
+		invalidReportId := reportId + 2
+		transmissionId := getTransmissionId(workflowExecutionId, invalidReportId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{0xAA}
+		dataBytes, _ := getDataBytes(t, invalidAccountHash, payload, invalidReportId, signers)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			deployerKey.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		// Should fail with InvalidAccountHash error
+		_, err = common.SendAndFailWith(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			deployerKey,
+			rpc.CommitmentConfirmed,
+			[]string{"Invalid Account Hash"},
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("Report with Wrong Remaining Accounts", func(t *testing.T) {
+		wrongAccountsReportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, wrongAccountsReportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Create a random extra account that won't be included in the actual transaction
+		extraAccount, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		// Generate account hash with WRONG accounts (including extra account)
+		wrongRemainingAccounts := []solana.PublicKey{
+			wrongAccountsReportState.PublicKey(),
+			extraAccount.PublicKey(), // This won't be in the actual transaction
+		}
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, wrongRemainingAccounts)
+
+		wrongAccountsReportId := reportId + 3
+		transmissionId := getTransmissionId(workflowExecutionId, wrongAccountsReportId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{0xBB}
+		dataBytes, _ := getDataBytes(t, accountHash, payload, wrongAccountsReportId, signers)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			deployerKey.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+
+		// Only append the ACTUAL remaining accounts (not the extra one)
+		actualRemainingAccounts := []solana.PublicKey{
+			wrongAccountsReportState.PublicKey(),
+		}
+		appendRemainingAccounts(fwdOnReportIx, actualRemainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		// Should fail with InvalidAccountHash error because account hash includes
+		// extraAccount but the actual transaction doesn't
+		_, err = common.SendAndFailWith(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			deployerKey,
+			rpc.CommitmentConfirmed,
+			[]string{"Invalid Account Hash"},
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
 		require.NoError(t, err)
 	})
 }
@@ -438,12 +564,14 @@ func packDataWithSignatures(rawReportBytes, msgHash32, reportContext96 []byte, s
 	return final, nil
 }
 
-// hash the accounts together
-func generateAccountHash(state solana.PublicKey, forwarderAuthority solana.PublicKey, reportState solana.PublicKey) []byte {
+// hash the accounts together - forwarder state, forwarder authority, and all remaining accounts
+func generateAccountHash(state solana.PublicKey, forwarderAuthority solana.PublicKey, remainingAccounts []solana.PublicKey) []byte {
 	hasher := sha256.New()
 	hasher.Write(state.Bytes())
 	hasher.Write(forwarderAuthority.Bytes())
-	hasher.Write(reportState.Bytes()) // this would be all of the remaining accounts in onchain code
+	for _, account := range remainingAccounts {
+		hasher.Write(account.Bytes())
+	}
 	return hasher.Sum(nil)
 }
 
@@ -513,6 +641,29 @@ func initializeReceiverProgram(t *testing.T, reportState solana.PrivateKey, depl
 		common.AddSigners(reportState),
 	)
 	require.NoError(t, err)
+}
+
+// appendRemainingAccounts appends remaining accounts to an instruction
+// reportState should always be first in the remainingAccounts slice
+func appendRemainingAccounts(ix *keystone_forwarder.Report, remainingAccounts []solana.PublicKey) {
+	for _, account := range remainingAccounts {
+		ix.Append(&solana.AccountMeta{
+			PublicKey:  account,
+			IsWritable: true,
+			IsSigner:   false,
+		})
+	}
+}
+
+// appendRemainingAccountsForFailure appends remaining accounts to a report failure instruction
+func appendRemainingAccountsForFailure(ix *keystone_forwarder.ReportFailure, remainingAccounts []solana.PublicKey) {
+	for _, account := range remainingAccounts {
+		ix.Append(&solana.AccountMeta{
+			PublicKey:  account,
+			IsWritable: true,
+			IsSigner:   false,
+		})
+	}
 }
 
 // encode forwarder report
@@ -593,4 +744,12 @@ func getOraclesConfigAddress(t *testing.T, state solana.PublicKey, donId uint32,
 		keystone_forwarder.ProgramID,
 	)
 	return oraclesConfigAddress
+}
+
+func generateLargePayload(size int) []byte {
+	payload := make([]byte, size)
+	for i := 0; i < size; i++ {
+		payload[i] = byte(i)
+	}
+	return payload
 }
