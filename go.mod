@@ -194,4 +194,6 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
+replace github.com/smartcontractkit/chainlink-common => ../chainlink-common
+
 retract v1.1.0 // tag moved - checksum mismatch

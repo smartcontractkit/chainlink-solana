@@ -7,10 +7,14 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 type solanaService struct {
@@ -160,34 +164,208 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 	return res, nil
 }
 
-// TODO
 func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol.GetSignatureStatusesRequest) (*commonsol.GetSignatureStatusesReply, error) {
-	return nil, nil
-}
+	sigs := make([]solana.Signature, len(req.Sigs))
+	for _, s := range req.Sigs {
+		sigs = append(sigs, solana.Signature(s))
+	}
 
-func (ss *solanaService) GetLatestBlockhash(ctx context.Context, req commonsol.GetLatestBlockhashRequest) (*commonsol.GetLatestBlockhashReply, error) {
-	return nil, nil
+	res, err := ss.chain.MultiClient().SignatureStatuses(ctx, sigs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signature statuses: %w", err)
+	}
+
+	statuses := make([]commonsol.GetSignatureStatusesResult, len(res))
+	for _, r := range res {
+		var stErr string
+		if r.Err != nil {
+			stErr = fmt.Sprintf("%v", r.Err)
+		}
+		statuses = append(statuses, commonsol.GetSignatureStatusesResult{
+			Slot:               r.Slot,
+			Err:                stErr,
+			Confirmations:      r.Confirmations,
+			ConfirmationStatus: commonsol.ConfirmationStatusType(r.ConfirmationStatus),
+		})
+	}
+	return &commonsol.GetSignatureStatusesReply{
+		Results: statuses,
+	}, nil
 }
 
 func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlotHeightRequest) (*commonsol.GetSlotHeightReply, error) {
-	return nil, nil
+	reader, err := ss.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader: %w", err)
+	}
+
+	slot, err := reader.SlotHeightWithCommitment(ctx, rpc.CommitmentType(req.Commitment))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get slot height: %w", err)
+	}
+
+	return &commonsol.GetSlotHeightReply{Height: slot}, nil
 }
 
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
-	return nil, nil
+	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
+	if err != nil {
+		return nil, err
+	}
+	tx, err := solana.TransactionFromBase64(req.EncodedTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("invalid transaction payload: %w", err)
+	}
+	forwarder := ss.chain.Config().WF().ForwarderAddress()
+	r, err := ss.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader: %w", err)
+	}
+
+	blockhash, err := r.LatestBlockhash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest blockhash: %w", err)
+	}
+	transactionID := txID.String()
+	var cfg []utils.SetTxConfig
+	if req.Cfg != nil {
+		cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
+		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+	}
+
+	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
+	}
+
+	maximumWaitTimeForConfirmation := ss.chain.Config().WF().AcceptanceTimeout()
+	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
+	defer cancel()
+
+	txStatus, err := retry.Do(retryContext, ss.logger, func(ctx context.Context) (commonsol.TransactionStatus, error) {
+		txStatus, txStatusErr := ss.chain.TxManager().GetTransactionStatus(ctx, transactionID)
+		if txStatusErr != nil {
+			return commonsol.TxFatal, txStatusErr
+		}
+
+		switch txStatus {
+		case commontypes.Fatal, commontypes.Failed:
+			return commonsol.TxFatal, nil
+		case commontypes.Unconfirmed, commontypes.Finalized:
+			return commonsol.TxSuccess, nil
+		case commontypes.Pending, commontypes.Unknown:
+			return commonsol.TxFatal, fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
+		default:
+			return commonsol.TxFatal, fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
+		}
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed getting transaction status. %w", err)
+	}
+
+	if txStatus == commonsol.TxFatal {
+		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+	}
+
+	signature, err := ss.chain.TxManager().GetTransactionSig(transactionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction signature")
+	}
+
+	return &commonsol.SubmitTransactionReply{Status: txStatus, Signature: commonsol.Signature(signature), IdempotencyKey: transactionID}, nil
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
-	return nil, nil
+	r, err := ss.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader: %w", err)
+	}
+	var opts *rpc.GetMultipleAccountsOpts
+	var enc commonsol.EncodingType
+	if req.Opts != nil {
+		enc = req.Opts.Encoding
+		var ds *rpc.DataSlice
+		if req.Opts.DataSlice != nil {
+			ds = &rpc.DataSlice{
+				Offset: req.Opts.DataSlice.Offset,
+				Length: req.Opts.DataSlice.Length,
+			}
+		}
+		opts = &rpc.GetMultipleAccountsOpts{
+			Encoding:       solana.EncodingType(req.Opts.Encoding),
+			Commitment:     rpc.CommitmentType(req.Opts.Commitment),
+			DataSlice:      ds,
+			MinContextSlot: req.Opts.MinContextSlot,
+		}
+	}
+	res, err := r.GetMultipleAccountsWithOpts(ctx, convertPubKeys(req.Accounts), opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get multiple accounts with opts: %w", err)
+	}
+
+	accounts := make([]*commonsol.Account, len(res.Value))
+	for _, acc := range res.Value {
+		accounts = append(accounts, &commonsol.Account{
+			Lamports:   acc.Lamports,
+			Owner:      commonsol.PublicKey(acc.Owner),
+			Data:       convertDataBytesOrJSON(acc.Data, enc),
+			Executable: acc.Executable,
+			RentEpoch:  acc.RentEpoch,
+			Space:      acc.Space,
+		})
+	}
+
+	return &commonsol.GetMultipleAccountsReply{
+		RPCContext: commonsol.RPCContext{Context: commonsol.Context{
+			Slot: res.Context.Slot,
+		}},
+		Value: accounts,
+	}, nil
 }
+
 func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTransactionRequest) (*commonsol.GetTransactionReply, error) {
-	return nil, nil
+	r, err := ss.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader")
+	}
+
+	tx, err := r.GetTransaction(ctx, solana.Signature(req.Signature))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction: %w", err)
+	}
+
+	envelope, err := tx.Transaction.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal transaction envelope: %w", err)
+	}
+	var meta []byte
+	if tx.Meta != nil {
+		meta, err = json.Marshal(tx.Meta)
+	}
+
+	return &commonsol.GetTransactionReply{
+		Version:             commonsol.TransactionVersion(tx.Version),
+		Slot:                tx.Slot,
+		BlockTime:           (*commonsol.UnixTimeSeconds)(tx.BlockTime),
+		TransactionEnvelope: envelope,
+		Meta:                meta,
+	}, nil
 }
+
 func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.GetFeeForMessageRequest) (*commonsol.GetFeeForMessageReply, error) {
+	ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
 	return nil, nil
 }
 
 // converters
+func convertPubKeys(keys []commonsol.PublicKey) []solana.PublicKey {
+	ret := make([]solana.PublicKey, len(keys))
+	for _, acc := range keys {
+		ret = append(ret, solana.PublicKey(acc))
+	}
+	return ret
+}
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 	var idl logpollertypes.EventIdl
 	err := json.Unmarshal(f.EventIdlJSON, &idl)

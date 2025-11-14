@@ -45,6 +45,7 @@ type TxManager interface {
 	// - The caller needs to set the tx.Message.RecentBlockhash and provide the corresponding lastValidBlockHeight. These values are obtained from the GetLatestBlockhash RPC call.
 	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
 	GetTransactionStatus(ctx context.Context, transactionID string) (relaytypes.TransactionStatus, error)
+	GetTransactionSig(transactionID string) (solana.Signature, error)
 }
 
 var _ relaytypes.Relayer = &Relayer{}
