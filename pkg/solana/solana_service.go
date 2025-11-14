@@ -354,8 +354,14 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 }
 
 func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.GetFeeForMessageRequest) (*commonsol.GetFeeForMessageReply, error) {
-	ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
-	return nil, nil
+	fee, err := ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fee for message: %w", err)
+	}
+
+	return &commonsol.GetFeeForMessageReply{
+		Fee: fee,
+	}, nil
 }
 
 // converters
