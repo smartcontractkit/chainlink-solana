@@ -13,6 +13,7 @@ import (
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
+
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -92,7 +93,7 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 		Accounts:               accounts,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("simulate tx failed")
+		return nil, fmt.Errorf("simulate tx failed: %w", err)
 	}
 	var simErr string
 	if res.Err != nil {
@@ -270,7 +271,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 
 	signature, err := ss.chain.TxManager().GetTransactionSig(transactionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction signature")
+		return nil, fmt.Errorf("failed to get transaction signature: %w", err)
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, Signature: commonsol.Signature(signature), IdempotencyKey: transactionID}, nil
@@ -327,7 +328,7 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTransactionRequest) (*commonsol.GetTransactionReply, error) {
 	r, err := ss.chain.Reader()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reader")
+		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
 	tx, err := r.GetTransaction(ctx, solana.Signature(req.Signature))
@@ -340,8 +341,12 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 		return nil, fmt.Errorf("failed to marshal transaction envelope: %w", err)
 	}
 	var meta []byte
+	var err2 error
 	if tx.Meta != nil {
-		meta, err = json.Marshal(tx.Meta)
+		meta, err2 = json.Marshal(tx.Meta)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to marshal tx meta: %w", err2)
+		}
 	}
 
 	return &commonsol.GetTransactionReply{
