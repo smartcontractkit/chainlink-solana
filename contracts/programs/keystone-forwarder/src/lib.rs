@@ -198,18 +198,9 @@ pub mod keystone_forwarder {
         require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
         let oracles_config = ctx.accounts.oracles_config.load()?;
-        let num_signatures = data[0] as usize;
 
-        // Extract signatures and hash report (includes signature count validation)
-        let (signatures, hashed_report, remaining_data) =
-            extract_and_hash_report(&data, num_signatures, oracles_config.f)?;
-
-        // Verify signatures using the existing verify_signatures function
-        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
-
-        // slice raw_report from the report context
-        let raw_report_len = remaining_data.len() - REPORT_CONTEXT_LEN;
-        let raw_report = &remaining_data[..raw_report_len];
+        // Extract signatures, hash report, verify, and get raw report
+        let raw_report = verify_and_extract_report(&data, &oracles_config)?;
 
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
@@ -325,7 +316,6 @@ pub mod keystone_forwarder {
         require!(report_size_ok(&data), ForwarderError::InvalidReport);
 
         let oracles_config = ctx.accounts.oracles_config.load()?;
-        let num_signatures = data[0] as usize;
 
         // Verify that the transmitter is authorized
         // We do not perform this validation in the report instruction
@@ -338,22 +328,15 @@ pub mod keystone_forwarder {
             .binary_search_by(|addr| addr.cmp(&transmitter_bytes))
             .map_err(|_| ForwarderError::UnauthorizedTransmitter)?;
 
-        // Extract signatures and hash report (includes signature count validation)
-        let (signatures, hashed_report, remaining_data) =
-            extract_and_hash_report(&data, num_signatures, oracles_config.f)?;
-
-        // Verify signatures using the existing verify_signatures function
-        verify_signatures(&hashed_report, signatures, &oracles_config, num_signatures)?;
-
-        // slice raw_report from the report context
-        let raw_report_len = remaining_data.len() - REPORT_CONTEXT_LEN;
-        let raw_report = &remaining_data[..raw_report_len];
+        // Extract signatures, hash report, verify, and get raw report
+        let raw_report = verify_and_extract_report(&data, &oracles_config)?;
 
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
 
         let execution_state = &mut ctx.accounts.execution_state;
 
+        // cannot mark failed if already succeeded
         require!(
             execution_state.status != Status::Success,
             ForwarderError::ExecutionAlreadySucceded
@@ -393,18 +376,18 @@ pub mod keystone_forwarder {
     }
 }
 
-/// Extracts signatures and hashes the report data.
-/// Returns (signatures, hashed_report, remaining_data) where remaining_data is raw_report | report_context
+/// Extracts signatures, hashes the report data, verifies signatures, and returns the raw report.
+/// Returns raw_report slice
 #[inline(never)]
-fn extract_and_hash_report<'a>(
+fn verify_and_extract_report<'a>(
     data: &'a [u8],
-    num_signatures: usize,
-    f: u8,
-) -> Result<(&'a [u8], [u8; 32], &'a [u8])> {
+    oracles_config: &OraclesConfig,
+) -> Result<&'a [u8]> {
+    let num_signatures = data[0] as usize;
     // Validate signature count
     require_gte!(
         num_signatures,
-        (f + 1) as usize,
+        (oracles_config.f + 1) as usize,
         ForwarderError::InvalidSignatureCount
     );
 
@@ -429,7 +412,12 @@ fn extract_and_hash_report<'a>(
 
     let hashed_report = hash::hash(&preimage).to_bytes();
 
-    Ok((signatures, hashed_report, remaining_data))
+    // Verify signatures
+    verify_signatures(&hashed_report, signatures, oracles_config, num_signatures)?;
+
+    // Extract and return raw_report
+    let raw_report = &remaining_data[..raw_report_len];
+    Ok(raw_report)
 }
 
 #[inline(never)]
