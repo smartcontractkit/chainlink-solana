@@ -116,9 +116,19 @@ describe("keystone_storage", function () {
 
   let defaultOraclesConfigStorage: anchor.web3.PublicKey;
   const defaultSigners = Array.from({ length: N }, () => generateEthKeypair());
+  
   defaultSigners.sort((a, b) => {
     return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
   });
+
+  const defaultTransmitters = Array.from({ length: N-1 }, () => Keypair.generate().publicKey);
+  defaultTransmitters.push(provider.wallet.publicKey);
+    // Sort transmitters in increasing order
+    defaultTransmitters.sort((a, b) => {
+      return Buffer.compare(a.toBuffer(), b.toBuffer());
+    });
+
+  // const transmitterAddresses = transmitters.map((t) => Array.from(t.toBuffer()));
 
   it("Is initialized!", async () => {
     const eventPromise = waitForEvent(
@@ -321,6 +331,7 @@ describe("keystone_storage", function () {
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
     const initialEthAddresses = signerEthAddresses.slice(0, 4);
+    const initialTransmitterAddresses = defaultTransmitters.slice(0, 4).map((t) => t.toBuffer());
 
     // f = 1, N = 4 initially
     await program.methods
@@ -328,7 +339,8 @@ describe("keystone_storage", function () {
         new BN(7),
         new BN(3),
         new BN(1),
-        initialEthAddresses as any
+        initialEthAddresses as any,
+        initialTransmitterAddresses as any
       )
       .accounts({
         state: forwarderState.publicKey,
@@ -377,7 +389,8 @@ describe("keystone_storage", function () {
         new BN(7),
         new BN(3),
         new BN(f),
-        signerEthAddresses as any
+        signerEthAddresses as any,
+        defaultTransmitters.map((t) => t.toBuffer()) as any
       )
       .accounts({
         state: forwarderState.publicKey,
@@ -441,12 +454,25 @@ describe("keystone_storage", function () {
 
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
+    // Generate transmitter addresses (Solana public keys)
+    const transmitters = Array.from({ length: 15 }, () => anchor.web3.Keypair.generate().publicKey);
+    // Add provider wallet as one of the transmitters
+    transmitters.push(provider.wallet.publicKey);
+    
+    // Sort transmitters in increasing order
+    transmitters.sort((a, b) => {
+      return Buffer.compare(a.toBuffer(), b.toBuffer());
+    });
+
+    const transmitterAddresses = transmitters.map((t) => Array.from(t.toBuffer()));
+
     const ix = await program.methods
       .initOraclesConfig(
         new BN(9),
         new BN(2),
         new BN(1),
-        signerEthAddresses as any
+        signerEthAddresses as any,
+        transmitterAddresses as any
       )
       .accounts({
         state: forwarderState.publicKey,
@@ -794,9 +820,9 @@ describe("keystone_storage", function () {
       executionStateStorage
     );
 
-    assert.equal(
-      true,
-      actualExecutionState.success,
+    assert.deepEqual(
+      actualExecutionState.status,
+      { success: {} },
       "execution should succeed"
     );
     assert.isTrue(
