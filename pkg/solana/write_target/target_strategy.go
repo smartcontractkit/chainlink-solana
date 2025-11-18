@@ -122,14 +122,15 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 
 	// Currently if execution state exists it's guaranteed to have succeeded.
 	// We keep this check here in case if we support failed execution state update in the future
-	if transmissionInfo.Status == ks_forwarder.Success_Status {
+	switch transmissionInfo.Status {
+	case ks_forwarder.Success_Status:
 		ts.lggr.Infow("returning without a transmission attempt - report already onchain ", "executionID", request.Metadata.WorkflowExecutionID)
 		return &wt.TransmissionState{
 			Status:      wt.TransmissionStateSucceeded,
 			Transmitter: transmissionInfo.Transmitter.String(),
 			Err:         nil,
 		}, nil
-	} else if transmissionInfo.Status == ks_forwarder.Failure_Status {
+	case ks_forwarder.Failure_Status:
 		ts.lggr.Infow("returning without a transmission attempt - transmission already attempted and failed, sufficient gas was provided",
 			"executionID", request.Metadata.WorkflowExecutionID)
 		return &wt.TransmissionState{
@@ -137,13 +138,13 @@ func (ts *targetStrategy) QueryTransmissionState(ctx context.Context, reportID u
 			Transmitter: transmissionInfo.Transmitter.String(),
 			Err:         errors.New("submitted transaction failed"),
 		}, nil
+	default:
+		return &wt.TransmissionState{
+			Status:      wt.TransmissionStateNotAttempted,
+			Transmitter: transmissionInfo.Transmitter.String(),
+			Err:         errors.New("transmission not attempted"),
+		}, nil
 	}
-
-	return &wt.TransmissionState{
-		Status:      wt.TransmissionStateNotAttempted,
-		Transmitter: transmissionInfo.Transmitter.String(),
-		Err:         errors.New("transmission not attempted"),
-	}, nil
 }
 
 const (
