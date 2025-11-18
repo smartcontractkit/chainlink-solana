@@ -5,7 +5,7 @@ package keystone_forwarder
 import ag_binary "github.com/gagliardetto/binary"
 
 type SignerAddressList struct {
-	Xs  [32][20]uint8
+	Xs  [16][20]uint8
 	Len uint64
 }
 
@@ -37,16 +37,53 @@ func (obj *SignerAddressList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
+type TransmitterAddressList struct {
+	Xs  [16][32]uint8
+	Len uint64
+}
+
+func (obj TransmitterAddressList) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Xs` param:
+	err = encoder.Encode(obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TransmitterAddressList) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Xs`:
+	err = decoder.Decode(&obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ForwarderError ag_binary.BorshEnum
 
 const (
 	InvalidProposedOwner_ForwarderError ForwarderError = iota
 	ExcessSigners_ForwarderError
 	SignersNotSortedInIncreasingOrder_ForwarderError
+	ExcessTransmitters_ForwarderError
+	TransmittersNotSortedInIncreasingOrder_ForwarderError
+	SignerTransmitterCountMismatch_ForwarderError
 	InvalidReport_ForwarderError
 	InvalidSignatureCount_ForwarderError
 	InvalidSignature_ForwarderError
 	UnauthorizedSigner_ForwarderError
+	UnauthorizedTransmitter_ForwarderError
 	DuplicateSignatures_ForwarderError
 	ExecutionAlreadySucceded_ForwarderError
 	ExecutionAlreadyMarkedFailed_ForwarderError
@@ -64,6 +101,12 @@ func (value ForwarderError) String() string {
 		return "ExcessSigners"
 	case SignersNotSortedInIncreasingOrder_ForwarderError:
 		return "SignersNotSortedInIncreasingOrder"
+	case ExcessTransmitters_ForwarderError:
+		return "ExcessTransmitters"
+	case TransmittersNotSortedInIncreasingOrder_ForwarderError:
+		return "TransmittersNotSortedInIncreasingOrder"
+	case SignerTransmitterCountMismatch_ForwarderError:
+		return "SignerTransmitterCountMismatch"
 	case InvalidReport_ForwarderError:
 		return "InvalidReport"
 	case InvalidSignatureCount_ForwarderError:
@@ -72,6 +115,8 @@ func (value ForwarderError) String() string {
 		return "InvalidSignature"
 	case UnauthorizedSigner_ForwarderError:
 		return "UnauthorizedSigner"
+	case UnauthorizedTransmitter_ForwarderError:
+		return "UnauthorizedTransmitter"
 	case DuplicateSignatures_ForwarderError:
 		return "DuplicateSignatures"
 	case ExecutionAlreadySucceded_ForwarderError:
@@ -86,6 +131,27 @@ func (value ForwarderError) String() string {
 		return "ForwarderReportExpected"
 	case InvalidAccountHash_ForwarderError:
 		return "InvalidAccountHash"
+	default:
+		return ""
+	}
+}
+
+type Status ag_binary.BorshEnum
+
+const (
+	NotReported_Status Status = iota
+	Success_Status
+	Failure_Status
+)
+
+func (value Status) String() string {
+	switch value {
+	case NotReported_Status:
+		return "NotReported"
+	case Success_Status:
+		return "Success"
+	case Failure_Status:
+		return "Failure"
 	default:
 		return ""
 	}

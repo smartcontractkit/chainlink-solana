@@ -16,6 +16,7 @@ pub struct ConfigSet {
     pub config_version: u32,
     pub f: u8,
     pub signers: Vec<[u8; 20]>,
+    pub transmitters: Vec<[u8; 32]>,
 }
 
 #[event]

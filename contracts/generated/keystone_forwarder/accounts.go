@@ -9,10 +9,11 @@ import (
 )
 
 type OraclesConfig struct {
-	ConfigId        uint64
-	F               uint8
-	Padding         [7]uint8
-	SignerAddresses SignerAddressList
+	ConfigId             uint64
+	F                    uint8
+	Padding              [7]uint8
+	SignerAddresses      SignerAddressList
+	TransmitterAddresses TransmitterAddressList
 }
 
 var OraclesConfigDiscriminator = [8]byte{153, 175, 230, 85, 235, 101, 107, 140}
@@ -40,6 +41,11 @@ func (obj OraclesConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `SignerAddresses` param:
 	err = encoder.Encode(obj.SignerAddresses)
+	if err != nil {
+		return err
+	}
+	// Serialize `TransmitterAddresses` param:
+	err = encoder.Encode(obj.TransmitterAddresses)
 	if err != nil {
 		return err
 	}
@@ -77,6 +83,11 @@ func (obj *OraclesConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `SignerAddresses`:
 	err = decoder.Decode(&obj.SignerAddresses)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TransmitterAddresses`:
+	err = decoder.Decode(&obj.TransmitterAddresses)
 	if err != nil {
 		return err
 	}
@@ -150,8 +161,7 @@ func (obj *ForwarderState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 type ExecutionState struct {
 	Transmitter    ag_solanago.PublicKey
 	TransmissionId [32]uint8
-	Success        bool
-	Failure        bool
+	Status         Status
 }
 
 var ExecutionStateDiscriminator = [8]byte{31, 209, 35, 133, 132, 142, 151, 100}
@@ -172,13 +182,8 @@ func (obj ExecutionState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	if err != nil {
 		return err
 	}
-	// Serialize `Success` param:
-	err = encoder.Encode(obj.Success)
-	if err != nil {
-		return err
-	}
-	// Serialize `Failure` param:
-	err = encoder.Encode(obj.Failure)
+	// Serialize `Status` param:
+	err = encoder.Encode(obj.Status)
 	if err != nil {
 		return err
 	}
@@ -209,13 +214,8 @@ func (obj *ExecutionState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `Success`:
-	err = decoder.Decode(&obj.Success)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Failure`:
-	err = decoder.Decode(&obj.Failure)
+	// Deserialize `Status`:
+	err = decoder.Decode(&obj.Status)
 	if err != nil {
 		return err
 	}

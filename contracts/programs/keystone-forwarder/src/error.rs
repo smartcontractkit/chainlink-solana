@@ -31,6 +31,15 @@ pub enum ForwarderError {
     #[msg("Signer addresses must strictly increase")]
     SignersNotSortedInIncreasingOrder,
 
+    #[msg("Transmitters exceed max limit")]
+    ExcessTransmitters,
+
+    #[msg("Transmitter addresses must strictly increase")]
+    TransmittersNotSortedInIncreasingOrder,
+
+    #[msg("Signer and transmitter counts must match")]
+    SignerTransmitterCountMismatch,
+
     #[msg("Report does not meet minimum length")]
     InvalidReport,
 
@@ -42,6 +51,9 @@ pub enum ForwarderError {
 
     #[msg("Unauthorized signer")]
     UnauthorizedSigner,
+
+    #[msg("Unauthorized transmitter")]
+    UnauthorizedTransmitter,
 
     #[msg("Duplicate signatures")]
     DuplicateSignatures,

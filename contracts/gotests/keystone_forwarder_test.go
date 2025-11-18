@@ -56,6 +56,7 @@ type ConfigSetEvent struct {
 	ConfigVersion uint32
 	F             uint8
 	Signers       [][20]uint8
+	Transmitters  [][32]uint8
 }
 
 type ReportProcessedEvent struct {
@@ -67,8 +68,13 @@ type ReportProcessedEvent struct {
 }
 
 type Signer struct {
-	privKeys  *ecdsa.PrivateKey
-	addresses [20]uint8
+	privKeys *ecdsa.PrivateKey
+	address  [20]uint8
+}
+
+type Transmitter struct {
+	privKey solana.PrivateKey
+	address [32]uint8
 }
 
 const (
@@ -104,6 +110,9 @@ func TestKeystoneForwarder(t *testing.T) {
 	// signers for the report
 	var defaultSigners []Signer
 
+	// transmitters (Solana key pairs and addresses)
+	var defaultTransmitters []Transmitter
+
 	provider := cldf_solana_provider.NewCTFChainProvider(t, 16423721717087811551,
 		cldf_solana_provider.CTFChainProviderConfig{
 			DeployerKeyGen:               cldf_solana_provider.PrivateKeyRandom(),
@@ -131,6 +140,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		keystone_forwarder.SetProgramID(solana.MustPublicKeyFromBase58(SolanaProgramIDs["keystone_forwarder"]))
 		receiver_program.SetProgramID(receiver_program_id)
 		defaultSigners = generateSigners(t, 16)
+		defaultTransmitters = generateTransmitters(t, deployerKey, 16)
 		forwarderAuthorityStorage, _, err = solana.FindProgramAddress(
 			[][]byte{[]byte("forwarder"), forwarderStateAddress.Bytes(), receiver_program_id.Bytes()},
 			keystone_forwarder.ProgramID,
@@ -213,12 +223,14 @@ func TestKeystoneForwarder(t *testing.T) {
 	t.Run("Initialize Oracles Config", func(t *testing.T) {
 		f := uint8(1)
 		initialEthAddresses := make([][20]uint8, 4)
+		initialTransmitterAddresses := make([][32]uint8, 4)
 		for i := 0; i < 4; i++ {
-			initialEthAddresses[i] = defaultSigners[i].addresses
+			initialEthAddresses[i] = defaultSigners[i].address
+			initialTransmitterAddresses[i] = defaultTransmitters[i].address
 		}
 		oraclesConfigAddress := getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion)
 		initOraclesConfigIx, err := keystone_forwarder.NewInitOraclesConfigInstruction(
-			donId, configVersion, f, initialEthAddresses, forwarderStateAddress, oraclesConfigAddress,
+			donId, configVersion, f, initialEthAddresses, initialTransmitterAddresses, forwarderStateAddress, oraclesConfigAddress,
 			deployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 		require.NoError(t, err)
 		res, err := common.SendAndConfirm(
@@ -238,16 +250,19 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, configSetEvent.ConfigVersion, configVersion)
 		require.Equal(t, configSetEvent.F, f)
 		require.Equal(t, configSetEvent.Signers, initialEthAddresses)
+		require.Equal(t, configSetEvent.Transmitters, initialTransmitterAddresses)
 	})
 
 	t.Run("Update Oracles Config", func(t *testing.T) {
 		oraclesConfigAddress := getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion)
 		allEthAddresses := make([][20]uint8, len(defaultSigners))
+		allTransmitterAddresses := make([][32]uint8, len(defaultTransmitters))
 		for i := 0; i < len(defaultSigners); i++ {
-			allEthAddresses[i] = defaultSigners[i].addresses
+			allEthAddresses[i] = defaultSigners[i].address
+			allTransmitterAddresses[i] = defaultTransmitters[i].address
 		}
 		updateOraclesConfigIx, err := keystone_forwarder.NewUpdateOraclesConfigInstruction(
-			donId, configVersion, F, allEthAddresses, forwarderStateAddress, oraclesConfigAddress,
+			donId, configVersion, F, allEthAddresses, allTransmitterAddresses, forwarderStateAddress, oraclesConfigAddress,
 			deployerKey.PublicKey()).ValidateAndBuild()
 		require.NoError(t, err)
 		res, err := common.SendAndConfirm(
@@ -265,6 +280,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, configSetEvent.ConfigVersion, configVersion)
 		require.Equal(t, configSetEvent.F, F)
 		require.Equal(t, len(configSetEvent.Signers), len(allEthAddresses))
+		require.Equal(t, len(configSetEvent.Transmitters), len(allTransmitterAddresses))
 	})
 
 	t.Run("Report", func(t *testing.T) {
@@ -329,7 +345,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		var executionState keystone_forwarder.ExecutionState
 		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
 		require.NoError(t, err)
-		require.Equal(t, true, executionState.Success)
+		require.Equal(t, keystone_forwarder.Success_Status, executionState.Status)
 		require.Equal(t, [32]byte(transmissionId), executionState.TransmissionId)
 		require.Equal(t, deployerKey.PublicKey(), executionState.Transmitter)
 
@@ -407,8 +423,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		var executionState keystone_forwarder.ExecutionState
 		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
 		require.NoError(t, err)
-		require.Equal(t, false, executionState.Success)
-		require.Equal(t, true, executionState.Failure)
+		require.Equal(t, keystone_forwarder.Failure_Status, executionState.Status)
 		require.Equal(t, [32]byte(transmissionId), executionState.TransmissionId)
 		require.Equal(t, deployerKey.PublicKey(), executionState.Transmitter)
 
@@ -435,7 +450,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		}
 		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, wrongRemainingAccounts)
 
-		wrongAccountsReportId := reportId + 3
+		wrongAccountsReportId := reportId + 2
 		transmissionId := getTransmissionId(workflowExecutionId, wrongAccountsReportId, receiver_program_id)
 		executionStateStorage, _, err := solana.FindProgramAddress(
 			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
@@ -507,7 +522,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		remainingAccounts = append(remainingAccounts, lookupAccounts[:3]...)
 
 		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
-		lookupReportId := reportId + 1
+		lookupReportId := reportId + 3
 		transmissionId := getTransmissionId(workflowExecutionId, lookupReportId, receiver_program_id)
 		executionStateStorage, _, err := solana.FindProgramAddress(
 			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
@@ -559,7 +574,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		var executionState keystone_forwarder.ExecutionState
 		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
 		require.NoError(t, err)
-		require.Equal(t, true, executionState.Success)
+		require.Equal(t, keystone_forwarder.Success_Status, executionState.Status)
 
 		// Verify the payload was received correctly
 		var latestReportAccount receiver_program.LatestReport
@@ -567,6 +582,196 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, payload, latestReportAccount.Report)
 		require.Equal(t, rawReportBytes[45:109], latestReportAccount.Metadata)
+	})
+
+	t.Run("Report by transmitter not equal to deployer", func(t *testing.T) {
+		reportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Define remaining accounts that will be passed to the receiver program
+		remainingAccounts := []solana.PublicKey{
+			reportState.PublicKey(),
+		}
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
+		diffTransmitterReportId := reportId + 4
+		transmissionId := getTransmissionId(workflowExecutionId, diffTransmitterReportId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{255}
+		dataBytes, _ := getDataBytes(t, accountHash, payload, diffTransmitterReportId, signers)
+
+		diffTransmitter := defaultTransmitters[1]
+		soltesting.FundTestAccounts(t, []solana.PublicKey{diffTransmitter.address}, solanaChain.URL)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			diffTransmitter.address,
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		_, err = common.SendAndConfirm(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			diffTransmitter.privKey,
+			rpc.CommitmentConfirmed,
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
+
+		var executionState keystone_forwarder.ExecutionState
+		err = common.GetAccountDataBorshInto(context.Background(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
+		require.NoError(t, err)
+		require.Equal(t, keystone_forwarder.Success_Status, executionState.Status)
+		require.Equal(t, [32]byte(transmissionId), executionState.TransmissionId)
+		require.Equal(t, diffTransmitter.privKey.PublicKey(), executionState.Transmitter)
+	})
+
+	t.Run("Report by random transmitter", func(t *testing.T) {
+		reportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Define remaining accounts that will be passed to the receiver program
+		remainingAccounts := []solana.PublicKey{
+			reportState.PublicKey(),
+		}
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
+		randomTransmitterReportId := reportId + 5
+		transmissionId := getTransmissionId(workflowExecutionId, randomTransmitterReportId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{255}
+		dataBytes, _ := getDataBytes(t, accountHash, payload, randomTransmitterReportId, signers)
+
+		randomTransmitter, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		soltesting.FundTestAccounts(t, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			randomTransmitter.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		_, err = common.SendAndConfirm(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			randomTransmitter,
+			rpc.CommitmentConfirmed,
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("Report failure by random transmitter fails but report by random transmitter succeeds", func(t *testing.T) {
+		reportState, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		initializeReceiverProgram(t, reportState, deployerKey, forwarderAuthorityStorage, solanaClient)
+
+		// Define remaining accounts that will be passed to the receiver program
+		remainingAccounts := []solana.PublicKey{
+			reportState.PublicKey(),
+		}
+
+		accountHash := generateAccountHash(forwarderStateAddress, forwarderAuthorityStorage, remainingAccounts)
+		randomTransmitterReportFailureId := reportId + 6
+		transmissionId := getTransmissionId(workflowExecutionId, randomTransmitterReportFailureId, receiver_program_id)
+		executionStateStorage, _, err := solana.FindProgramAddress(
+			[][]byte{[]byte("execution_state"), forwarderStateAddress.Bytes(), transmissionId},
+			keystone_forwarder.ProgramID,
+		)
+		require.NoError(t, err)
+
+		signers := getFSigners(t, defaultSigners, F)
+		payload := []byte{255}
+		dataBytes, _ := getDataBytes(t, accountHash, payload, randomTransmitterReportFailureId, signers)
+
+		randomTransmitter, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		soltesting.FundTestAccounts(t, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
+
+		fwdOnReportFailureIx := keystone_forwarder.NewReportFailureInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			randomTransmitter.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccountsForFailure(fwdOnReportFailureIx, remainingAccounts)
+		fwdOnReportFailureIxWithRemainingAccounts, err := fwdOnReportFailureIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		_, err = common.SendAndFailWith(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportFailureIxWithRemainingAccounts},
+			randomTransmitter,
+			rpc.CommitmentConfirmed,
+			[]string{"Unauthorized transmitter"},
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
+
+		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+			dataBytes,
+			forwarderStateAddress,
+			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
+			randomTransmitter.PublicKey(),
+			forwarderAuthorityStorage,
+			executionStateStorage,
+			receiver_program_id,
+			solana.SystemProgramID,
+		)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
+		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
+		require.NoError(t, err)
+
+		_, err = common.SendAndConfirm(
+			context.Background(),
+			solanaClient,
+			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			randomTransmitter,
+			rpc.CommitmentConfirmed,
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
+		)
+		require.NoError(t, err)
 	})
 }
 
@@ -643,14 +848,41 @@ func generateSigners(t *testing.T, n int) []Signer {
 		uint8Address := [20]uint8{}
 		copy(uint8Address[:], address)
 		signers[i] = Signer{
-			privKeys:  privKey,
-			addresses: uint8Address,
+			privKeys: privKey,
+			address:  uint8Address,
 		}
 	}
 	sort.Slice(signers, func(i, j int) bool {
-		return bytes.Compare(signers[i].addresses[:], signers[j].addresses[:]) < 0
+		return bytes.Compare(signers[i].address[:], signers[j].address[:]) < 0
 	})
 	return signers
+}
+
+func generateTransmitters(t *testing.T, deployerKey solana.PrivateKey, n int) []Transmitter {
+	transmitters := make([]Transmitter, n)
+
+	// First, add the deployer key as it will be the transmitter
+	transmitters[0] = Transmitter{
+		privKey: deployerKey,
+	}
+	copy(transmitters[0].address[:], deployerKey.PublicKey().Bytes())
+
+	// Generate random Solana key pairs for the rest
+	for i := 1; i < n; i++ {
+		privKey, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		transmitters[i] = Transmitter{
+			privKey: privKey,
+		}
+		copy(transmitters[i].address[:], privKey.PublicKey().Bytes())
+	}
+
+	// Sort transmitters in increasing order by address
+	sort.Slice(transmitters, func(i, j int) bool {
+		return bytes.Compare(transmitters[i].address[:], transmitters[j].address[:]) < 0
+	})
+
+	return transmitters
 }
 
 func getFSigners(t *testing.T, signers []Signer, f uint8) []Signer {

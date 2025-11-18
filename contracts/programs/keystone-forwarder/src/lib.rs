@@ -12,7 +12,7 @@ use events::{
 
 use context::*;
 pub use error::*;
-pub use state::{ExecutionState, ForwarderState, OraclesConfig};
+pub use state::{ExecutionState, ForwarderState, OraclesConfig, Status};
 use utils::get_config_id;
 
 mod common;
@@ -118,6 +118,7 @@ pub mod keystone_forwarder {
         config_version: u32,
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
+        transmitter_addresses: Vec<[u8; 32]>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_init()?;
 
@@ -128,9 +129,17 @@ pub mod keystone_forwarder {
             config_version,
             f,
             signers: signer_addresses.clone(),
+            transmitters: transmitter_addresses.clone(),
         });
 
-        set_oracles_config(config, don_id, config_version, f, signer_addresses.clone())
+        set_oracles_config(
+            config,
+            don_id,
+            config_version,
+            f,
+            signer_addresses.clone(),
+            transmitter_addresses.clone(),
+        )
     }
 
     /// Updates oracles config under circumstances where the designated
@@ -141,6 +150,7 @@ pub mod keystone_forwarder {
         config_version: u32,
         f: u8,
         signer_addresses: Vec<[u8; 20]>,
+        transmitter_addresses: Vec<[u8; 32]>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.oracles_config.load_mut()?;
 
@@ -151,9 +161,17 @@ pub mod keystone_forwarder {
             config_version,
             f,
             signers: signer_addresses.clone(),
+            transmitters: transmitter_addresses.clone(),
         });
 
-        set_oracles_config(config, don_id, config_version, f, signer_addresses)
+        set_oracles_config(
+            config,
+            don_id,
+            config_version,
+            f,
+            signer_addresses,
+            transmitter_addresses,
+        )
     }
 
     /// Closes oracle config account
@@ -220,7 +238,7 @@ pub mod keystone_forwarder {
         let execution_state = &mut ctx.accounts.execution_state;
 
         require!(
-            !execution_state.success,
+            execution_state.status != Status::Success,
             ForwarderError::ExecutionAlreadySucceded
         );
 
@@ -309,7 +327,7 @@ pub mod keystone_forwarder {
 
         execution_state.transmitter = ctx.accounts.transmitter.key();
         execution_state.transmission_id = transmission_id;
-        execution_state.success = true;
+        execution_state.status = Status::Success;
 
         emit!(ReportProcessed {
             state: ctx.accounts.state.key(),
@@ -334,6 +352,17 @@ pub mod keystone_forwarder {
             (oracles_config.f + 1) as usize,
             ForwarderError::InvalidSignatureCount
         );
+
+        // Verify that the transmitter is authorized
+        // We do not perform this validation in the report instruction
+        // because we allow anyone to submit a successful report
+        let transmitter_pubkey = ctx.accounts.transmitter.key();
+        let transmitter_bytes: [u8; 32] = transmitter_pubkey.to_bytes();
+        oracles_config
+            .transmitter_addresses
+            .as_slice()
+            .binary_search_by(|addr| addr.cmp(&transmitter_bytes))
+            .map_err(|_| ForwarderError::UnauthorizedTransmitter)?;
 
         // extract signatures
         let data = &data[1..];
@@ -368,12 +397,12 @@ pub mod keystone_forwarder {
         let execution_state = &mut ctx.accounts.execution_state;
 
         require!(
-            !execution_state.success,
+            execution_state.status != Status::Success,
             ForwarderError::ExecutionAlreadySucceded
         );
 
         require!(
-            !execution_state.failure,
+            execution_state.status != Status::Failure,
             ForwarderError::ExecutionAlreadyMarkedFailed
         );
 
@@ -391,7 +420,7 @@ pub mod keystone_forwarder {
         verify_forwarder_account_hash(&forwarder_report, &account_infos)?;
 
         // update execution state
-        execution_state.failure = true;
+        execution_state.status = Status::Failure;
         execution_state.transmitter = ctx.accounts.transmitter.key();
         execution_state.transmission_id = transmission_id;
 
@@ -473,6 +502,7 @@ fn set_oracles_config(
     config_version: u32,
     f: u8,
     signer_addresses: Vec<[u8; 20]>,
+    transmitter_addresses: Vec<[u8; 32]>,
 ) -> Result<()> {
     require_gt!(f, 0, ForwarderError::FaultToleranceMustBePositive);
     require_gte!(
@@ -484,6 +514,18 @@ fn set_oracles_config(
         signer_addresses.len(),
         (3 * f) as usize,
         ForwarderError::InsufficientSigners
+    );
+
+    require_gte!(
+        MAX_ORACLES,
+        transmitter_addresses.len(),
+        ForwarderError::ExcessTransmitters
+    );
+
+    require_eq!(
+        signer_addresses.len(),
+        transmitter_addresses.len(),
+        ForwarderError::SignerTransmitterCountMismatch
     );
 
     let mut prev_signer = [0u8; 20];
@@ -498,11 +540,27 @@ fn set_oracles_config(
         prev_signer = curr_signer;
     }
 
+    let mut prev_transmitter = [0u8; 32];
+
+    for &curr_transmitter in transmitter_addresses.iter() {
+        // will also fail if there is a duplicate transmitter
+        require!(
+            curr_transmitter > prev_transmitter,
+            ForwarderError::TransmittersNotSortedInIncreasingOrder
+        );
+
+        prev_transmitter = curr_transmitter;
+    }
+
     oracles_config.config_id = get_config_id(don_id, config_version);
     oracles_config.f = f;
     oracles_config.signer_addresses.clear();
+    oracles_config.transmitter_addresses.clear();
 
     oracles_config.signer_addresses.extend(&signer_addresses);
+    oracles_config
+        .transmitter_addresses
+        .extend(&transmitter_addresses);
 
     Ok(())
 }

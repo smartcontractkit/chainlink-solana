@@ -15,10 +15,11 @@ import (
 // may exist for a forwarder because more than one DON may be allowed to sign
 // reports for a forwarder.
 type InitOraclesConfig struct {
-	DonId           *uint32
-	ConfigVersion   *uint32
-	F               *uint8
-	SignerAddresses *[][20]uint8
+	DonId                *uint32
+	ConfigVersion        *uint32
+	F                    *uint8
+	SignerAddresses      *[][20]uint8
+	TransmitterAddresses *[][32]uint8
 
 	// [0] = [] state
 	//
@@ -59,6 +60,12 @@ func (inst *InitOraclesConfig) SetF(f uint8) *InitOraclesConfig {
 // SetSignerAddresses sets the "signerAddresses" parameter.
 func (inst *InitOraclesConfig) SetSignerAddresses(signerAddresses [][20]uint8) *InitOraclesConfig {
 	inst.SignerAddresses = &signerAddresses
+	return inst
+}
+
+// SetTransmitterAddresses sets the "transmitterAddresses" parameter.
+func (inst *InitOraclesConfig) SetTransmitterAddresses(transmitterAddresses [][32]uint8) *InitOraclesConfig {
+	inst.TransmitterAddresses = &transmitterAddresses
 	return inst
 }
 
@@ -138,6 +145,9 @@ func (inst *InitOraclesConfig) Validate() error {
 		if inst.SignerAddresses == nil {
 			return errors.New("SignerAddresses parameter is not set")
 		}
+		if inst.TransmitterAddresses == nil {
+			return errors.New("TransmitterAddresses parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -167,11 +177,12 @@ func (inst *InitOraclesConfig) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("          DonId", *inst.DonId))
-						paramsBranch.Child(ag_format.Param("  ConfigVersion", *inst.ConfigVersion))
-						paramsBranch.Child(ag_format.Param("              F", *inst.F))
-						paramsBranch.Child(ag_format.Param("SignerAddresses", *inst.SignerAddresses))
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("               DonId", *inst.DonId))
+						paramsBranch.Child(ag_format.Param("       ConfigVersion", *inst.ConfigVersion))
+						paramsBranch.Child(ag_format.Param("                   F", *inst.F))
+						paramsBranch.Child(ag_format.Param("     SignerAddresses", *inst.SignerAddresses))
+						paramsBranch.Child(ag_format.Param("TransmitterAddresses", *inst.TransmitterAddresses))
 					})
 
 					// Accounts of the instruction:
@@ -206,6 +217,11 @@ func (obj InitOraclesConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	if err != nil {
 		return err
 	}
+	// Serialize `TransmitterAddresses` param:
+	err = encoder.Encode(obj.TransmitterAddresses)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *InitOraclesConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -229,6 +245,11 @@ func (obj *InitOraclesConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
+	// Deserialize `TransmitterAddresses`:
+	err = decoder.Decode(&obj.TransmitterAddresses)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -239,6 +260,7 @@ func NewInitOraclesConfigInstruction(
 	configVersion uint32,
 	f uint8,
 	signerAddresses [][20]uint8,
+	transmitterAddresses [][32]uint8,
 	// Accounts:
 	state ag_solanago.PublicKey,
 	oraclesConfig ag_solanago.PublicKey,
@@ -249,6 +271,7 @@ func NewInitOraclesConfigInstruction(
 		SetConfigVersion(configVersion).
 		SetF(f).
 		SetSignerAddresses(signerAddresses).
+		SetTransmitterAddresses(transmitterAddresses).
 		SetStateAccount(state).
 		SetOraclesConfigAccount(oraclesConfig).
 		SetOwnerAccount(owner).
