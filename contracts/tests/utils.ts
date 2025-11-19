@@ -254,6 +254,7 @@ export class Forwarder {
   public f: number;
   public state: anchor.web3.Keypair;
   public oracles: Array<EthKeypairInfo>;
+  public transmitters: Array<anchor.web3.PublicKey>;
   public donId: number;
   public configVersion: number;
   public configId: bigint;
@@ -275,12 +276,22 @@ export class Forwarder {
     this.f = f;
     // number of oracles is 3*f + 1 for BFT checks
     this.oracles = Array.from({ length: 3 * this.f + 1 }, () =>
-      generateEthKeypair()
+      generateEthKeypair() as EthKeypairInfo
     );
     this.oracles.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
     });
 
+    const defaultTransmitters = Array.from(
+      { length: 3 * this.f },
+      () => Keypair.generate().publicKey
+    );
+    defaultTransmitters.push(this.provider.wallet.publicKey);
+    // Sort transmitters in increasing order
+    defaultTransmitters.sort((a, b) => {
+      return Buffer.compare(a.toBuffer(), b.toBuffer());
+    });
+    this.transmitters = defaultTransmitters;
     this.donId = donId;
     this.configVersion = configVersion;
     this.configId = (BigInt(this.donId) << 32n) | BigInt(this.configVersion);
@@ -348,7 +359,8 @@ export class Forwarder {
         new BN(this.donId),
         new BN(this.configVersion),
         new BN(this.f),
-        oracleSigners as any
+        oracleSigners as any,
+        this.transmitters as any
       )
       .accounts({
         state: this.state.publicKey,

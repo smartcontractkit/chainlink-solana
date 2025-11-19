@@ -30,7 +30,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Helper function to parse oracle config account data
 function parseOraclesConfigAccount(data: Buffer) {
   // Layout: discriminator(8) + config_id(8) + f(1) + padding(7) + signer_addresses
-  // SignerAddresses layout: xs(32*20) + len(1) + padding(7)
+  // SignerAddresses layout: xs(16*20) + len(1) + padding(7)
 
   let offset = 8; // Skip discriminator
 
@@ -47,7 +47,7 @@ function parseOraclesConfigAccount(data: Buffer) {
 
   // Read SignerAddresses structure
   // Layout: xs (32*20 bytes) + len (1 byte) + padding (7 bytes)
-  const signerAddressesLen = data.readUInt8(offset + 32 * 20); // len is after xs array
+  const signerAddressesLen = data.readUInt8(offset + 16 * 20); // len is after xs array
 
   // Extract the actual addresses from xs array
   const signerAddresses = [];
@@ -79,9 +79,6 @@ async function getOraclesConfigAccount(
   return parseOraclesConfigAccount(accountInfo.data);
 }
 
-let getEthereumAddress = (publicKey: Buffer) => {
-  return keccak256(publicKey).slice(12);
-};
 
 describe("keystone_storage", function () {
   this.timeout(30_000);
