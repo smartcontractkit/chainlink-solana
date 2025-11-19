@@ -632,7 +632,7 @@ func TestTxm(t *testing.T) {
 
 				// check prom metric
 				prom.finalized++
-				prom.feeBumped+=2 // bumped twice before it made it on-chain
+				prom.feeBumped += 2 // bumped twice before it made it on-chain
 				prom.assertEqual(t)
 
 				_, err := txm.GetTransactionStatus(ctx, testTxID)

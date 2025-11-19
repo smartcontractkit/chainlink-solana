@@ -655,7 +655,7 @@ func TestGetChainInfo(t *testing.T) {
 
 func TestChain_SubmitTransaction(t *testing.T) {
 	t.Parallel()
-	ctx := tests.Context(t)
+	ctx := t.Context()
 
 	// Create mock client
 	rw := clientmocks.NewReaderWriter(t)

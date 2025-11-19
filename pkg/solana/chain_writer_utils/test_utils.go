@@ -10,11 +10,13 @@ import (
 	solana "github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
-	"github.com/test-go/testify/mock"
-	"github.com/test-go/testify/require"
 )
 
 func GetRandomPubKey(t *testing.T) solana.PublicKey {
