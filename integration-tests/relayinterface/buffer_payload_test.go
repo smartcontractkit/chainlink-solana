@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/buffer_payload"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
@@ -32,7 +33,7 @@ import (
 )
 
 // NOTE: Ensure the test contract maintains the same buffer code as the CCIP offramp execute report buffer for compatibility with this test
-var testBufferContractIDL = chainwriter.FetchTestBufferContractIDL()
+var testBufferContractIDL = chainwriterutils.FetchTestBufferContractIDL()
 
 const (
 	testBufferContractPubKey = "85bivLENWAX36kyWC9zemZu9H3D88J79wXdHgR6ZmZHX"
@@ -78,24 +79,24 @@ func Test_BufferPayload(t *testing.T) {
 	methodName := "execute"
 
 	cwConfig := chainwriter.ChainWriterConfig{
-		Programs: map[string]chainwriter.ProgramConfig{
+		Programs: map[string]chainwriterutils.ProgramConfig{
 			contractName: {
-				Methods: map[string]chainwriter.MethodConfig{
+				Methods: map[string]chainwriterutils.MethodConfig{
 					methodName: {
 						FromAddress:              sender.PublicKey().String(),
 						ChainSpecificName:        "execute",
 						ComputeUnitLimitOverhead: 150_000,
 						BufferPayloadMethod:      "CCIPExecutionReportBuffer",
-						Accounts: []chainwriter.Lookup{
+						Accounts: []chainwriterutils.Lookup{
 							{
-								AccountConstant: &chainwriter.AccountConstant{
+								AccountConstant: &chainwriterutils.AccountConstant{
 									Address:    sender.PublicKey().String(),
 									IsSigner:   true,
 									IsWritable: true,
 								},
 							},
 							{
-								AccountConstant: &chainwriter.AccountConstant{
+								AccountConstant: &chainwriterutils.AccountConstant{
 									Address:    solana.SystemProgramID.String(),
 									IsSigner:   false,
 									IsWritable: false,
