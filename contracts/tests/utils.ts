@@ -348,6 +348,7 @@ export class Forwarder {
 
   public async initOraclesConfig(ownerKeypair?: anchor.web3.Keypair) {
     const oracleSigners = this.oracles.map((o) => o.ethereumAddress);
+    const transmitters = this.transmitters.map((t) => t.toBuffer());
 
     // owner defaults to provider
     const ownerPublicKey = ownerKeypair
@@ -361,7 +362,7 @@ export class Forwarder {
         new BN(this.configVersion),
         new BN(this.f),
         oracleSigners as any,
-        this.transmitters as any
+        transmitters as any
       )
       .accounts({
         state: this.state.publicKey,
