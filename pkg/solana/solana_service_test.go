@@ -204,7 +204,7 @@ func Test_Converters(t *testing.T) {
 			ParentSlot:        100,
 			Signatures:        []solana.Signature{sig(5)},
 			BlockTime:         &bt,
-			BlockHeight:       uint64PtrVal(1234),
+			BlockHeight:       uint64Ptr(1234),
 			Transactions: []rpc.TransactionWithMeta{
 				{
 					Version: rpc.TransactionVersion(0),
@@ -220,7 +220,7 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, uint64(100), got.ParentSlot)
 		require.Equal(t, []commonsol.Signature{csig(5)}, got.Signatures)
 		require.NotNil(t, got.BlockTime)
-		require.Equal(t, uint64PtrVal(1234), got.BlockHeight)
+		require.Equal(t, uint64Ptr(1234), got.BlockHeight)
 		require.Len(t, got.Transactions, 1)
 		require.NotNil(t, got.Transactions[0].Meta)
 		require.Equal(t, uint64(1), got.Transactions[0].Meta.Fee)
@@ -250,7 +250,9 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertTransactionEnvelope_nil", func(t *testing.T) {
-		require.Nil(t, convertTransactionEnvelope(nil))
+		res, err := convertTransactionEnvelope(nil)
+		require.NoError(t, err)
+		require.Nil(t, res)
 	})
 	t.Run("convertTransaction", func(t *testing.T) {
 		tx, err := solana.TransactionFromBase64("AduqZjAgyh5j1WdY3U9AeS2ipk4CKvAwg05YgEE/PuGmiCKV01sK5OosREvDUtzYgEcy8udNEgrJ3h6EyNSiygoBAAEDW/Kcohx9SWr/V/UMmcy8RLIcyoTiGMJUzTO0hUeDFhBPITyQP/O3TBMr+8ECxBuHQ3bPl6iselx2P3Pd0jC7jQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4idjTDYMB0/8Mqa9G/bgm/1maapeTeQPGS9KIGaXpwBAgIAAQwCAAAAgJaYAAAAAAA=")
@@ -287,5 +289,4 @@ func sig(i byte) solana.Signature {
 
 func csig(i byte) commonsol.Signature { return commonsol.Signature(sig(i)) }
 
-func uint64Ptr(v uint64) *uint64    { return &v }
-func uint64PtrVal(v uint64) *uint64 { return &v }
+func uint64Ptr(v uint64) *uint64 { return &v }

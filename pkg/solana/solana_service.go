@@ -20,6 +20,7 @@ import (
 )
 
 type solanaService struct {
+	commontypes.UnimplementedSolanaService
 	chain  Chain
 	logger logger.Logger
 }
@@ -55,7 +56,7 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccountResult(account), nil
+	return convertAccountResult(account, req.Opts.Encoding), nil
 }
 
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
@@ -121,7 +122,7 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 
 	err = lp.RegisterFilter(ctx, f)
 	if err != nil {
-		return fmt.Errorf("failed to register fitler: %w", err)
+		return fmt.Errorf("failed to register filter: %w", err)
 	}
 
 	return nil
@@ -148,7 +149,6 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 	res := make([]*commonsol.Log, 0, len(logs))
 	for _, l := range logs {
 		res = append(res, &commonsol.Log{
-
 			ChainID:        l.ChainID,
 			LogIndex:       l.LogIndex,
 			BlockHash:      commonsol.Hash(l.BlockHash),
@@ -359,12 +359,16 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 	if tx.BlockTime != nil {
 		bt = (*commonsol.UnixTimeSeconds)(tx.BlockTime)
 	}
+	ptx, err := convertTransactionEnvelope(tx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &commonsol.GetTransactionReply{
 		Version:     commonsol.TransactionVersion(tx.Version),
 		Slot:        tx.Slot,
 		BlockTime:   bt,
-		Transaction: convertTransactionEnvelope(tx),
+		Transaction: ptx,
 		Meta:        convertTransactionMeta(tx.Meta),
 	}, nil
 }
@@ -381,9 +385,9 @@ func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.Get
 }
 
 // converters
-func convertTransactionEnvelope(tx *rpc.GetTransactionResult) *commonsol.TransactionResultEnvelope {
+func convertTransactionEnvelope(tx *rpc.GetTransactionResult) (*commonsol.TransactionResultEnvelope, error) {
 	if tx == nil || tx.Transaction == nil {
-		return nil
+		return nil, nil
 	}
 	out := &commonsol.TransactionResultEnvelope{}
 	data := tx.Transaction.GetData()
@@ -391,11 +395,14 @@ func convertTransactionEnvelope(tx *rpc.GetTransactionResult) *commonsol.Transac
 		Content:  data.Content,
 		Encoding: commonsol.EncodingType(data.Encoding),
 	}
-	if pr, err := tx.Transaction.GetTransaction(); err != nil {
-		out.AsParsedTransaction = convertTransaction(pr)
-	}
 
-	return out
+	ptx, err := tx.Transaction.GetTransaction()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parse tx envelope: %w", err)
+	}
+	out.AsParsedTransaction = convertTransaction(ptx)
+
+	return out, nil
 }
 
 func convertTransaction(tx *solana.Transaction) *commonsol.Transaction {
@@ -626,18 +633,18 @@ func convertAccounts(accs []*rpc.Account) []*commonsol.Account {
 	return ret
 }
 
-func convertAccountResult(acc *rpc.GetAccountInfoResult) *commonsol.GetAccountInfoReply {
+func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingType) *commonsol.GetAccountInfoReply {
 	if acc == nil {
 		return nil
 	}
 
 	var a *commonsol.Account
 	if acc.Value != nil {
-		acc.Value.Data.GetBinary()
 		a = &commonsol.Account{
 			Lamports:   acc.Value.Lamports,
 			Executable: acc.Value.Executable,
 			Owner:      commonsol.PublicKey(acc.Value.Owner),
+			Data:       convertDataBytesOrJSON(acc.Value.Data, enc),
 		}
 	}
 
@@ -711,7 +718,7 @@ func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) *common
 		for i, tx := range block.Transactions {
 			var perTxBT *commonsol.UnixTimeSeconds
 			if tx.BlockTime != nil {
-				t := commonsol.UnixTimeSeconds(int64(*block.BlockTime))
+				t := commonsol.UnixTimeSeconds(int64(*tx.BlockTime))
 				perTxBT = &t
 			}
 
