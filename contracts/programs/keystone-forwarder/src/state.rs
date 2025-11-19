@@ -57,11 +57,14 @@ pub struct ForwarderState {
 }
 
 /// Status enum for execution state
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug, PartialEq, Eq, Copy)]
+#[derive(
+    Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug, PartialEq, Eq, Copy, Default,
+)]
 pub enum Status {
+    #[default]
     NotReported, // 0
-    Success,     // 1
-    Failure,     // 2
+    Success, // 1
+    Failure, // 2
 }
 
 impl Display for Status {
@@ -83,12 +86,6 @@ impl FromStr for Status {
             "Failure" => Ok(Status::Failure),
             _ => Err(()),
         }
-    }
-}
-
-impl Default for Status {
-    fn default() -> Self {
-        Status::NotReported
     }
 }
 
