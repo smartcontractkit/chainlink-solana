@@ -520,7 +520,7 @@ func convertTransactionMeta(meta *rpc.TransactionMeta) *commonsol.TransactionMet
 	}
 
 	if meta.ComputeUnitsConsumed != nil {
-		v := uint64(*meta.ComputeUnitsConsumed)
+		v := *meta.ComputeUnitsConsumed
 		out.ComputeUnitsConsumed = &v
 	}
 
@@ -565,7 +565,7 @@ func convertTokenBalance(tb rpc.TokenBalance) commonsol.TokenBalance {
 	}
 
 	return commonsol.TokenBalance{
-		AccountIndex:  uint16(tb.AccountIndex),
+		AccountIndex:  tb.AccountIndex,
 		Owner:         owner,
 		ProgramId:     programID,
 		Mint:          commonsol.PublicKey(tb.Mint),
