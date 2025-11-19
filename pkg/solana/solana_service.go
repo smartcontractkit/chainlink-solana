@@ -153,7 +153,7 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 			LogIndex:       l.LogIndex,
 			BlockHash:      commonsol.Hash(l.BlockHash),
 			BlockNumber:    l.BlockNumber,
-			BlockTimestamp: uint64(l.BlockTimestamp.Unix()),
+			BlockTimestamp: uint64(l.BlockTimestamp.Unix()), //nolint:gosec // G115
 			Address:        commonsol.PublicKey(l.Address),
 			EventSig:       commonsol.EventSignature(l.EventSig),
 			TxHash:         commonsol.Signature(l.TxHash),
@@ -448,13 +448,9 @@ func convertAddressTableLookupSlice(in []solana.MessageAddressTableLookup) commo
 
 func convertCompiledInstruction(ix solana.CompiledInstruction) commonsol.CompiledInstruction {
 	out := commonsol.CompiledInstruction{
-		ProgramIDIndex: uint16(ix.ProgramIDIndex), // cast if upstream is smaller
-		Data:           append([]byte(nil), ix.Data...),
-		StackHeight:    0, // not defined for top-level message instructions
-	}
-	out.Accounts = make([]uint16, len(ix.Accounts))
-	for i, a := range ix.Accounts {
-		out.Accounts[i] = uint16(a) // cast if upstream is uint8
+		ProgramIDIndex: ix.ProgramIDIndex,
+		Data:           ix.Data,
+		Accounts:       ix.Accounts,
 	}
 	return out
 }
@@ -533,15 +529,15 @@ func convertTransactionMeta(meta *rpc.TransactionMeta) *commonsol.TransactionMet
 
 func convertInnerInstruction(in rpc.InnerInstruction) commonsol.InnerInstruction {
 	out := commonsol.InnerInstruction{
-		Index:        uint16(in.Index),
+		Index:        in.Index,
 		Instructions: make([]commonsol.CompiledInstruction, 0, len(in.Instructions)),
 	}
 	for _, ci := range in.Instructions {
 		out.Instructions = append(out.Instructions, commonsol.CompiledInstruction{
-			ProgramIDIndex: uint16(ci.ProgramIDIndex),
+			ProgramIDIndex: ci.ProgramIDIndex,
 			Accounts:       ci.Accounts,
 			Data:           ci.Data,
-			StackHeight:    uint16(ci.StackHeight),
+			StackHeight:    ci.StackHeight,
 		})
 	}
 	return out

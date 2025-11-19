@@ -273,7 +273,6 @@ func (v *pgDSLParser) EventBySubkey(evs *solprimitives.EventBySubkey) {
 	}
 
 	v.VisitEventSubKeysByValueFilter(p)
-
 }
 
 func (v *pgDSLParser) orderClause(limiter query.LimitAndSort) (string, error) {
