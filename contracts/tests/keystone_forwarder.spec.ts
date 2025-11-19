@@ -116,17 +116,20 @@ describe("keystone_storage", function () {
 
   let defaultOraclesConfigStorage: anchor.web3.PublicKey;
   const defaultSigners = Array.from({ length: N }, () => generateEthKeypair());
-  
+
   defaultSigners.sort((a, b) => {
     return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
   });
 
-  const defaultTransmitters = Array.from({ length: N-1 }, () => Keypair.generate().publicKey);
+  const defaultTransmitters = Array.from(
+    { length: N - 1 },
+    () => Keypair.generate().publicKey
+  );
   defaultTransmitters.push(provider.wallet.publicKey);
-    // Sort transmitters in increasing order
-    defaultTransmitters.sort((a, b) => {
-      return Buffer.compare(a.toBuffer(), b.toBuffer());
-    });
+  // Sort transmitters in increasing order
+  defaultTransmitters.sort((a, b) => {
+    return Buffer.compare(a.toBuffer(), b.toBuffer());
+  });
 
   // const transmitterAddresses = transmitters.map((t) => Array.from(t.toBuffer()));
 
@@ -331,7 +334,9 @@ describe("keystone_storage", function () {
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
     const initialEthAddresses = signerEthAddresses.slice(0, 4);
-    const initialTransmitterAddresses = defaultTransmitters.slice(0, 4).map((t) => t.toBuffer());
+    const initialTransmitterAddresses = defaultTransmitters
+      .slice(0, 4)
+      .map((t) => t.toBuffer());
 
     // f = 1, N = 4 initially
     await program.methods
@@ -455,16 +460,21 @@ describe("keystone_storage", function () {
     const signerEthAddresses = signers.map((s) => s.ethereumAddress);
 
     // Generate transmitter addresses (Solana public keys)
-    const transmitters = Array.from({ length: 15 }, () => anchor.web3.Keypair.generate().publicKey);
+    const transmitters = Array.from(
+      { length: 15 },
+      () => anchor.web3.Keypair.generate().publicKey
+    );
     // Add provider wallet as one of the transmitters
     transmitters.push(provider.wallet.publicKey);
-    
+
     // Sort transmitters in increasing order
     transmitters.sort((a, b) => {
       return Buffer.compare(a.toBuffer(), b.toBuffer());
     });
 
-    const transmitterAddresses = transmitters.map((t) => Array.from(t.toBuffer()));
+    const transmitterAddresses = transmitters.map((t) =>
+      Array.from(t.toBuffer())
+    );
 
     const ix = await program.methods
       .initOraclesConfig(
