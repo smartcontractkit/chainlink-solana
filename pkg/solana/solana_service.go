@@ -81,7 +81,7 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 	}
 	accounts := &rpc.SimulateTransactionAccountsOpts{
 		Encoding:  solana.EncodingType(req.Opts.Accounts.Encoding),
-		Addresses: make([]solana.PublicKey, len(req.Opts.Accounts.Addresses)),
+		Addresses: make([]solana.PublicKey, 0, len(req.Opts.Accounts.Addresses)),
 	}
 	for _, addr := range req.Opts.Accounts.Addresses {
 		accounts.Addresses = append(accounts.Addresses, solana.PublicKey(addr))
@@ -145,7 +145,7 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 		return nil, fmt.Errorf("failed to filter logs: %w", err)
 	}
 
-	res := make([]*commonsol.Log, len(logs))
+	res := make([]*commonsol.Log, 0, len(logs))
 	for _, l := range logs {
 		res = append(res, &commonsol.Log{
 
@@ -185,7 +185,7 @@ func deriveNameFromFilterQuery(filter []query.Expression) string {
 }
 
 func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol.GetSignatureStatusesRequest) (*commonsol.GetSignatureStatusesReply, error) {
-	sigs := make([]solana.Signature, len(req.Sigs))
+	sigs := make([]solana.Signature, 0, len(req.Sigs))
 	for _, s := range req.Sigs {
 		sigs = append(sigs, solana.Signature(s))
 	}
@@ -195,7 +195,7 @@ func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol
 		return nil, fmt.Errorf("failed to get signature statuses: %w", err)
 	}
 
-	statuses := make([]commonsol.GetSignatureStatusesResult, len(res))
+	statuses := make([]commonsol.GetSignatureStatusesResult, 0, len(res))
 	for _, r := range res {
 		var stErr string
 		if r.Err != nil {
@@ -324,7 +324,7 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 		return nil, fmt.Errorf("failed to get multiple accounts with opts: %w", err)
 	}
 
-	accounts := make([]*commonsol.Account, len(res.Value))
+	accounts := make([]*commonsol.Account, 0, len(res.Value))
 	for _, acc := range res.Value {
 		accounts = append(accounts, &commonsol.Account{
 			Lamports:   acc.Lamports,
@@ -439,8 +439,8 @@ func convertAddressTableLookupSlice(in []solana.MessageAddressTableLookup) commo
 	for i, atl := range in {
 		out[i] = commonsol.MessageAddressTableLookup{
 			AccountKey:      commonsol.PublicKey(atl.AccountKey),
-			WritableIndexes: append([]uint8(nil), atl.WritableIndexes...),
-			ReadonlyIndexes: append([]uint8(nil), atl.ReadonlyIndexes...),
+			WritableIndexes: atl.WritableIndexes,
+			ReadonlyIndexes: atl.ReadonlyIndexes,
 		}
 	}
 	return out
@@ -540,7 +540,7 @@ func convertInnerInstruction(in rpc.InnerInstruction) commonsol.InnerInstruction
 		out.Instructions = append(out.Instructions, commonsol.CompiledInstruction{
 			ProgramIDIndex: uint16(ci.ProgramIDIndex),
 			Accounts:       ci.Accounts,
-			Data:           append([]byte(nil), ci.Data...),
+			Data:           ci.Data,
 			StackHeight:    uint16(ci.StackHeight),
 		})
 	}
@@ -615,7 +615,7 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 }
 
 func convertAccounts(accs []*rpc.Account) []*commonsol.Account {
-	ret := make([]*commonsol.Account, len(accs))
+	ret := make([]*commonsol.Account, 0, len(accs))
 	for _, acc := range accs {
 		ret = append(ret, &commonsol.Account{
 			Lamports:   acc.Lamports,
