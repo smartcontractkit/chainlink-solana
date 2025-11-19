@@ -73,7 +73,9 @@ func Test_Converters(t *testing.T) {
 
 		got := convertMessage(m)
 		require.Equal(t, commonsol.PublicKeySlice{cpk(1), cpk(2)}, got.AccountKeys)
-		require.Equal(t, commonsol.MessageHeader{2, 1, 0}, got.Header)
+		require.Equal(t, commonsol.MessageHeader{NumReadonlySignedAccounts: 1,
+			NumRequiredSignatures:       2,
+			NumReadonlyUnsignedAccounts: 0}, got.Header)
 		require.Equal(t, commonsol.Hash(cpk(9)), got.RecentBlockhash)
 		require.Len(t, got.Instructions, 1)
 		require.Equal(t, uint16(0), got.Instructions[0].ProgramIDIndex)
@@ -255,14 +257,13 @@ func Test_Converters(t *testing.T) {
 		require.NoError(t, err)
 		got := convertTransaction(tx)
 
-		require.Equal(t, len(tx.Message.AccountKeys), len(got.Message.AccountKeys))
+		require.Len(t, tx.Message.AccountKeys, len(got.Message.AccountKeys))
 		for i := range tx.Message.AccountKeys {
 			require.Equal(t, tx.Message.AccountKeys[i], solana.PublicKey(got.Message.AccountKeys[i]))
 		}
 		require.Equal(t, tx.Message.Header.NumReadonlySignedAccounts, got.Message.Header.NumReadonlySignedAccounts)
 		require.Equal(t, tx.Message.Header.NumReadonlyUnsignedAccounts, got.Message.Header.NumReadonlyUnsignedAccounts)
 		require.Equal(t, tx.Message.Header.NumRequiredSignatures, got.Message.Header.NumRequiredSignatures)
-
 	})
 }
 
