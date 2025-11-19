@@ -19,7 +19,6 @@ import (
 	wt "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget"
 
 	ks_forwarder "github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 
@@ -27,6 +26,7 @@ import (
 
 	"github.com/gagliardetto/solana-go/rpc"
 
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -178,13 +178,13 @@ func (ts *targetStrategy) TransmitReport(ctx context.Context, report []byte, rep
 		return "", fmt.Errorf("failed to create solana tx: %w", err)
 	}
 
-	txSize, err := chainwriter.CalculateTxSize(tx)
+	txSize, err := chainwriterutils.CalculateTxSize(tx)
 	if err != nil {
 		return "", fmt.Errorf("failed calculate tx size: %w", err)
 	}
 
-	if txSize > chainwriter.MaxSolanaTxSize {
-		return "", fmt.Errorf("transaction size:%d exceeds solana max tx size:%d", txSize, chainwriter.MaxSolanaTxSize)
+	if txSize > chainwriterutils.MaxSolanaTxSize {
+		return "", fmt.Errorf("transaction size:%d exceeds solana max tx size:%d", txSize, chainwriterutils.MaxSolanaTxSize)
 	}
 
 	transactionID := txID.String()

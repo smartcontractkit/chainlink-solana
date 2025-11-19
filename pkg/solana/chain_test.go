@@ -30,11 +30,15 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	solanatesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 const TestSolanaGenesisHashTemplate = `{"jsonrpc":"2.0","result":"%s","id":1}`
@@ -647,4 +651,203 @@ func TestGetChainInfo(t *testing.T) {
 		NetworkNameFull: familyName + "-" + chainEnvName,
 	}
 	require.Equal(t, cf, chainInfo)
+}
+
+// i need to figure out this test
+func TestChain_SubmitTransaction(t *testing.T) {
+	t.Parallel()
+	ctx := tests.Context(t)
+
+	// Create mock client
+	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
+
+	// Setup admin key
+	adminPk, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	admin := adminPk.PublicKey()
+
+	account1 := chainwriterutils.GetRandomPubKey(t)
+	account2 := chainwriterutils.GetRandomPubKey(t)
+
+	seed1 := []byte("seed1")
+	seed2 := []byte("seed2")
+	programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
+	derivedTablePda := chainwriterutils.MustFindPdaProgramAddress(t, [][]byte{seed2}, programID)
+	// mock data account response from program
+	derivedLookupTablePubkey := chainwriterutils.MockDataAccountLookupTable(t, rw, derivedTablePda)
+	// mock fetch lookup table addresses call
+	derivedLookupKeys := chainwriterutils.CreateTestPubKeys(t, 1)
+	chainwriterutils.MockFetchLookupTableAddresses(t, rw, derivedLookupTablePubkey, derivedLookupKeys)
+
+	// mock static lookup table call
+	staticLookupTablePubkey := chainwriterutils.GetRandomPubKey(t)
+	staticLookupKeys := chainwriterutils.CreateTestPubKeys(t, 2)
+	chainwriterutils.MockFetchLookupTableAddresses(t, rw, staticLookupTablePubkey, staticLookupKeys)
+
+	// Create program config matching chain_writer_test.go
+	programConfig := chainwriterutils.ProgramConfig{
+		Methods: map[string]chainwriterutils.MethodConfig{
+			"initializeLookupTable": {
+				FromAddress:       admin.String(),
+				ChainSpecificName: "initializeLookupTable",
+				LookupTables: chainwriterutils.LookupTables{
+					DerivedLookupTables: []chainwriterutils.DerivedLookupTable{
+						{
+							Name: "DerivedTable",
+							Accounts: chainwriterutils.Lookup{PDALookups: &chainwriterutils.PDALookups{
+								Name:      "DataAccountPDA",
+								PublicKey: chainwriterutils.Lookup{AccountConstant: &chainwriterutils.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+								Seeds: []chainwriterutils.Seed{
+									{Dynamic: chainwriterutils.Lookup{AccountLookup: &chainwriterutils.AccountLookup{Name: "Seed2", Location: "Seed2"}}},
+								},
+								IsSigner:   false,
+								IsWritable: false,
+								InternalField: chainwriterutils.InternalField{
+									TypeName: "LookupTableDataAccount",
+									Location: "LookupTable",
+									IDL:      chainwriterutils.FetchTestContractIDL(),
+								},
+							}},
+						},
+					},
+					StaticLookupTables: []solana.PublicKey{staticLookupTablePubkey},
+				},
+				Accounts: []chainwriterutils.Lookup{
+					{AccountConstant: &chainwriterutils.AccountConstant{
+						Name:       "feepayer",
+						Address:    admin.String(),
+						IsSigner:   false,
+						IsWritable: false,
+					}},
+					{AccountConstant: &chainwriterutils.AccountConstant{
+						Name:       "Constant",
+						Address:    account1.String(),
+						IsSigner:   false,
+						IsWritable: false,
+					}},
+					{AccountLookup: &chainwriterutils.AccountLookup{
+						Name:       "LookupTable",
+						Location:   "LookupTable",
+						IsSigner:   chainwriterutils.MetaBool{Value: false},
+						IsWritable: chainwriterutils.MetaBool{Value: false},
+					}},
+					{PDALookups: &chainwriterutils.PDALookups{
+						Name:      "DataAccountPDA",
+						PublicKey: chainwriterutils.Lookup{AccountConstant: &chainwriterutils.AccountConstant{Name: "WriteTest", Address: solana.SystemProgramID.String()}},
+						Seeds: []chainwriterutils.Seed{
+							{Dynamic: chainwriterutils.Lookup{AccountLookup: &chainwriterutils.AccountLookup{Name: "Seed1", Location: "Seed1"}}},
+						},
+						IsSigner:      false,
+						IsWritable:    false,
+						InternalField: chainwriterutils.InternalField{},
+					}},
+					{AccountsFromLookupTable: &chainwriterutils.AccountsFromLookupTable{
+						LookupTableName: "DerivedTable",
+						IncludeIndexes:  []int{0},
+					}},
+					{AccountConstant: &chainwriterutils.AccountConstant{
+						Name:       "systemprogram",
+						Address:    solana.SystemProgramID.String(),
+						IsSigner:   false,
+						IsWritable: false,
+					}},
+				},
+			},
+		},
+		IDL: chainwriterutils.FetchTestContractIDL(),
+	}
+
+	// Mock LatestBlockhash
+	recentBlockHash := solana.Hash{}
+	rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            recentBlockHash,
+			LastValidBlockHeight: uint64(100),
+		},
+	}, nil).Maybe()
+
+	// Mock SimulateTx for the txm's pre-send simulation
+	rw.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+
+	// Mock SendTx for the real txm to use (can be called multiple times due to retries)
+	rw.On("SendTx", mock.Anything, mock.Anything).Return(solana.Signature{}, nil).Maybe()
+
+	// Mock SignatureStatuses for transaction confirmation
+	rw.On("SignatureStatuses", mock.Anything, mock.Anything).Return([]*rpc.SignatureStatusesResult{
+		{ConfirmationStatus: rpc.ConfirmationStatusConfirmed},
+	}, nil).Maybe()
+
+	txID := uuid.NewString()
+
+	args := struct {
+		LookupTable solana.PublicKey
+		Seed1       []byte
+		Seed2       []byte
+	}{
+		LookupTable: account2,
+		Seed1:       seed1,
+		Seed2:       seed2,
+	}
+
+	// Create a chain instance - need to use a real txm since mockTxm can't be assigned to *txm.Txm
+	cfg := &solcfg.TOMLConfig{
+		ChainID: ptr("localnet"),
+	}
+	cfg.SetDefaults()
+
+	// Create minimal loader that returns our mock client
+	clientLoader := utils.NewOnceLoader[client.ReaderWriter](func(ctx context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
+
+	mkey := mocks.NewSimpleKeystore(t)
+	mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil)
+
+	// Create real txm with our mock client - this is the proper way to test
+	realTxm, err := txm.NewTxm("localnet", clientLoader, nil, cfg, mkey, logger.Test(t))
+	require.NoError(t, err)
+
+	testChain := &chain{
+		id:          "localnet",
+		cfg:         cfg,
+		lggr:        logger.Test(t),
+		txm:         realTxm,
+		multiClient: &mc,
+	}
+
+	// Start txm to enable enqueuing
+	err = realTxm.Start(ctx)
+	require.NoError(t, err)
+	defer realTxm.Close()
+
+	// Call chain.SubmitTransaction
+	err = testChain.SubmitTransaction(
+		ctx,
+		ChainProgramConfig{Programs: map[string]chainwriterutils.ProgramConfig{"contract_reader_interface": programConfig}},
+		"contract_reader_interface",
+		"initializeLookupTable",
+		args,
+		txID,
+		programID.String(),
+	)
+
+	// Verify transaction was enqueued successfully
+	require.NoError(t, err)
+
+	// Wait for SendTx to be called by the background goroutine
+	assert.Eventually(t, func() bool {
+		// Check if SendTx has been called at least once
+		for _, call := range rw.Calls {
+			if call.Method == "SendTx" {
+				return true
+			}
+		}
+		return false
+	}, 2*time.Second, 100*time.Millisecond, "SendTx should be called")
+
+	// Verify all expected calls were made
+	rw.AssertExpectations(t)
 }

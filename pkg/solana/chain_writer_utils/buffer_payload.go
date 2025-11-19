@@ -1,4 +1,4 @@
-package chainwriter
+package chainwriterutils
 
 import (
 	"context"
@@ -8,12 +8,15 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -137,7 +140,7 @@ func buildBufferExecutionReportIx(bufferID []byte, reportLen uint32, chunkPayloa
 // - Marks the main transaction as dependent on all of the buffer transactions
 // - Bulds and queues the close buffer transaction
 // - Marks it as dependent on the failure of the main transaction or buffer transactions
-func (s *SolanaChainWriterService) sendBufferInstructions(
+func SendBufferInstructions(
 	ctx context.Context,
 	bufferIxs []solana.Instruction,
 	closeBufferIx solana.Instruction,
@@ -148,8 +151,12 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	args any,
 	options []txmutils.SetTxConfig,
 	lookupTableMap map[solana.PublicKey]solana.PublicKeySlice,
+	client client.MultiClient,
+	txm txm.TxManager,
+	lggr logger.Logger,
+	encoder types.Encoder,
 ) error {
-	blockhash, err := s.client.LatestBlockhash(ctx)
+	blockhash, err := client.LatestBlockhash(ctx)
 	if err != nil {
 		return fmt.Errorf("error fetching latest blockhash: %w", err)
 	}
@@ -167,7 +174,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 
 	// Encode new main tx payload with transformed args
-	transformedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
+	transformedPayload, err := EncodePayload(ctx, args, methodConfig, contractName, method, lggr, encoder)
 	if err != nil {
 		return fmt.Errorf("error encoding transformed payload for transaction using buffer: %w", err)
 	}
@@ -195,7 +202,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		return fmt.Errorf("main transaction still oversized after buffering. new size: %d, max size: %d", mainTxSize, MaxSolanaTxSize)
 	}
 
-	s.lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferIxs))
+	lggr.Debugw("Sending transactions to write to buffer", "contract", contractName, "method", method, "transactionID", txID, "bufferTransactionCount", len(bufferIxs))
 
 	for i, ix := range bufferIxs {
 		bufferTx, bufferTxErr := solana.NewTransaction(
@@ -210,7 +217,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 		bufferUUID := fmt.Sprintf("Buffer-%d-%s", i, uuid.NewString())
 
 		// Enqueue execution report buffer transaction
-		if bufferErr := s.txm.Enqueue(ctx, methodConfig.FromAddress, bufferTx, &bufferUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); bufferErr != nil {
+		if bufferErr := txm.Enqueue(ctx, methodConfig.FromAddress, bufferTx, &bufferUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); bufferErr != nil {
 			return fmt.Errorf("error enqueuing buffer transaction: %w", bufferErr)
 		}
 		bufferTxIDs = append(bufferTxIDs, bufferUUID)
@@ -224,8 +231,8 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 	mainOpts := append(options, txmutils.AppendDependencyTxs(bufferTxs))
 
-	s.lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", txID, "debugID", debugID)
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, mainTx, &txID, blockhash.Value.LastValidBlockHeight, mainOpts...); err != nil {
+	lggr.Debugw("Sending main transaction", "contract", contractName, "method", method, "tx", txID, "debugID", debugID)
+	if err = txm.Enqueue(ctx, methodConfig.FromAddress, mainTx, &txID, blockhash.Value.LastValidBlockHeight, mainOpts...); err != nil {
 		return fmt.Errorf("error enqueuing maintransaction: %w", err)
 	}
 
@@ -240,8 +247,8 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 
 	// The main transaction closes the buffer automatically so the close buffer transaction is only needed if it fails
-	s.lggr.Debugw("Queuing close buffer transaction, only sends if buffer or main transcation fails", "contract", contractName, "method", method, "closeBufferTxID", closeBufferUUID, "mainTxID", txID)
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, closeOpts...); err != nil {
+	lggr.Debugw("Queuing close buffer transaction, only sends if buffer or main transcation fails", "contract", contractName, "method", method, "closeBufferTxID", closeBufferUUID, "mainTxID", txID)
+	if err = txm.Enqueue(ctx, methodConfig.FromAddress, closeBufferTx, &closeBufferUUID, blockhash.Value.LastValidBlockHeight, closeOpts...); err != nil {
 		return fmt.Errorf("error enqueuing close buffer transaction: %w", err)
 	}
 

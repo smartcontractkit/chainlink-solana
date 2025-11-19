@@ -1,4 +1,4 @@
-package chainwriter
+package chainwriterutils
 
 import (
 	"context"
@@ -378,7 +378,7 @@ func deriveExecuteAccounts(ctx context.Context, client client.MultiClient, param
 func fetchLookupTables(ctx context.Context, client client.MultiClient, lookupTablesAddrs []solana.PublicKey) (map[solana.PublicKey]solana.PublicKeySlice, error) {
 	lookupTableMap := make(map[solana.PublicKey]solana.PublicKeySlice)
 	for _, addr := range lookupTablesAddrs {
-		lookupTableContents, err := getLookupTableAddresses(ctx, client, addr)
+		lookupTableContents, err := GetLookupTableAddresses(ctx, client, addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch lookup table contents for address %s: %w", addr.String(), err)
 		}

@@ -1,4 +1,4 @@
-package chainwriter
+package chainwriterutils
 
 import (
 	"context"

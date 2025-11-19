@@ -1,9 +1,9 @@
-package chainwriter_test
+package chainwriterutils_test
 
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 )
 
 func TestToSnakeCase(t *testing.T) {
@@ -20,7 +20,7 @@ func TestToSnakeCase(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.input, func(t *testing.T) {
-			actual := chainwriter.ToSnakeCase(tc.input)
+			actual := chainwriterutils.ToSnakeCase(tc.input)
 			if actual != tc.expected {
 				t.Errorf("expected %s, got %s", tc.expected, actual)
 			}

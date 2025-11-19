@@ -1,4 +1,4 @@
-package chainwriter
+package chainwriterutils
 
 import (
 	"crypto/sha256"
@@ -123,7 +123,7 @@ func GetDebugIDAtLocation(args any, location string) (string, error) {
 	return debugID.String(), nil
 }
 
-func errorWithDebugID(err error, debugID string) error {
+func ErrorWithDebugID(err error, debugID string) error {
 	if debugID == "" {
 		return err
 	}

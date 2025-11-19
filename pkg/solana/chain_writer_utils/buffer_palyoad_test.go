@@ -1,4 +1,4 @@
-package chainwriter_test
+package chainwriterutils_test
 
 import (
 	"testing"
@@ -7,19 +7,19 @@ import (
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 )
 
 func Test_CCIPExecutionReportBuffer(t *testing.T) {
 	var accounts solana.AccountMetaSlice
-	prorgamID := GetRandomPubKey(t)
-	feePayer := GetRandomPubKey(t)
+	prorgamID := chainwriterutils.GetRandomPubKey(t)
+	feePayer := chainwriterutils.GetRandomPubKey(t)
 
 	t.Run("CCIP Execution report happy path", func(t *testing.T) {
 		args := ccipsolana.SVMExecCallArgs{
 			Report: make([]byte, 1500),
 		}
-		bufferIxs, closeBufferIx, newAccounts, newArgs, err := chainwriter.CCIPExecutionReportBuffer(t.Context(), args, accounts, prorgamID, feePayer)
+		bufferIxs, closeBufferIx, newAccounts, newArgs, err := chainwriterutils.CCIPExecutionReportBuffer(t.Context(), args, accounts, prorgamID, feePayer)
 		require.NoError(t, err)
 
 		require.Len(t, bufferIxs, 2)
@@ -44,7 +44,7 @@ func Test_CCIPExecutionReportBuffer(t *testing.T) {
 		args := ccipsolana.SVMExecCallArgs{
 			Report: make([]byte, 500000),
 		}
-		_, _, _, _, err := chainwriter.CCIPExecutionReportBuffer(t.Context(), args, accounts, prorgamID, feePayer)
+		_, _, _, _, err := chainwriterutils.CCIPExecutionReportBuffer(t.Context(), args, accounts, prorgamID, feePayer)
 		require.ErrorContains(t, err, "number of chunks exceeds limit")
 	})
 }

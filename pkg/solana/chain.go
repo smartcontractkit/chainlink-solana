@@ -27,6 +27,7 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
+	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
@@ -60,6 +61,7 @@ type Chain interface {
 	// Reader returns a new Reader from the available list of nodes (if there are multiple, it will randomly select one)
 	Reader() (client.Reader, error)
 	MultiClient() *client.MultiClient
+	SubmitTransaction(ctx context.Context, programConfig ChainProgramConfig, contractName, method string, args any, transactionID string, toAddress string) error
 }
 
 // DefaultRequestTimeout is the default Solana client timeout.
@@ -727,4 +729,34 @@ func solanaValidateBalance(ctx context.Context, reader client.Reader, from solan
 		return fmt.Errorf("balance %d is too low for this transaction to be executed: amount %d + fee %d", balance, amount, fee)
 	}
 	return nil
+}
+
+type ChainProgramConfig struct {
+	Programs map[string]chainwriterutils.ProgramConfig `json:"programs"`
+}
+
+func (c *chain) SubmitTransaction(ctx context.Context, programConfig ChainProgramConfig, contractName, method string, args any, transactionID string, toAddress string) error {
+	contractConfig, exists := programConfig.Programs[contractName]
+	if !exists {
+		return fmt.Errorf("failed to find program config for contract name: %s", contractName)
+	}
+
+	// Parse programs and create codec with proper encoder definitions
+	_, encoder, err := chainwriterutils.ParseProgramsToCodec(programConfig.Programs)
+	if err != nil {
+		return fmt.Errorf("error parsing programs and creating codec: %w", err)
+	}
+
+	return chainwriterutils.SubmitTransactionImpl(ctx, chainwriterutils.SubmitTransactionParams{
+		ProgramConfig: contractConfig,
+		ContractName:  contractName,
+		Method:        method,
+		Args:          args,
+		TransactionID: transactionID,
+		ToAddress:     toAddress,
+		Client:        *c.multiClient,
+		TxManager:     c.txm,
+		Encoder:       encoder,
+		Lggr:          c.lggr,
+	})
 }

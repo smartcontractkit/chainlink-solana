@@ -1,4 +1,4 @@
-package chainwriter
+package chainwriterutils
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -40,7 +41,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 			}
 		}
 		walletAddresses, err := GetAddresses(ctx, args, []Lookup{lookup.WalletAddress}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
+		if lookup.Optional && IsIgnorableError(err) {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("error resolving wallet address: %w", err)
@@ -51,7 +52,7 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 		wallet := walletAddresses[0].PublicKey
 
 		mints, err := GetAddresses(ctx, args, []Lookup{lookup.MintAddress}, derivedTableMap, client)
-		if lookup.Optional && isIgnorableError(err) {
+		if lookup.Optional && IsIgnorableError(err) {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("error resolving mint address: %w", err)
@@ -97,11 +98,12 @@ func CreateATAs(ctx context.Context, args any, lookups []ATALookup, derivedTable
 	return createATAInstructions, nil
 }
 
-func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, createATAinstructions []solana.Instruction, methodConfig MethodConfig, contractName, method string, feePayer solana.PublicKey) (string, error) {
+func HandleATACreation(
+	ctx context.Context, createATAinstructions []solana.Instruction, methodConfig MethodConfig, contractName, method string, feePayer solana.PublicKey, client client.MultiClient, txm txm.TxManager, logger logger.Logger) (string, error) {
 	if len(createATAinstructions) == 0 {
 		return "", nil
 	}
-	blockhash, err := s.client.LatestBlockhash(ctx)
+	blockhash, err := client.LatestBlockhash(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error fetching latest blockhash: %w", err)
 	}
@@ -119,10 +121,10 @@ func (s *SolanaChainWriterService) handleATACreation(ctx context.Context, create
 	}
 	ataUUID := fmt.Sprintf("ATA-%s", uuid.NewString())
 
-	s.lggr.Infow("Sending create ATA transaction", "contract", contractName, "method", method)
+	logger.Infow("Sending create ATA transaction", "contract", contractName, "method", method)
 
 	// Enqueue ATA transaction
-	if err = s.txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); err != nil {
+	if err = txm.Enqueue(ctx, methodConfig.FromAddress, ataTx, &ataUUID, blockhash.Value.LastValidBlockHeight, txmutils.SetEstimateComputeUnitLimit(true)); err != nil {
 		return "", fmt.Errorf("error enqueuing transaction: %w", err)
 	}
 
