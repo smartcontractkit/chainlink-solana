@@ -7,15 +7,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	solana "github.com/gagliardetto/solana-go"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	ccip_offramp_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	chainwriterutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/chain_writer_utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
