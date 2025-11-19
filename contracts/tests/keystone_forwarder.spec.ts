@@ -79,7 +79,6 @@ async function getOraclesConfigAccount(
   return parseOraclesConfigAccount(accountInfo.data);
 }
 
-
 describe("keystone_storage", function () {
   this.timeout(30_000);
   // Configure the client to use the local cluster.

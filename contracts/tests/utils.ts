@@ -275,8 +275,9 @@ export class Forwarder {
   public withOracles(f: number, donId: number, configVersion: number) {
     this.f = f;
     // number of oracles is 3*f + 1 for BFT checks
-    this.oracles = Array.from({ length: 3 * this.f + 1 }, () =>
-      generateEthKeypair() as EthKeypairInfo
+    this.oracles = Array.from(
+      { length: 3 * this.f + 1 },
+      () => generateEthKeypair() as EthKeypairInfo
     );
     this.oracles.sort((a, b) => {
       return Buffer.compare(a.ethereumAddress, b.ethereumAddress);
