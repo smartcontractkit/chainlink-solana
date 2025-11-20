@@ -45,6 +45,7 @@ type LogPoller interface {
 	HasFilter(context.Context, string) bool
 	RegisterFilter(ctx context.Context, filter logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
+	GetLatestBlock(ctx context.Context) (int64, error)
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
 	Replay(fromBlock int64)
 }

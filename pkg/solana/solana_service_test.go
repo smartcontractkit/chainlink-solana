@@ -215,18 +215,13 @@ func Test_Converters(t *testing.T) {
 			},
 		}
 
-		got, err := convertBlock(rpcBlock, commonsol.EncodingJSON)
-		require.NoError(t, err)
+		got := convertBlock(rpcBlock)
 		require.NotNil(t, got)
 		require.Equal(t, commonsol.Hash(cpk(1)), got.Blockhash)
 		require.Equal(t, commonsol.Hash(cpk(2)), got.PreviousBlockhash)
 		require.Equal(t, uint64(100), got.ParentSlot)
-		require.Equal(t, []commonsol.Signature{csig(5)}, got.Signatures)
 		require.NotNil(t, got.BlockTime)
 		require.Equal(t, uint64Ptr(1234), got.BlockHeight)
-		require.Len(t, got.Transactions, 1)
-		require.NotNil(t, got.Transactions[0].Meta)
-		require.Equal(t, uint64(1), got.Transactions[0].Meta.Fee)
 	})
 
 	t.Run("convertTransaction_nilSafe", func(t *testing.T) {

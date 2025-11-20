@@ -33,17 +33,26 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 	}
 
 	result, err := reader.GetBlockWithOpts(ctx, req.Slot, &rpc.GetBlockOpts{
-		Encoding:                       solana.EncodingType(req.Opts.Encoding),
-		TransactionDetails:             rpc.TransactionDetailsType(req.Opts.TransactionDetails),
-		Rewards:                        req.Opts.Rewards,
-		Commitment:                     rpc.CommitmentType(req.Opts.Commitment),
-		MaxSupportedTransactionVersion: req.Opts.MaxSupportedTransactionVersion,
+		Commitment: rpc.CommitmentType(req.Opts.Commitment),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
 
-	return convertBlock(result, req.Opts.Encoding)
+	return convertBlock(result), nil
+}
+
+func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlock, error) {
+	lp := ss.chain.LogPoller()
+	n, err := lp.GetLatestBlock(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest lp block: %w", err)
+	}
+
+	return &commonsol.LPBlock{
+		Slot: uint64(n), //nolint:gosec // G115
+	}, nil
+
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
@@ -749,45 +758,14 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 	}, nil
 }
 
-func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) (*commonsol.GetBlockReply, error) {
+func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {
 	if block == nil {
-		return nil, nil
+		return nil
 	}
 
 	// Hashes
 	bh := commonsol.Hash(block.Blockhash)
 	pbh := commonsol.Hash(block.PreviousBlockhash)
-
-	// Signatures
-	var sigs []commonsol.Signature
-	if n := len(block.Signatures); n > 0 {
-		sigs = make([]commonsol.Signature, n)
-		for i, s := range block.Signatures {
-			sigs[i] = commonsol.Signature(s)
-		}
-	}
-
-	var txs []commonsol.TransactionWithMeta
-	if n := len(block.Transactions); n > 0 {
-		txs = make([]commonsol.TransactionWithMeta, n)
-		for i, tx := range block.Transactions {
-			var perTxBT *commonsol.UnixTimeSeconds
-			if tx.BlockTime != nil {
-				t := commonsol.UnixTimeSeconds(int64(*tx.BlockTime))
-				perTxBT = &t
-			}
-			txData, err := convertDataBytesOrJSON(tx.Transaction, enc)
-			if err != nil {
-				return nil, fmt.Errorf("conversion of data bytes or json for tx data failed: %w", err)
-			}
-			txs[i] = commonsol.TransactionWithMeta{
-				BlockTime:   perTxBT,
-				Version:     commonsol.TransactionVersion(tx.Version),
-				Transaction: txData,
-				Meta:        convertTransactionMeta(tx.Meta),
-			}
-		}
-	}
 
 	var bt *commonsol.UnixTimeSeconds
 	if block.BlockTime != nil {
@@ -798,9 +776,7 @@ func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) (*commo
 		Blockhash:         bh,
 		PreviousBlockhash: pbh,
 		ParentSlot:        block.ParentSlot,
-		Transactions:      txs,
-		Signatures:        sigs,
 		BlockTime:         bt,
 		BlockHeight:       block.BlockHeight,
-	}, nil
+	}
 }

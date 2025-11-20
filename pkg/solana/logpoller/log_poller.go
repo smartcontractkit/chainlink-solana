@@ -297,6 +297,10 @@ func (lp *Service) ReplayStatus() types.ReplayStatus {
 	return lp.replay.status
 }
 
+func (lp *Service) GetLatestBlock(ctx context.Context) (int64, error) {
+	return lp.orm.GetLatestBlock(ctx)
+}
+
 func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int64, err error) {
 	lastProcessed = lp.lastProcessedSlot
 	if lastProcessed > 0 {
