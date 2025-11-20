@@ -3,6 +3,7 @@ package solana
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -42,7 +43,7 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
 
-	return convertBlock(result, req.Opts.Encoding), nil
+	return convertBlock(result, req.Opts.Encoding)
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
@@ -56,7 +57,7 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccountResult(account, req.Opts.Encoding), nil
+	return convertAccountResult(account, req.Opts.Encoding)
 }
 
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
@@ -101,10 +102,15 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 	if res.Err != nil {
 		simErr = fmt.Sprintf("%v", res.Err)
 	}
+
+	accs, err := convertAccounts(res.Accounts)
+	if err != nil {
+		return nil, err
+	}
 	return &commonsol.SimulateTXReply{
 		Err:           simErr,
 		Logs:          res.Logs,
-		Accounts:      convertAccounts(res.Accounts),
+		Accounts:      accs,
 		UnitsConsumed: res.UnitsConsumed,
 	}, nil
 }
@@ -140,7 +146,11 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
 	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
 	lp := ss.chain.LogPoller()
-	queryName := deriveNameFromFilterQuery(filterQuery)
+	queryName, err := deriveNameFromFilterQuery(filterQuery)
+	if err != nil {
+		return nil, err
+	}
+
 	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, queryName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter logs: %w", err)
@@ -166,7 +176,12 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 	return res, nil
 }
 
-func deriveNameFromFilterQuery(filter []query.Expression) string {
+var (
+	missingEventSigPrimitiveErr = errors.New("missing event signature primitive in filter query")
+	missingAddressPrimitiveErr  = errors.New("missing address primitive in filter query")
+)
+
+func deriveNameFromFilterQuery(filter []query.Expression) (string, error) {
 	var address string
 	var eventSig string
 
@@ -181,7 +196,18 @@ func deriveNameFromFilterQuery(filter []query.Expression) string {
 		}
 	}
 
-	return address + "-" + eventSig
+	var errs []error
+	if address == "" {
+		errs = append(errs, missingAddressPrimitiveErr)
+	}
+	if eventSig == "" {
+		errs = append(errs, missingEventSigPrimitiveErr)
+	}
+	if len(errs) > 0 {
+		return "", errors.Join(errs...)
+	}
+
+	return address + "-" + eventSig, nil
 }
 
 func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol.GetSignatureStatusesRequest) (*commonsol.GetSignatureStatusesReply, error) {
@@ -326,10 +352,14 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 
 	accounts := make([]*commonsol.Account, 0, len(res.Value))
 	for _, acc := range res.Value {
+		data, err := convertDataBytesOrJSON(acc.Data, enc)
+		if err != nil {
+			return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)
+		}
 		accounts = append(accounts, &commonsol.Account{
 			Lamports:   acc.Lamports,
 			Owner:      commonsol.PublicKey(acc.Owner),
-			Data:       convertDataBytesOrJSON(acc.Data, enc),
+			Data:       data,
 			Executable: acc.Executable,
 			RentEpoch:  acc.RentEpoch,
 			Space:      acc.Space,
@@ -617,34 +647,42 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 	}, nil
 }
 
-func convertAccounts(accs []*rpc.Account) []*commonsol.Account {
+func convertAccounts(accs []*rpc.Account) ([]*commonsol.Account, error) {
 	ret := make([]*commonsol.Account, 0, len(accs))
 	for _, acc := range accs {
+		data, err := convertDataBytesOrJSON(acc.Data, "")
+		if err != nil {
+			return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)
+		}
 		ret = append(ret, &commonsol.Account{
 			Lamports:   acc.Lamports,
 			Owner:      commonsol.PublicKey(acc.Owner),
-			Data:       convertDataBytesOrJSON(acc.Data, ""),
+			Data:       data,
 			Executable: acc.Executable,
 			RentEpoch:  acc.RentEpoch,
 			Space:      acc.Space,
 		})
 	}
 
-	return ret
+	return ret, nil
 }
 
-func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingType) *commonsol.GetAccountInfoReply {
+func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingType) (*commonsol.GetAccountInfoReply, error) {
 	if acc == nil {
-		return nil
+		return nil, nil
 	}
 
 	var a *commonsol.Account
+	data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
+	if err != nil {
+		return nil, err
+	}
 	if acc.Value != nil {
 		a = &commonsol.Account{
 			Lamports:   acc.Value.Lamports,
 			Executable: acc.Value.Executable,
 			Owner:      commonsol.PublicKey(acc.Value.Owner),
-			Data:       convertDataBytesOrJSON(acc.Value.Data, enc),
+			Data:       data,
 		}
 	}
 
@@ -655,7 +693,7 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 			},
 		},
 		Value: a,
-	}
+	}, nil
 }
 
 func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountInfoOpts {
@@ -674,29 +712,46 @@ func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountI
 	}
 }
 
-func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, enc commonsol.EncodingType) *commonsol.DataBytesOrJSON {
+func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingType) (*commonsol.DataBytesOrJSON, error) {
 	if obj == nil {
-		return nil
+		return nil, nil
 	}
-	if enc == "" {
-		enc = commonsol.EncodingJSON // default
+	if pref == "" {
+		pref = commonsol.EncodingJSON // default
 	}
-	var txJSON []byte
-	if b, err := json.Marshal(obj); err == nil {
-		txJSON = b
-	}
+
 	txBytes := obj.GetBinary()
+
+	txJSON, jerr := json.Marshal(obj)
+
+	enc := pref
+	switch pref {
+	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
+		if jerr != nil {
+			// fall back to binary if available. Pick one policy.
+			if len(txBytes) == 0 {
+				return nil, fmt.Errorf("marshal to json failed: %w", jerr)
+			}
+
+			enc = commonsol.EncodingBase64 // fallback
+		}
+	default:
+		// If caller prefers binary but there are no bytes, try JSON.
+		if len(txBytes) == 0 && jerr == nil {
+			enc = commonsol.EncodingJSON
+		}
+	}
 
 	return &commonsol.DataBytesOrJSON{
 		RawDataEncoding: enc,
 		AsDecodedBinary: txBytes,
-		AsJSON:          txJSON,
-	}
+		AsJSON:          txJSON, // nil if marshal failed; that’s fine if enc != JSON
+	}, nil
 }
 
-func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) *commonsol.GetBlockReply {
+func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) (*commonsol.GetBlockReply, error) {
 	if block == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Hashes
@@ -721,11 +776,14 @@ func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) *common
 				t := commonsol.UnixTimeSeconds(int64(*tx.BlockTime))
 				perTxBT = &t
 			}
-
+			txData, err := convertDataBytesOrJSON(tx.Transaction, enc)
+			if err != nil {
+				return nil, fmt.Errorf("conversion of data bytes or json for tx data failed: %w", err)
+			}
 			txs[i] = commonsol.TransactionWithMeta{
 				BlockTime:   perTxBT,
 				Version:     commonsol.TransactionVersion(tx.Version),
-				Transaction: convertDataBytesOrJSON(tx.Transaction, enc),
+				Transaction: txData,
 				Meta:        convertTransactionMeta(tx.Meta),
 			}
 		}
@@ -744,5 +802,5 @@ func convertBlock(block *rpc.GetBlockResult, enc commonsol.EncodingType) *common
 		Signatures:        sigs,
 		BlockTime:         bt,
 		BlockHeight:       block.BlockHeight,
-	}
+	}, nil
 }

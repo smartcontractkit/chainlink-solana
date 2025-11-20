@@ -194,7 +194,9 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertDataBytesOrJSON_nil", func(t *testing.T) {
-		require.Nil(t, convertDataBytesOrJSON(nil, ""))
+		data, err := convertDataBytesOrJSON(nil, "")
+		require.Nil(t, data)
+		require.NoError(t, err)
 	})
 	t.Run("convertBlock_minimal", func(t *testing.T) {
 		bt := solana.UnixTimeSeconds(1730000000)
@@ -213,7 +215,8 @@ func Test_Converters(t *testing.T) {
 			},
 		}
 
-		got := convertBlock(rpcBlock, commonsol.EncodingJSON)
+		got, err := convertBlock(rpcBlock, commonsol.EncodingJSON)
+		require.NoError(t, err)
 		require.NotNil(t, got)
 		require.Equal(t, commonsol.Hash(cpk(1)), got.Blockhash)
 		require.Equal(t, commonsol.Hash(cpk(2)), got.PreviousBlockhash)
