@@ -52,7 +52,6 @@ func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlo
 	return &commonsol.LPBlock{
 		Slot: uint64(n), //nolint:gosec // G115
 	}, nil
-
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
@@ -186,8 +185,8 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 }
 
 var (
-	missingEventSigPrimitiveErr = errors.New("missing event signature primitive in filter query")
-	missingAddressPrimitiveErr  = errors.New("missing address primitive in filter query")
+	errMissingEventSigPrimitive = errors.New("missing event signature primitive in filter query")
+	errMissingAddressPrimitive  = errors.New("missing address primitive in filter query")
 )
 
 func deriveNameFromFilterQuery(filter []query.Expression) (string, error) {
@@ -207,10 +206,10 @@ func deriveNameFromFilterQuery(filter []query.Expression) (string, error) {
 
 	var errs []error
 	if address == "" {
-		errs = append(errs, missingAddressPrimitiveErr)
+		errs = append(errs, errMissingAddressPrimitive)
 	}
 	if eventSig == "" {
-		errs = append(errs, missingEventSigPrimitiveErr)
+		errs = append(errs, errMissingEventSigPrimitive)
 	}
 	if len(errs) > 0 {
 		return "", errors.Join(errs...)
@@ -271,7 +270,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
-	forwarder := ss.chain.Config().WF().ForwarderAddress()
+	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
