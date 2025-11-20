@@ -270,7 +270,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
-	forwarder := ss.chain.Config().WF().ForwarderAddress()
+	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
