@@ -17,6 +17,9 @@ packages:
       NodeSuccess:
       ReportObservations:
       SlotHeight:
+  github.com/smartcontractkit/chainlink-solana/pkg/solana:
+    interfaces:
+      Chain:
   github.com/smartcontractkit/chainlink-solana/pkg/solana/client:
     interfaces:
       ReaderWriter:
