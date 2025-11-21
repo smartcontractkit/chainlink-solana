@@ -595,9 +595,14 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 			continue
 		}
 
+		a.lggr.Debugw("decoded executed event", "event", stateChange)
+
 		executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)] =
 			append(executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)], ccipocr3.SeqNum(stateChange.SequenceNumber))
 	}
+
+	a.lggr.Debugw("executed results", "map", executed)
+
 	return executed, nil
 }
 
