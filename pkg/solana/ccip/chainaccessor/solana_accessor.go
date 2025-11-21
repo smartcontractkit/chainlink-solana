@@ -509,7 +509,7 @@ func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipoc
 
 	expressions := []query.Expression{
 		logpoller.NewAddressFilter(offrampAddr),
-		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameCommitReportAccepted)),
+		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameExecutionStateChanged)),
 	}
 	expressions = append(expressions, keyFilter.Expressions...)
 
@@ -517,6 +517,11 @@ func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipoc
 	if err != nil {
 		return nil, fmt.Errorf("failed to query executed message logs from log poller: %w", err)
 	}
+
+	a.lggr.Debugw("queried ExecutedMessages",
+		"numEvents", len(logs),
+		"seqRangesPerChain", nonEmptyRangesPerChain,
+	)
 
 	return a.processExecutionStateChangesEvents(logs, nonEmptyRangesPerChain)
 }
