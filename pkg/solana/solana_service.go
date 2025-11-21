@@ -375,9 +375,9 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 	}
 
 	return &commonsol.GetMultipleAccountsReply{
-		RPCContext: commonsol.RPCContext{Context: commonsol.Context{
+		RPCContext: commonsol.RPCContext{
 			Slot: res.Context.Slot,
-		}},
+		},
 		Value: accounts,
 	}, nil
 }
@@ -696,9 +696,7 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 
 	return &commonsol.GetAccountInfoReply{
 		RPCContext: commonsol.RPCContext{
-			Context: commonsol.Context{
-				Slot: acc.Context.Slot,
-			},
+			Slot: acc.Context.Slot,
 		},
 		Value: a,
 	}, nil
