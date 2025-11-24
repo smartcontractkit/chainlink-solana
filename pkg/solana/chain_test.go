@@ -17,11 +17,13 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
+	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	commonks "github.com/smartcontractkit/chainlink-common/keystore"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
@@ -269,13 +271,30 @@ func TestChain_Transact(t *testing.T) {
 	url := solanatesting.SetupLocalSolNode(t)
 	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
-	// transaction parameters
-	sender, err := solana.NewRandomPrivateKey()
+	storage := commonks.NewMemoryStorage()
+	ks, err := commonks.LoadKeystore(ctx, storage, "test-password", commonks.WithScryptParams(commonks.FastScryptParams))
 	require.NoError(t, err)
+	oldCoreKeystore := commonks.NewCoreKeystore(ks)
+	keysResp, err := ks.CreateKeys(ctx, commonks.CreateKeysRequest{
+		Keys: []commonks.CreateKeyRequest{
+			{KeyName: "sign", KeyType: commonks.Ed25519},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(keysResp.Keys))
+	senderPubkeyBytes := keysResp.Keys[0].KeyInfo.PublicKey
+	senderPubkeyString := base58.Encode(senderPubkeyBytes)
+	// chain uses key name as account identifier, rename to public key string.
+	_, err = ks.RenameKey(ctx, commonks.RenameKeyRequest{
+		OldName: "sign",
+		NewName: senderPubkeyString,
+	})
+
+	// receiver does not sign transactions, so we create it plain.
 	receiver, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 	amount := big.NewInt(100_000_000_000 - 5_000) // total balance - tx fee
-	solanatesting.FundTestAccounts(t, solana.PublicKeySlice{sender.PublicKey()}, url)
+	solanatesting.FundTestAccounts(t, solana.PublicKeySlice{solana.PublicKey(senderPubkeyBytes)}, url)
 
 	// configuration
 	cfg := solcfg.NewDefault()
@@ -285,23 +304,16 @@ func TestChain_Transact(t *testing.T) {
 		SendOnly: false,
 	})
 
-	// mocked keystore
-	mkey := mocks.NewSimpleKeystore(t)
-	mkey.On("Sign", mock.Anything, sender.PublicKey().String(), mock.Anything).Return(func(_ context.Context, _ string, data []byte) []byte {
-		sig, _ := sender.Sign(data)
-		return sig[:]
-	}, nil)
-
 	// get genesis hash and use it as chainID
 	solClient := rpc.New(url)
 	genesisHash, err := solClient.GetGenesisHash(ctx)
 	require.NoError(t, err)
 
-	c, err := newChain(genesisHash.String(), cfg, mkey, lgr, sqltest.NewNoOpDataSource())
+	c, err := newChain(genesisHash.String(), cfg, oldCoreKeystore, lgr, sqltest.NewNoOpDataSource())
 	require.NoError(t, err)
 	require.NoError(t, c.txm.Start(ctx))
 
-	require.NoError(t, c.Transact(ctx, sender.PublicKey().String(), receiver.PublicKey().String(), amount, true))
+	require.NoError(t, c.Transact(ctx, senderPubkeyString, receiver.PublicKey().String(), amount, true))
 	tests.AssertLogEventually(t, logs, "marking transaction as confirmed")
 	tests.AssertLogEventually(t, logs, "stopped tx retry")
 	require.NoError(t, c.txm.Close())
