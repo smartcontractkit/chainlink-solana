@@ -240,7 +240,7 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 	}
 
 	genericEvents := make([]*chainaccessor.SendRequestedEvent, 0)
-	for i, seq := range iter {
+	for _, seq := range iter {
 		event, ok := seq.Data.(*ccip.EventCCIPMessageSent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to EventCCIPMessageSent", seq.Data)
@@ -252,9 +252,8 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 				DestChainSelector:   ccipocr3.ChainSelector(event.Message.Header.DestChainSelector),
 				SequenceNumber:      ccipocr3.SeqNum(event.Message.Header.SequenceNumber),
 				Nonce:               event.Message.Header.Nonce,
-				TxHash:              logs[i].TxHash.ToSolana().String(),
 				OnRamp:              ccipocr3.UnknownAddress(onrampAddr.Bytes()),
-				// MsgHash: , TODO: need to set this field also?
+				// TxHash: logs[i].TxHash.ToSolana().String(), // Populating TxHash causes inconsistent state with non-LOOPP. Eventually required for CCTPv2.
 			},
 			Sender:         ccipocr3.UnknownAddress(event.Message.Sender.Bytes()),
 			Data:           ccipocr3.Bytes(event.Message.Data),
@@ -596,9 +595,14 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 			continue
 		}
 
+		a.lggr.Debugw("decoded executed event", "event", stateChange)
+
 		executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)] =
 			append(executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)], ccipocr3.SeqNum(stateChange.SequenceNumber))
 	}
+
+	a.lggr.Debugw("executed results", "map", executed)
+
 	return executed, nil
 }
 
