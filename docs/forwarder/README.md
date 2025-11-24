@@ -14,21 +14,23 @@ pub struct Report<'info> {
 
     #[account(
         mut,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
     )]
-    oracles_config: Account<'info, OraclesConfig>,
+    pub oracles_config: AccountLoader<'info, OraclesConfig>,
 
     #[account(mut)]
     pub transmitter: Signer<'info>,
 
     /// CHECK: This is a PDA
-    #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
 
     // it is dependent on the state.key(), a predetermined bump, workflow execution id, config_id, report_id
     #[account(
         init_if_needed,
+        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         payer = transmitter,
         space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
         seeds = [
@@ -75,7 +77,7 @@ The following instructions exist on the program:
 
 ## initialize
 
-An important responsibility of this instruction is to pre-compute the forwarder authority PDA and store the bump in the state account for future usage. The bump (along with seed phrases) is used to deterministically compute the forwarder authority PDA. So this means that given a state account, known seeds, and the bump in authority nonce (or bump) you can deterministically derive the associated forwarder authority PDA.
+Basic instruction which creates a new state account and sets the owner.
 
 ## report
 
@@ -87,7 +89,7 @@ If everything looks good, it'll begin constructing the CPI instruction. The repo
 The report function takes a raw data buffer `Vec<u8>` with a custom encoding format to save space
 
 ```
-data =  len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
+data = len_signatures (1) | signatures (N*65) | raw_report (M) | report_context (96)
 ```
 
 The `report_context` is extra information about the report that is included before signing the entire report blob.
@@ -106,12 +108,16 @@ pub fn on_report(ctx: Context<OnReport>, metadata: Vec<u8>, report: Vec<u8>) -> 
 
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    #[account(owner = FORWARDER_ID)]
+    // Note: the receiver function does not need to directly authenticate the forwarder state
+    // as long as it verifies the forwarder_authority.
+    // WARNING: the FORWARDER_ID deployed in an environment may be different
+    // than the one in source control (the chainlink keystone_forwarder crate). You need to view the official chainlink docs to determine
+    // the correct FORWARDER_ID to use
+    #[account(owner = <FORWARDER_ID>)]
     pub state: Account<'info, ForwarderState>,
 
     /// CHECK: This is a PDA
-    /// Anchor is unable to compute PDA with other program id so must do inline check within on_report
-    /// #[account(seeds = [b"forwarder", state.key().as_ref()], bump = state.authority_nonce)]
+    /// #[account(seeds = [b"forwarder", state.key().as_ref(), <RECEIVER_PROGRAM_ID>], bump = state.authority_nonce, seeds::program = <FORWARDER_ID>)]
     pub forwarder_authority: Signer<'info>,
 
     // remaining accounts passed in as well
@@ -154,26 +160,26 @@ We use ALTs (address lookup tables) for the following accounts for a hypothetica
 * system program
 * receiver data account state which stores some arbitrary data (part of ctx.remaining_accounts)
 
-This uses 901 bytes, so we have 1232 - 901 = 331 bytes left over for the payload. 
+This uses 937 bytes, so we have 1232 - 937 = 295 bytes left over for the payload. 
 
-This 331 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 333 bytes with a clean slate.
+This 295 number accounts for a test 1 byte payload and also an extra single data account used by the receiver, so it'd be 297 (295 + 1 + 1) bytes as the theoretical maximum amount of space.
 
 In an internal data feeds use case we can assume that the receiver program is static and that the data accounts we are writing to per price asset are also static. However, a realistic use case would definitely have extra data accounts passed into ctx.remaining_accounts. 
 
 So for internal data feeds use case:
 ```
-max_payload_size = 333 - (ctx.remaining_accounts.len())
+max_payload_size = 297 - (ctx.remaining_accounts.len())
 ```
 
 For an external use-case, for an arbitrary receiver, the user will need to pass in another ALT (Solana can support passing 4 ALTs per transaction) on top of the internal ALT we always pass in. So we lose 32 bytes. Assuming the user also puts the receiver program and extra data accounts in their personal ALT:
 ```
-max_payload_size = 333 - 32 = 301 - (ctx.remaining_accounts.len())
+max_payload_size = 297 - 32 = 265 - (ctx.remaining_accounts.len())
 ```
 
 If they don't pass in another ALT:
 
 ```
-max_payload_size = 333 - 32 - 32*(ctx.remaining_accounts.len()) = 301 - 32*(ctx.remaining_accounts.len()) 
+max_payload_size = 297 - 32 - 32*(ctx.remaining_accounts.len()) = 265 - 32*(ctx.remaining_accounts.len()) 
 ```
 (the first 32 bytes is deducted for the receiver account address)
 

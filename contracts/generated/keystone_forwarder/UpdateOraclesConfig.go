@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateOraclesConfig is the `updateOraclesConfig` instruction.
+// Updates oracles config under circumstances where the designated
+// signers or configuration parameters change
 type UpdateOraclesConfig struct {
 	DonId           *uint32
 	ConfigVersion   *uint32
@@ -22,15 +23,13 @@ type UpdateOraclesConfig struct {
 	// [1] = [WRITE] oraclesConfig
 	//
 	// [2] = [WRITE, SIGNER] owner
-	//
-	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewUpdateOraclesConfigInstructionBuilder creates a new `UpdateOraclesConfig` instruction builder.
 func NewUpdateOraclesConfigInstructionBuilder() *UpdateOraclesConfig {
 	nd := &UpdateOraclesConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -92,17 +91,6 @@ func (inst *UpdateOraclesConfig) GetOwnerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }
 
-// SetSystemProgramAccount sets the "systemProgram" account.
-func (inst *UpdateOraclesConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *UpdateOraclesConfig {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
-	return inst
-}
-
-// GetSystemProgramAccount gets the "systemProgram" account.
-func (inst *UpdateOraclesConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
 func (inst UpdateOraclesConfig) Build() *Instruction {
 	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
@@ -148,9 +136,6 @@ func (inst *UpdateOraclesConfig) Validate() error {
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Owner is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.SystemProgram is not set")
-		}
 	}
 	return nil
 }
@@ -172,11 +157,10 @@ func (inst *UpdateOraclesConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("        state", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("oraclesConfig", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("        owner", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -239,8 +223,7 @@ func NewUpdateOraclesConfigInstruction(
 	// Accounts:
 	state ag_solanago.PublicKey,
 	oraclesConfig ag_solanago.PublicKey,
-	owner ag_solanago.PublicKey,
-	systemProgram ag_solanago.PublicKey) *UpdateOraclesConfig {
+	owner ag_solanago.PublicKey) *UpdateOraclesConfig {
 	return NewUpdateOraclesConfigInstructionBuilder().
 		SetDonId(donId).
 		SetConfigVersion(configVersion).
@@ -248,6 +231,5 @@ func NewUpdateOraclesConfigInstruction(
 		SetSignerAddresses(signerAddresses).
 		SetStateAccount(state).
 		SetOraclesConfigAccount(oraclesConfig).
-		SetOwnerAccount(owner).
-		SetSystemProgramAccount(systemProgram)
+		SetOwnerAccount(owner)
 }

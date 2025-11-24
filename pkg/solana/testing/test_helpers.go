@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	fundingTimeout    = 30 * time.Second
 	fundingTimestep   = 500 * time.Millisecond
 	fundingMaxRetries = 5
 )
@@ -118,7 +117,7 @@ func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string
 		if attempts <= 0 {
 			return fmt.Errorf("failed to fund solana accounts")
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(fundingTimestep)
 		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
 	}
 

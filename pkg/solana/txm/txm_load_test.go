@@ -73,7 +73,8 @@ func TestTxm_Integration(t *testing.T) {
 			client, err := solanaClient.NewClient(url, cfg, 2*time.Second, lggr)
 			require.NoError(t, err)
 			loader := utils.NewStaticLoader[solanaClient.ReaderWriter](client)
-			txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+			txm, err := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+			require.NoError(t, err)
 
 			// track initial balance
 			initBal, err := client.Balance(ctx, pubKey)
@@ -124,7 +125,7 @@ func TestTxm_Integration(t *testing.T) {
 
 			// check to make sure all txs are closed out from inflight list (longest should last MaxConfirmTimeout)
 			require.Eventually(t, func() bool {
-				txs := txm.InflightTxs()
+				txs := txm.InflightTxs(ctx)
 				t.Logf("Inflight txs: %d", txs)
 				return txs == 0
 			}, tests.WaitTimeout(t), time.Second)

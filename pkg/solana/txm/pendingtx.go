@@ -3,6 +3,7 @@ package txm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -29,7 +30,7 @@ type PendingTxContext interface {
 	// RevertToAwaitingBroadcast reverts the transaction's status to AwaitingBroadcast. It also removes context and related signatures from storage associated to given tx id if not in finalized or errored state
 	RevertToAwaitingBroadcast(id string) error
 	// ListAllSigs returns all of the signatures being tracked for all transactions not yet finalized or errored
-	ListAllSigs() []solana.Signature
+	ListAllSigs(ctx context.Context) []solana.Signature
 	// ListAllExpiredBroadcastedTxs returns all the txes that are in broadcasted state and have expired for given block number compared against lastValidBlockHeight (last valid block number)
 	// Passing maxUint64 as currBlockNumber will return all broadcasted txes.
 	ListAllExpiredBroadcastedTxs(currBlockNumber uint64) []pendingTx
@@ -40,13 +41,13 @@ type PendingTxContext interface {
 	// OnProcessed marks transactions as Processed
 	OnProcessed(sig solana.Signature) (string, error)
 	// OnConfirmed marks transaction as Confirmed and moves it from broadcast map to confirmed map
-	OnConfirmed(sig solana.Signature) (string, error)
+	OnConfirmed(ctx context.Context, sig solana.Signature) (string, error)
 	// OnFinalized marks transaction as Finalized, moves it from the broadcasted or confirmed map to finalized map, removes signatures from signature map to stop confirmation checks
-	OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error)
+	OnFinalized(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration) (string, error)
 	// OnPrebroadcastError adds transaction that has not yet been broadcasted to the finalized/errored map as errored, matches err type using enum
-	OnPrebroadcastError(id string, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) error
+	OnPrebroadcastError(ctx context.Context, id string, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) error
 	// OnError marks transaction as errored, matches err type using enum, moves it from the broadcasted or confirmed map to finalized/errored map, removes signatures from signature map to stop confirmation checks
-	OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error)
+	OnError(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error)
 	// GetTxState returns the transaction state for the provided ID if it exists
 	GetTxState(id string) (utils.TxState, bool)
 	// TrimFinalizedErroredTxs removes transactions that have reached their retention time
@@ -59,6 +60,8 @@ type PendingTxContext interface {
 	IsTxReorged(sig solana.Signature, currentState utils.TxState) (string, bool)
 	// GetPendingTx returns the pendingTx for the given ID if it exists
 	GetPendingTx(id string) (pendingTx, error)
+	// GetTransactionSig returns the signature of the transaction for the given ID if it exists
+	GetTransactionSig(id string) (solana.Signature, error)
 }
 
 // finishedTx is used to store info required to track transactions to finality or error
@@ -76,6 +79,7 @@ type pendingTx struct {
 type finishedTx struct {
 	retentionTs time.Time
 	state       utils.TxState
+	sig         solana.Signature
 }
 
 type txInfo struct {
@@ -284,7 +288,7 @@ func (c *pendingTxContext) RevertToAwaitingBroadcast(id string) error {
 	return err
 }
 
-func (c *pendingTxContext) ListAllSigs() []solana.Signature {
+func (c *pendingTxContext) ListAllSigs(ctx context.Context) []solana.Signature {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return maps.Keys(c.sigToTxInfo)
@@ -366,7 +370,7 @@ func (c *pendingTxContext) OnProcessed(sig solana.Signature) (string, error) {
 	})
 }
 
-func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
+func (c *pendingTxContext) OnConfirmed(ctx context.Context, sig solana.Signature) (string, error) {
 	err := c.withReadLock(func() error {
 		// validate if sig exists
 		info, sigExists := c.sigToTxInfo[sig]
@@ -413,7 +417,7 @@ func (c *pendingTxContext) OnConfirmed(sig solana.Signature) (string, error) {
 	})
 }
 
-func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error) {
+func (c *pendingTxContext) OnFinalized(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration) (string, error) {
 	err := c.withReadLock(func() error {
 		info, sigExists := c.sigToTxInfo[sig]
 		if !sigExists {
@@ -470,6 +474,7 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 		finalizedTx := finishedTx{
 			state:       utils.Finalized,
 			retentionTs: time.Now().Add(retentionTimeout),
+			sig:         sig,
 		}
 		// move transaction from confirmed to finalized map
 		c.finalizedErroredTxs[info.id] = finalizedTx
@@ -477,7 +482,7 @@ func (c *pendingTxContext) OnFinalized(sig solana.Signature, retentionTimeout ti
 	})
 }
 
-func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) error {
+func (c *pendingTxContext) OnPrebroadcastError(ctx context.Context, id string, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) error {
 	err := c.withReadLock(func() error {
 		// check if transaction already in the expected state
 		if tx, exists := c.finalizedErroredTxs[id]; exists && tx.state == txState {
@@ -522,7 +527,7 @@ func (c *pendingTxContext) OnPrebroadcastError(id string, retentionTimeout time.
 	return err
 }
 
-func (c *pendingTxContext) OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) (string, error) {
+func (c *pendingTxContext) OnError(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, _ TxErrType) (string, error) {
 	err := c.withReadLock(func() error {
 		// validate if signature exists
 		// skip checking tx existence to allow signature to get cleaned up
@@ -680,6 +685,19 @@ func (c *pendingTxContext) GetPendingTx(id string) (pendingTx, error) {
 	return tx, nil
 }
 
+func (c *pendingTxContext) GetTransactionSig(id string) (solana.Signature, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	tx, exists := c.finalizedErroredTxs[id]
+	if !exists {
+		return solana.Signature{}, ErrTransactionNotFound
+	}
+	if tx.sig.IsZero() {
+		return solana.Signature{}, fmt.Errorf("signature is zero, txState: %s", tx.state)
+	}
+	return tx.sig, nil
+}
+
 func (c *pendingTxContext) withReadLock(fn func() error) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -697,6 +715,7 @@ var _ PendingTxContext = &pendingTxContextWithProm{}
 type pendingTxContextWithProm struct {
 	pendingTx *pendingTxContext
 	chainID   string
+	metrics   *solTxmMetrics
 }
 
 type TxErrType int
@@ -711,10 +730,11 @@ const (
 	TxDependencyFail
 )
 
-func newPendingTxContextWithProm(id string) *pendingTxContextWithProm {
+func newPendingTxContextWithProm(id string, metrics *solTxmMetrics) *pendingTxContextWithProm {
 	return &pendingTxContextWithProm{
 		chainID:   id,
 		pendingTx: newPendingTxContext(),
+		metrics:   metrics,
 	}
 }
 
@@ -734,10 +754,10 @@ func (c *pendingTxContextWithProm) OnProcessed(sig solana.Signature) (string, er
 	return c.pendingTx.OnProcessed(sig)
 }
 
-func (c *pendingTxContextWithProm) OnConfirmed(sig solana.Signature) (string, error) {
-	id, err := c.pendingTx.OnConfirmed(sig) // empty ID indicates already previously removed
-	if id != "" && err == nil {             // increment if tx was not removed
-		promSolTxmSuccessTxs.WithLabelValues(c.chainID).Add(1)
+func (c *pendingTxContextWithProm) OnConfirmed(ctx context.Context, sig solana.Signature) (string, error) {
+	id, err := c.pendingTx.OnConfirmed(ctx, sig) // empty ID indicates already previously removed
+	if id != "" && err == nil {                  // increment if tx was not removed
+		c.metrics.IncrementSuccessTxs(ctx)
 	}
 	return id, err
 }
@@ -746,9 +766,9 @@ func (c *pendingTxContextWithProm) RevertToAwaitingBroadcast(id string) error {
 	return c.pendingTx.RevertToAwaitingBroadcast(id)
 }
 
-func (c *pendingTxContextWithProm) ListAllSigs() []solana.Signature {
-	sigs := c.pendingTx.ListAllSigs()
-	promSolTxmPendingTxs.WithLabelValues(c.chainID).Set(float64(len(sigs)))
+func (c *pendingTxContextWithProm) ListAllSigs(ctx context.Context) []solana.Signature {
+	sigs := c.pendingTx.ListAllSigs(ctx)
+	c.metrics.SetPendingTxs(ctx, len(sigs))
 	return sigs
 }
 
@@ -761,49 +781,49 @@ func (c *pendingTxContextWithProm) Expired(sig solana.Signature, lifespan time.D
 }
 
 // Success - tx finalized
-func (c *pendingTxContextWithProm) OnFinalized(sig solana.Signature, retentionTimeout time.Duration) (string, error) {
-	id, err := c.pendingTx.OnFinalized(sig, retentionTimeout) // empty ID indicates already previously removed
-	if id != "" && err == nil {                               // increment if tx was not removed
-		promSolTxmFinalizedTxs.WithLabelValues(c.chainID).Add(1)
+func (c *pendingTxContextWithProm) OnFinalized(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration) (string, error) {
+	id, err := c.pendingTx.OnFinalized(ctx, sig, retentionTimeout) // empty ID indicates already previously removed
+	if id != "" && err == nil {                                    // increment if tx was not removed
+		c.metrics.IncrementFinalizedTxs(ctx)
 	}
 	return id, err
 }
 
-func (c *pendingTxContextWithProm) OnError(sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error) {
-	id, err := c.pendingTx.OnError(sig, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
+func (c *pendingTxContextWithProm) OnError(ctx context.Context, sig solana.Signature, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) (string, error) {
+	id, err := c.pendingTx.OnError(ctx, sig, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
 	if err == nil {
-		incrementErrorMetrics(errType, c.chainID)
+		incrementErrorMetrics(ctx, errType, c.chainID, c.metrics)
 	}
 	return id, err
 }
 
-func (c *pendingTxContextWithProm) OnPrebroadcastError(id string, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) error {
-	err := c.pendingTx.OnPrebroadcastError(id, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
+func (c *pendingTxContextWithProm) OnPrebroadcastError(ctx context.Context, id string, retentionTimeout time.Duration, txState utils.TxState, errType TxErrType) error {
+	err := c.pendingTx.OnPrebroadcastError(ctx, id, retentionTimeout, txState, errType) // err indicates transaction not found so may already be removed
 	if err == nil {
-		incrementErrorMetrics(errType, c.chainID)
+		incrementErrorMetrics(ctx, errType, c.chainID, c.metrics)
 	}
 	return err
 }
 
-func incrementErrorMetrics(errType TxErrType, chainID string) {
+func incrementErrorMetrics(ctx context.Context, errType TxErrType, chainID string, metrics *solTxmMetrics) {
 	switch errType {
 	case NoFailure:
 		// Return early if no failure identified
 		return
 	case TxFailReject:
-		promSolTxmRejectTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementRejectTxs(ctx)
 	case TxFailRevert:
-		promSolTxmRevertTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementRevertTxs(ctx)
 	case TxFailDrop:
-		promSolTxmDropTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementDropTxs(ctx)
 	case TxFailSimRevert:
-		promSolTxmSimRevertTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementSimRevertTxs(ctx)
 	case TxFailSimOther:
-		promSolTxmSimOtherTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementSimOtherTxs(ctx)
 	case TxDependencyFail:
-		promSolTxmDependencyFailTxs.WithLabelValues(chainID).Inc()
+		metrics.IncrementDependencyFailTxs(ctx)
 	}
-	promSolTxmErrorTxs.WithLabelValues(chainID).Inc()
+	metrics.IncrementErrorTxs(ctx)
 }
 
 func (c *pendingTxContextWithProm) GetTxState(id string) (utils.TxState, bool) {
@@ -820,4 +840,8 @@ func (c *pendingTxContextWithProm) IsTxReorged(sig solana.Signature, currentSigS
 
 func (c *pendingTxContextWithProm) GetPendingTx(id string) (pendingTx, error) {
 	return c.pendingTx.GetPendingTx(id)
+}
+
+func (c *pendingTxContextWithProm) GetTransactionSig(id string) (solana.Signature, error) {
+	return c.pendingTx.GetTransactionSig(id)
 }

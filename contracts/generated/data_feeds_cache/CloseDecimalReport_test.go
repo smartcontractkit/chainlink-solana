@@ -10,18 +10,18 @@ import (
 	"testing"
 )
 
-func TestEncodeDecode_CloseDecimalReports(t *testing.T) {
+func TestEncodeDecode_CloseDecimalReport(t *testing.T) {
 	fu := ag_gofuzz.New().NilChance(0)
 	for i := 0; i < 1; i++ {
-		t.Run("CloseDecimalReports"+strconv.Itoa(i), func(t *testing.T) {
+		t.Run("CloseDecimalReport"+strconv.Itoa(i), func(t *testing.T) {
 			{
-				params := new(CloseDecimalReports)
+				params := new(CloseDecimalReport)
 				fu.Fuzz(params)
 				params.AccountMetaSlice = nil
 				buf := new(bytes.Buffer)
 				err := encodeT(*params, buf)
 				ag_require.NoError(t, err)
-				got := new(CloseDecimalReports)
+				got := new(CloseDecimalReport)
 				err = decodeT(got, buf.Bytes())
 				got.AccountMetaSlice = nil
 				ag_require.NoError(t, err)

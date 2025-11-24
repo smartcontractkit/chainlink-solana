@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
@@ -21,7 +22,6 @@ import (
 	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
 	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
@@ -320,7 +320,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+			ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
 		},
 	}
 	if *c.TestConfig.Common.InsideK8s {
@@ -348,7 +348,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
 				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: models.Interval(15 * time.Second),
+				ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig:                      PluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
 			},

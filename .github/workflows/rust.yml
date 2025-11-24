@@ -44,18 +44,18 @@ jobs:
       uses: actions/cache@v4
       with:
         path: contracts/target
-        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
     - name: Cache hello-world target dir
       uses: actions/cache@v4
       with:
         path: contracts/examples/hello-world/target
-        key: ${{ runner.os }}-v2-cargo-build-target-hello-world-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-v2-cargo-build-target-hello-world-${{ hashFiles('contracts/**/Cargo.lock') }}
     - name: cache docker build image
       id: cache-image
       uses: actions/cache@v4
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
@@ -89,13 +89,13 @@ jobs:
       uses: actions/cache@v4
       with:
         path: contracts/target
-        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
     - name: cache docker build image
       id: cache-image
       uses: actions/cache@v4
       with:
         path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
     - name: load cached image
       run: |
         docker load --input docker-build.tar
@@ -133,7 +133,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: contracts/target
-          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
 
       - name: cache docker build image
         id: cache-image
@@ -141,7 +141,7 @@ jobs:
         with:
           fail-on-cache-miss: true
           path: contracts/docker-build.tar
-          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
 
       - name: load cached image
         run: |
@@ -153,9 +153,6 @@ jobs:
           go-version-file: "./integration-tests/go.mod"
           check-latest: true
           cache-dependency-path: "./integration-tests/go.sum"
-
-      - name: Install gotestloghelper
-        run: go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@latest
 
       - name: Install Solana CLI
         run: ../scripts/install-solana-ci.sh

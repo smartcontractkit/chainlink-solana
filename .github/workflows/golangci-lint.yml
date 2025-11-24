@@ -1,55 +1,63 @@
 name: golangci_lint
 
-on:
-  pull_request:
+on: [pull_request]
 
 jobs:
   golang_lint_integration_tests:
     name: Golang Lint Integration Tests
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: cachix/install-nix-action@3715ab1a11cac9e991980d7b4a28d80c7ebdd8f9 # nix:v2.24.6
+      - name: Checkout code
+        uses: actions/checkout@v5
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - name: Print golangci-lint Version
-        run: nix develop -c golangci-lint --version
-      - name: golangci-lint
-        run: nix develop -c make lint-go-integration-tests
-      - name: Print lint report artifact
-        if: failure()
-        shell: bash
-        run: cat ./integration-tests/golangci-lint-integration-tests-report.xml
-      - name: Store lint report artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: golangci-lint-integration-tests-report
-          path: ./integration-tests/golangci-lint-integration-tests-report.xml
+          persist-credentials: false
 
+      - name: Get golangci-lint version from asdf
+        id: get-version
+        run: |
+          version=$(grep '^golangci-lint ' .tool-versions | awk '{print $2}')
+          echo "version=${version}" | tee -a "$GITHUB_OUTPUT"
+      - name: Run golangci-lint (integration-tests)
+        if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
+        uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/3.0.0
+        env:
+          checkout-repo: false
+          golangci-lint-version: v${{ steps.get-version.outputs.version }}
+          go-directory: integration-tests
+          golangci-lint-config:  ${{ github.workspace }}/.golangci.yml
   golang_lint_relay:
     name: Golang Lint Relay tests
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: cachix/install-nix-action@3715ab1a11cac9e991980d7b4a28d80c7ebdd8f9 # nix:v2.24.6
+      - name: Checkout code
+        uses: actions/checkout@v5
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - name: Print golangci-lint Version
-        run: nix develop -c golangci-lint --version
-      - name: golangci-lint
-        run: nix develop -c make lint-go-relay
-      - name: Print lint report artifact
-        if: failure()
-        shell: bash
-        run: cat ./pkg/golangci-lint-relay-report.xml
-      - name: Store lint report artifact
+          persist-credentials: false
+
+      - name: Get golangci-lint version from asdf
+        id: get-version
+        run: |
+          version=$(grep '^golangci-lint ' .tool-versions | awk '{print $2}')
+          echo "version=${version}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Run golangci-lint (integration-tests)
+        if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
+        uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/3.0.0
+        with:
+          checkout-repo: false
+          golangci-lint-version: v${{ steps.get-version.outputs.version }}
+          go-directory: pkg 
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: golangci-lint-relay-report
-          path: ./pkg/golangci-lint-relay-report.xml
+          path: pkg/golangci-lint-report.xml

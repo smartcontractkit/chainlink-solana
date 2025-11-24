@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// Report is the `report` instruction.
+// The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report.
+// After verification it will create a PDA to store the execution state if it does not exist.
+// The ctx.remaining_accounts accounts are passed on to the receiver, alongside the forwarder state account
+// and forwarder authority signer.
+// Available space for receiver payload is ~ 297 bytes. However, many factors will affect
+// this number including adding more accounts in the ctx.remaining_accounts and/or using address
+// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
 type Report struct {
 	Data *[]byte
 

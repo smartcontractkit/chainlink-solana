@@ -1148,7 +1148,8 @@ func (h *helper) Init(t *testing.T) {
 		return sig[:]
 	}, nil)
 
-	txm := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	txm, err := txm.NewTxm("localnet", loader, nil, cfg, mkey, lggr)
+	require.NoError(t, err)
 	err = txm.Start(t.Context())
 	require.NoError(t, err)
 

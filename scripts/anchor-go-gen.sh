@@ -6,7 +6,7 @@ for idl_path_str in "contracts/target/idl"/*
 do
   filename=$(basename "$idl_path_str")
 
-  if [[ "$filename" == "dummy_receiver.json" || "$filename" == "keystone_forwarder.json" || "$filename" == "data_feeds_cache.json"  ]]; then
+  if [[ "$filename" == "dummy_receiver.json" ]]; then
     echo "Skipping $filename"
     continue
   fi

@@ -63,11 +63,12 @@ func TestTxm_SendWithRetry_Race(t *testing.T) {
 	testRunner := func(t *testing.T, client solanaClient.ReaderWriter) {
 		// build minimal txm
 		loader := utils.NewStaticLoader(client)
-		txm := NewTxm("retry_race", loader, nil, cfg, ks, lggr)
+		txm, err := NewTxm("retry_race", loader, nil, cfg, ks, lggr)
+		require.NoError(t, err)
 		txm.fee = fee
 
 		msg.cfg = txm.defaultTxConfig()
-		err := txm.txs.New(msg)
+		err = txm.txs.New(msg)
 		require.NoError(t, err)
 		_, _, _, err = txm.sendWithRetry(t.Context(), msg)
 		require.NoError(t, err)

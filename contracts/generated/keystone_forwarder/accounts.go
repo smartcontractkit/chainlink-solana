@@ -11,7 +11,8 @@ import (
 type OraclesConfig struct {
 	ConfigId        uint64
 	F               uint8
-	SignerAddresses [][20]uint8
+	Padding         [7]uint8
+	SignerAddresses SignerAddressList
 }
 
 var OraclesConfigDiscriminator = [8]byte{153, 175, 230, 85, 235, 101, 107, 140}
@@ -29,6 +30,11 @@ func (obj OraclesConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `F` param:
 	err = encoder.Encode(obj.F)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding` param:
+	err = encoder.Encode(obj.Padding)
 	if err != nil {
 		return err
 	}
@@ -64,6 +70,11 @@ func (obj *OraclesConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	if err != nil {
 		return err
 	}
+	// Deserialize `Padding`:
+	err = decoder.Decode(&obj.Padding)
+	if err != nil {
+		return err
+	}
 	// Deserialize `SignerAddresses`:
 	err = decoder.Decode(&obj.SignerAddresses)
 	if err != nil {
@@ -73,10 +84,9 @@ func (obj *OraclesConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 }
 
 type ForwarderState struct {
-	Version        uint8
-	AuthorityNonce uint8
-	Owner          ag_solanago.PublicKey
-	ProposedOwner  ag_solanago.PublicKey
+	Version       uint8
+	Owner         ag_solanago.PublicKey
+	ProposedOwner ag_solanago.PublicKey
 }
 
 var ForwarderStateDiscriminator = [8]byte{211, 150, 18, 11, 12, 158, 235, 175}
@@ -89,11 +99,6 @@ func (obj ForwarderState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return err
-	}
-	// Serialize `AuthorityNonce` param:
-	err = encoder.Encode(obj.AuthorityNonce)
 	if err != nil {
 		return err
 	}
@@ -126,11 +131,6 @@ func (obj *ForwarderState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return err
-	}
-	// Deserialize `AuthorityNonce`:
-	err = decoder.Decode(&obj.AuthorityNonce)
 	if err != nil {
 		return err
 	}

@@ -1,3 +1,4 @@
+version: "2"
 run:
   timeout: 15m0s
 linters:
@@ -5,7 +6,6 @@ linters:
     - exhaustive
     - copyloopvar
     - revive
-    - goimports
     - gosec
     - misspell
     - rowserrcheck
@@ -20,11 +20,16 @@ linters:
     - mirror
     - loggercheck
     - staticcheck
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/smartcontractkit/chainlink-solana
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
-  goimports:
-    local-prefixes: github.com/smartcontractkit/chainlink-solana
   golint:
     min-confidence: 1.0
   gosec:
@@ -106,8 +111,6 @@ linters-settings:
         deny:
           - pkg: "cosmossdk.io/errors"
             desc: Use the standard library instead
-          - pkg: "github.com/ethereum/go-ethereum"
-            desc: This is chain must be isolated from ethereum
           - pkg: "github.com/go-gorm/gorm"
             desc: Use github.com/jmoiron/sqlx directly instead
           - pkg: "github.com/gofrs/uuid"

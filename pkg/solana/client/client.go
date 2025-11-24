@@ -56,6 +56,7 @@ type Reader interface {
 type AccountReader interface {
 	GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
 	GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error)
+	GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, accountType any) (err error)
 }
 
 type Writer interface {
@@ -211,6 +212,21 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
+func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {
+	done := c.latency("get_account_data_borsh_into")
+	defer func() { done(err) }()
+
+	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
+	defer cancel()
+
+	err = c.rpc.GetAccountDataBorshInto(ctx, addr, &inVar)
+	if err != nil {
+		return fmt.Errorf("failed to get account data: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err error) {

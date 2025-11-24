@@ -10,7 +10,13 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// QueryFeedMetadata is the `queryFeedMetadata` instruction.
+// Returns a feed's workflow metadata. Chunks return
+// values by `max_count`.
+// Can be used on-chain to verify a feed's configuration.
+// If `start_index` is out of bounds the function will return an
+// empty array.
+// If `max_count = 0` then function will return the entire
+// workflow metadata list.
 type QueryFeedMetadata struct {
 	DataId     *[16]uint8
 	StartIndex *uint8

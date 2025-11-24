@@ -10,7 +10,10 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// UpdateLegacyFeedsConfig is the `updateLegacyFeedsConfig` instruction.
+// Updates legacy feed config.
+// Recommended limit of 15 legacy feeds can be updated at once.
+// Instruction does not verify internally if data id and associated legacy feed account
+// are correct pairs or if aforementioned legacy feed account is owned by the legacy store.
 type UpdateLegacyFeedsConfig struct {
 	DataIds       *[][16]uint8
 	WriteDisabled *[]bool

@@ -34,9 +34,6 @@ pub enum ForwarderError {
     #[msg("Report does not meet minimum length")]
     InvalidReport,
 
-    #[msg("Config does not exist")]
-    InvalidConfig,
-
     #[msg("Invalid signature count")]
     InvalidSignatureCount,
 
@@ -52,12 +49,15 @@ pub enum ForwarderError {
     #[msg("Execution already succeded")]
     ExecutionAlreadySucceded,
 
-    #[msg("Invalid Execution PDA")]
-    InvalidExecutionPDA,
-
     #[msg("Fault tolerance must be positive")]
     FaultToleranceMustBePositive,
 
     #[msg("Insufficient Signers")]
     InsufficientSigners,
+
+    #[msg("Forwarder Report Expected")]
+    ForwarderReportExpected,
+
+    #[msg("Invalid Account Hash")]
+    InvalidAccountHash,
 }

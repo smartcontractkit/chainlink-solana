@@ -9,20 +9,25 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/provider"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
+	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
@@ -47,17 +52,19 @@ var _ relaytypes.Relayer = &Relayer{}
 type Relayer struct {
 	relaytypes.UnimplementedRelayer
 	services.StateMachine
-	lggr   logger.Logger
-	chain  Chain
-	stopCh services.StopChan
+	lggr                 logger.Logger
+	chain                Chain
+	stopCh               services.StopChan
+	capabilitiesRegistry core.CapabilitiesRegistry
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain, _ core.CapabilitiesRegistry) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain, capReg core.CapabilitiesRegistry) *Relayer {
 	return &Relayer{
-		lggr:   logger.Named(lggr, "Relayer"),
-		chain:  chain,
-		stopCh: make(services.StopChan),
+		lggr:                 logger.Named(lggr, "Relayer"),
+		chain:                chain,
+		stopCh:               make(services.StopChan),
+		capabilitiesRegistry: capReg,
 	}
 }
 
@@ -72,7 +79,63 @@ func (r *Relayer) Start(ctx context.Context) error {
 		if r.chain == nil {
 			return errors.New("Solana unavailable")
 		}
-		return r.chain.Start(ctx)
+		err := r.chain.Start(ctx)
+		if err != nil {
+			return err
+		}
+		if wfCfg := r.chain.Config().WF(); wfCfg.IsEnabled() {
+			if r.capabilitiesRegistry == nil {
+				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
+				return nil
+			}
+
+			var info relaytypes.ChainInfo
+
+			if wfCfg.Local() {
+				info = relaytypes.ChainInfo{
+					FamilyName:      "Solana",
+					ChainID:         r.chain.ID(),
+					NetworkName:     "testnet",
+					NetworkNameFull: "testnet",
+				}
+			} else {
+				info, err = r.GetChainInfo(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get chainInfo: %w", err)
+				}
+			}
+
+			wt, err := writetarget.New(r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)
+			if err != nil {
+				return fmt.Errorf("failed to initialise write target capability: %w", err)
+			}
+
+			dr, err := writetarget.NewDeriveRemaining(r.chain, r.chain.MultiClient(), wfCfg, r.lggr)
+			if err != nil {
+				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
+			}
+
+			err = r.capabilitiesRegistry.Add(ctx, wt)
+			if err != nil {
+				return fmt.Errorf("failed to register capability: %w", err)
+			}
+
+			capInfo, err := wt.Info(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get write target info: %w", err)
+			}
+
+			r.lggr.Infow("Registered write target", "chain_id", r.chain.ID(), "info", capInfo)
+
+			err = r.capabilitiesRegistry.Add(ctx, dr)
+			if err != nil {
+				return fmt.Errorf("failed to register capability: %w", err)
+			}
+
+			r.lggr.Infow("Registered derive remaining", "chain_id", r.chain.ID())
+		}
+
+		return nil
 	})
 }
 
@@ -367,4 +430,17 @@ func (r *Relayer) NewPluginProvider(ctx context.Context, rargs relaytypes.RelayA
 
 func (r *Relayer) NewOCR3CapabilityProvider(ctx context.Context, rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.OCR3CapabilityProvider, error) {
 	return nil, errors.New("ocr3 capability provider is not supported for solana")
+}
+
+func (r *Relayer) NewCCIPProvider(ctx context.Context, ccipArgs relaytypes.CCIPProviderArgs) (relaytypes.CCIPProvider, error) {
+	chainSelector, ok := chainsel.SolanaChainIdToChainSelector()[r.chain.ID()]
+	if !ok {
+		return nil, fmt.Errorf("invalid chain ID %s: could not find chain selector", r.chain.ID())
+	}
+
+	if r.chain.MultiClient() == nil {
+		return nil, errors.New("chain multi client is not set")
+	}
+
+	return provider.NewCCIPProvider(ctx, r.lggr, ccipocr3common.ChainSelector(chainSelector), ccipArgs.PluginType, *r.chain.MultiClient(), r.chain.LogPoller(), r.chain.FeeEstimator(), r.chain.TxManager(), ccipArgs)
 }

@@ -2,7 +2,6 @@ package solana
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -108,7 +107,7 @@ func TestGetState(t *testing.T) {
 	reader := testSetupReader(t, mockServer.URL)
 	getReader := func() (client.AccountReader, error) { return reader, nil }
 	// happy path does not error (actual state decoding handled in types_test)
-	_, _, err := GetState(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err := GetState(t.Context(), getReader, solana.PublicKey{}, "")
 	require.NoError(t, err)
 }
 
@@ -135,17 +134,17 @@ func TestGetLatestTransmission(t *testing.T) {
 
 	reader := testSetupReader(t, mockServer.URL)
 	getReader := func() (client.AccountReader, error) { return reader, nil }
-	a, _, err := GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
+	a, _, err := GetLatestTransmission(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedTime, a.Timestamp)
 	assert.Equal(t, expectedAns, a.Data.String())
 
 	// fail if returned transmission header is too short
-	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 
 	// fail if returned transmission is too short
-	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.Error(t, err)
 }
 
@@ -230,14 +229,14 @@ func TestNilPointerHandling(t *testing.T) {
 	getReader := func() (client.AccountReader, error) { return reader, nil }
 
 	// fail on get state query
-	_, _, err := GetState(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err := GetState(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetState.GetAccountInfoWithOpts")
 
 	// fail on transmissions header query
-	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Header")
 
 	passFirst = true // allow proper response for header query, fail on transmission
-	_, _, err = GetLatestTransmission(context.TODO(), getReader, solana.PublicKey{}, "")
+	_, _, err = GetLatestTransmission(t.Context(), getReader, solana.PublicKey{}, "")
 	assert.EqualError(t, err, errString+"GetLatestTransmission.GetAccountInfoWithOpts.Transmission")
 }

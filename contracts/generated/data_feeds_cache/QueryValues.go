@@ -10,7 +10,8 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// QueryValues is the `queryValues` instruction.
+// The data ids passed in must match the ordering of the decimal report accounts
+// passed into the remaining account context.
 type QueryValues struct {
 	DataIds *[][16]uint8
 
