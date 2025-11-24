@@ -83,6 +83,64 @@ func (_c *ReaderWriter_Balance_Call) RunAndReturn(run func(context.Context, sola
 	return _c
 }
 
+// BalanceWithCommitment provides a mock function with given fields: ctx, addr, commitment
+func (_m *ReaderWriter) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error) {
+	ret := _m.Called(ctx, addr, commitment)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BalanceWithCommitment")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) (uint64, error)); ok {
+		return rf(ctx, addr, commitment)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) uint64); ok {
+		r0 = rf(ctx, addr, commitment)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, solana.PublicKey, rpc.CommitmentType) error); ok {
+		r1 = rf(ctx, addr, commitment)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_BalanceWithCommitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BalanceWithCommitment'
+type ReaderWriter_BalanceWithCommitment_Call struct {
+	*mock.Call
+}
+
+// BalanceWithCommitment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - addr solana.PublicKey
+//   - commitment rpc.CommitmentType
+func (_e *ReaderWriter_Expecter) BalanceWithCommitment(ctx interface{}, addr interface{}, commitment interface{}) *ReaderWriter_BalanceWithCommitment_Call {
+	return &ReaderWriter_BalanceWithCommitment_Call{Call: _e.mock.On("BalanceWithCommitment", ctx, addr, commitment)}
+}
+
+func (_c *ReaderWriter_BalanceWithCommitment_Call) Run(run func(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType)) *ReaderWriter_BalanceWithCommitment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(solana.PublicKey), args[2].(rpc.CommitmentType))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_BalanceWithCommitment_Call) Return(_a0 uint64, _a1 error) *ReaderWriter_BalanceWithCommitment_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_BalanceWithCommitment_Call) RunAndReturn(run func(context.Context, solana.PublicKey, rpc.CommitmentType) (uint64, error)) *ReaderWriter_BalanceWithCommitment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ChainID provides a mock function with given fields: ctx
 func (_m *ReaderWriter) ChainID(ctx context.Context) (multinode.StringID, error) {
 	ret := _m.Called(ctx)
