@@ -70,7 +70,7 @@ func (k *TxKey) SignTx(ctx context.Context, req SignTxRequest) (SignTxResponse, 
 
 // CreateTxKey creates a new transaction signing key.
 // Note that key names are prefixed with PrefixSolana and PrefixTxKeystore.
-// For example, a key named "test-key" will be stored at the path "solana/test-key".
+// For example, a key named "test-key" will be stored at the path "solana/tx/test-key".
 func CreateTxKey(ks keystore.Keystore, name string) (*TxKey, error) {
 	path := keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore, name)
 	createReq := keystore.CreateKeysRequest{
