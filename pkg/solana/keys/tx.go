@@ -59,11 +59,13 @@ func (k *TxKey) SignTx(ctx context.Context, req SignTxRequest) (SignTxResponse, 
 		return SignTxResponse{}, err
 	}
 
-	// why?
-	var finalSig [64]byte
-	copy(finalSig[:], signResp.Signature)
-	req.Tx.Signatures = append(req.Tx.Signatures, finalSig)
-	return SignTxResponse{Tx: req.Tx}, nil
+	if solana.SignatureLength != len(signResp.Signature) {
+		return SignTxResponse{}, errors.New("invalid signature length")
+	}
+	var sigArray [solana.SignatureLength]byte
+	copy(sigArray[:], signResp.Signature)
+	req.Tx.Signatures = append(req.Tx.Signatures, sigArray)
+	return SignTxResponse(req), nil
 }
 
 // CreateTxKey creates a new transaction signing key.

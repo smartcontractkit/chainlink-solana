@@ -67,8 +67,8 @@ func TestTxKey(t *testing.T) {
 
 	// Wait for the transaction to be confirmed.
 	tests.AssertEventually(t, func() bool {
-		status, err := c.SignatureStatuses(ctx, []solana.Signature{sig})
-		if err != nil {
+		status, err2 := c.SignatureStatuses(ctx, []solana.Signature{sig})
+		if err2 != nil {
 			return false
 		}
 		if len(status) == 0 || status[0] == nil {
