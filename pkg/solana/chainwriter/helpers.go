@@ -1,6 +1,7 @@
 package chainwriter
 
 import (
+	"context"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/binary"
@@ -11,8 +12,11 @@ import (
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
+	associatedtokenaccount "github.com/gagliardetto/solana-go/programs/associated-token-account"
 
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 )
 
 type TestArgs struct {
@@ -191,6 +195,68 @@ func traversePath(data any, path []string) ([]any, error) {
 	default:
 		return nil, errors.New("unexpected type encountered at path: " + path[0])
 	}
+}
+func GetOrCreateATAIx(
+	ctx context.Context,
+	client client.MultiClient,
+	mint, owner, payer solana.PublicKey,
+) (ata solana.PublicKey, ix solana.Instruction, err error) {
+	// Derive ATA
+	ata, _, err = solana.FindAssociatedTokenAddress(owner, mint)
+	if err != nil {
+		return solana.PublicKey{}, nil, fmt.Errorf("find ATA: %w", err)
+	}
+
+	// Probe account
+	_, err = client.GetAccountInfoWithOpts(ctx, ata, &rpc.GetAccountInfoOpts{
+		Encoding:   "base64",
+		Commitment: rpc.CommitmentFinalized,
+	})
+
+	// account already exists, no instructions needed
+	if err == nil {
+		return ata, nil, nil
+	}
+
+	if err != nil && !errors.Is(err, rpc.ErrNotFound) {
+		return solana.PublicKey{}, nil, err
+	}
+
+	// Build ATA creation since Probe doesn't exists
+	ix = associatedtokenaccount.NewCreateInstruction(
+		ata,   // associated account
+		owner, // owner
+		mint,  // mint
+	).Build()
+	return ata, ix, nil
+}
+
+// EnsureATAs returns a slice of create-ATA instructions (if any) for a batch.
+// Callers typically prepend these to their transaction(s).
+type ATARequest struct {
+	Mint  solana.PublicKey
+	Owner solana.PublicKey
+}
+
+func EnsureATAs(
+	ctx context.Context,
+	client client.MultiClient,
+	payer solana.PublicKey,
+	reqs ...ATARequest,
+) ([]solana.Instruction, error) {
+	var out []solana.Instruction
+	seen := map[solana.PublicKey]bool{}
+	for _, r := range reqs {
+		ata, ix, err := GetOrCreateATAIx(ctx, client, r.Mint, r.Owner, payer)
+		if err != nil {
+			return nil, err
+		}
+		if ix != nil && !seen[ata] {
+			out = append(out, ix)
+			seen[ata] = true
+		}
+	}
+	return out, nil
 }
 
 func GetDiscriminator(instruction string) [8]byte {
