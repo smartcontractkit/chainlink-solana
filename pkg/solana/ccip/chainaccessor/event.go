@@ -192,7 +192,11 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		return fmt.Errorf("failed to extract event IDL: %w", err)
 	}
 
-	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
+	lpEventIDL := codec.EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}
+	eventIdlJSON, err := json.Marshal(lpEventIDL)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event IDL: %w", err)
+	}
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
@@ -200,7 +204,7 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Address:         logpollertypes.PublicKey(address),
 		EventName:       eventName,
 		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
-		EventIdl:        lpEventIDL,
+		EventIdl:        string(eventIdlJSON),
 		SubkeyPaths:     subKeyPaths,
 		StartingBlock:   conf.GetStartingBlock(),
 		Retention:       conf.GetRetention(),

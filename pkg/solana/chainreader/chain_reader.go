@@ -2,6 +2,7 @@ package chainreader
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -668,11 +669,12 @@ func toLPFilter(
 	subKeyPaths [][]string,
 	eventIdl codec.EventIDLTypes,
 ) logpollertypes.Filter {
+	eventIdlJSON, _ := json.Marshal(eventIdl)
 	return logpollertypes.Filter{
 		EventName:       name,
 		EventSig:        logpollertypes.NewEventSignatureFromName(name),
 		StartingBlock:   conf.GetStartingBlock(),
-		EventIdl:        logpollertypes.EventIdl(eventIdl),
+		EventIdl:        string(eventIdlJSON),
 		SubkeyPaths:     subKeyPaths,
 		Retention:       conf.GetRetention(),
 		MaxLogsKept:     conf.GetMaxLogsKept(),

@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -205,8 +206,14 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	return nil
 }
 
+// HANDLE codecv2 here
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	var eventIdl codec.EventIDLTypes
+	if err := json.Unmarshal([]byte(filter.EventIdl), &eventIdl); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal EventIdl: %w", err)
+	}
+
+	cEntry, err := codec.NewEventArgsEntry(filter.EventName, eventIdl, true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
 	}

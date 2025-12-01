@@ -135,20 +135,6 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl codec.EventIDLTypes
-
-func (e *EventIdl) Scan(src interface{}) error {
-	return scanJSON("EventIdl", e, src)
-}
-
-func (e EventIdl) Value() (driver.Value, error) {
-	return json.Marshal(e)
-}
-
-func (e EventIdl) Equal(o EventIdl) bool {
-	return reflect.DeepEqual(e, o)
-}
-
 func scanJSON(name string, dest, src interface{}) error {
 	var bSrc []byte
 	switch src := src.(type) {

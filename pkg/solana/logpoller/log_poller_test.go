@@ -376,7 +376,7 @@ func TestProcess(t *testing.T) {
 	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
 	require.NoError(t, err)
 
-	idl := types.EventIdl{
+	idl := codec.EventIDLTypes{
 		Event: codec.IdlEvent{
 			Name: "myEvent",
 			Fields: []codec.IdlEventField{{
@@ -395,7 +395,7 @@ func TestProcess(t *testing.T) {
 		EventName:   eventName,
 		Address:     addr,
 		EventSig:    eventSig,
-		EventIdl:    idl,
+		EventIdl:    mustMarshalEventIdl(idl),
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().ChainID().Return(chainID).Maybe()
