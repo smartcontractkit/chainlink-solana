@@ -54,7 +54,7 @@ func TestLookup(t *testing.T) {
 
 func TestAccountContant(t *testing.T) {
 	t.Run("AccountConstant resolves valid address", func(t *testing.T) {
-		expectedAddr := GetRandomPubKey(t)
+		expectedAddr := utils.GetRandomPubKey(t)
 		expectedMeta := []*solana.AccountMeta{
 			{
 				PublicKey:  expectedAddr,
@@ -75,7 +75,7 @@ func TestAccountContant(t *testing.T) {
 }
 func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup resolves valid address with just one address", func(t *testing.T) {
-		expectedAddr := GetRandomPubKey(t)
+		expectedAddr := utils.GetRandomPubKey(t)
 		testArgs := chainwriter.TestArgs{
 			Inner: []chainwriter.InnerArgs{
 				{Address: expectedAddr.Bytes()},
@@ -101,8 +101,8 @@ func TestAccountLookups(t *testing.T) {
 	})
 
 	t.Run("AccountLookup resolves valid address with just multiple addresses", func(t *testing.T) {
-		expectedAddr1 := GetRandomPubKey(t)
-		expectedAddr2 := GetRandomPubKey(t)
+		expectedAddr1 := utils.GetRandomPubKey(t)
+		expectedAddr2 := utils.GetRandomPubKey(t)
 
 		testArgs := chainwriter.TestArgs{
 			Inner: []chainwriter.InnerArgs{
@@ -137,7 +137,7 @@ func TestAccountLookups(t *testing.T) {
 	})
 
 	t.Run("AccountLookup fails when address isn't in args", func(t *testing.T) {
-		expectedAddr := GetRandomPubKey(t)
+		expectedAddr := utils.GetRandomPubKey(t)
 
 		testArgs := chainwriter.TestArgs{
 			Inner: []chainwriter.InnerArgs{
@@ -159,7 +159,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
 				IsWritable: (i)%2 == 0,
 			}
@@ -198,7 +198,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
 				IsSigner:   true,
 			}
@@ -227,7 +227,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
 			}
 		}
@@ -254,7 +254,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
 			}
 		}
@@ -281,7 +281,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 65; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
 			}
 		}
@@ -306,7 +306,7 @@ func TestAccountLookups(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			accounts[i] = &solana.AccountMeta{
-				PublicKey:  GetRandomPubKey(t),
+				PublicKey:  utils.GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
 				IsWritable: (i)%2 == 0,
 			}
@@ -333,11 +333,11 @@ func TestAccountLookups(t *testing.T) {
 }
 
 func TestPDALookups(t *testing.T) {
-	programID := GetRandomPubKey(t)
+	programID := utils.GetRandomPubKey(t)
 	ctx := t.Context()
 
 	t.Run("PDALookup resolves valid PDA with constant address seeds", func(t *testing.T) {
-		seed := GetRandomPubKey(t)
+		seed := utils.GetRandomPubKey(t)
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed.Bytes()}, programID)
 		require.NoError(t, err)
@@ -372,7 +372,7 @@ func TestPDALookups(t *testing.T) {
 		seed3 := ccipocr3common.ChainSelector(4)
 		bufSeed3 := make([]byte, 8)
 		binary.LittleEndian.PutUint64(bufSeed3, uint64(seed3))
-		seed4 := ccipocr3common.Bytes32(GetRandomPubKey(t).Bytes())
+		seed4 := ccipocr3common.Bytes32(utils.GetRandomPubKey(t).Bytes())
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed1, bufSeed2, bufSeed3, seed4[:]}, programID)
 		require.NoError(t, err)
@@ -430,9 +430,9 @@ func TestPDALookups(t *testing.T) {
 	})
 
 	t.Run("PDALookup resolves valid PDA with address lookup seeds", func(t *testing.T) {
-		seed1 := GetRandomPubKey(t)
-		seed2 := GetRandomPubKey(t)
-		addr3 := GetRandomPubKey(t)
+		seed1 := utils.GetRandomPubKey(t)
+		seed2 := utils.GetRandomPubKey(t)
+		addr3 := utils.GetRandomPubKey(t)
 		seed3 := ccipocr3common.UnknownEncodedAddress(addr3.String())
 
 		pda, _, err := solana.FindProgramAddress([][]byte{seed1.Bytes(), seed2.Bytes(), addr3.Bytes()}, programID)
@@ -471,7 +471,7 @@ func TestPDALookups(t *testing.T) {
 
 	t.Run("PDALookups resolves list of PDAs when a seed is an array", func(t *testing.T) {
 		singleSeed := []byte("test_seed")
-		arraySeed := []solana.PublicKey{GetRandomPubKey(t), GetRandomPubKey(t)}
+		arraySeed := []solana.PublicKey{utils.GetRandomPubKey(t), utils.GetRandomPubKey(t)}
 
 		expectedMeta := []*solana.AccountMeta{}
 
@@ -509,7 +509,7 @@ func TestPDALookups(t *testing.T) {
 
 	t.Run("PDALookups resolves list of PDAs when multiple seeds are arrays", func(t *testing.T) {
 		arraySeed1 := [][]byte{[]byte("test_seed1"), []byte("test_seed2")}
-		arraySeed2 := []solana.PublicKey{GetRandomPubKey(t), GetRandomPubKey(t)}
+		arraySeed2 := []solana.PublicKey{utils.GetRandomPubKey(t), utils.GetRandomPubKey(t)}
 
 		expectedMeta := []*solana.AccountMeta{}
 
@@ -616,7 +616,7 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Derived lookup table fails with invalid address", func(t *testing.T) {
-		invalidTable := GetRandomPubKey(t)
+		invalidTable := utils.GetRandomPubKey(t)
 
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
@@ -655,7 +655,7 @@ func TestLookupTables(t *testing.T) {
 	})
 
 	t.Run("Static lookup table fails with invalid address", func(t *testing.T) {
-		invalidTable := GetRandomPubKey(t)
+		invalidTable := utils.GetRandomPubKey(t)
 
 		lookupConfig := chainwriter.LookupTables{
 			DerivedLookupTables: nil,
@@ -796,7 +796,7 @@ func TestLookupTables(t *testing.T) {
 
 		pdaWithAccountLookupSeed := chainwriter.Lookup{
 			PDALookups: &chainwriter.PDALookups{
-				PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Address: GetRandomPubKey(t).String()}},
+				PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Address: utils.GetRandomPubKey(t).String()}},
 				Seeds: []chainwriter.Seed{
 					{
 						Dynamic: chainwriter.Lookup{
@@ -904,7 +904,7 @@ func TestCreateATAs(t *testing.T) {
 	}, 1*time.Minute, time.Second, "failed to confirm create mint transaction")
 
 	t.Run("returns no instructions when no ATA location is found", func(t *testing.T) {
-		user := GetRandomPubKey(t)
+		user := utils.GetRandomPubKey(t)
 		lookups := []chainwriter.ATALookup{
 			{
 				Location: "Invalid.Address",
@@ -942,7 +942,7 @@ func TestCreateATAs(t *testing.T) {
 		}
 
 		args := map[string][]solana.PublicKey{
-			"Addresses": {GetRandomPubKey(t), GetRandomPubKey(t)},
+			"Addresses": {utils.GetRandomPubKey(t), utils.GetRandomPubKey(t)},
 		}
 
 		_, err := chainwriter.CreateATAs(ctx, args, lookups, nil, multiClient, feePayer, lggr)
@@ -950,7 +950,7 @@ func TestCreateATAs(t *testing.T) {
 	})
 
 	t.Run("fails when mint is not a token address", func(t *testing.T) {
-		user := GetRandomPubKey(t)
+		user := utils.GetRandomPubKey(t)
 		ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint1, user)
 		require.NoError(t, err)
 		require.False(t, checkIfATAExists(t, rpcClient, ataAddress))
@@ -968,7 +968,7 @@ func TestCreateATAs(t *testing.T) {
 
 		args := chainwriter.TestArgs{
 			Inner: []chainwriter.InnerArgs{
-				{Address: GetRandomPubKey(t).Bytes()},
+				{Address: utils.GetRandomPubKey(t).Bytes()},
 			},
 		}
 
@@ -977,7 +977,7 @@ func TestCreateATAs(t *testing.T) {
 	})
 
 	t.Run("successfully creates ATAs only when necessary", func(t *testing.T) {
-		user := GetRandomPubKey(t)
+		user := utils.GetRandomPubKey(t)
 		ataAddress, _, err := tokens.FindAssociatedTokenAddress(tokenProgram, mint1, user)
 		require.NoError(t, err)
 		require.False(t, checkIfATAExists(t, rpcClient, ataAddress))
@@ -1013,7 +1013,7 @@ func TestCreateATAs(t *testing.T) {
 
 	t.Run("successfully creates multiple ATAs when necessary", func(t *testing.T) {
 		mints := []solana.PublicKey{mint1, mint2}
-		user := GetRandomPubKey(t)
+		user := utils.GetRandomPubKey(t)
 
 		var ataAddresses []solana.PublicKey
 		for _, mint := range mints {
@@ -1061,7 +1061,7 @@ func TestCreateATAs(t *testing.T) {
 	})
 
 	t.Run("optional ATA creation does not return error if lookups fail", func(t *testing.T) {
-		user := GetRandomPubKey(t)
+		user := utils.GetRandomPubKey(t)
 		lookups := []chainwriter.ATALookup{
 			{
 				Location: "Inner.Address",
@@ -1131,7 +1131,7 @@ func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 
 	addresses := make([]solana.PublicKey, num)
 	for i := 0; i < num; i++ {
-		addresses[i] = GetRandomPubKey(t)
+		addresses[i] = utils.GetRandomPubKey(t)
 	}
 	return addresses
 }

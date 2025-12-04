@@ -207,7 +207,7 @@ type printParser struct {
 	values []uint64
 }
 
-func (p *printParser) ProcessBlocks(ctx context.Context, blocks []logpollertypes.Block) error {
+func (p *printParser) ProcessBlocks(_ context.Context, blocks []logpollertypes.Block) error {
 	for _, b := range blocks {
 		err := p.process(b)
 		if err != nil {
