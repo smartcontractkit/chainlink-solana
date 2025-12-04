@@ -129,7 +129,7 @@ require (
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/cometbft/cometbft v0.38.17 // indirect
 	github.com/cometbft/cometbft-db v1.0.1 // indirect
-	github.com/consensys/gnark-crypto v0.18.1 // indirect
+	github.com/consensys/gnark-crypto v0.19.2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
