@@ -16,7 +16,7 @@
 /integration-tests @smartcontractkit/bix-build @smartcontractkit/bix-framework @smartcontractkit/data-feeds
 
 # contracts
-/contracts @smartcontractkit/data-feeds
+/contracts @smartcontractkit/data-feeds @smartcontractkit/bix-framework
 
 # gauntlet ownership
 /gauntlet @smartcontractkit/data-feeds
@@ -28,7 +28,7 @@
 /pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations @smartcontractkit/data-feeds @smartcontractkit/bix-build
 
 # CI/CD
-/.github/** @smartcontractkit/data-feeds @smartcontractkit/bix-build
+/.github/** @smartcontractkit/data-feeds @smartcontractkit/bix-build @smartcontractkit/bix-framework
 
 # SDK for feeds
 /ts @smartcontractkit/data-feeds
