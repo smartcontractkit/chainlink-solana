@@ -13,23 +13,23 @@ pub mod mock_ccip_events {
         execute_event: ExecutionStateChangedObj,
         cctp_event: CcipCctpMessageSentEventObj,
     ) -> Result<()> {
-        emit!(CCIPMessageSent{
+        emit!(CCIPMessageSent {
             dest_chain_selector: sent_event.dest_chain_selector,
             message: sent_event.message,
             sequence_number: sent_event.sequence_number,
         });
-        emit!(CommitReportAccepted{
+        emit!(CommitReportAccepted {
             merkle_root: commit_event.merkle_root,
             price_updates: commit_event.price_updates,
         });
-        emit!(ExecutionStateChanged{
+        emit!(ExecutionStateChanged {
             message_hash: execute_event.message_hash,
             message_id: execute_event.message_id,
             sequence_number: execute_event.sequence_number,
             source_chain_selector: execute_event.source_chain_selector,
             state: execute_event.state,
         });
-        emit!(CcipCctpMessageSentEvent{
+        emit!(CcipCctpMessageSentEvent {
             cctp_nonce: cctp_event.cctp_nonce,
             event_address: cctp_event.event_address,
             message_sent_bytes: cctp_event.message_sent_bytes,
@@ -44,7 +44,7 @@ pub mod mock_ccip_events {
 }
 
 #[derive(Accounts)]
-pub struct Initialize{}
+pub struct Initialize {}
 
 /// Events and structs copied from the CCIP contracts
 /// https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs
