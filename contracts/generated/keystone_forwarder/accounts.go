@@ -151,7 +151,6 @@ type ExecutionState struct {
 	Transmitter    ag_solanago.PublicKey
 	TransmissionId [32]uint8
 	Success        bool
-	Failure        bool
 }
 
 var ExecutionStateDiscriminator = [8]byte{31, 209, 35, 133, 132, 142, 151, 100}
@@ -174,11 +173,6 @@ func (obj ExecutionState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	}
 	// Serialize `Success` param:
 	err = encoder.Encode(obj.Success)
-	if err != nil {
-		return err
-	}
-	// Serialize `Failure` param:
-	err = encoder.Encode(obj.Failure)
 	if err != nil {
 		return err
 	}
@@ -211,11 +205,6 @@ func (obj *ExecutionState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `Success`:
 	err = decoder.Decode(&obj.Success)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Failure`:
-	err = decoder.Decode(&obj.Failure)
 	if err != nil {
 		return err
 	}

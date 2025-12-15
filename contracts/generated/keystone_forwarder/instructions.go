@@ -59,8 +59,6 @@ var (
 	// this number including adding more accounts in the ctx.remaining_accounts and/or using address
 	// lookup tables. Please refer to ../../docs/forwarder/README.md#L140
 	Instruction_Report = ag_binary.TypeID([8]byte{96, 121, 245, 84, 178, 45, 48, 91})
-
-	Instruction_ReportFailure = ag_binary.TypeID([8]byte{136, 97, 248, 125, 193, 230, 192, 171})
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -80,8 +78,6 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "CloseOraclesConfig"
 	case Instruction_Report:
 		return "Report"
-	case Instruction_ReportFailure:
-		return "ReportFailure"
 	default:
 		return ""
 	}
@@ -122,9 +118,6 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"report", (*Report)(nil),
-		},
-		{
-			"report_failure", (*ReportFailure)(nil),
 		},
 	},
 )
