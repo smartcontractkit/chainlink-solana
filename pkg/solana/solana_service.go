@@ -286,6 +286,18 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
 		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
 	}
+	msg := tx.Message
+	fmt.Println("Account keys:")
+	for i, k := range msg.AccountKeys {
+		fmt.Printf("account key:  [%d] %s\n", i, k.String())
+	}
+
+	fmt.Println("Instructions:")
+	for i, ins := range msg.Instructions {
+		fmt.Printf("  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
+			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
+	}
+	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
