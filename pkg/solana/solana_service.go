@@ -288,14 +288,14 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
 	}
 	msg := tx.Message
-	fmt.Println("Account keys:")
+	ss.logger.Debug("Account keys:")
 	for i, k := range msg.AccountKeys {
-		fmt.Printf("account key:  [%d] %s\n", i, k.String())
+		ss.logger.Debugf("account key:  [%d] %s\n", i, k.String())
 	}
 
-	fmt.Println("Instructions:")
+	ss.logger.Debug("Instructions:")
 	for i, ins := range msg.Instructions {
-		fmt.Printf("  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
+		ss.logger.Debugf("  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
 			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
 	}
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
