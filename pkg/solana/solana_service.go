@@ -263,7 +263,7 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
-	ss.logger.Debugf("submit transaction tx: %s", txID.String())
+	ss.logger.Debugf("submit transaction tx: %s tx:%s", txID.String(), req.EncodedTransaction)
 	if err != nil {
 		return nil, err
 	}
