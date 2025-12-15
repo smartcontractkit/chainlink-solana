@@ -290,8 +290,19 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	msg := tx.Message
 	ss.logger.Debug("Account keys:")
 	for i, k := range msg.AccountKeys {
-		ss.logger.Debugf("account key:  [%d] %s\n", i, k.String())
+		w, _ := msg.IsWritable(k)
+		ss.logger.Debugw("account flags",
+			"index", i,
+			"key", k.String(),
+			"isSigner", msg.IsSigner(k),
+			"isWritable", w,
+		)
 	}
+	ss.logger.Debugw("tx header",
+		"numRequiredSignatures", msg.Header.NumRequiredSignatures,
+		"numReadonlySigned", msg.Header.NumReadonlySignedAccounts,
+		"numReadonlyUnsigned", msg.Header.NumReadonlyUnsignedAccounts,
+	)
 
 	ss.logger.Debug("Instructions:")
 	for i, ins := range msg.Instructions {
