@@ -284,8 +284,9 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	transactionID := txID.String()
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
-		cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
-		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		//cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
+		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
+		cfg = append(cfg, utils.SetComputeUnitLimit(500_000))
 	}
 	msg := tx.Message
 	ss.logger.Debug("Account keys:")
