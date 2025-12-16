@@ -195,6 +195,30 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 
 	// Send initial transaction
 	ctx, cancel := context.WithTimeout(ctx, msg.cfg.Timeout)
+	m := initTx.Message
+
+	txm.lggr.Debug("TXM Account keys:")
+	for i, k := range m.AccountKeys {
+		w, _ := m.IsWritable(k)
+		txm.lggr.Debugw("TXM account flags",
+			"index", i,
+			"key", k.String(),
+			"isSigner", m.IsSigner(k),
+			"isWritable", w,
+		)
+	}
+	txm.lggr.Debugw("TXM tx header",
+		"numRequiredSignatures", m.Header.NumRequiredSignatures,
+		"numReadonlySigned", m.Header.NumReadonlySignedAccounts,
+		"numReadonlyUnsigned", m.Header.NumReadonlyUnsignedAccounts,
+	)
+
+	txm.lggr.Debug("TXM Instructions:")
+	for i, ins := range m.Instructions {
+		txm.lggr.Debugf("TXM  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
+			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
+	}
+
 	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		// Do not retry and exit early if fails
