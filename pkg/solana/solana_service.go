@@ -310,6 +310,10 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
 	}
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
+	_, err = ss.chain.MultiClient().SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false})
+	if err != nil {
+		return nil, fmt.Errorf("failed to simulate tx")
+	}
 
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
