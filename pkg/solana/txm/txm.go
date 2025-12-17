@@ -218,13 +218,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 		txm.lggr.Debugf("TXM  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
 			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
 	}
-
-	solClient := rpc.New("http://localhost:8550")
-	_, err = solClient.SimulateTransactionWithOpts(ctx, &initTx, &rpc.SimulateTransactionOpts{SigVerify: false})
-	if err != nil {
-		cancel()
-		return solanaGo.Transaction{}, "", solanaGo.Signature{}, fmt.Errorf("tx failed simulation: %w", err)
-	}
+	txm.lggr.Debugf("TXM final transaction: %s", initTx.MustToBase64())
 	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		// Do not retry and exit early if fails
