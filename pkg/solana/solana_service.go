@@ -316,6 +316,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("failed to simulate tx")
 	}
+	tx.Signatures = tx.Signatures[:0]
 
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
