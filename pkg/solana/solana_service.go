@@ -271,6 +271,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
+	ss.logger.Debug("SolService num signatures: ", len(tx.Signatures))
 	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
 	if err != nil {
