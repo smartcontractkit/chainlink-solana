@@ -263,7 +263,6 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
-	ss.logger.Debugf("submit transaction tx: %s tx:%s", txID.String(), req.EncodedTransaction)
 	if err != nil {
 		return nil, err
 	}
@@ -272,6 +271,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
 	ss.logger.Debug("SolService num signatures: ", len(tx.Signatures))
+	// remove dummy signatures
+	tx.Signatures = tx.Signatures[:0]
 	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
 	if err != nil {
@@ -289,34 +290,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
 		cfg = append(cfg, utils.SetComputeUnitLimit(500_000))
 	}
-	msg := tx.Message
-	ss.logger.Debug("Account keys:")
-	for i, k := range msg.AccountKeys {
-		w, _ := msg.IsWritable(k)
-		ss.logger.Debugw("account flags",
-			"index", i,
-			"key", k.String(),
-			"isSigner", msg.IsSigner(k),
-			"isWritable", w,
-		)
-	}
-	ss.logger.Debugw("tx header",
-		"numRequiredSignatures", msg.Header.NumRequiredSignatures,
-		"numReadonlySigned", msg.Header.NumReadonlySignedAccounts,
-		"numReadonlyUnsigned", msg.Header.NumReadonlyUnsignedAccounts,
-	)
-
-	ss.logger.Debug("Instructions:")
-	for i, ins := range msg.Instructions {
-		ss.logger.Debugf("  IX %d: program_id_index=%d, accounts=%v, data_len=%d\n",
-			i, ins.ProgramIDIndex, ins.Accounts, len(ins.Data))
-	}
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
-	_, err = ss.chain.MultiClient().SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{SigVerify: false})
-	if err != nil {
-		return nil, fmt.Errorf("failed to simulate tx")
-	}
-	tx.Signatures = tx.Signatures[:0]
 
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
