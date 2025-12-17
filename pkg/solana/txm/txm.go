@@ -195,7 +195,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 
 	// Send initial transaction
 	ctx, cancel := context.WithTimeout(ctx, msg.cfg.Timeout)
-	txm.lggr.Debugw("num signatures: ", len(initTx.Signatures))
+	txm.lggr.Debugf("num signatures: %d", len(initTx.Signatures))
 	sig, initSendErr := txm.sendTx(ctx, &initTx)
 	if initSendErr != nil {
 		// Do not retry and exit early if fails
