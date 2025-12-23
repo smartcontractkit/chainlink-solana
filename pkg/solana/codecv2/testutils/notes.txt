@@ -1,0 +1,9 @@
+SolanaAccessor.Sync
+  SolanaAccessor.bindContractEvent
+    SolanaAccessor.registerFilterIfNotExists
+      - unmarshal idl string into codec.IDL
+      - extractEventIdl using eventName into codec.IdlEvent
+      - add types to that to create codec.EventIDLTypes
+      logPoller.RegisterFilter (in logpoller/filters.go)
+        newDecoder
+          codec.NewEventArgsEntry

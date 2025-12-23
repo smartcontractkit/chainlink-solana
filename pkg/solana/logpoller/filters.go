@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -36,7 +38,7 @@ type filters struct {
 	knownDiscriminators    map[types.EventSignature]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
 	decoders               map[int64]types.Decoder
-	discriminatorExtractor codec.DiscriminatorExtractor
+	discriminatorExtractor solcommoncodec.DiscriminatorExtractor
 }
 
 func newFilters(lggr logger.Logger, orm ORM) *filters {
@@ -44,7 +46,7 @@ func newFilters(lggr logger.Logger, orm ORM) *filters {
 		orm:                    orm,
 		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]types.Decoder),
-		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
+		discriminatorExtractor: solcommoncodec.NewDiscriminatorExtractor(),
 	}
 }
 
@@ -206,12 +208,30 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	var cEntry solcommoncodec.Entry
+	var err error
+
+	// Get the inner EventIdl from the scanner
+	innerIdl := filter.EventIdl.Get()
+	if innerIdl == nil {
+		return nil, fmt.Errorf("EventIdl is nil")
+	}
+
+	// Check which type of EventIdl we have and create the appropriate entry
+	switch idl := innerIdl.(type) {
+	case *types.CodecEventIdl:
+		cEntry, err = codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(*idl), true, nil, binary.LittleEndian())
+	case *types.Codecv2EventIdl:
+		cEntry, err = codecv2.NewEventArgsEntry(filter.EventName, codecv2.EventIDLTypes(*idl), true, nil, binary.LittleEndian())
+	default:
+		return nil, fmt.Errorf("unsupported EventIdl type: %T", innerIdl)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
+	return solcommoncodec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
 func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {

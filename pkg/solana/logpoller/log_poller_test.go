@@ -376,26 +376,29 @@ func TestProcess(t *testing.T) {
 	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
 	require.NoError(t, err)
 
-	idl := types.EventIdl{
-		Event: codec.IdlEvent{
-			Name: "myEvent",
-			Fields: []codec.IdlEventField{{
-				Name: "A",
-				Type: idlTypeInt64,
-			}, {
-				Name: "B",
-				Type: idlTypeString,
-			}},
-		},
+	// idl := types.EventIdl{
+	idl := types.CodecEventIdl{Event: codec.IdlEvent{
+		Name: "myEvent",
+		Fields: []codec.IdlEventField{{
+			Name: "A",
+			Type: idlTypeInt64,
+		}, {
+			Name: "B",
+			Type: idlTypeString,
+		}},
+	},
 		Types: []codec.IdlTypeDef{},
 	}
+
+	var scanner types.EventIdlScanner
+	scanner.Set(&idl)
 
 	filter := types.Filter{
 		Name:        "test filter",
 		EventName:   eventName,
 		Address:     addr,
 		EventSig:    eventSig,
-		EventIdl:    idl,
+		EventIdl:    scanner,
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().ChainID().Return(chainID).Maybe()

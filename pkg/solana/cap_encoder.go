@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 var (
@@ -28,10 +29,10 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse borsh encoder config: %w", err)
 	}
-	parsed := &codec.ParsedTypes{
-		EncoderDefs: make(map[string]codec.Entry),
+	parsed := &solcommoncodec.ParsedTypes{
+		EncoderDefs: make(map[string]solcommoncodec.Entry),
 	}
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, idl.Accounts[0].Name, idl)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, idl.Accounts[0].Name, idl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find definition: %w", err)
 	}

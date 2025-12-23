@@ -15,6 +15,8 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 type PublicKey solana.PublicKey
@@ -113,7 +115,7 @@ const EventSignatureLength = 8
 type EventSignature [EventSignatureLength]byte
 
 func NewEventSignatureFromName(eventName string) EventSignature {
-	return EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
+	return EventSignature(solcommoncodec.NewDiscriminatorHashPrefix(eventName, false))
 }
 
 // Scan implements Scanner for database/sql.
@@ -135,18 +137,98 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl codec.EventIDLTypes
-
-func (e *EventIdl) Scan(src interface{}) error {
-	return scanJSON("EventIdl", e, src)
+// EventIdl is an interface that can be implemented by both codec and codecv2 EventIDLTypes
+type EventIdl interface {
+	driver.Valuer
+	Equal(other EventIdl) bool
 }
 
-func (e EventIdl) Value() (driver.Value, error) {
+// EventIdlScanner is a smart scanner that can scan database JSON into either CodecEventIdl or Codecv2EventIdl
+// It tries both types and uses whichever one works
+type EventIdlScanner struct {
+	inner EventIdl
+}
+
+// Scan implements sql.Scanner - tries codecv2 first, then codec
+func (w *EventIdlScanner) Scan(src interface{}) error {
+	if src == nil {
+		w.inner = nil
+		return nil
+	}
+
+	// Try to unmarshal as codecv2 first
+	var codecv2Idl Codecv2EventIdl
+	if err := scanJSON("Codecv2EventIdl", &codecv2Idl, src); err == nil {
+		w.inner = &codecv2Idl
+		return nil
+	}
+
+	// Fall back to codec
+	var codecIdl CodecEventIdl
+	if err := scanJSON("CodecEventIdl", &codecIdl, src); err != nil {
+		return fmt.Errorf("failed to scan EventIdl as both codecv2 and codec: %w", err)
+	}
+	w.inner = &codecIdl
+	return nil
+}
+
+// Value implements driver.Valuer
+func (w EventIdlScanner) Value() (driver.Value, error) {
+	if w.inner == nil {
+		return nil, nil
+	}
+	return w.inner.Value()
+}
+
+// Get returns the inner EventIdl interface
+func (w *EventIdlScanner) Get() EventIdl {
+	return w.inner
+}
+
+// Set sets the inner EventIdl
+func (w *EventIdlScanner) Set(idl EventIdl) {
+	w.inner = idl
+}
+
+// Equal compares two EventIdlScanners
+func (w *EventIdlScanner) Equal(other *EventIdlScanner) bool {
+	if w.inner == nil && other.inner == nil {
+		return true
+	}
+	if w.inner == nil || other.inner == nil {
+		return false
+	}
+	return w.inner.Equal(other.inner)
+}
+
+// CodecEventIdl wraps codec.EventIDLTypes to implement the EventIdl interface
+type CodecEventIdl codec.EventIDLTypes
+
+func (e *CodecEventIdl) Value() (driver.Value, error) {
 	return json.Marshal(e)
 }
 
-func (e EventIdl) Equal(o EventIdl) bool {
-	return reflect.DeepEqual(e, o)
+func (e *CodecEventIdl) Equal(other EventIdl) bool {
+	otherCodecPtr, ok := other.(*CodecEventIdl)
+	if !ok {
+		return false
+	}
+	return reflect.DeepEqual(e, otherCodecPtr)
+}
+
+// Codecv2EventIdl wraps codecv2.EventIDLTypes to implement the EventIdl interface
+type Codecv2EventIdl codecv2.EventIDLTypes
+
+func (e *Codecv2EventIdl) Value() (driver.Value, error) {
+	return json.Marshal(e)
+}
+
+func (e *Codecv2EventIdl) Equal(other EventIdl) bool {
+	otherCodecv2Ptr, ok := other.(*Codecv2EventIdl)
+	if !ok {
+		return false
+	}
+	return reflect.DeepEqual(e, otherCodecv2Ptr)
 }
 
 func scanJSON(name string, dest, src interface{}) error {

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"golang.org/x/exp/maps"
@@ -31,6 +32,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -159,18 +162,6 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 	return nil
 }
 
-func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, eventName, codecIDL)
-	if err != nil {
-		return codec.IdlEvent{}, err
-	}
-	eventIdl, isOk := idlDef.(codec.IdlEvent)
-	if !isOk {
-		return codec.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
-	}
-	return eventIdl, nil
-}
-
 // registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
 func (a *SolanaAccessor) registerFilterIfNotExists(
 	ctx context.Context,
@@ -182,17 +173,35 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Retention: &defaultCCIPLogsRetention,
 	}
 
-	var codecIDL codec.IDL
-	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
+	// Try to unmarshal into codecv2 (anchor-go) IDL first, then fall back to codec IDL
+	var innerEventIDL logpollertypes.EventIdl
+	var codecv2IDL anchoridl.Idl
+	if err := json.Unmarshal([]byte(filterConfig.idl), &codecv2IDL); err == nil {
+		// Successfully unmarshaled as codecv2 IDL
+		eventIdl, err := codecv2.ExtractEventIDL(eventName, codecv2IDL)
+		if err != nil {
+			return fmt.Errorf("failed to extract event IDL from codecv2: %w", err)
+		}
+		codecv2EventIDL := logpollertypes.Codecv2EventIdl{Event: eventIdl, Types: codecv2IDL.Types}
+		innerEventIDL = &codecv2EventIDL
+	} else {
+		// Try codec IDL as fallback
+		var codecIDL codec.IDL
+		if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
+			return fmt.Errorf("unexpected error: invalid IDL (tried both codecv2 and codec), error: %w", err)
+		}
+
+		eventIdl, err := codec.ExtractEventIDL(eventName, codecIDL)
+		if err != nil {
+			return fmt.Errorf("failed to extract event IDL from codec: %w", err)
+		}
+		codecEventIDL := logpollertypes.CodecEventIdl{Event: eventIdl, Types: codecIDL.Types}
+		innerEventIDL = &codecEventIDL
 	}
 
-	eventIdl, err := extractEventIDL(eventName, codecIDL)
-	if err != nil {
-		return fmt.Errorf("failed to extract event IDL: %w", err)
-	}
-
-	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
+	// Create scanner and set the inner idl
+	var lpEventIDL logpollertypes.EventIdlScanner
+	lpEventIDL.Set(innerEventIDL)
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
@@ -260,9 +269,9 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 			Receiver:       ccipocr3.UnknownAddress(event.Message.Receiver),
 			ExtraArgs:      ccipocr3.Bytes(event.Message.ExtraArgs),
 			FeeToken:       ccipocr3.UnknownAddress(event.Message.FeeToken.Bytes()),
-			FeeTokenAmount: codec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
+			FeeTokenAmount: solcommoncodec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
 			TokenAmounts:   convertTokenAmounts(event.Message.TokenAmounts),
-			FeeValueJuels:  codec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
+			FeeValueJuels:  solcommoncodec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
 		}
 		genericEvents = append(genericEvents, &chainaccessor.SendRequestedEvent{
 			DestChainSelector: msg.Header.DestChainSelector,
@@ -280,7 +289,7 @@ func convertTokenAmounts(transfers []ccip_router.SVM2AnyTokenTransfer) []ccipocr
 			SourcePoolAddress: transfer.SourcePoolAddress.Bytes(),
 			DestTokenAddress:  transfer.DestTokenAddress,
 			ExtraData:         transfer.ExtraData,
-			Amount:            codec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
+			Amount:            solcommoncodec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
 			DestExecData:      transfer.DestExecData,
 		})
 	}
