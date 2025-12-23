@@ -38,9 +38,9 @@ func TestLogPollerFilters(t *testing.T) {
 				EventSig:      types.EventSignature{1, 2, 3},
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-				EventIdl: func() types.EventIdlScanner {
-					var scanner types.EventIdlScanner
-					scanner.Set(&types.CodecEventIdl{
+				EventIdl: func() types.EventIdlWrapper {
+					var wrapper types.EventIdlWrapper
+					wrapper.Set(&types.CodecEventIdl{
 						Event: codec.IdlEvent{
 							Name:   "MyEvent",
 							Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
@@ -49,7 +49,7 @@ func TestLogPollerFilters(t *testing.T) {
 							{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
 						},
 					})
-					return scanner
+					return wrapper
 				}(),
 				Retention:   1000,
 				MaxLogsKept: 3,

@@ -651,9 +651,9 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 		idl = &codecIdl
 	}
 
-	// Create scanner and set the inner idl
-	var scanner logpollertypes.EventIdlScanner
-	scanner.Set(idl)
+	// Create wrapper and set the inner idl
+	var wrapper logpollertypes.EventIdlWrapper
+	wrapper.Set(idl)
 
 	return logpollertypes.Filter{
 		Name:            f.Name,
@@ -661,7 +661,7 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 		EventName:       f.EventName,
 		EventSig:        logpollertypes.EventSignature(f.EventSig),
 		StartingBlock:   f.StartingBlock,
-		EventIdl:        scanner,
+		EventIdl:        wrapper,
 		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
 		Retention:       f.Retention,
 		MaxLogsKept:     f.MaxLogsKept,

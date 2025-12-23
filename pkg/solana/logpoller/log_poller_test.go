@@ -390,15 +390,15 @@ func TestProcess(t *testing.T) {
 		Types: []codec.IdlTypeDef{},
 	}
 
-	var scanner types.EventIdlScanner
-	scanner.Set(&idl)
+	var wrapper types.EventIdlWrapper
+	wrapper.Set(&idl)
 
 	filter := types.Filter{
 		Name:        "test filter",
 		EventName:   eventName,
 		Address:     addr,
 		EventSig:    eventSig,
-		EventIdl:    scanner,
+		EventIdl:    wrapper,
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().ChainID().Return(chainID).Maybe()

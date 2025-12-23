@@ -13,7 +13,7 @@ type Filter struct {
 	EventName       string
 	EventSig        EventSignature
 	StartingBlock   int64
-	EventIdl        EventIdlScanner
+	EventIdl        EventIdlWrapper
 	SubkeyPaths     SubKeyPaths
 	Retention       time.Duration
 	MaxLogsKept     int64

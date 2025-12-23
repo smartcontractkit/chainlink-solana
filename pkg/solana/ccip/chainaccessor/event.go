@@ -199,8 +199,8 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		innerEventIDL = &codecEventIDL
 	}
 
-	// Create scanner and set the inner idl
-	var lpEventIDL logpollertypes.EventIdlScanner
+	// Create wrapper and set the inner idl
+	var lpEventIDL logpollertypes.EventIdlWrapper
 	lpEventIDL.Set(innerEventIDL)
 
 	subKeyPaths := processSubKeyPaths(filterConfig)

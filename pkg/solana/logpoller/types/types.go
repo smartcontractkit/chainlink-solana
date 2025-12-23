@@ -143,14 +143,14 @@ type EventIdl interface {
 	Equal(other EventIdl) bool
 }
 
-// EventIdlScanner is a smart scanner that can scan database JSON into either CodecEventIdl or Codecv2EventIdl
+// EventIdlWrapper is a smart scanner that can scan database JSON into either CodecEventIdl or Codecv2EventIdl
 // It tries both types and uses whichever one works
-type EventIdlScanner struct {
+type EventIdlWrapper struct {
 	inner EventIdl
 }
 
 // Scan implements sql.Scanner - tries codecv2 first, then codec
-func (w *EventIdlScanner) Scan(src interface{}) error {
+func (w *EventIdlWrapper) Scan(src interface{}) error {
 	if src == nil {
 		w.inner = nil
 		return nil
@@ -173,7 +173,7 @@ func (w *EventIdlScanner) Scan(src interface{}) error {
 }
 
 // Value implements driver.Valuer
-func (w EventIdlScanner) Value() (driver.Value, error) {
+func (w EventIdlWrapper) Value() (driver.Value, error) {
 	if w.inner == nil {
 		return nil, nil
 	}
@@ -181,17 +181,17 @@ func (w EventIdlScanner) Value() (driver.Value, error) {
 }
 
 // Get returns the inner EventIdl interface
-func (w *EventIdlScanner) Get() EventIdl {
+func (w *EventIdlWrapper) Get() EventIdl {
 	return w.inner
 }
 
 // Set sets the inner EventIdl
-func (w *EventIdlScanner) Set(idl EventIdl) {
+func (w *EventIdlWrapper) Set(idl EventIdl) {
 	w.inner = idl
 }
 
-// Equal compares two EventIdlScanners
-func (w *EventIdlScanner) Equal(other *EventIdlScanner) bool {
+// Equal compares two EventIdlWrappers
+func (w *EventIdlWrapper) Equal(other *EventIdlWrapper) bool {
 	if w.inner == nil && other.inner == nil {
 		return true
 	}
