@@ -9,16 +9,7 @@
   "instructions": [
     {
       "name": "get_multiple_reserves",
-      "discriminator": [
-        104,
-        122,
-        140,
-        104,
-        175,
-        151,
-        70,
-        42
-      ],
+      "discriminator": [104, 122, 140, 104, 175, 151, 70, 42],
       "accounts": [],
       "args": [],
       "returns": {
@@ -31,16 +22,7 @@
     },
     {
       "name": "get_reserves",
-      "discriminator": [
-        121,
-        140,
-        237,
-        84,
-        218,
-        105,
-        48,
-        17
-      ],
+      "discriminator": [121, 140, 237, 84, 218, 105, 48, 17],
       "accounts": [],
       "args": [],
       "returns": {
@@ -51,31 +33,13 @@
     },
     {
       "name": "get_tuple_reserves",
-      "discriminator": [
-        189,
-        83,
-        186,
-        20,
-        127,
-        80,
-        109,
-        49
-      ],
+      "discriminator": [189, 83, 186, 20, 127, 80, 109, 49],
       "accounts": [],
       "args": []
     },
     {
       "name": "initialize_data_account",
-      "discriminator": [
-        9,
-        64,
-        78,
-        49,
-        71,
-        193,
-        15,
-        250
-      ],
+      "discriminator": [9, 64, 78, 49, 71, 193, 15, 250],
       "accounts": [
         {
           "name": "data_account",
@@ -84,20 +48,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  100,
-                  97,
-                  116,
-                  97,
-                  95,
-                  97,
-                  99,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
+                "value": [100, 97, 116, 97, 95, 97, 99, 99, 111, 117, 110, 116]
               },
               {
                 "kind": "account",
@@ -129,16 +80,7 @@
     },
     {
       "name": "log_access",
-      "discriminator": [
-        196,
-        55,
-        194,
-        24,
-        5,
-        224,
-        161,
-        204
-      ],
+      "discriminator": [196, 55, 194, 24, 5, 224, 161, 204],
       "accounts": [
         {
           "name": "user",
@@ -154,16 +96,7 @@
     },
     {
       "name": "on_report",
-      "discriminator": [
-        214,
-        173,
-        18,
-        221,
-        173,
-        148,
-        151,
-        208
-      ],
+      "discriminator": [214, 173, 18, 221, 173, 148, 151, 208],
       "accounts": [
         {
           "name": "user",
@@ -177,20 +110,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  100,
-                  97,
-                  116,
-                  97,
-                  95,
-                  97,
-                  99,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
+                "value": [100, 97, 116, 97, 95, 97, 99, 99, 111, 117, 110, 116]
               },
               {
                 "kind": "account",
@@ -206,7 +126,7 @@
       ],
       "args": [
         {
-          "name": "_metadata",
+          "name": "metadata",
           "type": "bytes"
         },
         {
@@ -217,16 +137,7 @@
     },
     {
       "name": "update_key_value_data",
-      "discriminator": [
-        67,
-        137,
-        144,
-        35,
-        210,
-        126,
-        254,
-        79
-      ],
+      "discriminator": [67, 137, 144, 35, 210, 126, 254, 79],
       "accounts": [
         {
           "name": "user",
@@ -240,20 +151,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  100,
-                  97,
-                  116,
-                  97,
-                  95,
-                  97,
-                  99,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
+                "value": [100, 97, 116, 97, 95, 97, 99, 99, 111, 117, 110, 116]
               },
               {
                 "kind": "account",
@@ -276,16 +174,7 @@
     },
     {
       "name": "update_user_data",
-      "discriminator": [
-        11,
-        13,
-        114,
-        150,
-        194,
-        224,
-        192,
-        78
-      ],
+      "discriminator": [11, 13, 114, 150, 194, 224, 192, 78],
       "accounts": [
         {
           "name": "user",
@@ -299,20 +188,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  100,
-                  97,
-                  116,
-                  97,
-                  95,
-                  97,
-                  99,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
+                "value": [100, 97, 116, 97, 95, 97, 99, 99, 111, 117, 110, 116]
               },
               {
                 "kind": "account",
@@ -337,57 +213,21 @@
   "accounts": [
     {
       "name": "DataAccount",
-      "discriminator": [
-        85,
-        240,
-        182,
-        158,
-        76,
-        7,
-        18,
-        233
-      ]
+      "discriminator": [85, 240, 182, 158, 76, 7, 18, 233]
     }
   ],
   "events": [
     {
       "name": "AccessLogged",
-      "discriminator": [
-        243,
-        53,
-        225,
-        71,
-        64,
-        120,
-        109,
-        25
-      ]
+      "discriminator": [243, 53, 225, 71, 64, 120, 109, 25]
     },
     {
       "name": "DynamicEvent",
-      "discriminator": [
-        236,
-        145,
-        224,
-        161,
-        9,
-        222,
-        218,
-        237
-      ]
+      "discriminator": [236, 145, 224, 161, 9, 222, 218, 237]
     },
     {
       "name": "NoFields",
-      "discriminator": [
-        160,
-        156,
-        94,
-        85,
-        77,
-        122,
-        98,
-        240
-      ]
+      "discriminator": [160, 156, 94, 85, 77, 122, 98, 240]
     }
   ],
   "errors": [
@@ -472,10 +312,7 @@
           {
             "name": "fixed_size_array",
             "type": {
-              "array": [
-                "u8",
-                2
-              ]
+              "array": ["u8", 2]
             }
           },
           {

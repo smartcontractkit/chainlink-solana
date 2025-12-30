@@ -145,7 +145,7 @@ type EventIdl interface {
 	_is_EventIdl() // private method - seals the interface to this package only
 }
 
-// EventIdlWrapper is a smart scanner that can scan database JSON into either CodecEventIdl or Codecv2EventIdl
+// EventIdlWrapper ican hold either CodecEventIdl or Codecv2EventIdl
 // It tries both types and uses whichever one works
 type EventIdlWrapper struct {
 	inner EventIdl

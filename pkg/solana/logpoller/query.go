@@ -88,7 +88,7 @@ func (q *queryArgs) withStartingBlock(startingBlock int64) *queryArgs {
 }
 
 // withEventIDL sets the EventIDL field in queryArgs.
-func (q *queryArgs) withEventIDL(eventIdl types.EventIdl) *queryArgs {
+func (q *queryArgs) withEventIDL(eventIdl types.EventIdlWrapper) *queryArgs {
 	return q.withField("event_idl", eventIdl)
 }
 
