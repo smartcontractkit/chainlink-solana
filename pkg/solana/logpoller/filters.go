@@ -214,7 +214,10 @@ func newDecoder(filter types.Filter) (types.Decoder, error) {
 	// Get the inner EventIdl from the scanner
 	innerIdl := filter.EventIdl.Get()
 	if innerIdl == nil {
-		return nil, fmt.Errorf("EventIdl is nil")
+		// For backward compatibility, create an empty codec v1 EventIdl
+		// This maintains the old behavior where zero-valued EventIDLTypes was used in tests
+		emptyEventIdl := types.CodecEventIdl{}
+		innerIdl = &emptyEventIdl
 	}
 
 	// Check which type of EventIdl we have and create the appropriate entry

@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
+	anchoridltype "github.com/gagliardetto/anchor-go/idl/idltype"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +19,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -103,6 +108,57 @@ func requireNoInIndices(t *testing.T, fs *filters, f types.Filter) {
 	require.NotContains(t, fs.knownPrograms, f.Address.String())
 	require.NotContains(t, fs.seqNums, f.ID)
 	require.NotContains(t, fs.filtersToBackfill, f.ID)
+}
+
+// createTestFilterWithCodecV1 creates a test filter with codec v1 EventIdl
+func createTestFilterWithCodecV1(name, eventName string) types.Filter {
+	codecV1EventIdl := types.CodecEventIdl{
+		Event: codec.IdlEvent{
+			Name: eventName,
+			Fields: []codec.IdlEventField{
+				{Name: "field1", Type: codec.NewIdlStringType(codec.IdlTypeU64), Index: true},
+			},
+		},
+		Types: codec.IdlTypeDefSlice{},
+	}
+
+	var wrapper types.EventIdlWrapper
+	wrapper.Set(&codecV1EventIdl)
+
+	return types.Filter{
+		Name:     name,
+		EventIdl: wrapper,
+	}
+}
+
+// createTestFilterWithCodecV2 creates a test filter with codec v2 EventIdl
+func createTestFilterWithCodecV2(name, eventName string) types.Filter {
+	// Create a simple codecv2 event using the EventIDLTypes structure
+	codecV2EventIdl := types.Codecv2EventIdl(codecv2.EventIDLTypes{
+		Event: anchoridl.IdlEvent{
+			Name:          eventName,
+			Discriminator: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		},
+		Types: []anchoridl.IdlTypeDef{
+			{
+				Name: eventName,
+				Ty: &anchoridl.IdlTypeDefTyStruct{
+					Kind: "struct",
+					Fields: anchoridl.IdlDefinedFieldsNamed{
+						{Name: "field1", Ty: &anchoridltype.U64{}},
+					},
+				},
+			},
+		},
+	})
+
+	var wrapper types.EventIdlWrapper
+	wrapper.Set(&codecV2EventIdl)
+
+	return types.Filter{
+		Name:     name,
+		EventIdl: wrapper,
+	}
 }
 
 func TestFilters_RegisterFilter(t *testing.T) {
@@ -237,6 +293,31 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		require.Equal(t, filter, storedFilters[0])
 		// all indices contain filter
 		requireIndexed(t, fs, filter)
+	})
+	t.Run("Happy path versioned", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm)
+		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+
+		// Test with codec v1 (CodecEventIdl)
+		codecV1Filter := createTestFilterWithCodecV1("codecV1Filter", "TestEvent")
+		const codecV1FilterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV1FilterID, nil).Once()
+		err := fs.RegisterFilter(t.Context(), codecV1Filter)
+		require.NoError(t, err)
+
+		// Test with codec v2 (Codecv2EventIdl)
+		codecV2Filter := createTestFilterWithCodecV2("codecV2Filter", "TestEvent2")
+		const codecV2FilterID = int64(2)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV2FilterID, nil).Once()
+		err = fs.RegisterFilter(t.Context(), codecV2Filter)
+		require.NoError(t, err)
+
+		// Verify both filters are registered
+		require.Len(t, fs.filtersToBackfill, 2)
+		require.Contains(t, fs.filtersToBackfill, codecV1FilterID)
+		require.Contains(t, fs.filtersToBackfill, codecV2FilterID)
 	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
