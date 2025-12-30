@@ -173,35 +173,11 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Retention: &defaultCCIPLogsRetention,
 	}
 
-	// Try to unmarshal into codecv2 (anchor-go) IDL first, then fall back to codec IDL
-	var innerEventIDL logpollertypes.EventIdl
-	var codecv2IDL anchoridl.Idl
-	if err := json.Unmarshal([]byte(filterConfig.idl), &codecv2IDL); err == nil {
-		// Successfully unmarshaled as codecv2 IDL
-		eventIdl, err := codecv2.ExtractEventIDL(eventName, codecv2IDL)
-		if err != nil {
-			return fmt.Errorf("failed to extract event IDL from codecv2: %w", err)
-		}
-		codecv2EventIDL := logpollertypes.Codecv2EventIdl{Event: eventIdl, Types: codecv2IDL.Types}
-		innerEventIDL = &codecv2EventIDL
-	} else {
-		// Try codec IDL as fallback
-		var codecIDL codec.IDL
-		if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-			return fmt.Errorf("unexpected error: invalid IDL (tried both codecv2 and codec), error: %w", err)
-		}
-
-		eventIdl, err := codec.ExtractEventIDL(eventName, codecIDL)
-		if err != nil {
-			return fmt.Errorf("failed to extract event IDL from codec: %w", err)
-		}
-		codecEventIDL := logpollertypes.CodecEventIdl{Event: eventIdl, Types: codecIDL.Types}
-		innerEventIDL = &codecEventIDL
+	// Create EventIdlWrapper from IDL string
+	lpEventIDL, err := CreateEventIdlWrapper(eventName, filterConfig.idl)
+	if err != nil {
+		return err
 	}
-
-	// Create wrapper and set the inner idl
-	var lpEventIDL logpollertypes.EventIdlWrapper
-	lpEventIDL.Set(innerEventIDL)
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
@@ -233,6 +209,42 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	return nil
+}
+
+// CreateEventIdlWrapper creates an EventIdlWrapper from an IDL string and event name.
+// It tries to unmarshal as codecv2 (anchor-go) IDL first, then falls back to codec IDL.
+func CreateEventIdlWrapper(eventName, idlString string) (logpollertypes.EventIdlWrapper, error) {
+	var innerEventIDL logpollertypes.EventIdl
+	var wrapper logpollertypes.EventIdlWrapper
+
+	// Try to unmarshal into codecv2 (anchor-go) IDL first
+	var codecv2IDL anchoridl.Idl
+	if err := json.Unmarshal([]byte(idlString), &codecv2IDL); err == nil {
+		// Successfully unmarshaled as codecv2 IDL
+		eventIdl, err := codecv2.ExtractEventIDL(eventName, codecv2IDL)
+		if err != nil {
+			return wrapper, fmt.Errorf("failed to extract event IDL from codecv2: %w", err)
+		}
+		codecv2EventIDL := logpollertypes.Codecv2EventIdl{Event: eventIdl, Types: codecv2IDL.Types}
+		innerEventIDL = &codecv2EventIDL
+	} else {
+		// Try codec IDL as fallback
+		var codecIDL codec.IDL
+		if err := json.Unmarshal([]byte(idlString), &codecIDL); err != nil {
+			return wrapper, fmt.Errorf("unexpected error: invalid IDL (tried both codecv2 and codec), error: %w", err)
+		}
+
+		eventIdl, err := codec.ExtractEventIDL(eventName, codecIDL)
+		if err != nil {
+			return wrapper, fmt.Errorf("failed to extract event IDL from codec: %w", err)
+		}
+		codecEventIDL := logpollertypes.CodecEventIdl{Event: eventIdl, Types: codecIDL.Types}
+		innerEventIDL = &codecEventIDL
+	}
+
+	// Create wrapper and set the inner idl
+	wrapper.Set(innerEventIDL)
+	return wrapper, nil
 }
 
 // convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic
