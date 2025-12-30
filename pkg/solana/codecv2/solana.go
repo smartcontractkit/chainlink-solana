@@ -42,7 +42,7 @@ func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecific
 	switch cfgType {
 	case solcommoncodec.ChainConfigTypeAccountDef:
 		// codecv2 does not support accounts
-		return nil, fmt.Errorf("failed to find account %q in IDL", chainSpecificName)
+		return nil, fmt.Errorf("codecv2 does not support accounts: %q", chainSpecificName)
 
 	case solcommoncodec.ChainConfigTypeInstructionDef:
 		for i := range idl.Instructions {
@@ -139,7 +139,6 @@ func asStruct(
 
 	switch fields := structType.Fields.(type) {
 	case anchoridl.IdlDefinedFieldsNamed:
-		// fields = fields.(*anchoridl.IdlDefinedFieldsNamed)
 		named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
 		if includeDiscriminator {
 			named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: solcommoncodec.NewDiscriminator(name, true)}
@@ -164,13 +163,11 @@ func asStruct(
 		}
 
 		return name, structCodec, nil
-	case *anchoridl.IdlDefinedFieldsTuple:
-		// fields = fields.(*anchoridl.IdlDefinedFieldsTuple)
+	case anchoridl.IdlDefinedFieldsTuple:
+		panic(fmt.Errorf("unhandled type: %T", fields))
 	default:
-		// panic(fmt.Errorf("unhandled type: %T", fields))
+		return name, nil, nil
 	}
-
-	return name, nil, nil
 }
 
 func asStructForInstructionArgs(
