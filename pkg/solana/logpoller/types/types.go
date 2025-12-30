@@ -138,9 +138,11 @@ type Decoder interface {
 }
 
 // EventIdl is an interface that can be implemented by both codec and codecv2 EventIDLTypes
+// EventIdl is a sealed interface - only CodecEventIdl and Codecv2EventIdl can implement it
+// The private _is_EventIdl() method ensures no external types can implement this interface
 type EventIdl interface {
-	driver.Valuer
 	Equal(other EventIdl) bool
+	_is_EventIdl() // private method - seals the interface to this package only
 }
 
 // EventIdlWrapper is a smart scanner that can scan database JSON into either CodecEventIdl or Codecv2EventIdl
@@ -156,16 +158,33 @@ func (w *EventIdlWrapper) Scan(src interface{}) error {
 		return nil
 	}
 
+	// Convert src to bytes and check for null/empty before attempting decode
+	var bSrc []byte
+	switch src := src.(type) {
+	case string:
+		bSrc = []byte(src)
+	case []byte:
+		bSrc = src
+	default:
+		return fmt.Errorf("can't scan %T into EventIdlWrapper", src)
+	}
+
+	// Handle null/empty - set inner to nil
+	if len(bSrc) == 0 || string(bSrc) == "null" {
+		w.inner = nil
+		return nil
+	}
+
 	// Try to unmarshal as codecv2 first
 	var codecv2Idl Codecv2EventIdl
-	if err := scanJSON("Codecv2EventIdl", &codecv2Idl, src); err == nil {
+	if err := json.Unmarshal(bSrc, &codecv2Idl); err == nil {
 		w.inner = &codecv2Idl
 		return nil
 	}
 
 	// Fall back to codec
 	var codecIdl CodecEventIdl
-	if err := scanJSON("CodecEventIdl", &codecIdl, src); err != nil {
+	if err := json.Unmarshal(bSrc, &codecIdl); err != nil {
 		return fmt.Errorf("failed to scan EventIdl as both codecv2 and codec: %w", err)
 	}
 	w.inner = &codecIdl
@@ -177,7 +196,7 @@ func (w EventIdlWrapper) Value() (driver.Value, error) {
 	if w.inner == nil {
 		return nil, nil
 	}
-	return w.inner.Value()
+	return json.Marshal(w.inner)
 }
 
 // Get returns the inner EventIdl interface
@@ -204,10 +223,6 @@ func (w *EventIdlWrapper) Equal(other *EventIdlWrapper) bool {
 // CodecEventIdl wraps codec.EventIDLTypes to implement the EventIdl interface
 type CodecEventIdl codec.EventIDLTypes
 
-func (e *CodecEventIdl) Value() (driver.Value, error) {
-	return json.Marshal(e)
-}
-
 func (e *CodecEventIdl) Equal(other EventIdl) bool {
 	otherCodecPtr, ok := other.(*CodecEventIdl)
 	if !ok {
@@ -216,12 +231,11 @@ func (e *CodecEventIdl) Equal(other EventIdl) bool {
 	return reflect.DeepEqual(e, otherCodecPtr)
 }
 
+// _is_EventIdl is a private marker method that seals this interface to this package
+func (e *CodecEventIdl) _is_EventIdl() {}
+
 // Codecv2EventIdl wraps codecv2.EventIDLTypes to implement the EventIdl interface
 type Codecv2EventIdl codecv2.EventIDLTypes
-
-func (e *Codecv2EventIdl) Value() (driver.Value, error) {
-	return json.Marshal(e)
-}
 
 func (e *Codecv2EventIdl) Equal(other EventIdl) bool {
 	otherCodecv2Ptr, ok := other.(*Codecv2EventIdl)
@@ -230,6 +244,9 @@ func (e *Codecv2EventIdl) Equal(other EventIdl) bool {
 	}
 	return reflect.DeepEqual(e, otherCodecv2Ptr)
 }
+
+// _is_EventIdl is a private marker method that seals this interface to this package
+func (e *Codecv2EventIdl) _is_EventIdl() {}
 
 func scanJSON(name string, dest, src interface{}) error {
 	var bSrc []byte
