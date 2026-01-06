@@ -10,14 +10,12 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 
-	sol_binary "github.com/gagliardetto/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
-	ks_forwarder "github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -66,10 +64,6 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
-	var transmissionInfo ks_forwarder.ExecutionState
-
-	err = sol_binary.UnmarshalBorsh(&transmissionInfo, account.Bytes())
-	ss.logger.Debug(fmt.Sprintf("unmarshal transmission info: %w", err))
 	return convertAccountResult(account, req.Opts.Encoding)
 }
 
