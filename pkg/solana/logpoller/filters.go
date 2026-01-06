@@ -50,8 +50,9 @@ func newFilters(lggr logger.Logger, orm ORM) *filters {
 
 // IncrementSeqNum increments the sequence number for a filterID and returns the new
 // number. This means the sequence number assigned to the first log matched after registration will be 1.
-// WARNING: not thread safe, should only be called while fl.filtersMutex is locked, and after filters have been loaded.
 func (fl *filters) IncrementSeqNum(filterID int64) int64 {
+	fl.filtersMutex.Lock()
+	defer fl.filtersMutex.Unlock()
 	fl.seqNums[filterID]++
 	return fl.seqNums[filterID]
 }
