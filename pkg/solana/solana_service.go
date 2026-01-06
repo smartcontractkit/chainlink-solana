@@ -73,9 +73,8 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 
 		err = sol_binary.UnmarshalBorsh(&transmissionInfo, account.Bytes())
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarashal transmission info: %w, bytes: %x", err, account.Bytes())
+			ss.logger.Debug(fmt.Sprintf("transmission info: %v err:%w bytes:%x", transmissionInfo, err, account.Bytes()))
 		}
-		ss.logger.Debug("transmissionInfo:", transmissionInfo)
 	}
 
 	return convertAccountResult(account, req.Opts.Encoding)
