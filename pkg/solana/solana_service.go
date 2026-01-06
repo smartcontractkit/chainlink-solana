@@ -64,6 +64,7 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
+
 	return convertAccountResult(account, req.Opts.Encoding)
 }
 
@@ -721,7 +722,7 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return nil, nil
 	}
 	if pref == "" {
-		pref = commonsol.EncodingJSON // default
+		pref = commonsol.EncodingBase64 // default
 	}
 
 	txBytes := obj.GetBinary()
