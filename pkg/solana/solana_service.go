@@ -60,6 +60,7 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 	opts := convertAccountInfoOpts(req.Opts)
+	ss.logger.Debug("opts encoding:", opts.Encoding)
 	account, err := reader.GetAccountInfoWithOpts(ctx, solana.PublicKey(req.Account), opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
@@ -722,36 +723,44 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return nil, nil
 	}
 	if pref == "" {
-		pref = commonsol.EncodingBase64 // default
+		pref = commonsol.EncodingBase64
 	}
 
 	txBytes := obj.GetBinary()
 
-	txJSON, jerr := json.Marshal(obj)
+	txJSON, _ := json.Marshal(obj)
 
-	enc := pref
 	switch pref {
+	case commonsol.EncodingBase64:
+		if len(txBytes) == 0 {
+			// Hard fail: upstream didn't return a binary encoding (or decode didn't happen)
+			return nil, fmt.Errorf("expected base64/binary account data but got empty bytes txJSON: %s", string(txJSON))
+		}
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: commonsol.EncodingBase64,
+			AsDecodedBinary: txBytes,
+			AsJSON:          txJSON,
+		}, nil
+
 	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
-		if jerr != nil {
-			// fall back to binary if available. Pick one policy.
-			if len(txBytes) == 0 {
-				return nil, fmt.Errorf("marshal to json failed: %w", jerr)
-			}
+		// Caller explicitly wants JSON. Return it even if bytes exist.
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: pref,
+			AsDecodedBinary: txBytes,
+			AsJSON:          txJSON,
+		}, nil
 
-			enc = commonsol.EncodingBase64 // fallback
-		}
 	default:
-		// If caller prefers binary but there are no bytes, try JSON.
-		if len(txBytes) == 0 && jerr == nil {
-			enc = commonsol.EncodingJSON
+		// Treat unknown as base64 preference
+		if len(txBytes) == 0 {
+			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", string(txJSON))
 		}
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: commonsol.EncodingBase64,
+			AsDecodedBinary: txBytes,
+			AsJSON:          txJSON,
+		}, nil
 	}
-
-	return &commonsol.DataBytesOrJSON{
-		RawDataEncoding: enc,
-		AsDecodedBinary: txBytes,
-		AsJSON:          txJSON, // nil if marshal failed; that’s fine if enc != JSON
-	}, nil
 }
 
 func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {
