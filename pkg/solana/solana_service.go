@@ -299,6 +299,11 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
 	defer cancel()
 
+	signature, err := ss.chain.TxManager().GetTransactionSig(transactionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction signature: %w", err)
+	}
+
 	txStatus, err := retry.Do(retryContext, ss.logger, func(ctx context.Context) (commonsol.TransactionStatus, error) {
 		txStatus, txStatusErr := ss.chain.TxManager().GetTransactionStatus(ctx, transactionID)
 		if txStatusErr != nil {
@@ -323,11 +328,6 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 
 	if txStatus == commonsol.TxFatal {
 		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
-	}
-
-	signature, err := ss.chain.TxManager().GetTransactionSig(transactionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction signature: %w", err)
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, Signature: commonsol.Signature(signature), IdempotencyKey: transactionID}, nil
