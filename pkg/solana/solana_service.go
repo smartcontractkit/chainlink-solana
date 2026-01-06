@@ -2,6 +2,7 @@ package solana
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -732,13 +733,37 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 
 	switch pref {
 	case commonsol.EncodingBase64:
-		if len(txBytes) == 0 {
-			// Hard fail: upstream didn't return a binary encoding (or decode didn't happen)
-			return nil, fmt.Errorf("expected base64/binary account data but got empty bytes txJSON: %s", string(txJSON))
+		if len(txBytes) != 0 {
+			return &commonsol.DataBytesOrJSON{
+				RawDataEncoding: commonsol.EncodingBase64,
+				AsDecodedBinary: txBytes,
+				AsJSON:          txJSON,
+			}, nil
 		}
+
+		// Fallback: decode ["<base64>", "base64"] manually
+		var arr []any
+		if err := json.Unmarshal(txJSON, &arr); err != nil {
+			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, string(txJSON))
+		}
+		if len(arr) != 2 {
+			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), string(txJSON))
+		}
+
+		s, _ := arr[0].(string)
+		enc, _ := arr[1].(string)
+		if enc != "base64" {
+			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, string(txJSON))
+		}
+
+		b, err := base64.StdEncoding.DecodeString(s)
+		if err != nil {
+			return nil, fmt.Errorf("base64 decode failed: %w", err)
+		}
+
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
-			AsDecodedBinary: txBytes,
+			AsDecodedBinary: b,
 			AsJSON:          txJSON,
 		}, nil
 
