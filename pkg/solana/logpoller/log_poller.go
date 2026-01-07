@@ -459,6 +459,7 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed getting addresses: %w", err)
 	}
+	lp.lggr.Info("run solana lp for addresses:", addresses)
 	if len(addresses) == 0 {
 		return nil
 	}
