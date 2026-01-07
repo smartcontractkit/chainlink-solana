@@ -167,7 +167,7 @@ func (s *SolanaChainWriterService) sendBufferInstructions(
 	}
 
 	// Encode new main tx payload with transformed args
-	transformedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
+	transformedPayload, err := s.EncodePayload(ctx, args, methodConfig, contractName, method)
 	if err != nil {
 		return fmt.Errorf("error encoding transformed payload for transaction using buffer: %w", err)
 	}

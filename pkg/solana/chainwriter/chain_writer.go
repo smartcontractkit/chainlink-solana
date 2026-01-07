@@ -390,7 +390,7 @@ func (s *SolanaChainWriterService) SubmitTransaction(ctx context.Context, contra
 		return errorWithDebugID(fmt.Errorf("error parsing program ID: %w", err), debugID)
 	}
 
-	encodedPayload, err := s.encodePayload(ctx, args, methodConfig, contractName, method)
+	encodedPayload, err := s.EncodePayload(ctx, args, methodConfig, contractName, method)
 	if err != nil {
 		return errorWithDebugID(fmt.Errorf("error encoding transaction payload: %w", err), debugID)
 	}
@@ -542,7 +542,7 @@ func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt 
 	return resultMap, nil
 }
 
-func (s *SolanaChainWriterService) encodePayload(ctx context.Context, args any, methodConfig MethodConfig, contractName, method string) ([]byte, error) {
+func (s *SolanaChainWriterService) EncodePayload(ctx context.Context, args any, methodConfig MethodConfig, contractName, method string) ([]byte, error) {
 	s.lggr.Debugw("Encoding transaction payload", "contract", contractName, "method", method)
 	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
 	if err != nil {
