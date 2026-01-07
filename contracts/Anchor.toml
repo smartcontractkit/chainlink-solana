@@ -15,6 +15,7 @@ dummy_receiver = "5z38tFCAmcPJb1DXUHSoKQhR8qQ8o9aNZ8rZFWe6gH4L"
 keystone_forwarder = "whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz"
 data_feeds_cache = "3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa"
 log-read-test = "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4"
+mock-ccip-events = "CGn5MQX5GK9qKqERhjnADhd6i2LiSF6XUC2ewUHND1Mw"
 ocr_2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
 store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 

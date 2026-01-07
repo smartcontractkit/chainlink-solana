@@ -31,6 +31,10 @@ func (txm verifyTxSize) Start(ctx context.Context) error {
 	panic("implement me")
 }
 
+func (txm verifyTxSize) GetTransactionSig(transactionID string) (solana.Signature, error) {
+	panic("implement me")
+}
+
 func (txm verifyTxSize) Close() error {
 	panic("implement me")
 }

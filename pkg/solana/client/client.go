@@ -35,6 +35,7 @@ type ReaderWriter interface {
 type Reader interface {
 	AccountReader
 	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
+	BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error)
 	SlotHeight(ctx context.Context) (uint64, error)
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
@@ -127,6 +128,27 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
 		return c.rpc.GetBalance(ctx, addr, c.commitment)
 	})
+	if err != nil {
+		return 0, err
+	}
+	res, ok := v.(*rpc.GetBalanceResult)
+	if !ok {
+		return 0, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
+	}
+	return res.Value, err
+}
+
+func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (bal uint64, err error) {
+	done := c.latency("balance")
+	defer func() { done(err) }()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
+		return c.rpc.GetBalance(ctx, addr, commitment)
+	})
+
 	if err != nil {
 		return 0, err
 	}

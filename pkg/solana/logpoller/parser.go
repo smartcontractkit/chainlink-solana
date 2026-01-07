@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -60,6 +61,7 @@ type pgDSLParser struct {
 }
 
 var _ primitives.Visitor = (*pgDSLParser)(nil)
+var _ solprimitives.Visitor = (*pgDSLParser)(nil)
 
 func (v *pgDSLParser) Comparator(_ primitives.Comparator) {}
 
@@ -244,6 +246,33 @@ func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.
 	}
 
 	return segment, nil
+}
+
+func (v *pgDSLParser) Address(addr *solprimitives.Address) {
+	v.VisitAddressFilter(&addressFilter{
+		types.PublicKey(addr.PubKey),
+	})
+}
+
+func (v *pgDSLParser) EventSig(eventSig *solprimitives.EventSig) {
+	v.VisitEventSigFilter(&eventSigFilter{
+		eventSig: types.EventSignature(eventSig.Sig),
+	})
+}
+
+func (v *pgDSLParser) EventBySubkey(evs *solprimitives.EventBySubkey) {
+	p := &eventBySubKeyFilter{
+		SubKeyIndex:    evs.SubKeyIndex,
+		ValueComparers: make([]IndexedValueComparator, 0, len(evs.ValueComparers)),
+	}
+	for _, c := range evs.ValueComparers {
+		p.ValueComparers = append(p.ValueComparers, IndexedValueComparator{
+			Value:    types.IndexedValue(c.Value),
+			Operator: c.Operator,
+		})
+	}
+
+	v.VisitEventSubKeysByValueFilter(p)
 }
 
 func (v *pgDSLParser) orderClause(limiter query.LimitAndSort) (string, error) {

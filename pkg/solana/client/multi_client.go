@@ -95,6 +95,15 @@ func (m *MultiClient) Balance(ctx context.Context, addr solana.PublicKey) (uint6
 	return r.Balance(ctx, addr)
 }
 
+func (m *MultiClient) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error) {
+	r, err := m.getClient(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return r.BalanceWithCommitment(ctx, addr, commitment)
+}
+
 func (m *MultiClient) SlotHeight(ctx context.Context) (uint64, error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
