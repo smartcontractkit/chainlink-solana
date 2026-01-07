@@ -114,6 +114,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
+	lp.blockTime = time.Second
 
 	return lp
 }
@@ -442,6 +443,7 @@ func (lp *Service) run(ctx context.Context) (err error) {
 			err = fmt.Errorf("panic recovered: %v", rec)
 		}
 	}()
+	lp.lggr.Info("run solana lp is called")
 	err = lp.filters.LoadFilters(ctx)
 	if err != nil {
 		return fmt.Errorf("error loading filters: %w", err)
