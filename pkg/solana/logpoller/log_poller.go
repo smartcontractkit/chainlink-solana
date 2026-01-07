@@ -96,6 +96,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 		client: cl,
 	}
 
+	lggr.Info("log poller created")
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
@@ -126,6 +127,7 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 const BackgroundWorkerInterval = 10 * time.Minute
 
 func (lp *Service) start(_ context.Context) error {
+	lp.lggr.Info("log poller has started")
 	lp.eng.GoTick(services.NewTicker(2*lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
