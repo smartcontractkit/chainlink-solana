@@ -609,7 +609,8 @@ func (c *chain) Start(ctx context.Context) error {
 		c.lggr.Debug("Starting txm")
 		c.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
-		startAll := []services.StartClose{c.txm, c.balanceMonitor}
+		// TODO add cfg logPoller enabled
+		startAll := []services.StartClose{c.txm, c.balanceMonitor, c.lp}
 		if c.cfg.MultiNode.Enabled() {
 			c.lggr.Debug("Starting multinode")
 			startAll = append(startAll, c.multiNode, c.txSender)
