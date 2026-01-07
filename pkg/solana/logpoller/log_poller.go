@@ -426,6 +426,9 @@ consumedAllBlocks:
 
 func (lp *Service) processBlocksImpl(ctx context.Context, blocks []types.Block) error {
 	for _, block := range blocks {
+		if len(block.Events) != 0 {
+			lp.lggr.Info("process block events length:", len(block.Events))
+		}
 		for _, event := range block.Events {
 			err := lp.Process(ctx, event)
 			if err != nil {
