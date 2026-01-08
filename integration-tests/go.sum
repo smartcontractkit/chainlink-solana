@@ -1363,8 +1363,8 @@ github.com/smartcontractkit/chainlink/deployment v0.0.0-20260107144507-da034b08d
 github.com/smartcontractkit/chainlink/deployment v0.0.0-20260107144507-da034b08d3ef/go.mod h1:DkllNjZ2WuZzNPsZCU39Z0ndKXW8TMHY+Am7bhgiBQg=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20260107144507-da034b08d3ef h1:N0WCaFa3sqoxeTf/RGEP02aF1Po0yAvulJEEQ+O4Ego=
 github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20260107144507-da034b08d3ef/go.mod h1:krOh7zo+7S4uBOonuHqj1aLXMrJahLoZ0hOOcSf0ffI=
-github.com/smartcontractkit/chainlink/v2 v2.31.0 h1:lGIqRstalHhziJHv0Ja8+opesGjno3l/5tk9rCm4D5Q=
-github.com/smartcontractkit/chainlink/v2 v2.31.0/go.mod h1:jGFPNGiSGJ/cIThn7o+1pg9eV3iL6M96pmRLetlWVeo=
+github.com/smartcontractkit/chainlink/v2 v2.29.1-cre-beta.0.0.20260107144507-da034b08d3ef h1:CMClhzXOAT8BmYHau5F48hT71pJ3k6CwG+oOgW1G13E=
+github.com/smartcontractkit/chainlink/v2 v2.29.1-cre-beta.0.0.20260107144507-da034b08d3ef/go.mod h1:2NPyvulWektz5sWDjt3t/MGVdHDjQXEcxHWj3TNAxQU=
 github.com/smartcontractkit/cre-sdk-go v0.7.1-0.20250919133015-2df149f34a81 h1:CfnjzJvn3iX93PzdGucyGJmgv/KDXv8DfKcLw/mix24=
 github.com/smartcontractkit/cre-sdk-go v0.7.1-0.20250919133015-2df149f34a81/go.mod h1:CQY8hCISjctPmt8ViDVgFm4vMGLs5fYI198QhkBS++Y=
 github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e h1:Hv9Mww35LrufCdM9wtS9yVi/rEWGI1UnjHbcKKU0nVY=
