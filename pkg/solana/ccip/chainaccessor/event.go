@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
@@ -227,9 +226,9 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 }
 
 // convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic
-// chainaccessor.SendRequestedEvent. This function is idempotent and performs a
+// ccipocr3.SendRequestedEvent. This function is idempotent and performs a
 // one-to-one mapping of event fields from the Solana format to the standard CCIP format.
-func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onrampAddr solana.PublicKey) ([]*chainaccessor.SendRequestedEvent, error) {
+func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onrampAddr solana.PublicKey) ([]*ccipocr3.SendRequestedEvent, error) {
 	iter, err := a.decodeLogsIntoSequences(consts.EventNameCCIPMessageSent, logs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
@@ -239,7 +238,7 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 		return nil, fmt.Errorf("failed to convert all logs into generic ccip event, logs %d, events %d", len(logs), len(iter))
 	}
 
-	genericEvents := make([]*chainaccessor.SendRequestedEvent, 0)
+	genericEvents := make([]*ccipocr3.SendRequestedEvent, 0)
 	for _, seq := range iter {
 		event, ok := seq.Data.(*ccip.EventCCIPMessageSent)
 		if !ok {
@@ -264,7 +263,7 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 			TokenAmounts:   convertTokenAmounts(event.Message.TokenAmounts),
 			FeeValueJuels:  codec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
 		}
-		genericEvents = append(genericEvents, &chainaccessor.SendRequestedEvent{
+		genericEvents = append(genericEvents, &ccipocr3.SendRequestedEvent{
 			DestChainSelector: msg.Header.DestChainSelector,
 			SequenceNumber:    msg.Header.SequenceNumber,
 			Message:           msg,
