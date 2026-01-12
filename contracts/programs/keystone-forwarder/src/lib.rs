@@ -7,7 +7,7 @@ use common::{
 };
 
 use events::{
-    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportProcessed,
+    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportProcessed, ReportInProgress
 };
 
 use context::*;
@@ -316,6 +316,11 @@ pub mod keystone_forwarder {
             receiver_program.as_ref(),
             &[authority_bump],
         ];
+
+        emit!(ReportInProgress {
+            state: ctx.accounts.state.key(),
+            transmission_id,
+        });
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
 
