@@ -18,7 +18,10 @@ const (
 
 // TxKey represents a Solana transaction signing key.
 type TxKey struct {
-	ks      keystore.Keystore
+	ks interface {
+		keystore.Reader
+		keystore.Signer
+	}
 	keyPath keystore.KeyPath
 	addr    solana.PublicKey
 }
@@ -96,7 +99,10 @@ func CreateTxKey(ks keystore.Keystore, name string) (*TxKey, error) {
 }
 
 // GetTxKeys retrieves transaction keys by name.
-func GetTxKeys(ctx context.Context, ks keystore.Keystore, names []string) ([]*TxKey, error) {
+func GetTxKeys(ctx context.Context, ks interface {
+	keystore.Reader
+	keystore.Signer
+}, names []string) ([]*TxKey, error) {
 	fullNames := make([]string, 0, len(names))
 	for _, name := range names {
 		fullNames = append(fullNames, keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore, name).String())
@@ -107,6 +113,30 @@ func GetTxKeys(ctx context.Context, ks keystore.Keystore, names []string) ([]*Tx
 	}
 
 	// Note we rely on deterministic order of keys in the response
+	keys := make([]*TxKey, 0, len(resp.Keys))
+	for _, key := range resp.Keys {
+		keys = append(keys, &TxKey{
+			ks:      ks,
+			keyPath: keystore.NewKeyPathFromString(key.KeyInfo.Name),
+			addr:    solana.PublicKeyFromBytes(key.KeyInfo.PublicKey),
+		})
+	}
+	return keys, nil
+}
+
+// LoadTxKeys loads transaction keys from a keystore directly by name.
+// Used for KMS-backed keystores where keys/key names are managed externally.
+func LoadTxKeys(ctx context.Context, ks interface {
+	keystore.Reader
+	keystore.Signer
+}, names []string) ([]*TxKey, error) {
+	resp, err := ks.GetKeys(ctx, keystore.GetKeysRequest{KeyNames: names})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Keys) != len(names) {
+		return nil, errors.New("some keys not found")
+	}
 	keys := make([]*TxKey, 0, len(resp.Keys))
 	for _, key := range resp.Keys {
 		keys = append(keys, &TxKey{
