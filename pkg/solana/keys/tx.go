@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gagliardetto/solana-go"
+	"strings"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-common/keystore"
 )
 
@@ -118,7 +119,7 @@ func GetTxKeys(ctx context.Context, ks interface {
 	for _, key := range resp.Keys {
 		path := keystore.NewKeyPathFromString(key.KeyInfo.Name)
 		// If no names are provided we must filter only solana keys.
-		if len(names) == 0 && path.Base() != keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore).String() {
+		if len(names) == 0 && !strings.HasPrefix(path.String(), keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore).String()) {
 			continue
 		}
 		keys = append(keys, &TxKey{
