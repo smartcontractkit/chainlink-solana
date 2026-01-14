@@ -98,7 +98,8 @@ func CreateTxKey(ks keystore.Keystore, name string) (*TxKey, error) {
 	}, nil
 }
 
-// GetTxKeys retrieves transaction keys by name.
+// GetTxKeys retrieves transaction keys by name, prepending the solana/tx prefix.
+// For example, a key named "test-key" will be retrieved at the path "solana/tx/test-key".
 func GetTxKeys(ctx context.Context, ks interface {
 	keystore.Reader
 	keystore.Signer
@@ -115,9 +116,14 @@ func GetTxKeys(ctx context.Context, ks interface {
 	// Note we rely on deterministic order of keys in the response
 	keys := make([]*TxKey, 0, len(resp.Keys))
 	for _, key := range resp.Keys {
+		path := keystore.NewKeyPathFromString(key.KeyInfo.Name)
+		// If no names are provided we must filter only solana keys.
+		if len(names) == 0 && path.Base() != keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore).String() {
+			continue
+		}
 		keys = append(keys, &TxKey{
 			ks:      ks,
-			keyPath: keystore.NewKeyPathFromString(key.KeyInfo.Name),
+			keyPath: path,
 			addr:    solana.PublicKeyFromBytes(key.KeyInfo.PublicKey),
 		})
 	}
@@ -126,6 +132,7 @@ func GetTxKeys(ctx context.Context, ks interface {
 
 // LoadTxKeys loads transaction keys from a keystore directly by name.
 // Used for KMS-backed keystores where keys/key names are managed externally.
+// Clients responsibility to ensure
 func LoadTxKeys(ctx context.Context, ks interface {
 	keystore.Reader
 	keystore.Signer
@@ -139,6 +146,10 @@ func LoadTxKeys(ctx context.Context, ks interface {
 	}
 	keys := make([]*TxKey, 0, len(resp.Keys))
 	for _, key := range resp.Keys {
+		// Sanity check the provided key is solana compatible.
+		if key.KeyInfo.KeyType != keystore.Ed25519 {
+			return nil, errors.New("tried to load a non-Ed25519 key: " + key.KeyInfo.Name)
+		}
 		keys = append(keys, &TxKey{
 			ks:      ks,
 			keyPath: keystore.NewKeyPathFromString(key.KeyInfo.Name),
