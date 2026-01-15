@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"

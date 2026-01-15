@@ -315,7 +315,7 @@ func asArray(parentTypeName string, idlArray *idltype.Array, refs *codecRefs) (c
 	var lenInt int
 	switch size := idlArray.Size.(type) {
 	case *idltype.IdlArrayLenValue:
-		lenInt = int(size.Value)
+		lenInt = size.Value
 	case *idltype.IdlArrayLenGeneric:
 		return nil, fmt.Errorf("%w: generic array lengths are not supported yet: %s", commontypes.ErrInvalidConfig, size.Generic)
 	default:

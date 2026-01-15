@@ -2,8 +2,10 @@ package codecv2
 
 import (
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
