@@ -3,6 +3,7 @@ package keys
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/keystore"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -15,6 +16,7 @@ type TxKeyCoreKeystore struct {
 		keystore.Reader
 		keystore.Signer
 	}
+	cacheMu         sync.RWMutex
 	cache           map[string]string
 	allowedKeyNames []string
 }
@@ -67,15 +69,11 @@ func (s *TxKeyCoreKeystore) Accounts(ctx context.Context) ([]string, error) {
 }
 
 func (s *TxKeyCoreKeystore) Sign(ctx context.Context, account string, data []byte) ([]byte, error) {
-	if keyPath, ok := s.cache[account]; ok {
-		resp, err := s.ks.Sign(ctx, keystore.SignRequest{
-			KeyName: keyPath,
-			Data:    data,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return resp.Signature, nil
+	s.cacheMu.RLock()
+	keyPath, ok := s.cache[account]
+	s.cacheMu.RUnlock()
+	if ok {
+		return s.getSignature(ctx, keyPath, data)
 	}
 	// Otherwise do the first time lookup to find the key by address.
 	keys, err := s.getKeys(ctx)
@@ -87,19 +85,24 @@ func (s *TxKeyCoreKeystore) Sign(ctx context.Context, account string, data []byt
 	}
 	for _, key := range keys {
 		if key.Address().String() == account {
+			s.cacheMu.Lock()
 			s.cache[account] = key.KeyPath().String()
-			signReq := keystore.SignRequest{
-				KeyName: key.KeyPath().String(),
-				Data:    data,
-			}
-			resp, err := s.ks.Sign(ctx, signReq)
-			if err != nil {
-				return nil, err
-			}
-			return resp.Signature, nil
+			s.cacheMu.Unlock()
+			return s.getSignature(ctx, key.KeyPath().String(), data)
 		}
 	}
 	return nil, errors.New("key not found")
+}
+
+func (s *TxKeyCoreKeystore) getSignature(ctx context.Context, keyName string, data []byte) ([]byte, error) {
+	resp, err := s.ks.Sign(ctx, keystore.SignRequest{
+		KeyName: keyName,
+		Data:    data,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Signature, nil
 }
 
 func (s *TxKeyCoreKeystore) Decrypt(ctx context.Context, account string, data []byte) ([]byte, error) {
