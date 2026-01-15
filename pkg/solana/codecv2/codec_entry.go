@@ -15,7 +15,7 @@ type InstructionArgsIDLTypes struct {
 }
 
 func NewInstructionArgsEntry(offChainName string, idlTypes InstructionArgsIDLTypes, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
-	_, instructionCodecArgs, err := asStructForInstructionArgs(idlTypes.Instruction.Args, createRefs(idlTypes.Types, builder), idlTypes.Instruction.Name, false)
+	instructionCodecArgs, err := asStructForInstructionArgs(idlTypes.Instruction.Args, createRefs(idlTypes.Types, builder), idlTypes.Instruction.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ type EventIDLTypes struct {
 }
 
 func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
-	_, eventCodec, err := asStruct(createRefs(idlTypes.Types, builder), idlTypes.Event.Name, false)
+	_, eventCodec, err := asStruct(createRefs(idlTypes.Types, builder), idlTypes.Event.Name)
 	if err != nil {
 		return nil, err
 	}

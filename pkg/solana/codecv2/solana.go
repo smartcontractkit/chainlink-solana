@@ -87,20 +87,20 @@ type codecRefs struct {
 func createCodecType(
 	def anchoridl.IdlTypeDef,
 	refs *codecRefs,
-	// TODO Deprecated includeDiscriminator is not needed here after NewIDLAccountCodec gets cleaned up
-	includeDiscriminator bool,
 ) (string, commonencodings.TypeCodec, error) {
 	name := def.Name
+	// as opposed to codecv1, def.Ty is an interface instead of a concrete type
+	// hence we cannot access def.Ty.Kind directly
 	switch vv := def.Ty.(type) {
 	case *anchoridl.IdlTypeDefTyStruct:
-		return asStruct(refs, name, includeDiscriminator)
+		return asStruct(refs, name)
 	case *anchoridl.IdlTypeDefTyEnum:
 		variants := vv.Variants
 		if !variants.IsAllSimple() {
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
-	// TODO: I only see these being used with chain_reader, skipping for now
+	// TODO: I only see these being used with chain_reader, skipping
 	// case IdlTypeDefTyKindCustom:
 	// 	switch def.Type.Codec {
 	// 	case "onramp_address":
@@ -118,18 +118,13 @@ func createCodecType(
 func asStruct(
 	refs *codecRefs,
 	name string, // name is the struct name and can be used in dependency checks
-	// TODO Deprecated includeDiscriminator is not needed here after NewIDLAccountCodec gets cleaned up
-	includeDiscriminator bool,
 ) (string, commonencodings.TypeCodec, error) {
-	desLen := 0
-	if includeDiscriminator {
-		desLen = 1
-	}
-
 	namedType := refs.typeDefs.ByName(name)
 	if namedType == nil {
 		return name, nil, fmt.Errorf("named type %q not found", name)
 	}
+	// as opposed to codecv1, namedType.Ty is an interface instead of a concrete type
+	// hence we cannot access def.Ty.Kind or def.Ty.Fields directly
 	var structType anchoridl.IdlTypeDefTyStruct
 	switch vv := namedType.Ty.(type) {
 	case *anchoridl.IdlTypeDefTyStruct:
@@ -138,12 +133,10 @@ func asStruct(
 		panic(fmt.Errorf("unhandled type: %T", vv))
 	}
 
+	// as opposed to codecv1, IdlTypeDefTyStruct.Fields is an interface instead of a concrete type
 	switch fields := structType.Fields.(type) {
 	case anchoridl.IdlDefinedFieldsNamed:
-		named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
-		if includeDiscriminator {
-			named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: solcommoncodec.NewDiscriminator(name, true)}
-		}
+		named := make([]commonencodings.NamedTypeCodec, len(fields))
 		for idx, field := range fields {
 			fieldName := field.Name
 
@@ -156,7 +149,7 @@ func asStruct(
 				return name, nil, err
 			}
 
-			named[idx+desLen] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+			named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
 		}
 		structCodec, err := commonencodings.NewStructCodec(named)
 		if err != nil {
@@ -174,30 +167,17 @@ func asStruct(
 func asStructForInstructionArgs(
 	fields []anchoridl.IdlField,
 	refs *codecRefs,
-	name string, // name is the struct name and can be used in dependency checks
-	// TODO Deprecated includeDiscriminator is not needed here after NewIDLAccountCodec gets cleaned up
-	includeDiscriminator bool,
-) (string, commonencodings.TypeCodec, error) {
-	desLen := 0
-	if includeDiscriminator {
-		desLen = 1
-	}
-
-	named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
-
-	if includeDiscriminator {
-		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: solcommoncodec.NewDiscriminator(name, true)}
-	}
+	ixName string, // the name of the argument struct
+) (commonencodings.TypeCodec, error) {
+	named := make([]commonencodings.NamedTypeCodec, len(fields))
 
 	for idx, field := range fields {
 		fieldName := field.Name
-
-		typedCodec, err := processFieldType(name, field.Ty, refs)
+		typedCodec, err := processFieldType(ixName, field.Ty, refs)
 		if err != nil {
-			return name, nil, err
+			return nil, err
 		}
-
-		named[idx+desLen] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+		named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
 	}
 
 	var isVecOrArray bool
@@ -210,17 +190,17 @@ func asStructForInstructionArgs(
 		isVecOrArray = false
 	}
 
-	// accounts have to be in a struct, instruction args don't if they're an array
+	// If it's an instruction arg that's just a single array/vec → return the array codec directly (no struct wrapper)
 	if len(named) == 1 && isVecOrArray {
-		return name, named[0].Codec, nil
+		return named[0].Codec, nil
 	}
 
 	structCodec, err := commonencodings.NewStructCodec(named)
 	if err != nil {
-		return name, nil, err
+		return nil, err
 	}
 
-	return name, structCodec, nil
+	return structCodec, nil
 }
 
 func processFieldType(parentTypeName string, idlType idltype.IdlType, refs *codecRefs) (commonencodings.TypeCodec, error) {
@@ -230,6 +210,7 @@ func processFieldType(parentTypeName string, idlType idltype.IdlType, refs *code
 		return refs.builder.String(math.MaxUint32)
 	case *idltype.Bool:
 		return refs.builder.Bool(), nil
+	// integer types
 	case *idltype.I8:
 		return refs.builder.Int8(), nil
 	case *idltype.I16:
@@ -240,6 +221,7 @@ func processFieldType(parentTypeName string, idlType idltype.IdlType, refs *code
 		return refs.builder.Int64(), nil
 	case *idltype.I128:
 		return refs.builder.BigInt(16, true)
+	// unsigned integer types
 	case *idltype.U8:
 		return refs.builder.Uint8(), nil
 	case *idltype.U16:
@@ -309,7 +291,7 @@ func asDefined(parentTypeName string, definedType *idltype.Defined, refs *codecR
 
 	saveDependency(refs, parentTypeName, definedName)
 
-	newTypeName, newTypeCodec, err := createCodecType(*nextDef, refs, false)
+	newTypeName, newTypeCodec, err := createCodecType(*nextDef, refs)
 	if err != nil {
 		return nil, err
 	}
