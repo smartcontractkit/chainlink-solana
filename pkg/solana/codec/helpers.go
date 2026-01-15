@@ -11,3 +11,11 @@ var cwIDL string
 func FetchChainWriterTestIDL() string {
 	return cwIDL
 }
+
+//go:embed testutils/logPollerTypeTestIDL.json
+var logpollerTypeTestIDL string
+
+// FetchLogpollerTypeTestIDL returns the IDL for logpoller type test
+func FetchLogpollerTypeTestIDL() string {
+	return logpollerTypeTestIDL
+}

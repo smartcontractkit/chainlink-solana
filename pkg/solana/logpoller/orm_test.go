@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
+	anchoridltype "github.com/gagliardetto/anchor-go/idl/idltype"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -38,15 +40,42 @@ func TestLogPollerFilters(t *testing.T) {
 				EventSig:      types.EventSignature{1, 2, 3},
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-				EventIdl: types.EventIdl{
-					Event: codec.IdlEvent{
-						Name:   "MyEvent",
-						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
-					},
-					Types: codec.IdlTypeDefSlice{
-						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
-					},
-				},
+				EventIdl: func() types.EventIdlWrapper {
+					var wrapper types.EventIdlWrapper
+					wrapper.Set(&types.CodecEventIdl{
+						Event: codec.IdlEvent{
+							Name:   "MyEvent",
+							Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+						},
+						Types: codec.IdlTypeDefSlice{
+							{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+						},
+					})
+					return wrapper
+				}(),
+				Retention:   1000,
+				MaxLogsKept: 3,
+			},
+			{
+				Name:          "happy path v2",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      types.EventSignature{1, 2, 3},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: func() types.EventIdlWrapper {
+					var wrapper types.EventIdlWrapper
+					wrapper.Set(&types.Codecv2EventIdl{
+						Event: anchoridl.IdlEvent{
+							Name:          "MyEvent",
+							Discriminator: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+						},
+						Types: []anchoridl.IdlTypeDef{
+							{Name: "MyEvent", Ty: &anchoridl.IdlTypeDefTyStruct{Kind: "struct", Fields: anchoridl.IdlDefinedFieldsNamed{{Name: "field1", Ty: &anchoridltype.U64{}}}}},
+						},
+					})
+					return wrapper
+				}(),
 				Retention:   1000,
 				MaxLogsKept: 3,
 			},

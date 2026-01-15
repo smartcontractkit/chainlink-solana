@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -209,7 +210,28 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	var cEntry solcommoncodec.Entry
+	var err error
+
+	// Get the inner EventIdl from the scanner
+	innerIdl := filter.EventIdl.Get()
+	if innerIdl == nil {
+		// For backward compatibility, create an empty codec v1 EventIdl
+		// This maintains the old behavior where zero-valued EventIDLTypes was used in tests
+		emptyEventIdl := types.CodecEventIdl{}
+		innerIdl = &emptyEventIdl
+	}
+
+	// Check which type of EventIdl we have and create the appropriate entry
+	switch idl := innerIdl.(type) {
+	case *types.CodecEventIdl:
+		cEntry, err = codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(*idl), true, nil, binary.LittleEndian())
+	case *types.Codecv2EventIdl:
+		cEntry, err = codecv2.NewEventArgsEntry(filter.EventName, codecv2.EventIDLTypes(*idl), true, nil, binary.LittleEndian())
+	default:
+		return nil, fmt.Errorf("unsupported EventIdl type: %T", innerIdl)
+	}
+
 	if err != nil {
 		return nil, err
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
@@ -136,19 +137,115 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl codec.EventIDLTypes
-
-func (e *EventIdl) Scan(src interface{}) error {
-	return scanJSON("EventIdl", e, src)
+// EventIdl is an interface that can be implemented by both codec and codecv2 EventIDLTypes
+// The private _is_EventIdl() method ensures no external types can implement this interface
+type EventIdl interface {
+	Equal(other EventIdl) bool
+	_is_EventIdl() // private method - seals the interface to this package only
 }
 
-func (e EventIdl) Value() (driver.Value, error) {
-	return json.Marshal(e)
+// EventIdlWrapper ican hold either CodecEventIdl or Codecv2EventIdl
+// It tries both types and uses whichever one works
+type EventIdlWrapper struct {
+	inner EventIdl
 }
 
-func (e EventIdl) Equal(o EventIdl) bool {
-	return reflect.DeepEqual(e, o)
+// Scan implements sql.Scanner - tries codecv2 first, then codec
+func (w *EventIdlWrapper) Scan(src interface{}) error {
+	if src == nil {
+		w.inner = nil
+		return nil
+	}
+
+	// Convert src to bytes and check for null/empty before attempting decode
+	var bSrc []byte
+	switch src := src.(type) {
+	case string:
+		bSrc = []byte(src)
+	case []byte:
+		bSrc = src
+	default:
+		return fmt.Errorf("can't scan %T into EventIdlWrapper", src)
+	}
+
+	// Handle null/empty - set inner to nil
+	if len(bSrc) == 0 || string(bSrc) == "null" {
+		w.inner = nil
+		return nil
+	}
+
+	// Try to unmarshal as codecv2 first
+	var codecv2Idl Codecv2EventIdl
+	if err := json.Unmarshal(bSrc, &codecv2Idl); err == nil {
+		w.inner = &codecv2Idl
+		return nil
+	}
+
+	// Fall back to codec
+	var codecIdl CodecEventIdl
+	if err := json.Unmarshal(bSrc, &codecIdl); err != nil {
+		return fmt.Errorf("failed to scan EventIdl as both codecv2 and codec: %w", err)
+	}
+	w.inner = &codecIdl
+	return nil
 }
+
+// Value implements driver.Valuer
+func (w EventIdlWrapper) Value() (driver.Value, error) {
+	if w.inner == nil {
+		return nil, nil
+	}
+	return json.Marshal(w.inner)
+}
+
+// Get returns the inner EventIdl interface
+func (w *EventIdlWrapper) Get() EventIdl {
+	return w.inner
+}
+
+// Set sets the inner EventIdl
+func (w *EventIdlWrapper) Set(idl EventIdl) {
+	w.inner = idl
+}
+
+// Equal compares two EventIdlWrappers
+func (w *EventIdlWrapper) Equal(other *EventIdlWrapper) bool {
+	if w.inner == nil && other.inner == nil {
+		return true
+	}
+	if w.inner == nil || other.inner == nil {
+		return false
+	}
+	return w.inner.Equal(other.inner)
+}
+
+// CodecEventIdl wraps codec.EventIDLTypes to implement the EventIdl interface
+type CodecEventIdl codec.EventIDLTypes
+
+func (e *CodecEventIdl) Equal(other EventIdl) bool {
+	otherCodecPtr, ok := other.(*CodecEventIdl)
+	if !ok {
+		return false
+	}
+	return reflect.DeepEqual(e, otherCodecPtr)
+}
+
+// _is_EventIdl is a private marker method that seals this interface to this package
+func (e *CodecEventIdl) _is_EventIdl() {}
+
+// Codecv2EventIdl wraps codecv2.EventIDLTypes to implement the EventIdl interface
+type Codecv2EventIdl codecv2.EventIDLTypes
+
+func (e *Codecv2EventIdl) Equal(other EventIdl) bool {
+	otherCodecv2Ptr, ok := other.(*Codecv2EventIdl)
+	if !ok {
+		return false
+	}
+	return reflect.DeepEqual(e, otherCodecv2Ptr)
+}
+
+// _is_EventIdl is a private marker method that seals this interface to this package
+func (e *Codecv2EventIdl) _is_EventIdl() {}
 
 func scanJSON(name string, dest, src interface{}) error {
 	var bSrc []byte

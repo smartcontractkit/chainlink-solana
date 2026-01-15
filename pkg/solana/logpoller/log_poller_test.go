@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
+	anchoridltype "github.com/gagliardetto/anchor-go/idl/idltype"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -376,9 +378,9 @@ func TestProcess(t *testing.T) {
 	err = json.Unmarshal([]byte("\"string\""), &idlTypeString)
 	require.NoError(t, err)
 
-	idl := types.EventIdl{
+	idl := types.CodecEventIdl{
 		Event: codec.IdlEvent{
-			Name: "myEvent",
+			Name: eventName,
 			Fields: []codec.IdlEventField{{
 				Name: "A",
 				Type: idlTypeInt64,
@@ -390,12 +392,15 @@ func TestProcess(t *testing.T) {
 		Types: []codec.IdlTypeDef{},
 	}
 
+	var wrapper types.EventIdlWrapper
+	wrapper.Set(&idl)
+
 	filter := types.Filter{
 		Name:        "test filter",
 		EventName:   eventName,
 		Address:     addr,
 		EventSig:    eventSig,
-		EventIdl:    idl,
+		EventIdl:    wrapper,
 		SubkeyPaths: [][]string{{"A"}, {"B"}},
 	}
 	orm.EXPECT().ChainID().Return(chainID).Maybe()
@@ -483,6 +488,115 @@ func TestProcess(t *testing.T) {
 		assert.NoError(t, err)
 
 		ev.Error = nil
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+}
+
+func TestProcessWithV2IDL(t *testing.T) {
+	ctx := t.Context()
+
+	addr := newRandomPublicKey(t)
+	eventName := "myEvent"
+	eventSig := types.NewEventSignatureFromName(eventName)
+	event := struct {
+		A int64
+		B string
+	}{55, "hello"}
+	subKeyValA, err := types.NewIndexedValue(event.A)
+	require.NoError(t, err)
+	subKeyValB, err := types.NewIndexedValue(event.B)
+	require.NoError(t, err)
+
+	filterID := rand.Int63()
+	chainID := uuid.NewString()
+
+	txIndex := int(rand.Int31())
+	txLogIndex := uint(rand.Uint32())
+
+	expectedLog := newRandomLog(t, filterID, chainID, eventName)
+	expectedLog.Address = addr
+	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
+	require.NoError(t, err)
+	expectedLog.SequenceNum = 1
+	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA, subKeyValB}
+
+	expectedLog.Data, err = bin.MarshalBorsh(&event)
+	require.NoError(t, err)
+
+	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
+	ev := types.ProgramEvent{
+		Program: addr.ToSolana().String(),
+		BlockData: types.BlockData{
+			SlotNumber:          uint64(expectedLog.BlockNumber),
+			BlockHeight:         3,
+			BlockHash:           expectedLog.BlockHash.ToSolana(),
+			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+			TransactionHash:     expectedLog.TxHash.ToSolana(),
+			TransactionIndex:    txIndex,
+			TransactionLogIndex: txLogIndex,
+			Error:               nil,
+		},
+		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
+	}
+
+	orm := mocks.NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lggr := logger.Sugared(logger.Test(t))
+	lp := New(lggr, orm, cl, config.NewDefault())
+
+	idlv2 := types.Codecv2EventIdl{
+		Event: anchoridl.IdlEvent{
+			Name:          eventName,
+			Discriminator: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		},
+		Types: []anchoridl.IdlTypeDef{
+			{
+				Name: eventName,
+				Ty: &anchoridl.IdlTypeDefTyStruct{
+					Kind: "struct",
+					Fields: anchoridl.IdlDefinedFieldsNamed{
+						{
+							Name: "A",
+							Ty:   &anchoridltype.I64{},
+						}, {
+							Name: "B",
+							Ty:   &anchoridltype.String{},
+						},
+					},
+				},
+			},
+		},
+	}
+	var wrapper types.EventIdlWrapper
+	wrapper.Set(&idlv2)
+
+	filter := types.Filter{
+		Name:        "test filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    wrapper,
+		SubkeyPaths: [][]string{{"A"}, {"B"}},
+	}
+	orm.EXPECT().ChainID().Return(chainID).Maybe()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{filter}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) {
+		require.Equal(t, f, filter)
+		return filterID, nil
+	}).Once()
+
+	err = lp.RegisterFilter(ctx, filter)
+	require.NoError(t, err)
+
+	t.Run("accepts matching log", func(t *testing.T) {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+			require.Len(t, logs, 1)
+			log := logs[0]
+			assert.Equal(t, expectedLog, log)
+			return nil
+		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
 	})
