@@ -38,4 +38,3 @@ func (s SolanaAddressModifier) DecodeAddress(str string) ([]byte, error) {
 func (s SolanaAddressModifier) Length() int {
 	return solana.PublicKeyLength
 }
-

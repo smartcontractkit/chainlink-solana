@@ -87,4 +87,3 @@ func MapstructureDecode(src, dest any) error {
 
 	return nil
 }
-

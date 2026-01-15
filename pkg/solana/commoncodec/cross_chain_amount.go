@@ -90,4 +90,3 @@ func (d *crossChainAmount) Size(val int) (int, error) {
 func (d *crossChainAmount) FixedSize() (int, error) {
 	return CrossChainAmountLength, nil
 }
-
