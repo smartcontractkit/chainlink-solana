@@ -148,14 +148,6 @@ func ExtractEventIDL(eventName string, idl IDL) (IdlEvent, error) {
 	return eventIdl, nil
 }
 
-func WrapItemType(forEncoding bool, contractName, itemType string) string {
-	if forEncoding {
-		return fmt.Sprintf("input.%s.%s", contractName, itemType)
-	}
-
-	return fmt.Sprintf("output.%s.%s", contractName, itemType)
-}
-
 // TODO Deprecate and remove this.
 func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Accounts, true)

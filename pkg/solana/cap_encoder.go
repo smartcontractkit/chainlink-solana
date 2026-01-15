@@ -46,7 +46,7 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create codec entry: %w", err)
 	}
-	itemType := codec.WrapItemType(true, encoderName, idl.Accounts[0].Name)
+	itemType := solcommoncodec.WrapItemType(true, encoderName, idl.Accounts[0].Name)
 	parsed.EncoderDefs[itemType] = cEntry
 
 	c, err := parsed.ToCodec()
