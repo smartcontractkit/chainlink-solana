@@ -1,4 +1,4 @@
-package codec_test
+package commoncodec_test
 
 import (
 	"testing"
@@ -8,12 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestSolanaAddressModifier(t *testing.T) {
-	modifier := codec.SolanaAddressModifier{}
+	modifier := solcommoncodec.SolanaAddressModifier{}
 
 	// Valid Solana address (32 bytes, Base58 encoded)
 	validAddressStr := "9nQhQ7iCyY5SgAX2Zm4DtxNh9Ubc4vbiLkiYbX43SDXY"
@@ -71,3 +70,4 @@ func TestSolanaAddressModifier(t *testing.T) {
 		assert.Equal(t, solana.PublicKeyLength, modifier.Length())
 	})
 }
+

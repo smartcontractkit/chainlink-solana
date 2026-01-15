@@ -1,4 +1,4 @@
-package codec
+package commoncodec
 
 import (
 	"fmt"
@@ -56,3 +56,4 @@ func (d *option) Size(val int) (int, error) {
 func (d *option) FixedSize() (int, error) {
 	return d.codec.FixedSize()
 }
+

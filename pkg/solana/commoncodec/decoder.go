@@ -1,4 +1,4 @@
-package codec
+package commoncodec
 
 import (
 	"context"
@@ -87,3 +87,4 @@ func MapstructureDecode(src, dest any) error {
 
 	return nil
 }
+

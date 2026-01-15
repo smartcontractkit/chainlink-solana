@@ -1,4 +1,4 @@
-package codec
+package commoncodec
 
 import (
 	"fmt"
@@ -79,3 +79,4 @@ func TestDecoder_GetMaxDecodingSize_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+

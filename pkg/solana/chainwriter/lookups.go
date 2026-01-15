@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 var (
@@ -291,7 +292,7 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 
 		internalType := pda.InternalField.TypeName
 
-		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, internalType, idlCodec)
+		idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, internalType, idlCodec)
 		if err != nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error finding definition for type %s: %w", internalType, err))
 		}

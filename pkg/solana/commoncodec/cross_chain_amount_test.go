@@ -1,4 +1,4 @@
-package codec_test
+package commoncodec_test
 
 import (
 	"math/big"
@@ -8,11 +8,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestSolanaCrossChainAmountCodec(t *testing.T) {
-	ccaCodec := codec.NewCrossChainAmount()
+	ccaCodec := solcommoncodec.NewCrossChainAmount()
 
 	t.Run("successfully encodes and decodes cross chain amount", func(t *testing.T) {
 		var into []byte
@@ -20,8 +20,8 @@ func TestSolanaCrossChainAmountCodec(t *testing.T) {
 		// encode value
 		into, err := ccaCodec.Encode(value, into)
 		require.NoError(t, err)
-		require.Len(t, into, codec.CrossChainAmountLength)
-		expectedBytes := make([]byte, codec.CrossChainAmountLength)
+		require.Len(t, into, solcommoncodec.CrossChainAmountLength)
+		expectedBytes := make([]byte, solcommoncodec.CrossChainAmountLength)
 		expectedBytes[0] = 1 // set first digit in LE encoded bytes to 1 for big.Into value of 1
 		require.Equal(t, expectedBytes, into)
 		// decode value
@@ -36,7 +36,7 @@ func TestSolanaCrossChainAmountCodec(t *testing.T) {
 		encoded[0] = 1 // set first digit in LE encoded bytes to 1 for big.Into value of 1
 		decoded, remaining, err := ccaCodec.Decode(encoded)
 		require.NoError(t, err)
-		require.Len(t, remaining, len(encoded)-codec.CrossChainAmountLength)
+		require.Len(t, remaining, len(encoded)-solcommoncodec.CrossChainAmountLength)
 		require.Equal(t, ccipocr3.NewBigInt(big.NewInt(1)), decoded)
 	})
 
@@ -52,3 +52,4 @@ func TestSolanaCrossChainAmountCodec(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+

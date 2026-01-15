@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -37,7 +38,7 @@ type filters struct {
 	seqNums                map[int64]int64
 	seqNumsMutex           sync.Mutex
 	decoders               map[int64]types.Decoder
-	discriminatorExtractor codec.DiscriminatorExtractor
+	discriminatorExtractor solcommoncodec.DiscriminatorExtractor
 }
 
 func newFilters(lggr logger.Logger, orm ORM) *filters {
@@ -45,7 +46,7 @@ func newFilters(lggr logger.Logger, orm ORM) *filters {
 		orm:                    orm,
 		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]types.Decoder),
-		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
+		discriminatorExtractor: solcommoncodec.NewDiscriminatorExtractor(),
 	}
 }
 
@@ -213,7 +214,7 @@ func newDecoder(filter types.Filter) (types.Decoder, error) {
 		return nil, err
 	}
 
-	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
+	return solcommoncodec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
 func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {

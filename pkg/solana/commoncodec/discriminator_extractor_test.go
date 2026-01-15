@@ -1,4 +1,4 @@
-package codec
+package commoncodec
 
 import (
 	"encoding/base64"
@@ -102,3 +102,4 @@ func BenchmarkDiscriminatorExtraction(b *testing.B) {
 		}
 	})
 }
+

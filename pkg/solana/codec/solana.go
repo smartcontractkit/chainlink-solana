@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/text/cases"
@@ -33,6 +32,7 @@ import (
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 const (
@@ -49,17 +49,12 @@ const (
 // EpochToTimeHook allows multiple conversions: time.Time -> int64; int64 -> time.Time; *big.Int -> time.Time; and more
 var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, commoncodec.BigIntHook, commoncodec.SliceToArrayVerifySizeHook}
 
-type solanaCodec struct {
-	commontypes.Encoder
-	commontypes.Decoder
-	*ParsedTypes
-}
-
 // NewCodec creates a new [commontypes.RemoteCodec] for Solana.
-func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
-	parsed := &ParsedTypes{
-		EncoderDefs: map[string]Entry{},
-		DecoderDefs: map[string]Entry{},
+// DOES NOT SEEM TO BE USED
+func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
+	parsed := &solcommoncodec.ParsedTypes{
+		EncoderDefs: map[string]solcommoncodec.Entry{},
+		DecoderDefs: map[string]solcommoncodec.Entry{},
 	}
 
 	for offChainName, cfg := range conf.Configs {
@@ -90,7 +85,7 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	return parsed.ToCodec()
 }
 
-func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry Entry, err error) {
+func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
 	case IdlTypeDef:
 		entry, err = NewAccountEntry(offChainName, AccountIDLTypes{Account: v, Types: idl.Types}, true, mod, binary.LittleEndian())
@@ -110,10 +105,10 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 	return entry, nil
 }
 
-func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
+func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
-	case ChainConfigTypeAccountDef:
+	case solcommoncodec.ChainConfigTypeAccountDef:
 		for i := range idl.Accounts {
 			if idl.Accounts[i].Name == chainSpecificName {
 				return idl.Accounts[i], nil
@@ -121,7 +116,7 @@ func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, id
 		}
 		return nil, fmt.Errorf("failed to find account %q in IDL", chainSpecificName)
 
-	case ChainConfigTypeInstructionDef:
+	case solcommoncodec.ChainConfigTypeInstructionDef:
 		for i := range idl.Instructions {
 			if idl.Instructions[i].Name == chainSpecificName {
 				return idl.Instructions[i], nil
@@ -129,7 +124,7 @@ func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, id
 		}
 		return nil, fmt.Errorf("failed to find instruction %q in IDL", chainSpecificName)
 
-	case ChainConfigTypeEventDef:
+	case solcommoncodec.ChainConfigTypeEventDef:
 		for i := range idl.Events {
 			if idl.Events[i].Name == chainSpecificName {
 				return idl.Events[i], nil
@@ -138,6 +133,19 @@ func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, id
 		return nil, fmt.Errorf("failed to find event %q in IDL", chainSpecificName)
 	}
 	return nil, fmt.Errorf("unknown type: %q", cfgType)
+}
+
+// ExtractEventIDL extracts an event definition from the IDL by name.
+func ExtractEventIDL(eventName string, idl IDL) (IdlEvent, error) {
+	idlDef, err := FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, idl)
+	if err != nil {
+		return IdlEvent{}, err
+	}
+	eventIdl, isOk := idlDef.(IdlEvent)
+	if !isOk {
+		return IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
+	}
+	return eventIdl, nil
 }
 
 func WrapItemType(forEncoding bool, contractName, itemType string) string {
@@ -172,27 +180,6 @@ func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, mo
 // TODO Deprecate and remove this.
 func NewIDLDefinedTypesCodec(idl IDL, builder commonencodings.Builder) (commontypes.RemoteCodec, error) {
 	return newIDLCoded(idl, builder, idl.Types, false)
-}
-
-func (s solanaCodec) CreateType(itemType string, forEncoding bool) (any, error) {
-	var itemTypes map[string]Entry
-	if forEncoding {
-		itemTypes = s.EncoderDefs
-	} else {
-		itemTypes = s.DecoderDefs
-	}
-
-	def, ok := itemTypes[itemType]
-	if !ok {
-		return nil, fmt.Errorf("%w: cannot find type name %q", commontypes.ErrInvalidType, itemType)
-	}
-
-	// we don't need double pointers, and they can also mess up reflection variable creation and mapstruct decode
-	if def.GetType().Kind() == reflect.Pointer {
-		return reflect.New(def.GetCodecType().GetType().Elem()).Interface(), nil
-	}
-
-	return reflect.New(def.GetType()).Interface(), nil
 }
 
 func newIDLCoded(
@@ -252,7 +239,7 @@ func createCodecType(
 		case "onramp_address":
 			return name, NewOnRampAddress(refs.builder), nil
 		case "cross_chain_amount":
-			return name, NewCrossChainAmount(), nil
+			return name, solcommoncodec.NewCrossChainAmount(), nil
 		default:
 			return name, nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, def.Type.Codec)
 		}
@@ -277,7 +264,7 @@ func asStruct(
 	named := make([]commonencodings.NamedTypeCodec, len(fields)+desLen)
 
 	if includeDiscriminator {
-		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: NewDiscriminator(name, true)}
+		named[0] = commonencodings.NamedTypeCodec{Name: "Discriminator" + name, Codec: solcommoncodec.NewDiscriminator(name, true)}
 	}
 
 	for idx, field := range fields {
@@ -311,7 +298,7 @@ func processFieldType(parentTypeName string, idlType IdlType, refs *codecRefs) (
 	case idlType.IsIdlTypeOption():
 		// Go doesn't have an `Option` type; use pointer to type instead
 		inner, err := processFieldType(parentTypeName, idlType.GetIdlTypeOption().Option, refs)
-		return NewOption(inner), err
+		return solcommoncodec.NewOption(inner), err
 	case idlType.IsIdlTypeDefined():
 		return asDefined(parentTypeName, idlType.GetIdlTypeDefined(), refs)
 	case idlType.IsArray():
@@ -450,7 +437,7 @@ func getTimeCodecByStringType(curType IdlTypeAsString, builder commonencodings.B
 	case IdlTypeUnixTimestamp:
 		return builder.Int64(), nil
 	case IdlTypeDuration:
-		return NewDuration(builder), nil
+		return solcommoncodec.NewDuration(builder), nil
 	default:
 		return nil, fmt.Errorf(unknownIDLFormat, commontypes.ErrInvalidConfig, curType)
 	}

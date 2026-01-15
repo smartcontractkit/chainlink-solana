@@ -1,4 +1,4 @@
-package codec
+package commoncodec
 
 import commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
@@ -22,3 +22,4 @@ type ChainConfig struct {
 	Type            ChainConfigType             `json:"type" toml:"type"`
 	ModifierConfigs commoncodec.ModifiersConfig `json:"modifierConfigs,omitempty" toml:"modifierConfigs,omitempty"`
 }
+

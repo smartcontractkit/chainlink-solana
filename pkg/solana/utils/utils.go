@@ -8,7 +8,7 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 
@@ -27,14 +27,14 @@ func LamportsToSol(lamports uint64) float64 { return internal.LamportsToSol(lamp
 func InjectAddressModifier(inputModifications, outputModifications commoncodec.ModifiersConfig) {
 	for i, modConfig := range inputModifications {
 		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
+			addrModifierConfig.Modifier = solcommoncodec.SolanaAddressModifier{}
 			inputModifications[i] = addrModifierConfig
 		}
 	}
 
 	for i, modConfig := range outputModifications {
 		if addrModifierConfig, ok := modConfig.(*commoncodec.AddressBytesToStringModifierConfig); ok {
-			addrModifierConfig.Modifier = codec.SolanaAddressModifier{}
+			addrModifierConfig.Modifier = solcommoncodec.SolanaAddressModifier{}
 			outputModifications[i] = addrModifierConfig
 		}
 	}

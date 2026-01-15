@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -332,7 +333,7 @@ func (b *eventReadBinding) normalizeParams(value any, itemType string) (any, err
 	// params can be a singular primitive value, a map of values, or a struct
 	// in the case that the input params are presented as a map of values, apply the values to the off-chain type
 	// with solana hooks
-	if err = codec.MapstructureDecode(value, offChain); err != nil {
+	if err = solcommoncodec.MapstructureDecode(value, offChain); err != nil {
 		return nil, fmt.Errorf("%w: failed to decode offChain value: %s", types.ErrInternal, err.Error())
 	}
 
