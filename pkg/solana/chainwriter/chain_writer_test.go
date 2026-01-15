@@ -1403,9 +1403,9 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	}
 	type TestItemV2 struct {
 		Field                 int32
-		Oracle_id             uint8            //nolint:revive // snake_case required to match Anchor IDL
-		Oracle_ids            [32]uint8        //nolint:revive // snake_case required to match Anchor IDL
-		Account_struct        AccountStructV2  //nolint:revive // snake_case required to match Anchor IDL
+		Oracle_id             uint8           //nolint:revive // snake_case required to match Anchor IDL
+		Oracle_ids            [32]uint8       //nolint:revive // snake_case required to match Anchor IDL
+		Account_struct        AccountStructV2 //nolint:revive // snake_case required to match Anchor IDL
 		Accounts              []solana.PublicKey
 		Different_field       string           //nolint:revive // snake_case required to match Anchor IDL
 		Big_field             ag_binary.Int128 //nolint:revive // snake_case required to match Anchor IDL
