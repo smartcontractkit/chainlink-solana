@@ -669,11 +669,14 @@ func toLPFilter(
 	subKeyPaths [][]string,
 	eventIdl codec.EventIDLTypes,
 ) logpollertypes.Filter {
+	codecEventIdl := logpollertypes.CodecEventIdl(eventIdl)
+	var wrapper logpollertypes.EventIdlWrapper
+	wrapper.Set(&codecEventIdl)
 	return logpollertypes.Filter{
 		EventName:       name,
 		EventSig:        logpollertypes.NewEventSignatureFromName(name),
 		StartingBlock:   conf.GetStartingBlock(),
-		EventIdl:        logpollertypes.EventIdl(eventIdl),
+		EventIdl:        wrapper,
 		SubkeyPaths:     subKeyPaths,
 		Retention:       conf.GetRetention(),
 		MaxLogsKept:     conf.GetMaxLogsKept(),

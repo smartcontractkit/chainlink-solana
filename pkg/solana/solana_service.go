@@ -635,11 +635,25 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 }
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
+	// Try to unmarshal into codecv2 EventIdl first
 	var idl logpollertypes.EventIdl
-	err := json.Unmarshal(f.EventIdlJSON, &idl)
-	if err != nil {
-		return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
+	var codecv2Idl logpollertypes.Codecv2EventIdl
+	err := json.Unmarshal(f.EventIdlJSON, &codecv2Idl)
+	if err == nil {
+		idl = &codecv2Idl
+	} else {
+		// Fall back to codec EventIdl
+		var codecIdl logpollertypes.CodecEventIdl
+		err = json.Unmarshal(f.EventIdlJSON, &codecIdl)
+		if err != nil {
+			return logpollertypes.Filter{}, fmt.Errorf("invalid event idl (tried both codecv2 and codec): %w", err)
+		}
+		idl = &codecIdl
 	}
+
+	// Create wrapper and set the inner idl
+	var wrapper logpollertypes.EventIdlWrapper
+	wrapper.Set(idl)
 
 	return logpollertypes.Filter{
 		Name:            f.Name,
@@ -647,7 +661,7 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 		EventName:       f.EventName,
 		EventSig:        logpollertypes.EventSignature(f.EventSig),
 		StartingBlock:   f.StartingBlock,
-		EventIdl:        idl,
+		EventIdl:        wrapper,
 		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
 		Retention:       f.Retention,
 		MaxLogsKept:     f.MaxLogsKept,

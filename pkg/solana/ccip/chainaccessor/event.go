@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"golang.org/x/exp/maps"
@@ -30,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
@@ -159,18 +161,6 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 	return nil
 }
 
-func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
-	if err != nil {
-		return codec.IdlEvent{}, err
-	}
-	eventIdl, isOk := idlDef.(codec.IdlEvent)
-	if !isOk {
-		return codec.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
-	}
-	return eventIdl, nil
-}
-
 // registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
 func (a *SolanaAccessor) registerFilterIfNotExists(
 	ctx context.Context,
@@ -182,17 +172,11 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Retention: &defaultCCIPLogsRetention,
 	}
 
-	var codecIDL codec.IDL
-	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
-	}
-
-	eventIdl, err := extractEventIDL(eventName, codecIDL)
+	// Create EventIdlWrapper from IDL string
+	lpEventIDL, err := CreateEventIdlWrapper(eventName, filterConfig.idl)
 	if err != nil {
-		return fmt.Errorf("failed to extract event IDL: %w", err)
+		return err
 	}
-
-	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
@@ -224,6 +208,42 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	return nil
+}
+
+// CreateEventIdlWrapper creates an EventIdlWrapper from an IDL string and event name.
+// It tries to unmarshal as codecv2 (anchor-go) IDL first, then falls back to codec IDL.
+func CreateEventIdlWrapper(eventName, idlString string) (logpollertypes.EventIdlWrapper, error) {
+	var innerEventIDL logpollertypes.EventIdl
+	var wrapper logpollertypes.EventIdlWrapper
+
+	// Try to unmarshal into codecv2 (anchor-go) IDL first
+	var codecv2IDL anchoridl.Idl
+	if err := json.Unmarshal([]byte(idlString), &codecv2IDL); err == nil {
+		// Successfully unmarshaled as codecv2 IDL
+		eventIdl, err := codecv2.ExtractEventIDL(eventName, codecv2IDL)
+		if err != nil {
+			return wrapper, fmt.Errorf("failed to extract event IDL from codecv2: %w", err)
+		}
+		codecv2EventIDL := logpollertypes.Codecv2EventIdl{Event: eventIdl, Types: codecv2IDL.Types}
+		innerEventIDL = &codecv2EventIDL
+	} else {
+		// Try codec IDL as fallback
+		var codecIDL codec.IDL
+		if err := json.Unmarshal([]byte(idlString), &codecIDL); err != nil {
+			return wrapper, fmt.Errorf("unexpected error: invalid IDL (tried both codecv2 and codec), error: %w", err)
+		}
+
+		eventIdl, err := codec.ExtractEventIDL(eventName, codecIDL)
+		if err != nil {
+			return wrapper, fmt.Errorf("failed to extract event IDL from codec: %w", err)
+		}
+		codecEventIDL := logpollertypes.CodecEventIdl{Event: eventIdl, Types: codecIDL.Types}
+		innerEventIDL = &codecEventIDL
+	}
+
+	// Create wrapper and set the inner idl
+	wrapper.Set(innerEventIDL)
+	return wrapper, nil
 }
 
 // convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic
