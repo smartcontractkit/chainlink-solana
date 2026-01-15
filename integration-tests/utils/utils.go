@@ -281,3 +281,10 @@ func CreateTx(ctx context.Context, t tests.TestingT, rpcClient *rpc.Client, inst
 	require.NoError(t, err)
 	return tx
 }
+
+func GetRandomPubKey(t *testing.T) solana.PublicKey {
+	t.Helper()
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	return privKey.PublicKey()
+}
