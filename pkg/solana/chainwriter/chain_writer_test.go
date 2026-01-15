@@ -1381,42 +1381,36 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	require.NotNil(t, encodedPayloadv1)
 
 	// Anchor 0.3x IDL parsing results in snake_case field names. Create structs to match these field names.
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type InnerDynamicV2 struct {
-		Int_val int64
+		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
 		S       string
 	}
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type InnerStaticV2 struct {
-		Int_val int64
+		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
 		A       solana.PublicKey
 	}
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type AccountStructV2 struct {
 		Account     solana.PublicKey
-		Account_str solana.PublicKey
+		Account_str solana.PublicKey //nolint:revive // snake_case required to match Anchor IDL
 	}
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type NestedDynamicV2 struct {
-		Fixed_bytes [2]uint8
+		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
 		Inner       InnerDynamicV2
 	}
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type NestedStaticV2 struct {
-		Fixed_bytes [2]uint8
+		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
 		Inner       InnerStaticV2
 	}
-	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type TestItemV2 struct {
 		Field                 int32
-		Oracle_id             uint8
-		Oracle_ids            [32]uint8
-		Account_struct        AccountStructV2
+		Oracle_id             uint8           //nolint:revive // snake_case required to match Anchor IDL
+		Oracle_ids            [32]uint8       //nolint:revive // snake_case required to match Anchor IDL
+		Account_struct        AccountStructV2 //nolint:revive // snake_case required to match Anchor IDL
 		Accounts              []solana.PublicKey
-		Different_field       string
-		Big_field             ag_binary.Int128
-		Nested_dynamic_struct NestedDynamicV2
-		Nested_static_struct  NestedStaticV2
+		Different_field       string           //nolint:revive // snake_case required to match Anchor IDL
+		Big_field             ag_binary.Int128 //nolint:revive // snake_case required to match Anchor IDL
+		Nested_dynamic_struct NestedDynamicV2  //nolint:revive // snake_case required to match Anchor IDL
+		Nested_static_struct  NestedStaticV2   //nolint:revive // snake_case required to match Anchor IDL
 	}
 
 	// Test v2 encoding with matching struct (same data, different field names)
