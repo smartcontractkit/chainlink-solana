@@ -5,9 +5,9 @@ import (
 	"crypto/ed25519"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/keystore"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/keystore"
 	solanaks "github.com/smartcontractkit/chainlink-solana/pkg/solana/keys"
 )
 
@@ -20,7 +20,7 @@ func TestTxKeyCoreKeystore(t *testing.T) {
 	coreKs := solanaks.NewTxKeyCoreKeystore(ks)
 	accounts, err := coreKs.Accounts(ctx)
 	require.NoError(t, err)
-	require.Len(t, accounts, 0)
+	require.Empty(t, accounts)
 
 	txKey, err := solanaks.CreateTxKey(ks, "key1")
 	require.NoError(t, err)
