@@ -49,7 +49,7 @@ func NewTxKeyCoreKeystore(ks interface {
 
 func (s *TxKeyCoreKeystore) getKeys(ctx context.Context) ([]*TxKey, error) {
 	if len(s.allowedKeyNames) != 0 {
-		return LoadTxKeys(ctx, s.ks, s.allowedKeyNames)
+		return GetTxKeys(ctx, s.ks, s.allowedKeyNames, WithNoPrefix())
 	}
 	return GetTxKeys(ctx, s.ks, []string{})
 }

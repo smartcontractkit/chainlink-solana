@@ -75,4 +75,15 @@ func TestTxKeyCoreKeystore(t *testing.T) {
 	_, err = coreKs.Sign(ctx, "invalid-address", data)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "key not found")
+
+	// Test WithAllowedKeyNames: create another key and verify it's filtered
+	txKey2, err := solanaks.CreateTxKey(ks, "key2")
+	require.NoError(t, err)
+
+	coreKsFiltered := solanaks.NewTxKeyCoreKeystore(ks, solanaks.WithAllowedKeyNames([]string{txKey.KeyPath().String()}))
+	accountsFiltered, err := coreKsFiltered.Accounts(ctx)
+	require.NoError(t, err)
+	require.Len(t, accountsFiltered, 1)
+	require.Equal(t, txKey.Address().String(), accountsFiltered[0])
+	require.NotContains(t, accountsFiltered, txKey2.Address().String())
 }
