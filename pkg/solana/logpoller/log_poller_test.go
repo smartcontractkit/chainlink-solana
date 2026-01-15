@@ -353,7 +353,7 @@ func TestProcess(t *testing.T) {
 	ev := types.ProgramEvent{
 		Program: addr.ToSolana().String(),
 		BlockData: types.BlockData{
-			SlotNumber:          uint64(expectedLog.BlockNumber),
+			SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec // test data, block numbers are always positive
 			BlockHeight:         3,
 			BlockHash:           expectedLog.BlockHash.ToSolana(),
 			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
@@ -528,7 +528,7 @@ func TestProcessWithV2IDL(t *testing.T) {
 	ev := types.ProgramEvent{
 		Program: addr.ToSolana().String(),
 		BlockData: types.BlockData{
-			SlotNumber:          uint64(expectedLog.BlockNumber),
+			SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec // test data, block numbers are always positive
 			BlockHeight:         3,
 			BlockHash:           expectedLog.BlockHash.ToSolana(),
 			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
