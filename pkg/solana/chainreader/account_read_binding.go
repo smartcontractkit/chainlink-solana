@@ -11,9 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
-
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 // accountReadBinding provides decoding and reading Solana Account data using a defined codec.
@@ -119,11 +119,11 @@ func (b *accountReadBinding) GetAddressResponseHardCoder() *commoncodec.HardCode
 }
 
 func (b *accountReadBinding) CreateType(forEncoding bool) (any, error) {
-	return b.codec.CreateType(codec.WrapItemType(forEncoding, b.namespace, b.genericName), forEncoding)
+	return b.codec.CreateType(solcommoncodec.WrapItemType(forEncoding, b.namespace, b.genericName), forEncoding)
 }
 
 func (b *accountReadBinding) Decode(ctx context.Context, bts []byte, outVal any) error {
-	return b.codec.Decode(ctx, bts, outVal, codec.WrapItemType(false, b.namespace, b.genericName))
+	return b.codec.Decode(ctx, bts, outVal, solcommoncodec.WrapItemType(false, b.namespace, b.genericName))
 }
 
 func (b *accountReadBinding) QueryKey(_ context.Context, _ query.KeyFilter, _ query.LimitAndSort, _ any) ([]types.Sequence, error) {
@@ -136,7 +136,7 @@ func (b *accountReadBinding) buildSeedsSlice(ctx context.Context, params any) ([
 	// Append the static prefix string first
 	flattenedSeeds = append(flattenedSeeds, b.prefix...)
 	// Encode the seeds provided in the params
-	encodedParamSeeds, err := b.codec.Encode(ctx, params, codec.WrapItemType(true, b.namespace, b.genericName))
+	encodedParamSeeds, err := b.codec.Encode(ctx, params, solcommoncodec.WrapItemType(true, b.namespace, b.genericName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params into bytes for PDA seeds: %w", err)
 	}

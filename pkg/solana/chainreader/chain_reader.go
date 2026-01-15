@@ -415,9 +415,9 @@ func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, 
 	}
 
 	if forEncoding {
-		parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName)] = cEntry
+		parsed.EncoderDefs[solcommoncodec.WrapItemType(true, namespace, genericName)] = cEntry
 	} else {
-		parsed.DecoderDefs[codec.WrapItemType(false, namespace, genericName)] = cEntry
+		parsed.DecoderDefs[solcommoncodec.WrapItemType(false, namespace, genericName)] = cEntry
 	}
 	return nil
 }

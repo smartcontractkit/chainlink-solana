@@ -33,13 +33,13 @@ func TestEncodeDecodeBigInt(t *testing.T) {
 		B: big.NewInt(42),
 	}
 
-	bts, err := typedCodec.Encode(ctx, &value, codec.WrapItemType(true, namespace, genericName))
+	bts, err := typedCodec.Encode(ctx, &value, solcommoncodec.WrapItemType(true, namespace, genericName))
 
 	require.NoError(t, err)
 
 	var output offChain
 
-	require.NoError(t, typedCodec.Decode(ctx, bts, &output, codec.WrapItemType(false, namespace, genericName)))
+	require.NoError(t, typedCodec.Decode(ctx, bts, &output, solcommoncodec.WrapItemType(false, namespace, genericName)))
 	require.Equal(t, value.A.String(), output.A.String())
 	require.Equal(t, value.B.String(), output.B.String())
 }

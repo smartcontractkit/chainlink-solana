@@ -120,7 +120,7 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 				return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
 			}
 
-			s.parsed.EncoderDefs[codec.WrapItemType(true, program, method)] = input
+			s.parsed.EncoderDefs[solcommoncodec.WrapItemType(true, program, method)] = input
 		}
 	}
 
@@ -502,7 +502,7 @@ func (s *SolanaChainWriterService) loadTable(ctx context.Context, args any, rlt 
 
 func (s *SolanaChainWriterService) encodePayload(ctx context.Context, args any, methodConfig MethodConfig, contractName, method string) ([]byte, error) {
 	s.lggr.Debugw("Encoding transaction payload", "contract", contractName, "method", method)
-	encodedPayload, err := s.encoder.Encode(ctx, args, codec.WrapItemType(true, contractName, method))
+	encodedPayload, err := s.encoder.Encode(ctx, args, solcommoncodec.WrapItemType(true, contractName, method))
 	if err != nil {
 		return nil, fmt.Errorf("error encoding transaction payload: %w", err)
 	}
