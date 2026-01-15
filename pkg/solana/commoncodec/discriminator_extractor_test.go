@@ -102,4 +102,3 @@ func BenchmarkDiscriminatorExtraction(b *testing.B) {
 		}
 	})
 }
-

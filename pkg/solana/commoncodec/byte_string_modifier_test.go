@@ -70,4 +70,3 @@ func TestSolanaAddressModifier(t *testing.T) {
 		assert.Equal(t, solana.PublicKeyLength, modifier.Length())
 	})
 }
-

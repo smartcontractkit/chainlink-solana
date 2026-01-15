@@ -87,4 +87,3 @@ func AddEntries(defs map[string]Entry, modByTypeName map[string]map[string]commo
 
 	return nil
 }
-

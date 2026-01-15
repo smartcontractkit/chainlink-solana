@@ -52,4 +52,3 @@ func TestSolanaCrossChainAmountCodec(t *testing.T) {
 		require.Error(t, err)
 	})
 }
-

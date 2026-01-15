@@ -127,4 +127,3 @@ func (e *DiscriminatorExtractor) Extract(data string) [DiscriminatorLength]byte 
 
 	return [DiscriminatorLength]byte(decodeBuffer[:DiscriminatorLength])
 }
-

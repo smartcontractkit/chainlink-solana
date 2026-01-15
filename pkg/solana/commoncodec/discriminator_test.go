@@ -82,4 +82,3 @@ func TestDiscriminator(t *testing.T) {
 		require.Equal(t, 8, size)
 	})
 }
-

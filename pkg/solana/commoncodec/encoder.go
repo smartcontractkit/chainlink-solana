@@ -51,4 +51,3 @@ func (e *encoder) GetMaxEncodingSize(_ context.Context, n int, itemType string) 
 	}
 	return entry.GetCodecType().Size(n)
 }
-

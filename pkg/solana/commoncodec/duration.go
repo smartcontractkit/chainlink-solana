@@ -52,4 +52,3 @@ func (d *duration) Size(val int) (int, error) {
 func (d *duration) FixedSize() (int, error) {
 	return d.intEncoder.FixedSize()
 }
-
