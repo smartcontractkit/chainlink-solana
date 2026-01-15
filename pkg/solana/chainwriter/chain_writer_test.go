@@ -1381,26 +1381,32 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	require.NotNil(t, encodedPayloadv1)
 
 	// Anchor 0.3x IDL parsing results in snake_case field names. Create structs to match these field names.
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type InnerDynamicV2 struct {
 		Int_val int64
 		S       string
 	}
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type InnerStaticV2 struct {
 		Int_val int64
 		A       solana.PublicKey
 	}
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type AccountStructV2 struct {
 		Account     solana.PublicKey
 		Account_str solana.PublicKey
 	}
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type NestedDynamicV2 struct {
 		Fixed_bytes [2]uint8
 		Inner       InnerDynamicV2
 	}
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type NestedStaticV2 struct {
 		Fixed_bytes [2]uint8
 		Inner       InnerStaticV2
 	}
+	//nolint:revive // snake_case field names required to match Anchor IDL output
 	type TestItemV2 struct {
 		Field                 int32
 		Oracle_id             uint8
