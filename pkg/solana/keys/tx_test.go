@@ -90,14 +90,35 @@ func TestTxKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, solana.LAMPORTS_PER_SOL, bal2)
 
+	// Test filtering: create a non-solana key and verify it's filtered out
+	nonSolanaKey, err := ks.CreateKeys(ctx, commonks.CreateKeysRequest{
+		Keys: []commonks.CreateKeyRequest{
+			{KeyName: "evm/tx/non-solana-key", KeyType: commonks.ECDSA_S256},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, nonSolanaKey.Keys, 1)
+
+	// Empty names will return only solana keys (filtered).
+	keys, err := solanaks.GetTxKeys(ctx, ks, []string{})
+	require.NoError(t, err)
+	require.Len(t, keys, 2) // Only testKey and testKey2, not the non-solana key
+	keyAddresses := make([]string, len(keys))
+	for i, k := range keys {
+		keyAddresses[i] = k.Address().String()
+	}
+	require.Contains(t, keyAddresses, testKey.Address().String())
+	require.Contains(t, keyAddresses, testKey2.Address().String())
+	// Verify non-solana key is filtered out (ECDSA key won't be in the results)
+
 	// Admin operation will invalidate the keys.
 	_, err = ks.DeleteKeys(ctx, commonks.DeleteKeysRequest{
-		KeyNames: []string{testKey.KeyPath().String(), testKey2.KeyPath().String()},
+		KeyNames: []string{testKey.KeyPath().String(), testKey2.KeyPath().String(), "evm/tx/non-solana-key"},
 	})
 	require.NoError(t, err)
 
 	// Empty names will return all keys.
-	keys, err := solanaks.GetTxKeys(ctx, ks, []string{})
+	keys, err = solanaks.GetTxKeys(ctx, ks, []string{})
 	require.NoError(t, err)
 	require.Empty(t, keys)
 

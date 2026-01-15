@@ -25,7 +25,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260107095648-223976d2b9f1
-	github.com/smartcontractkit/chainlink-common/keystore v0.1.0
+	github.com/smartcontractkit/chainlink-common/keystore v0.1.1-0.20260115164422-897ee18790cd
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250818175541-3389ac08a563
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250717121125-2350c82883e2
@@ -127,7 +127,6 @@ require (
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/onsi/gomega v1.36.2 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
