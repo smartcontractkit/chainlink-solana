@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -40,15 +39,6 @@ const (
 	unknownIDLFormat     = "%w: unknown IDL type def %q"
 )
 
-// DecoderHooks
-//
-// BigIntHook allows *big.Int to be represented as any integer type or a string and to go back to them.
-// Useful for config, or if when a model may use a go type that isn't a *big.Int when Pack expects one.
-// Eg: int32 in a go struct from a plugin could require a *big.Int in Pack for int24, if it fits, we shouldn't care.
-// SliceToArrayVerifySizeHook verifies that slices have the correct size when converting to an array
-// EpochToTimeHook allows multiple conversions: time.Time -> int64; int64 -> time.Time; *big.Int -> time.Time; and more
-var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, commoncodec.BigIntHook, commoncodec.SliceToArrayVerifySizeHook}
-
 // NewCodec creates a new [commontypes.RemoteCodec] for Solana.
 // DOES NOT SEEM TO BE USED
 func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
@@ -63,7 +53,7 @@ func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
 			return nil, err
 		}
 
-		mod, err := cfg.ModifierConfigs.ToModifier(DecoderHooks...)
+		mod, err := cfg.ModifierConfigs.ToModifier(solcommoncodec.DecoderHooks...)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +149,7 @@ func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, mo
 		return nil, err
 	}
 
-	modCodec, err := commoncodec.NewModifierCodec(original, mod, DecoderHooks...)
+	modCodec, err := commoncodec.NewModifierCodec(original, mod, solcommoncodec.DecoderHooks...)
 	if err != nil {
 		return nil, err
 	}
