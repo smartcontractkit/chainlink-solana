@@ -6,6 +6,7 @@ require (
 	github.com/cometbft/cometbft v0.38.17
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/ethereum/go-ethereum v1.16.2
+	github.com/gagliardetto/anchor-go v1.0.0
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.13.0
@@ -34,6 +35,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/stretchr/testify v1.11.1
+	github.com/test-go/testify v1.1.4
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/metric v1.38.0
 	go.uber.org/zap v1.27.0
@@ -149,6 +151,10 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/testcontainers/testcontainers-go v0.37.0 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
