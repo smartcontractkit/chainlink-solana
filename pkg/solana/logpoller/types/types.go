@@ -138,10 +138,10 @@ type Decoder interface {
 }
 
 // EventIdl is an interface that can be implemented by both codec and codecv2 EventIDLTypes
-// The private _is_EventIdl() method ensures no external types can implement this interface
+// The private _isEventIdl() method ensures no external types can implement this interface
 type EventIdl interface {
 	Equal(other EventIdl) bool
-	_is_EventIdl() // private method - seals the interface to this package only
+	_isEventIdl() // private method - seals the interface to this package only
 }
 
 // EventIdlWrapper ican hold either CodecEventIdl or Codecv2EventIdl
@@ -230,8 +230,8 @@ func (e *CodecEventIdl) Equal(other EventIdl) bool {
 	return reflect.DeepEqual(e, otherCodecPtr)
 }
 
-// _is_EventIdl is a private marker method that seals this interface to this package
-func (e *CodecEventIdl) _is_EventIdl() {}
+// _isEventIdl is a private marker method that seals this interface to this package
+func (e *CodecEventIdl) _isEventIdl() {}
 
 // Codecv2EventIdl wraps codecv2.EventIDLTypes to implement the EventIdl interface
 type Codecv2EventIdl codecv2.EventIDLTypes
@@ -244,8 +244,8 @@ func (e *Codecv2EventIdl) Equal(other EventIdl) bool {
 	return reflect.DeepEqual(e, otherCodecv2Ptr)
 }
 
-// _is_EventIdl is a private marker method that seals this interface to this package
-func (e *Codecv2EventIdl) _is_EventIdl() {}
+// _isEventIdl is a private marker method that seals this interface to this package
+func (e *Codecv2EventIdl) _isEventIdl() {}
 
 func scanJSON(name string, dest, src interface{}) error {
 	var bSrc []byte
