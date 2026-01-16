@@ -15,6 +15,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 type PublicKey solana.PublicKey
@@ -113,7 +114,7 @@ const EventSignatureLength = 8
 type EventSignature [EventSignatureLength]byte
 
 func NewEventSignatureFromName(eventName string) EventSignature {
-	return EventSignature(codec.NewDiscriminatorHashPrefix(eventName, false))
+	return EventSignature(solcommoncodec.NewDiscriminatorHashPrefix(eventName, false))
 }
 
 // Scan implements Scanner for database/sql.

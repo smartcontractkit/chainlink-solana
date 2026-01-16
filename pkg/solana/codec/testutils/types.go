@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 var (
@@ -116,7 +116,7 @@ var nilTypeJSONIDL string
 type CodecDef struct {
 	IDL         string
 	IDLTypeName string
-	ItemType    codec.ChainConfigType
+	ItemType    solcommoncodec.ChainConfigType
 }
 
 // CodecDefs key is codec offchain type name
@@ -124,37 +124,37 @@ var CodecDefs = map[string]CodecDef{
 	interfacetests.TestItemType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solcommoncodec.ChainConfigTypeAccountDef,
 	},
 	interfacetests.TestItemSliceType: {
 		IDL:         itemSliceTypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemSliceType,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solcommoncodec.ChainConfigTypeInstructionDef,
 	},
 	interfacetests.TestItemArray1Type: {
 		IDL:         itemArray1TypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemArray1Type,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solcommoncodec.ChainConfigTypeInstructionDef,
 	},
 	interfacetests.TestItemArray2Type: {
 		IDL:         itemArray2TypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemArray2Type,
-		ItemType:    codec.ChainConfigTypeInstructionDef,
+		ItemType:    solcommoncodec.ChainConfigTypeInstructionDef,
 	},
 	TestItemWithConfigExtraType: {
 		IDL:         itemTypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solcommoncodec.ChainConfigTypeAccountDef,
 	},
 	interfacetests.NilType: {
 		IDL:         nilTypeJSONIDL,
 		IDLTypeName: interfacetests.NilType,
-		ItemType:    codec.ChainConfigTypeAccountDef,
+		ItemType:    solcommoncodec.ChainConfigTypeAccountDef,
 	},
 	TestEventItem: {
 		IDL:         eventItemTypeJSONIDL,
 		IDLTypeName: interfacetests.TestItemType,
-		ItemType:    codec.ChainConfigTypeEventDef,
+		ItemType:    solcommoncodec.ChainConfigTypeEventDef,
 	},
 }
 

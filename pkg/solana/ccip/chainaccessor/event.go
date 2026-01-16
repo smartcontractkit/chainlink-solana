@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -159,7 +160,7 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 }
 
 func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, eventName, codecIDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
 	if err != nil {
 		return codec.IdlEvent{}, err
 	}
@@ -259,9 +260,9 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 			Receiver:       ccipocr3.UnknownAddress(event.Message.Receiver),
 			ExtraArgs:      ccipocr3.Bytes(event.Message.ExtraArgs),
 			FeeToken:       ccipocr3.UnknownAddress(event.Message.FeeToken.Bytes()),
-			FeeTokenAmount: codec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
+			FeeTokenAmount: solcommoncodec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
 			TokenAmounts:   convertTokenAmounts(event.Message.TokenAmounts),
-			FeeValueJuels:  codec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
+			FeeValueJuels:  solcommoncodec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
 		}
 		genericEvents = append(genericEvents, &ccipocr3.SendRequestedEvent{
 			DestChainSelector: msg.Header.DestChainSelector,
@@ -279,7 +280,7 @@ func convertTokenAmounts(transfers []ccip_router.SVM2AnyTokenTransfer) []ccipocr
 			SourcePoolAddress: transfer.SourcePoolAddress.Bytes(),
 			DestTokenAddress:  transfer.DestTokenAddress,
 			ExtraData:         transfer.ExtraData,
-			Amount:            codec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
+			Amount:            solcommoncodec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
 			DestExecData:      transfer.DestExecData,
 		})
 	}
