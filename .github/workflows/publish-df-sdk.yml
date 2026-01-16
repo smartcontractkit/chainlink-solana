@@ -26,9 +26,9 @@ jobs:
           toolchain: stable
 
       - name: Verify tag matches version
+        env: ${{ github.event.inputs.version }}
         run: |
           VERSION=$(grep '^version = "' sdk/chainlink-solana/Cargo.toml | cut -d '"' -f2)
-          TAG_VERSION=${{ github.event.inputs.version }}
           if [ "$VERSION" != "$TAG_VERSION" ]; then
             echo "Version mismatch: Cargo.toml ($VERSION) != expected version ($TAG_VERSION)"
             exit 1
