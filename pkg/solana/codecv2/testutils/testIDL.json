@@ -1,0 +1,182 @@
+{
+  "address": "rnAuXkA1kazxZsCZ4P1SLvkEHfYwEUAWHkG45faiqCP",
+  "metadata": {
+    "name": "test_idl",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": {
+            "defined": {
+              "name": "StructWithNestedStructType"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "ObjectRef1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "prop1",
+            "type": "i8"
+          },
+          {
+            "name": "prop2",
+            "type": "string"
+          },
+          {
+            "name": "prop3",
+            "type": "u128"
+          },
+          {
+            "name": "prop4",
+            "type": "u16"
+          },
+          {
+            "name": "prop5",
+            "type": "u64"
+          },
+          {
+            "name": "prop6",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObjectRef2",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "prop1",
+            "type": "u32"
+          },
+          {
+            "name": "prop2",
+            "type": "i128"
+          },
+          {
+            "name": "prop3",
+            "type": "i16"
+          },
+          {
+            "name": "prop4",
+            "type": "i32"
+          },
+          {
+            "name": "prop5",
+            "type": "i64"
+          },
+          {
+            "name": "prop6",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SimpleEnum",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "A"
+          },
+          {
+            "name": "B"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StructWithNestedStructType",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u8"
+          },
+          {
+            "name": "inner_struct",
+            "type": {
+              "defined": {
+                "name": "ObjectRef1"
+              }
+            }
+          },
+          {
+            "name": "basic_nested_array",
+            "type": {
+              "array": [
+                {
+                  "array": ["u32", 3]
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "option",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "defined_array",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "ObjectRef2"
+                  }
+                },
+                2
+              ]
+            }
+          },
+          {
+            "name": "basic_vector",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "time_val",
+            "type": "i64"
+          },
+          {
+            "name": "duration_val",
+            "type": "i64"
+          },
+          {
+            "name": "public_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "enum_val",
+            "type": {
+              "defined": {
+                "name": "SimpleEnum"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
