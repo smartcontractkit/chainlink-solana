@@ -13,8 +13,6 @@ import (
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
-// TODO: do this for idls in testutils folder
-
 func TestCreateCodecEntry(t *testing.T) {
 	var idl anchoridl.Idl
 	if err := json.Unmarshal([]byte(dataStorageIdl), &idl); err != nil {

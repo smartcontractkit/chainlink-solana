@@ -13,8 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 )
 
-// TODO: do this for idls in testutils folder
-
 //go:embed testutils/data_storage.json
 var dataStorageIdl string
 
