@@ -100,7 +100,7 @@ func createCodecType(
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
-	// TODO: I only see these being used with chain_reader, skipping
+	// This is only being used with chain_reader, which will be disabled with the anchor upgrade
 	// case IdlTypeDefTyKindCustom:
 	// 	switch def.Type.Codec {
 	// 	case "onramp_address":
