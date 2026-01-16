@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -41,16 +43,15 @@ func TestLogPollerFilters(t *testing.T) {
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: func() types.EventIdlWrapper {
+					var codecIDLv1 codec.IDL
+					idlString := codec.FetchLogpollerTypeTestIDL()
+					err := json.Unmarshal([]byte(idlString), &codecIDLv1)
+					require.NoError(t, err)
+					eventIdlv1, err := codec.ExtractEventIDL("TestItem", codecIDLv1)
+					require.NoError(t, err)
+					codecEventIDL := types.CodecEventIdl{Event: eventIdlv1, Types: codecIDLv1.Types}
 					var wrapper types.EventIdlWrapper
-					wrapper.Set(&types.CodecEventIdl{
-						Event: codec.IdlEvent{
-							Name:   "MyEvent",
-							Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
-						},
-						Types: codec.IdlTypeDefSlice{
-							{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
-						},
-					})
+					wrapper.Set(&codecEventIDL)
 					return wrapper
 				}(),
 				Retention:   1000,
@@ -64,16 +65,14 @@ func TestLogPollerFilters(t *testing.T) {
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: func() types.EventIdlWrapper {
+					var codecIDLv2 anchoridl.Idl
+					err = json.Unmarshal([]byte(codecv2.FetchLogpollerTypeTestIDL()), &codecIDLv2)
+					require.NoError(t, err)
+					eventIdlv2, err := codecv2.ExtractEventIDL("TestItem", codecIDLv2)
+					require.NoError(t, err)
+					codecv2EventIDL := types.Codecv2EventIdl{Event: eventIdlv2, Types: codecIDLv2.Types}
 					var wrapper types.EventIdlWrapper
-					wrapper.Set(&types.Codecv2EventIdl{
-						Event: anchoridl.IdlEvent{
-							Name:          "MyEvent",
-							Discriminator: []byte{1, 2, 3, 4, 5, 6, 7, 8},
-						},
-						Types: []anchoridl.IdlTypeDef{
-							{Name: "MyEvent", Ty: &anchoridl.IdlTypeDefTyStruct{Kind: "struct", Fields: anchoridl.IdlDefinedFieldsNamed{{Name: "field1", Ty: &anchoridltype.U64{}}}}},
-						},
-					})
+					wrapper.Set(&codecv2EventIDL)
 					return wrapper
 				}(),
 				Retention:   1000,
@@ -237,6 +236,106 @@ func TestLogPollerFilters(t *testing.T) {
 		err = orm.MarkFilterBackfilled(ctx, filterID)
 		require.NoError(t, err)
 		ensureIsBackfilled(filterIDs, true)
+	})
+}
+
+func TestLogPollerFilters2(t *testing.T) {
+	// sqltest.SkipInMemory(t)
+	t.Parallel()
+
+	lggr := logger.Test(t)
+
+	privateKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	pubKey := privateKey.PublicKey()
+	t.Run("Ensure all fields are readable/writable", func(t *testing.T) {
+		filters := []types.Filter{
+			{
+				Name:          "happy path",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      types.EventSignature{1, 2, 3},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: func() types.EventIdlWrapper {
+					var codecIDLv1 codec.IDL
+					idlString := codec.FetchLogpollerTypeTestIDL()
+					err := json.Unmarshal([]byte(idlString), &codecIDLv1)
+					require.NoError(t, err)
+					eventIdlv1, err := codec.ExtractEventIDL("TestItem", codecIDLv1)
+					require.NoError(t, err)
+					codecEventIDL := types.CodecEventIdl{Event: eventIdlv1, Types: codecIDLv1.Types}
+					var wrapper types.EventIdlWrapper
+					wrapper.Set(&codecEventIDL)
+					// var wrapper types.EventIdlWrapper
+					// wrapper.Set(&types.CodecEventIdl{
+					// 	Event: codec.IdlEvent{
+					// 		Name:   "MyEvent",
+					// 		Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+					// 	},
+					// 	Types: codec.IdlTypeDefSlice{
+					// 		{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+					// 	},
+					// })
+					return wrapper
+				}(),
+				Retention:   1000,
+				MaxLogsKept: 3,
+			},
+			{
+				Name:          "happy path v2",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      types.EventSignature{1, 2, 3},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: func() types.EventIdlWrapper {
+					var wrapper types.EventIdlWrapper
+					wrapper.Set(&types.Codecv2EventIdl{
+						Event: anchoridl.IdlEvent{
+							Name:          "MyEvent",
+							Discriminator: []byte{1, 2, 3, 4, 5, 6, 7, 8},
+						},
+						Types: []anchoridl.IdlTypeDef{
+							{Name: "MyEvent", Ty: &anchoridl.IdlTypeDefTyStruct{Kind: "struct", Fields: anchoridl.IdlDefinedFieldsNamed{{Name: "field1", Ty: &anchoridltype.U64{}}}}},
+						},
+					})
+					return wrapper
+				}(),
+				Retention:   1000,
+				MaxLogsKept: 3,
+			},
+		}
+
+		for _, filter := range filters {
+			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
+				ctx := t.Context()
+				dbURL := "postgresql://chainlink_dev:insecurepassword@localhost:5432/chainlink_development_test?sslmode=disable"
+				// dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+				dbx := sqltest.NewDB(t, dbURL)
+
+				orm := NewORM(chainID, dbx, lggr)
+				id, err := orm.InsertFilter(ctx, filter)
+				require.NoError(t, err)
+				filter.ID = id
+				dbFilter, err := orm.GetFilterByID(ctx, id)
+				require.NoError(t, err)
+				require.Equal(t, filter, dbFilter)
+
+				exists, err := orm.HasFilter(ctx, dbFilter.Name)
+
+				require.NoError(t, err)
+				require.True(t, exists)
+
+				dbFilters, err := orm.SelectFilters(ctx)
+				require.NoError(t, err)
+				i := slices.IndexFunc(dbFilters, func(f types.Filter) bool {
+					return f.ID == id
+				})
+				require.NotEqual(t, -1, i, "Expected filter to be present in slice")
+				require.Equal(t, filter, dbFilters[i])
+			})
+		}
 	})
 }
 

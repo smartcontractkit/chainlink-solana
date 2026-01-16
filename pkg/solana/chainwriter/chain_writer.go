@@ -102,6 +102,7 @@ func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient
 func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error {
 	for program, programConfig := range config.Programs {
 		// Try to unmarshal as codecv2 IDL first
+		// The full IDL structures are different enough that JSON unmarshal actually fails for the wrong type
 		var codecv2IDL anchoridl.Idl
 		if err := json.Unmarshal([]byte(programConfig.IDL), &codecv2IDL); err == nil {
 			// Successfully unmarshaled as codecv2 IDL

@@ -217,6 +217,7 @@ func CreateEventIdlWrapper(eventName, idlString string) (logpollertypes.EventIdl
 	var wrapper logpollertypes.EventIdlWrapper
 
 	// Try to unmarshal into codecv2 (anchor-go) IDL first
+	// The full IDL structures are different enough that JSON unmarshal actually fails for the wrong type
 	var codecv2IDL anchoridl.Idl
 	if err := json.Unmarshal([]byte(idlString), &codecv2IDL); err == nil {
 		// Successfully unmarshaled as codecv2 IDL

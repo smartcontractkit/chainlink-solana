@@ -78,6 +78,13 @@ func TestCreateEventIdlWrapper_WrapperValueMethods(t *testing.T) {
 		newIdl := newWrapper.Get()
 		require.NotNil(t, originalIdl)
 		require.NotNil(t, newIdl)
+
+		// Type check: original should be Codecv2EventIdl, scanned should also be Codecv2EventIdl
+		_, originalIsV2 := originalIdl.(*logpollertypes.Codecv2EventIdl)
+		require.True(t, originalIsV2, "Original v2 wrapper should contain Codecv2EventIdl")
+		_, scannedIsV2 := newIdl.(*logpollertypes.Codecv2EventIdl)
+		require.True(t, scannedIsV2, "Scanned v2 wrapper should contain Codecv2EventIdl, not CodecEventIdl")
+
 		require.True(t, originalIdl.Equal(newIdl))
 	})
 
@@ -96,6 +103,13 @@ func TestCreateEventIdlWrapper_WrapperValueMethods(t *testing.T) {
 		newIdl := newWrapper.Get()
 		require.NotNil(t, originalIdl)
 		require.NotNil(t, newIdl)
+
+		// Type check: original should be CodecEventIdl, scanned should also be CodecEventIdl
+		_, originalIsV1 := originalIdl.(*logpollertypes.CodecEventIdl)
+		require.True(t, originalIsV1, "Original v1 wrapper should contain CodecEventIdl")
+		_, scannedIsV1 := newIdl.(*logpollertypes.CodecEventIdl)
+		require.True(t, scannedIsV1, "Scanned v1 wrapper should contain CodecEventIdl, not Codecv2EventIdl")
+
 		require.True(t, originalIdl.Equal(newIdl))
 	})
 }
