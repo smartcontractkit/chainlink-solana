@@ -45,10 +45,10 @@ func TestLogPollerFilters(t *testing.T) {
 				EventIdl: func() types.EventIdlWrapper {
 					var codecIDLv1 codec.IDL
 					idlString := codec.FetchLogpollerTypeTestIDL()
-					err := json.Unmarshal([]byte(idlString), &codecIDLv1)
-					require.NoError(t, err)
-					eventIdlv1, err := codec.ExtractEventIDL("TestItem", codecIDLv1)
-					require.NoError(t, err)
+					unmarshalErr := json.Unmarshal([]byte(idlString), &codecIDLv1)
+					require.NoError(t, unmarshalErr)
+					eventIdlv1, extractErr := codec.ExtractEventIDL("TestItem", codecIDLv1)
+					require.NoError(t, extractErr)
 					codecEventIDL := types.CodecEventIdl{Event: eventIdlv1, Types: codecIDLv1.Types}
 					var wrapper types.EventIdlWrapper
 					wrapper.Set(&codecEventIDL)
@@ -66,10 +66,10 @@ func TestLogPollerFilters(t *testing.T) {
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: func() types.EventIdlWrapper {
 					var codecIDLv2 anchoridl.Idl
-					err = json.Unmarshal([]byte(codecv2.FetchLogpollerTypeTestIDL()), &codecIDLv2)
-					require.NoError(t, err)
-					eventIdlv2, err := codecv2.ExtractEventIDL("TestItem", codecIDLv2)
-					require.NoError(t, err)
+					unmarshalErr := json.Unmarshal([]byte(codecv2.FetchLogpollerTypeTestIDL()), &codecIDLv2)
+					require.NoError(t, unmarshalErr)
+					eventIdlv2, extractErr := codecv2.ExtractEventIDL("TestItem", codecIDLv2)
+					require.NoError(t, extractErr)
 					codecv2EventIDL := types.Codecv2EventIdl{Event: eventIdlv2, Types: codecIDLv2.Types}
 					var wrapper types.EventIdlWrapper
 					wrapper.Set(&codecv2EventIDL)
