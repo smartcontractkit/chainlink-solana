@@ -173,7 +173,7 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	// Create EventIdlWrapper from IDL string
-	lpEventIDL, err := CreateEventIdlWrapper(eventName, filterConfig.idl)
+	lpEventIDL, err := a.createEventIdlWrapper(eventName, filterConfig.idl)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 
 // CreateEventIdlWrapper creates an EventIdlWrapper from an IDL string and event name.
 // It tries to unmarshal as codecv2 (anchor-go) IDL first, then falls back to codec IDL.
-func CreateEventIdlWrapper(eventName, idlString string) (logpollertypes.EventIdlWrapper, error) {
+func (a *SolanaAccessor) createEventIdlWrapper(eventName, idlString string) (logpollertypes.EventIdlWrapper, error) {
 	var innerEventIDL logpollertypes.EventIdl
 	var wrapper logpollertypes.EventIdlWrapper
 

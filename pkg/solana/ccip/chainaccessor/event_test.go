@@ -12,9 +12,9 @@ import (
 )
 
 func TestCreateEventIdlWrapper(t *testing.T) {
+	accessor := SolanaAccessor{}
 	t.Run("creates wrapper with codec v1 IDL", func(t *testing.T) {
-		// testIDL_v1.json has a TestItem event with various field types
-		wrapper, err := CreateEventIdlWrapper("TestItem", solcodecv1.FetchLogpollerTypeTestIDL())
+		wrapper, err := accessor.createEventIdlWrapper("TestItem", solcodecv1.FetchLogpollerTypeTestIDL())
 		require.NoError(t, err)
 
 		// Verify the inner IDL is set
@@ -33,7 +33,7 @@ func TestCreateEventIdlWrapper(t *testing.T) {
 	})
 
 	t.Run("creates wrapper with codec v2 IDL", func(t *testing.T) {
-		wrapper, err := CreateEventIdlWrapper("TestItem", solcodecv2.FetchLogpollerTypeTestIDL())
+		wrapper, err := accessor.createEventIdlWrapper("TestItem", solcodecv2.FetchLogpollerTypeTestIDL())
 		require.NoError(t, err)
 
 		// Verify the inner IDL is set
@@ -49,7 +49,7 @@ func TestCreateEventIdlWrapper(t *testing.T) {
 	})
 
 	t.Run("returns error for non-existent event in v1 IDL", func(t *testing.T) {
-		wrapper, err := CreateEventIdlWrapper("NonExistentEvent", solcodecv1.FetchLogpollerTypeTestIDL())
+		wrapper, err := accessor.createEventIdlWrapper("NonExistentEvent", solcodecv1.FetchLogpollerTypeTestIDL())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to extract event IDL from codec")
 		require.Contains(t, err.Error(), "failed to find event")
@@ -59,7 +59,7 @@ func TestCreateEventIdlWrapper(t *testing.T) {
 	})
 
 	t.Run("returns error for non-existent event in v2 IDL", func(t *testing.T) {
-		wrapper, err := CreateEventIdlWrapper("NonExistentEvent", solcodecv2.FetchLogpollerTypeTestIDL())
+		wrapper, err := accessor.createEventIdlWrapper("NonExistentEvent", solcodecv2.FetchLogpollerTypeTestIDL())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to extract event IDL from codecv2")
 		require.Contains(t, err.Error(), "failed to find event")
