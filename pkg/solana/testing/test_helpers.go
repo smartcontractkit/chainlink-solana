@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"testing"
@@ -54,6 +55,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	}, flags...)
 
 	cmd := exec.Command("solana-test-validator", args...)
+	// Prevent macOS from creating metadata files (._*) that interfere with validator startup
+	cmd.Env = append(os.Environ(), "COPYFILE_DISABLE=1")
 
 	var stdErr bytes.Buffer
 	cmd.Stderr = &stdErr
