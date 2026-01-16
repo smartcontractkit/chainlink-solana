@@ -100,7 +100,7 @@ func createCodecType(
 			return name, nil, fmt.Errorf("%w: variants are not supported", commontypes.ErrInvalidConfig)
 		}
 		return name, refs.builder.Uint8(), nil
-	// TODO: I only see these being used with chain_reader, skipping
+	// This is only being used with chain_reader, which will be disabled with the anchor upgrade
 	// case IdlTypeDefTyKindCustom:
 	// 	switch def.Type.Codec {
 	// 	case "onramp_address":
@@ -130,7 +130,7 @@ func asStruct(
 	case *anchoridl.IdlTypeDefTyStruct:
 		structType = *vv
 	default:
-		panic(fmt.Errorf("unhandled type: %T", vv))
+		return name, nil, fmt.Errorf("unhandled type: %T", vv)
 	}
 
 	// as opposed to codecv1, IdlTypeDefTyStruct.Fields is an interface instead of a concrete type
@@ -157,10 +157,8 @@ func asStruct(
 		}
 
 		return name, structCodec, nil
-	case anchoridl.IdlDefinedFieldsTuple:
-		panic(fmt.Errorf("unhandled type: %T", fields))
 	default:
-		return name, nil, nil
+		return name, nil, fmt.Errorf("unhandled type: %T", fields)
 	}
 }
 
@@ -181,13 +179,15 @@ func asStructForInstructionArgs(
 	}
 
 	var isVecOrArray bool
-	switch fields[0].Ty.(type) {
-	case *idltype.Vec:
-		isVecOrArray = true
-	case *idltype.Array:
-		isVecOrArray = true
-	default:
-		isVecOrArray = false
+	if len(fields) > 0 {
+		switch fields[0].Ty.(type) {
+		case *idltype.Vec:
+			isVecOrArray = true
+		case *idltype.Array:
+			isVecOrArray = true
+		default:
+			isVecOrArray = false
+		}
 	}
 
 	// If it's an instruction arg that's just a single array/vec → return the array codec directly (no struct wrapper)

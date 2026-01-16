@@ -1336,6 +1336,17 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	// mock txm
 	txm := txmMocks.NewTxManager(t)
 
+	invalidConfig := chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			"testIDLv1": {
+				IDL: "",
+			},
+		},
+	}
+
+	_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidConfig)
+	require.ErrorContains(t, err, "failed to unmarshal IDL for program testIDLv1 (tried both codecv2 and codec), error:")
+
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			"testIDLv1": {
