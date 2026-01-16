@@ -28,7 +28,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
+	basecodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -47,10 +47,9 @@ const (
 // Eg: int32 in a go struct from a plugin could require a *big.Int in Pack for int24, if it fits, we shouldn't care.
 // SliceToArrayVerifySizeHook verifies that slices have the correct size when converting to an array
 // EpochToTimeHook allows multiple conversions: time.Time -> int64; int64 -> time.Time; *big.Int -> time.Time; and more
-var DecoderHooks = []mapstructure.DecodeHookFunc{commoncodec.EpochToTimeHook, commoncodec.BigIntHook, commoncodec.SliceToArrayVerifySizeHook}
+var DecoderHooks = []mapstructure.DecodeHookFunc{basecodec.EpochToTimeHook, basecodec.BigIntHook, basecodec.SliceToArrayVerifySizeHook}
 
 // NewCodec creates a new [commontypes.RemoteCodec] for Solana.
-// DOES NOT SEEM TO BE USED
 func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
 	parsed := &solcommoncodec.ParsedTypes{
 		EncoderDefs: map[string]solcommoncodec.Entry{},
@@ -85,7 +84,7 @@ func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
 	return parsed.ToCodec()
 }
 
-func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
+func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod basecodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
 	case IdlTypeDef:
 		entry, err = NewAccountEntry(offChainName, AccountIDLTypes{Account: v, Types: idl.Types}, true, mod, binary.LittleEndian())
@@ -153,13 +152,13 @@ func NewIDLAccountCodec(idl IDL, builder commonencodings.Builder) (commontypes.R
 	return newIDLCoded(idl, builder, idl.Accounts, true)
 }
 
-func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, modifier commoncodec.Modifier) (commontypes.RemoteCodec, error) {
-	mod, err := commoncodec.NewByItemTypeModifier(map[string]commoncodec.Modifier{itemType: modifier})
+func NewNamedModifierCodec(original commontypes.RemoteCodec, itemType string, modifier basecodec.Modifier) (commontypes.RemoteCodec, error) {
+	mod, err := basecodec.NewByItemTypeModifier(map[string]basecodec.Modifier{itemType: modifier})
 	if err != nil {
 		return nil, err
 	}
 
-	modCodec, err := commoncodec.NewModifierCodec(original, mod, DecoderHooks...)
+	modCodec, err := basecodec.NewModifierCodec(original, mod, DecoderHooks...)
 	if err != nil {
 		return nil, err
 	}
