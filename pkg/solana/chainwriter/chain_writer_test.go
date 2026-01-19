@@ -1323,6 +1323,9 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 }
 
 // Tests that the two versioned IDLs for the same method args encode to the same bytes
+// 1. Create two chain writer configs representing the same contract but with different IDL versions
+// 2. Encode the same data with each chain writer
+// 3. Verify that the encoded bytes are the same
 func TestChainWriter_ParsePrograms(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -1340,12 +1343,17 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 		Programs: map[string]chainwriter.ProgramConfig{
 			"testIDLv1": {
 				IDL: "",
+				Methods: map[string]chainwriter.MethodConfig{
+					"TestItemArray1Type": {
+						ChainSpecificName: "TestItemArray1Type",
+					},
+				},
 			},
 		},
 	}
 
 	_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidConfig)
-	require.ErrorContains(t, err, "failed to unmarshal IDL for program testIDLv1 (tried both codecv2 and codec), error:")
+	require.ErrorContains(t, err, "failed to parse programs: failed to parse config for chainwriter program testIDLv1, method TestItemArray1Type")
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
