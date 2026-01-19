@@ -404,7 +404,7 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 }
 
 func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
-	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
+	mod, err := modCfg.ToModifier(solcommoncodec.DecoderHooks...)
 	if err != nil {
 		return err
 	}
