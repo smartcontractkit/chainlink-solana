@@ -1323,8 +1323,8 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 }
 
 // Tests that the two versioned IDLs for the same method args encode to the same bytes
-// 1. Create two chain writer configs representing the same contract but with different IDL versions
-// 2. Encode the same data with each chain writer
+// 1. Create two codecs from two chain writer configs representing the same contract but with different IDL versions
+// 2. Encode the same data with each codec
 // 3. Verify that the encoded bytes are the same
 func TestChainWriter_ParsePrograms(t *testing.T) {
 	t.Parallel()
