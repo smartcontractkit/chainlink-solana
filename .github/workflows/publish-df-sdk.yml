@@ -27,7 +27,7 @@ jobs:
 
       - name: Verify tag matches version
         env:
-          TARGET_VERSION: ${{ github.event.inputs.version }}
+          TAG_VERSION: ${{ github.event.inputs.version }}
         run: |
           VERSION=$(grep '^version = "' sdk/chainlink-solana/Cargo.toml | cut -d '"' -f2)
           if [ "$VERSION" != "$TAG_VERSION" ]; then
