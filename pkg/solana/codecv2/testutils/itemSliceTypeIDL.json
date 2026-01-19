@@ -1,0 +1,200 @@
+{
+  "address": "3aptuodC9cwzwVkeEWJwRB25Hz4FP3FTysc3cb2zETTh",
+  "metadata": {
+    "name": "item_slice_type_idl",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "test_item_slice_type",
+      "discriminator": [
+        252,
+        0,
+        175,
+        183,
+        86,
+        235,
+        217,
+        80
+      ],
+      "accounts": [],
+      "args": [
+        {
+          "name": "test_item_slice_type",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "TestItem"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountStruct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "account_str",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InnerDynamic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "int_val",
+            "type": "i64"
+          },
+          {
+            "name": "s",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InnerStatic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "int_val",
+            "type": "i64"
+          },
+          {
+            "name": "a",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NestedDynamic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed_bytes",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "inner",
+            "type": {
+              "defined": {
+                "name": "InnerDynamic"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "NestedStatic",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "fixed_bytes",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "inner",
+            "type": {
+              "defined": {
+                "name": "InnerStatic"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TestItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field",
+            "type": "i32"
+          },
+          {
+            "name": "oracle_id",
+            "type": "u8"
+          },
+          {
+            "name": "oracle_ids",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "account_struct",
+            "type": {
+              "defined": {
+                "name": "AccountStruct"
+              }
+            }
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "different_field",
+            "type": "string"
+          },
+          {
+            "name": "big_field",
+            "type": "i128"
+          },
+          {
+            "name": "nested_dynamic_struct",
+            "type": {
+              "defined": {
+                "name": "NestedDynamic"
+              }
+            }
+          },
+          {
+            "name": "nested_static_struct",
+            "type": {
+              "defined": {
+                "name": "NestedStatic"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

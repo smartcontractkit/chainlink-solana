@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/gagliardetto/solana-go"
-
 	"github.com/smartcontractkit/chainlink-common/keystore"
 )
 
@@ -18,7 +17,10 @@ const (
 
 // TxKey represents a Solana transaction signing key.
 type TxKey struct {
-	ks      keystore.Keystore
+	ks interface {
+		keystore.Reader
+		keystore.Signer
+	}
 	keyPath keystore.KeyPath
 	addr    solana.PublicKey
 }
@@ -95,23 +97,75 @@ func CreateTxKey(ks keystore.Keystore, name string) (*TxKey, error) {
 	}, nil
 }
 
-// GetTxKeys retrieves transaction keys by name.
-func GetTxKeys(ctx context.Context, ks keystore.Keystore, names []string) ([]*TxKey, error) {
-	fullNames := make([]string, 0, len(names))
-	for _, name := range names {
-		fullNames = append(fullNames, keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore, name).String())
+// GetTxKeysOption configures GetTxKeys behavior.
+type GetTxKeysOption func(*getTxKeysOptions)
+
+type getTxKeysOptions struct {
+	noPrefix bool
+}
+
+// WithNoPrefix disables adding the solana/tx prefix to key names.
+// When set, names are used as-is (useful for keystores with externally managed names
+// like KMS-backed keystores).
+func WithNoPrefix() GetTxKeysOption {
+	return func(opts *getTxKeysOptions) {
+		opts.noPrefix = true
 	}
+}
+
+// GetTxKeys retrieves transaction keys by name.
+// By default, prepends the solana/tx prefix to names.
+// For example, a key named "test-key" will be retrieved at the path "solana/tx/test-key".
+// Use WithNoPrefix() to use names as-is (for KMS-backed keystores).
+func GetTxKeys(ctx context.Context, ks interface {
+	keystore.Reader
+	keystore.Signer
+}, names []string, opts ...GetTxKeysOption) ([]*TxKey, error) {
+	options := &getTxKeysOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	fullNames := make([]string, 0, len(names))
+	if options.noPrefix {
+		fullNames = names
+	} else {
+		for _, name := range names {
+			fullNames = append(fullNames, keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore, name).String())
+		}
+	}
+
 	resp, err := ks.GetKeys(ctx, keystore.GetKeysRequest{KeyNames: fullNames})
 	if err != nil {
 		return nil, err
 	}
 
+	// Always require all requested keys to be found
+	if len(names) > 0 && len(resp.Keys) != len(names) {
+		return nil, errors.New("some keys not found")
+	}
+
 	// Note we rely on deterministic order of keys in the response
 	keys := make([]*TxKey, 0, len(resp.Keys))
+	prefixPath := keystore.NewKeyPath(PrefixSolana, PrefixTxKeystore)
 	for _, key := range resp.Keys {
+		path := keystore.NewKeyPathFromString(key.KeyInfo.Name)
+
+		// If no prefix, sanity check key type (for KMS-backed keystores)
+		if options.noPrefix {
+			if key.KeyInfo.KeyType != keystore.Ed25519 {
+				return nil, errors.New("tried to load a non-Ed25519 key: " + key.KeyInfo.Name)
+			}
+		}
+
+		// If no names are provided and we're using prefix, filter only solana keys
+		if !options.noPrefix && len(names) == 0 && !path.HasPrefix(prefixPath) {
+			continue
+		}
+
 		keys = append(keys, &TxKey{
 			ks:      ks,
-			keyPath: keystore.NewKeyPathFromString(key.KeyInfo.Name),
+			keyPath: path,
 			addr:    solana.PublicKeyFromBytes(key.KeyInfo.PublicKey),
 		})
 	}

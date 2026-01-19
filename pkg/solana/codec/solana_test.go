@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestNewIDLAccountCodec(t *testing.T) {
@@ -91,7 +92,7 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 		&codeccommon.RenameModifierConfig{Fields: map[string]string{"Value": "V"}},
 	}
 
-	renameMod, err := modConfig.ToModifier(codec.DecoderHooks...)
+	renameMod, err := modConfig.ToModifier(solcommoncodec.DecoderHooks...)
 	require.NoError(t, err)
 
 	idlCodecWithMods, err := codec.NewNamedModifierCodec(idlCodec, testutils.TestStructWithNestedStruct, renameMod)

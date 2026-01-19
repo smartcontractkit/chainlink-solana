@@ -27,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -57,7 +58,7 @@ type ContractReaderService struct {
 	// internal values
 	bdRegistry    *bindingsRegistry
 	lookup        *lookup
-	parsed        *codec.ParsedTypes
+	parsed        *solcommoncodec.ParsedTypes
 	codec         types.RemoteCodec
 	shouldStartLP bool
 
@@ -83,9 +84,9 @@ func NewContractReaderService(
 		client:     dataReader,
 		bdRegistry: newBindingsRegistry(),
 		lookup:     newLookup(),
-		parsed: &codec.ParsedTypes{
-			EncoderDefs: map[string]codec.Entry{},
-			DecoderDefs: map[string]codec.Entry{},
+		parsed: &solcommoncodec.ParsedTypes{
+			EncoderDefs: map[string]solcommoncodec.Entry{},
+			DecoderDefs: map[string]solcommoncodec.Entry{},
 		},
 		reader: reader,
 	}
@@ -402,8 +403,8 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
 }
 
-func (s *ContractReaderService) addCodecDef(parsed *codec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
-	mod, err := modCfg.ToModifier(codec.DecoderHooks...)
+func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+	mod, err := modCfg.ToModifier(solcommoncodec.DecoderHooks...)
 	if err != nil {
 		return err
 	}
@@ -414,9 +415,9 @@ func (s *ContractReaderService) addCodecDef(parsed *codec.ParsedTypes, forEncodi
 	}
 
 	if forEncoding {
-		parsed.EncoderDefs[codec.WrapItemType(true, namespace, genericName)] = cEntry
+		parsed.EncoderDefs[solcommoncodec.WrapItemType(true, namespace, genericName)] = cEntry
 	} else {
-		parsed.DecoderDefs[codec.WrapItemType(false, namespace, genericName)] = cEntry
+		parsed.DecoderDefs[solcommoncodec.WrapItemType(false, namespace, genericName)] = cEntry
 	}
 	return nil
 }
@@ -428,7 +429,7 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 
 			switch read.ReadType {
 			case config.Account:
-				idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
+				idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
 				if err != nil {
 					return err
 				}
@@ -488,7 +489,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addReadToCodec(parsed *codec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
 	if err := s.addCodecDef(parsed, true, namespace, genericName, idl, inputIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
@@ -499,7 +500,7 @@ func (s *ContractReaderService) addReadToCodec(parsed *codec.ParsedTypes, namesp
 func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
 	var reads []read
 	for _, mr := range readDefinition.MultiReader.Reads {
-		idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
+		idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
 		if err != nil {
 			return nil, err
 		}
@@ -563,9 +564,9 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 			}
 
 			idl, inputIDlType, outputIDLType := rb.GetIDLInfo()
-			parsed := &codec.ParsedTypes{
-				EncoderDefs: map[string]codec.Entry{},
-				DecoderDefs: map[string]codec.Entry{},
+			parsed := &solcommoncodec.ParsedTypes{
+				EncoderDefs: map[string]solcommoncodec.Entry{},
+				DecoderDefs: map[string]solcommoncodec.Entry{},
 			}
 
 			readDef := rb.GetReadDefinition()
@@ -598,7 +599,7 @@ func (s *ContractReaderService) addEventRead(
 
 	conf := readDefinition.EventDefinitions
 
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, readDefinition.ChainSpecificName, idl)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, readDefinition.ChainSpecificName, idl)
 	if err != nil {
 		return err
 	}

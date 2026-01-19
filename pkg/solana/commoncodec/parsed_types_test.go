@@ -1,4 +1,4 @@
-package codec_test
+package commoncodec_test
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestEncodeDecodeBigInt(t *testing.T) {
@@ -32,18 +33,18 @@ func TestEncodeDecodeBigInt(t *testing.T) {
 		B: big.NewInt(42),
 	}
 
-	bts, err := typedCodec.Encode(ctx, &value, codec.WrapItemType(true, namespace, genericName))
+	bts, err := typedCodec.Encode(ctx, &value, solcommoncodec.WrapItemType(true, namespace, genericName))
 
 	require.NoError(t, err)
 
 	var output offChain
 
-	require.NoError(t, typedCodec.Decode(ctx, bts, &output, codec.WrapItemType(false, namespace, genericName)))
+	require.NoError(t, typedCodec.Decode(ctx, bts, &output, solcommoncodec.WrapItemType(false, namespace, genericName)))
 	require.Equal(t, value.A.String(), output.A.String())
 	require.Equal(t, value.B.String(), output.B.String())
 }
 
-func newTestCodec(t *testing.T) *codec.ParsedTypes {
+func newTestCodec(t *testing.T) *solcommoncodec.ParsedTypes {
 	t.Helper()
 
 	rawIDL := fmt.Sprintf(basicEventIDL, testParamType)
@@ -51,7 +52,7 @@ func newTestCodec(t *testing.T) *codec.ParsedTypes {
 	var IDL codec.IDL
 	require.NoError(t, json.Unmarshal([]byte(rawIDL), &IDL))
 
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, "EventType", IDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
 
 	require.NoError(t, err)
 
@@ -63,9 +64,9 @@ func newTestCodec(t *testing.T) *codec.ParsedTypes {
 
 	require.NoError(t, err)
 
-	return &codec.ParsedTypes{
-		EncoderDefs: map[string]codec.Entry{codec.WrapItemType(true, namespace, genericName): entry},
-		DecoderDefs: map[string]codec.Entry{codec.WrapItemType(false, namespace, genericName): entry},
+	return &solcommoncodec.ParsedTypes{
+		EncoderDefs: map[string]solcommoncodec.Entry{solcommoncodec.WrapItemType(true, namespace, genericName): entry},
+		DecoderDefs: map[string]solcommoncodec.Entry{solcommoncodec.WrapItemType(false, namespace, genericName): entry},
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -226,19 +227,19 @@ func (b *eventReadBinding) SetFilter(filter logpollertypes.Filter) {
 }
 
 func (b *eventReadBinding) CreateType(forEncoding bool) (any, error) {
-	itemType := codec.WrapItemType(forEncoding, b.namespace, b.genericName)
+	itemType := solcommoncodec.WrapItemType(forEncoding, b.namespace, b.genericName)
 
 	return b.codec.CreateType(itemType, forEncoding)
 }
 
 func (b *eventReadBinding) Decode(ctx context.Context, bts []byte, outVal any) error {
-	itemType := codec.WrapItemType(false, b.namespace, b.genericName)
+	itemType := solcommoncodec.WrapItemType(false, b.namespace, b.genericName)
 
 	return b.codec.Decode(ctx, bts, outVal, itemType)
 }
 
 func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal any) error {
-	itemType := codec.WrapItemType(true, b.namespace, b.genericName)
+	itemType := solcommoncodec.WrapItemType(true, b.namespace, b.genericName)
 
 	pubKey, err := b.GetAddress(ctx, nil)
 	if err != nil {
@@ -332,7 +333,7 @@ func (b *eventReadBinding) normalizeParams(value any, itemType string) (any, err
 	// params can be a singular primitive value, a map of values, or a struct
 	// in the case that the input params are presented as a map of values, apply the values to the off-chain type
 	// with solana hooks
-	if err = codec.MapstructureDecode(value, offChain); err != nil {
+	if err = solcommoncodec.MapstructureDecode(value, offChain); err != nil {
 		return nil, fmt.Errorf("%w: failed to decode offChain value: %s", types.ErrInternal, err.Error())
 	}
 
@@ -343,7 +344,7 @@ func (b *eventReadBinding) extractFilterSubkeys(offChainParams any) ([]query.Exp
 	var expressions []query.Expression
 
 	for offChainKey, idx := range b.indexedSubKeys.lookup {
-		itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+offChainKey)
+		itemType := solcommoncodec.WrapItemType(true, b.namespace, b.genericName+"."+offChainKey)
 
 		fieldVal, err := commoncodec.ValueForPath(reflect.ValueOf(offChainParams), offChainKey)
 		if err != nil {
@@ -405,7 +406,7 @@ func (b *eventReadBinding) encodeComparator(comparator *primitives.Comparator) (
 		return query.Expression{}, fmt.Errorf("%w: unknown indexed subkey mapping %s", types.ErrInvalidConfig, comparator.Name)
 	}
 
-	itemType := codec.WrapItemType(true, b.namespace, b.genericName+"."+comparator.Name)
+	itemType := solcommoncodec.WrapItemType(true, b.namespace, b.genericName+"."+comparator.Name)
 
 	for idx, comp := range comparator.ValueComparators {
 		// need to do a transform and then extract the value for the subkey
@@ -458,7 +459,7 @@ func (b *eventReadBinding) decodeLogsIntoSequences(
 }
 
 func (b *eventReadBinding) decodeLog(ctx context.Context, log *logpollertypes.Log, into any) error {
-	itemType := codec.WrapItemType(false, b.namespace, b.genericName)
+	itemType := solcommoncodec.WrapItemType(false, b.namespace, b.genericName)
 
 	if err := b.codec.Decode(ctx, log.Data, into, itemType); err != nil {
 		return fmt.Errorf("%w: failed to decode log data: %s", types.ErrInvalidType, err.Error())
