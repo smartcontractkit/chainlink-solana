@@ -41,7 +41,7 @@ type EventIDLTypes struct {
 	Types anchoridl.IdTypeDef_slice
 }
 
-// called from logpoller newDecoder
+// accepts contract idl string
 func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	var codecIDL anchoridl.Idl
 	if err := json.Unmarshal([]byte(contractIdl), &codecIDL); err != nil {
@@ -56,6 +56,7 @@ func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDi
 	return NewEventArgsEntry(offChainName, EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}, true, nil, binary.LittleEndian())
 }
 
+// accepts struct containing event definition and types parsed from the contract idl
 func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	_, eventCodec, err := asStruct(createRefs(idlTypes.Types, builder), idlTypes.Event.Name)
 	if err != nil {

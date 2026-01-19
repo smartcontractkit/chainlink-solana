@@ -245,9 +245,9 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		requireIndexed(t, fs, filter)
 	})
 	t.Run("Happy path versioned", func(t *testing.T) {
-		// 1. Create decoder codecs for same event using two different IDL formats
+		// 1. Create decoder codecs for the same event using two different IDL formats
 		// 2. Create encoded event data
-		// 3. Decode subkey for both codecs and verify the results are the same
+		// 3. Decode subkey from event data using both codecs and verify the results are the same
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm)
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
