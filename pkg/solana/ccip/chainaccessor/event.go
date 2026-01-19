@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha3"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -182,25 +181,26 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Retention: &defaultCCIPLogsRetention,
 	}
 
-	var codecIDL codec.IDL
-	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
-	}
+	// var codecIDL codec.IDL
+	// if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
+	// 	return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
+	// }
 
-	eventIdl, err := extractEventIDL(eventName, codecIDL)
-	if err != nil {
-		return fmt.Errorf("failed to extract event IDL: %w", err)
-	}
+	// eventIdl, err := extractEventIDL(eventName, codecIDL)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to extract event IDL: %w", err)
+	// }
 
-	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
+	// lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
 	filter := logpollertypes.Filter{
-		Address:         logpollertypes.PublicKey(address),
-		EventName:       eventName,
-		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
-		EventIdl:        lpEventIDL,
+		Address:   logpollertypes.PublicKey(address),
+		EventName: eventName,
+		EventSig:  logpollertypes.NewEventSignatureFromName(eventName),
+		// EventIdl:        lpEventIDL,
+		ContractIdl:     filterConfig.idl,
 		SubkeyPaths:     subKeyPaths,
 		StartingBlock:   conf.GetStartingBlock(),
 		Retention:       conf.GetRetention(),

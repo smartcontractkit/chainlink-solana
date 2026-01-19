@@ -14,6 +14,7 @@ type Filter struct {
 	EventSig        EventSignature
 	StartingBlock   int64
 	EventIdl        EventIdl
+	ContractIdl     string
 	SubkeyPaths     SubKeyPaths
 	Retention       time.Duration
 	MaxLogsKept     int64
@@ -24,7 +25,7 @@ type Filter struct {
 
 func (f Filter) MatchSameLogs(other Filter) bool {
 	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventName == other.EventName &&
-		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
+		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths) && f.ContractIdl == other.ContractIdl
 }
 
 type Log struct {

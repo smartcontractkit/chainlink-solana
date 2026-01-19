@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -209,9 +211,26 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
-	if err != nil {
-		return nil, err
+	var cEntry solcommoncodec.Entry
+	var err error
+
+	// If ContractIdl is provided, use the new wrapper approach that parses the full IDL
+	if filter.ContractIdl != "" {
+		cEntry, err = codecv2.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, true, nil, binary.LittleEndian())
+		if err != nil {
+			cEntry, err = codec.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, true, nil, binary.LittleEndian())
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else if filter.EventIdl.Event.Name != "" {
+		// Backward compatibility: if ContractIdl is empty but EventIdl is populated, use the old approach
+		cEntry, err = codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("filter %s has neither ContractIdl nor EventIdl set", filter.Name)
 	}
 
 	return solcommoncodec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)

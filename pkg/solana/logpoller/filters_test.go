@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -238,6 +243,71 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		require.Equal(t, filter, storedFilters[0])
 		// all indices contain filter
 		requireIndexed(t, fs, filter)
+	})
+	t.Run("Happy path versioned", func(t *testing.T) {
+		// 1. Create decoder codecs for same event using two different IDL formats
+		// 2. Create encoded event data
+		// 3. Decode subkey for both codecs and verify the results are the same
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm)
+		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+		eventName := "TestEvent"
+
+		// Test with codec v1 (CodecEventIdl)
+		codecV1Filter := types.Filter{
+			Name:        "codecV1Filter",
+			ContractIdl: codec.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV1FilterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV1FilterID, nil).Once()
+		err := fs.RegisterFilter(t.Context(), codecV1Filter)
+		require.NoError(t, err)
+
+		// Test with codec v2 (Codecv2EventIdl)
+		codecV2Filter := types.Filter{
+			Name:        "codecV2Filter",
+			ContractIdl: codecv2.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV2FilterID = int64(2)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV2FilterID, nil).Once()
+		err = fs.RegisterFilter(t.Context(), codecV2Filter)
+		require.NoError(t, err)
+
+		// Verify both filters are registered
+		require.Len(t, fs.filtersToBackfill, 2)
+		require.Contains(t, fs.filtersToBackfill, codecV1FilterID)
+		require.Contains(t, fs.filtersToBackfill, codecV2FilterID)
+
+		// Test DecodeSubKey for both codec versions
+		// Define test event structs matching the IDL field names
+		type TestEvent struct {
+			Field1 int64
+		}
+
+		// Create test data
+		testValue := int64(12345)
+
+		// Borsh encode for event data
+		// Events use sha256("event:<EventName>")[:8] as discriminator
+		discriminator := solcommoncodec.NewDiscriminatorHashPrefix(eventName, false)
+		eventData := TestEvent{Field1: testValue}
+		buf := new(bytes.Buffer)
+		buf.Write(discriminator)
+		require.NoError(t, binary.NewBorshEncoder(buf).Encode(eventData))
+		encodedBytes := buf.Bytes()
+
+		// Test DecodeSubKey for v1
+		v1Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV1FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v1Result)
+
+		// Test DecodeSubKey for v2
+		v2Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV2FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v2Result)
 	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)

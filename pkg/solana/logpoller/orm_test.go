@@ -17,11 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 func TestLogPollerFilters(t *testing.T) {
-	sqltest.SkipInMemory(t)
+	// sqltest.SkipInMemory(t)
 	t.Parallel()
 
 	lggr := logger.Test(t)
@@ -47,6 +48,27 @@ func TestLogPollerFilters(t *testing.T) {
 						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
 					},
 				},
+				ContractIdl: codec.FetchLogpollerTypeTestIDL(),
+				Retention:   1000,
+				MaxLogsKept: 3,
+			},
+			{
+				Name:          "happy path",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "event",
+				EventSig:      types.EventSignature{1, 2, 3},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
+				EventIdl: types.EventIdl{
+					Event: codec.IdlEvent{
+						Name:   "MyEvent",
+						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+					},
+					Types: codec.IdlTypeDefSlice{
+						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+					},
+				},
+				ContractIdl: codecv2.FetchLogpollerTypeTestIDL(),
 				Retention:   1000,
 				MaxLogsKept: 3,
 			},
@@ -75,7 +97,9 @@ func TestLogPollerFilters(t *testing.T) {
 		for _, filter := range filters {
 			t.Run("Read/write filter: "+filter.Name, func(t *testing.T) {
 				ctx := t.Context()
-				dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+				dbURL := "postgresql://chainlink_dev:insecurepassword@localhost:5432/chainlink_development_test?sslmode=disable"
+				// dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+				dbx := sqltest.NewDB(t, dbURL)
 				orm := NewORM(chainID, dbx, lggr)
 				id, err := orm.InsertFilter(ctx, filter)
 				require.NoError(t, err)
@@ -100,7 +124,10 @@ func TestLogPollerFilters(t *testing.T) {
 		}
 	})
 	t.Run("Updates non primary fields if name and chainID is not unique", func(t *testing.T) {
-		dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+		// dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+		dbURL := "postgresql://chainlink_dev:insecurepassword@localhost:5432/chainlink_development_test?sslmode=disable"
+		// dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+		dbx := sqltest.NewDB(t, dbURL)
 		orm := NewORM(chainID, dbx, lggr)
 		filter := newRandomFilter(t)
 		ctx := t.Context()
