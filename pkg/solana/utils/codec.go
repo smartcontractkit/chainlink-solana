@@ -39,12 +39,12 @@ func NewEventCodecEntry(filter types.Filter) (solcommoncodec.Entry, error) {
 	return entry, nil
 }
 
-func NewCreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, offChainName string, idlString string, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
-	input, err := codecv2.CreateCodecEntryWrapper(cfgType, offChainName, idlString, mod)
+func NewCreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, mod commoncodec.Modifier, onChainName, offChainName, idlString string) (entry solcommoncodec.Entry, err error) {
+	input, err := codecv2.CreateCodecEntryWrapper(cfgType, mod, onChainName, offChainName, idlString)
 	if err == nil {
 		return input, nil
 	}
-	input, err = codec.CreateCodecEntryWrapper(cfgType, offChainName, idlString, mod)
+	input, err = codec.CreateCodecEntryWrapper(cfgType, mod, onChainName, offChainName, idlString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create codec entry for %s, error: %w", offChainName, err)
 	}

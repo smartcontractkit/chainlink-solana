@@ -94,12 +94,12 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 	return entry, nil
 }
 
-func CreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, offChainName string, idlString string, mod basecodec.Modifier) (entry solcommoncodec.Entry, err error) {
+func CreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, mod basecodec.Modifier, onChainName, offChainName, idlString string) (entry solcommoncodec.Entry, err error) {
 	var idl IDL
 	if err := json.Unmarshal([]byte(idlString), &idl); err != nil {
 		return nil, err
 	}
-	idlDefinition, err := FindDefinitionFromIDL(cfgType, offChainName, idl)
+	idlDefinition, err := FindDefinitionFromIDL(cfgType, onChainName, idl)
 	if err != nil {
 		return nil, err
 	}

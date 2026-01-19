@@ -103,7 +103,8 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 			if err != nil {
 				return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
 			}
-			input, err := utils.NewCreateCodecEntryWrapper(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, programConfig.IDL, inputMod)
+			methodName := methodConfig.ChainSpecificName
+			input, err := utils.NewCreateCodecEntryWrapper(solcommoncodec.ChainConfigTypeInstructionDef, inputMod, methodName, methodName, programConfig.IDL)
 			if err != nil {
 				return fmt.Errorf("failed to parse config for chainwriter program %s, method %s, error: %w", program, method, err)
 			}
