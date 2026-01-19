@@ -15,6 +15,7 @@ type AccountIDLTypes struct {
 	Types   IdlTypeDefSlice
 }
 
+// called from logpoller newDecoder
 func NewAccountEntry(offchainName string, idlTypes AccountIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	_, accCodec, err := createCodecType(idlTypes.Account, createRefs(idlTypes.Types, builder), false)
 	if err != nil {

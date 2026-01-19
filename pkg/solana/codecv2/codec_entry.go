@@ -41,6 +41,7 @@ type EventIDLTypes struct {
 	Types anchoridl.IdTypeDef_slice
 }
 
+// called from logpoller newDecoder
 func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	var codecIDL anchoridl.Idl
 	if err := json.Unmarshal([]byte(contractIdl), &codecIDL); err != nil {

@@ -635,12 +635,6 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 }
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
-	// var idl logpollertypes.EventIdl
-	// err := json.Unmarshal(f.EventIdlJSON, &idl)
-	// if err != nil {
-	// 	return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
-	// }
-
 	return logpollertypes.Filter{
 		Name:          f.Name,
 		Address:       logpollertypes.PublicKey(f.Address),

@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
@@ -158,18 +157,6 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 	return nil
 }
 
-func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
-	if err != nil {
-		return codec.IdlEvent{}, err
-	}
-	eventIdl, isOk := idlDef.(codec.IdlEvent)
-	if !isOk {
-		return codec.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
-	}
-	return eventIdl, nil
-}
-
 // registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
 func (a *SolanaAccessor) registerFilterIfNotExists(
 	ctx context.Context,
@@ -180,18 +167,6 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	conf := config.PollingFilter{
 		Retention: &defaultCCIPLogsRetention,
 	}
-
-	// var codecIDL codec.IDL
-	// if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-	// 	return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
-	// }
-
-	// eventIdl, err := extractEventIDL(eventName, codecIDL)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to extract event IDL: %w", err)
-	// }
-
-	// lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
 
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
