@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -597,7 +596,7 @@ func ExtractField(data any, path []string) (any, error) {
 	case reflect.Struct:
 		v = v.FieldByName(field)
 		if !v.IsValid() {
-			return nil, fmt.Errorf("field '%s' of struct %v does not exist, decoded struct:%s", field, data, DebugStructFields(data))
+			return nil, fmt.Errorf("field '%s' of struct %v does not exist", field, data)
 		}
 		return ExtractField(v.Interface(), path)
 	case reflect.Map:
@@ -622,43 +621,5 @@ func ExtractField(data any, path []string) (any, error) {
 		return ExtractField(v.Interface(), path)
 	default:
 		return nil, fmt.Errorf("extracting a field from a %s type is not supported", v.Kind().String())
-	}
-}
-
-func DebugStructFields(x any) string {
-	var b strings.Builder
-	writeFields(&b, reflect.ValueOf(x), 0)
-	return b.String()
-}
-
-func writeFields(b *strings.Builder, v reflect.Value, indent int) {
-	pad := strings.Repeat("  ", indent)
-
-	for v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			b.WriteString(pad + "<nil>\n")
-			return
-		}
-		v = v.Elem()
-	}
-
-	t := v.Type()
-	b.WriteString(fmt.Sprintf("%s%s (%s)\n", pad, t.Name(), v.Kind()))
-
-	switch v.Kind() {
-	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			f := t.Field(i)
-			// Only exported fields are accessible via FieldByName
-			if f.PkgPath != "" {
-				continue
-			}
-			fv := v.Field(i)
-			b.WriteString(fmt.Sprintf("%s- %s : %s\n", pad, f.Name, f.Type))
-			// Recurse one level for nested structs
-			if fv.Kind() == reflect.Struct || (fv.Kind() == reflect.Ptr && fv.Elem().Kind() == reflect.Struct) {
-				writeFields(b, fv, indent+1)
-			}
-		}
 	}
 }

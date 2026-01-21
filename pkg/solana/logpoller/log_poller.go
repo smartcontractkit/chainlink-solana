@@ -128,8 +128,6 @@ func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient
 const BackgroundWorkerInterval = 10 * time.Minute
 
 func (lp *Service) start(_ context.Context) error {
-	lp.lggr.Info("log poller has started, blockTime:", lp.blockTime)
-	lp.blockTime = time.Second
 	lp.eng.GoTick(services.NewTicker(2*lp.blockTime), func(ctx context.Context) {
 		err := lp.run(ctx)
 		if err != nil {
@@ -426,9 +424,6 @@ consumedAllBlocks:
 
 func (lp *Service) processBlocksImpl(ctx context.Context, blocks []types.Block) error {
 	for _, block := range blocks {
-		if len(block.Events) != 0 {
-			lp.lggr.Info("process block events length:", len(block.Events))
-		}
 		for _, event := range block.Events {
 			err := lp.Process(ctx, event)
 			if err != nil {
@@ -446,7 +441,6 @@ func (lp *Service) run(ctx context.Context) (err error) {
 			err = fmt.Errorf("panic recovered: %v", rec)
 		}
 	}()
-	lp.lggr.Info("run solana lp is called")
 	err = lp.filters.LoadFilters(ctx)
 	if err != nil {
 		return fmt.Errorf("error loading filters: %w", err)
@@ -467,7 +461,6 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed getting addresses: %w", err)
 	}
-	lp.lggr.Info("run solana lp for addresses:", addresses)
 	if len(addresses) == 0 {
 		return nil
 	}

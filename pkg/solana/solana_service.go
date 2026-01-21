@@ -271,7 +271,6 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
-	ss.logger.Debug("SolService num signatures: ", len(tx.Signatures))
 	// remove dummy signatures
 	tx.Signatures = tx.Signatures[:0]
 	forwarder := solana.PublicKey(req.Receiver)
@@ -287,9 +286,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	transactionID := txID.String()
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
-		//cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
-		cfg = append(cfg, utils.SetComputeUnitLimit(500_000))
+		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
 	}
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
