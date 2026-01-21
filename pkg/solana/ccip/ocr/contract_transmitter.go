@@ -12,9 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
