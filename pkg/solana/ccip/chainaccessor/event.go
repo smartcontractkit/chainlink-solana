@@ -171,10 +171,9 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
 	filter := logpollertypes.Filter{
-		Address:   logpollertypes.PublicKey(address),
-		EventName: eventName,
-		EventSig:  logpollertypes.NewEventSignatureFromName(eventName),
-		// EventIdl:        lpEventIDL,
+		Address:         logpollertypes.PublicKey(address),
+		EventName:       eventName,
+		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
 		ContractIdl:     filterConfig.idl,
 		SubkeyPaths:     subKeyPaths,
 		StartingBlock:   conf.GetStartingBlock(),
