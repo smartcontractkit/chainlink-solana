@@ -636,13 +636,12 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 	return logpollertypes.Filter{
-		Name:          f.Name,
-		Address:       logpollertypes.PublicKey(f.Address),
-		EventName:     f.EventName,
-		EventSig:      logpollertypes.EventSignature(f.EventSig),
-		StartingBlock: f.StartingBlock,
-		// EventIdl:        idl,
-		ContractIdl:     string(f.EventIdlJSON), // TODO: hack for now, fix it when we update chainlink-common, this should be contract idl
+		Name:            f.Name,
+		Address:         logpollertypes.PublicKey(f.Address),
+		EventName:       f.EventName,
+		EventSig:        logpollertypes.EventSignature(f.EventSig),
+		StartingBlock:   f.StartingBlock,
+		ContractIdl:     string(f.ContractIdlJSON),
 		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
 		Retention:       f.Retention,
 		MaxLogsKept:     f.MaxLogsKept,

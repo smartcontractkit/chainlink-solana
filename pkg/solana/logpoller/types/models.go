@@ -7,12 +7,13 @@ import (
 )
 
 type Filter struct {
-	ID              int64 // only for internal usage. Values set externally are ignored.
-	Name            string
-	Address         PublicKey
-	EventName       string
-	EventSig        EventSignature
-	StartingBlock   int64
+	ID            int64 // only for internal usage. Values set externally are ignored.
+	Name          string
+	Address       PublicKey
+	EventName     string
+	EventSig      EventSignature
+	StartingBlock int64
+	// Deprecated: Use ContractIdl instead. EventIdl is kept for backward compatibility.
 	EventIdl        EventIdl
 	ContractIdl     string
 	SubkeyPaths     SubKeyPaths
