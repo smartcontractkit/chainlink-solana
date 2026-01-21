@@ -13,9 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipconsts "github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
-
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 type call struct {
