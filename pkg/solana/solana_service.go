@@ -287,8 +287,11 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
-		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		if req.Cfg.ComputeLimit != nil {
+			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		}
 	}
+
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
