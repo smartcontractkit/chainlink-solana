@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -36,8 +37,9 @@ type filters struct {
 	knownPrograms          map[string]uint               // fast lookup to see if a base58-encoded ProgramID matches any registered filters
 	knownDiscriminators    map[types.EventSignature]uint // fast lookup based on raw discriminator bytes as string
 	seqNums                map[int64]int64
+	seqNumsMutex           sync.Mutex
 	decoders               map[int64]types.Decoder
-	discriminatorExtractor codec.DiscriminatorExtractor
+	discriminatorExtractor solcommoncodec.DiscriminatorExtractor
 }
 
 func newFilters(lggr logger.Logger, orm ORM) *filters {
@@ -45,14 +47,15 @@ func newFilters(lggr logger.Logger, orm ORM) *filters {
 		orm:                    orm,
 		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]types.Decoder),
-		discriminatorExtractor: codec.NewDiscriminatorExtractor(),
+		discriminatorExtractor: solcommoncodec.NewDiscriminatorExtractor(),
 	}
 }
 
 // IncrementSeqNum increments the sequence number for a filterID and returns the new
 // number. This means the sequence number assigned to the first log matched after registration will be 1.
-// WARNING: not thread safe, should only be called while fl.filtersMutex is locked, and after filters have been loaded.
 func (fl *filters) IncrementSeqNum(filterID int64) int64 {
+	fl.seqNumsMutex.Lock()
+	defer fl.seqNumsMutex.Unlock()
 	fl.seqNums[filterID]++
 	return fl.seqNums[filterID]
 }
@@ -212,7 +215,7 @@ func newDecoder(filter types.Filter) (types.Decoder, error) {
 		return nil, err
 	}
 
-	return codec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
+	return solcommoncodec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 
 func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {
@@ -292,7 +295,9 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
+	fl.seqNumsMutex.Lock()
 	delete(fl.seqNums, filter.ID)
+	fl.seqNumsMutex.Unlock()
 	delete(fl.decoders, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
@@ -530,7 +535,9 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 
 		fl.addToIndices(filter, decoder)
 	}
+	fl.seqNumsMutex.Lock()
 	fl.seqNums, err = fl.orm.SelectSeqNums(ctx)
+	fl.seqNumsMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to select sequence numbers from db: %w", err)
 	}

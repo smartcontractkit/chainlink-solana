@@ -39,88 +39,88 @@ jobs:
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
-    - name: Free Disk Space
-      uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
-    - uses: actions/checkout@v4
-    - name: Cache cargo target dir
-      uses: actions/cache@v4
-      with:
-        path: contracts/target
-        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
-    - name: Cache hello-world target dir
-      uses: actions/cache@v4
-      with:
-        path: contracts/examples/hello-world/target
-        key: ${{ runner.os }}-v2-cargo-build-target-hello-world-${{ hashFiles('contracts/**/Cargo.lock') }}
-    - name: cache docker build image
-      id: cache-image
-      uses: actions/cache@v4
-      with:
-        path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
-    - name: load cached image
-      run: |
-        docker load --input docker-build.tar
-    - name: run tests
-      run: |
-        docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
-          set -eoux pipefail &&\
-          RUSTUP_HOME=\"/root/.rustup\" &&\
-          FORCE_COLOR=1 &&\
-          cd /repo/contracts &&\
-          solana-keygen new -o id.json --no-bip39-passphrase &&\
-          cd /repo/ts &&\
-          pnpm install --frozen-lockfile &&\
-          pnpm build &&\
-          cd /repo/contracts &&\
-          pnpm install --frozen-lockfile &&\
-          anchor test &&\
-          chmod -R 755 ./target &&\
-          cd /repo/contracts/examples/hello-world &&\
-          pnpm install --frozen-lockfile &&\
-          anchor test &&\
-          chmod -R 755 ./target"
+      - name: Free Disk Space
+        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+      - uses: actions/checkout@v4
+      - name: Cache cargo target dir
+        uses: actions/cache@v4
+        with:
+          path: contracts/target
+          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: Cache hello-world target dir
+        uses: actions/cache@v4
+        with:
+          path: contracts/examples/hello-world/target
+          key: ${{ runner.os }}-v2-cargo-build-target-hello-world-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: cache docker build image
+        id: cache-image
+        uses: actions/cache@v4
+        with:
+          path: contracts/docker-build.tar
+          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: load cached image
+        run: |
+          docker load --input docker-build.tar
+      - name: run tests
+        run: |
+          docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
+            set -eoux pipefail &&\
+            RUSTUP_HOME=\"/root/.rustup\" &&\
+            FORCE_COLOR=1 &&\
+            cd /repo/contracts &&\
+            solana-keygen new -o id.json --no-bip39-passphrase &&\
+            cd /repo/ts &&\
+            pnpm install --frozen-lockfile &&\
+            pnpm build &&\
+            cd /repo/contracts &&\
+            pnpm install --frozen-lockfile &&\
+            anchor test &&\
+            chmod -R 755 ./target &&\
+            cd /repo/contracts/examples/hello-world &&\
+            pnpm install --frozen-lockfile &&\
+            anchor test &&\
+            chmod -R 755 ./target"
 
   rust_lint:
     name: Rust Lint
     runs-on: ubuntu-latest
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
-    - name: Free Disk Space
-      uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
-    - uses: actions/checkout@v4
-    - name: Cache cargo target dir
-      uses: actions/cache@v4
-      with:
-        path: contracts/target
-        key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
-    - name: cache docker build image
-      id: cache-image
-      uses: actions/cache@v4
-      with:
-        path: contracts/docker-build.tar
-        key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
-    - name: load cached image
-      run: |
-        docker load --input docker-build.tar
-    - name: format contracts + artifacts
-      run: |
-        npm install -g pnpm
-        pnpm install --frozen-lockfile
-        cd ../ # back to root
-        make format-contracts
-        echo "run 'make format-contracts' if this fails"
-        git diff --stat --exit-code
+      - name: Free Disk Space
+        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+      - uses: actions/checkout@v4
+      - name: Cache cargo target dir
+        uses: actions/cache@v4
+        with:
+          path: contracts/target
+          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: cache docker build image
+        id: cache-image
+        uses: actions/cache@v4
+        with:
+          path: contracts/docker-build.tar
+          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: load cached image
+        run: |
+          docker load --input docker-build.tar
+      - name: format contracts + artifacts
+        run: |
+          npm install -g pnpm
+          pnpm install --frozen-lockfile
+          cd ../ # back to root
+          make format-contracts
+          echo "run 'make format-contracts' if this fails"
+          git diff --stat --exit-code
 
-    - name: cargo check
-      run: |
-        docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
-          set -eoux pipefail &&\
-          RUSTUP_HOME=\"/root/.rustup\" &&\
-          FORCE_COLOR=1 &&\
-          cd /repo/contracts &&\
-          cargo check &&\
-          cargo clippy -- -D warnings"
+      - name: cargo check
+        run: |
+          docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
+            set -eoux pipefail &&\
+            RUSTUP_HOME=\"/root/.rustup\" &&\
+            FORCE_COLOR=1 &&\
+            cd /repo/contracts &&\
+            cargo check &&\
+            cargo clippy -- -D warnings"
 
   relay_run_interface_tests:
     name: Relay Run Interface Tests
@@ -166,7 +166,7 @@ jobs:
       - name: Setup Postgres
         uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
         with:
-          tmpfs: 'true'
+          tmpfs: "true"
 
       - name: Get core ref
         id: get-core-ref
@@ -193,3 +193,47 @@ jobs:
 
           cd ..
           make test_relay_integration
+
+  go:
+    name: Go tests for contracts
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest-8cores-32GB
+    needs: [get_projectserum_version, build_wrapped_anchor_image]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache cargo target dir
+        uses: actions/cache@v4
+        with:
+          path: contracts/target
+          key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: cache docker build image
+        id: cache-image
+        uses: actions/cache@v4
+        with:
+          path: contracts/docker-build.tar
+          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+      - name: load cached image
+        run: |
+          docker load --input docker-build.tar
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache-dependency-path: "./go.sum"
+      - name: Install Solana CLI
+        run: ../scripts/install-solana-ci.sh
+      - name: Build contracts + Test
+        run: |
+          set -eoux pipefail
+          # compile artifacts
+          docker run -v "$(pwd)/../":/repo chainlink-solana:build bash -c "\
+          set -eoux pipefail &&\
+          RUSTUP_HOME=\"/root/.rustup\" && \
+          FORCE_COLOR=1 && \
+          cd /repo/contracts && \
+          anchor build"
+          cd gotests
+          go test -v ./...

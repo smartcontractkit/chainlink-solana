@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 const anyExtraValue = 3
@@ -124,7 +125,7 @@ func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
 }
 
 func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
-	codecConfig := codec.Config{Configs: map[string]codec.ChainConfig{}}
+	codecConfig := solcommoncodec.Config{Configs: map[string]solcommoncodec.ChainConfig{}}
 	TestItem := CreateTestStruct(0, it)
 	for offChainName, v := range testutils.CodecDefs {
 		codecEntryCfg := codecConfig.Configs[offChainName]
@@ -142,7 +143,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		if slices.Contains([]string{TestItemType, TestItemSliceType, TestItemArray1Type, TestItemArray2Type, testutils.TestItemWithConfigExtraType, testutils.TestEventItem}, offChainName) {
 			addressByteModifier := &commoncodec.AddressBytesToStringModifierConfig{
 				Fields:   []string{"AccountStruct.AccountStr"},
-				Modifier: codec.SolanaAddressModifier{},
+				Modifier: solcommoncodec.SolanaAddressModifier{},
 			}
 			codecEntryCfg.ModifierConfigs = append(codecEntryCfg.ModifierConfigs, addressByteModifier)
 		}

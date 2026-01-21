@@ -8,9 +8,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
+	ccipconsts "github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"

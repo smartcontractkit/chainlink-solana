@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
@@ -536,6 +537,72 @@ func TestFilters_ExtractField(t *testing.T) {
 			assert.Equal(t, c.Result, result)
 		})
 	}
+}
+
+func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
+	orm := mocks.NewMockORM(t)
+	lggr := logger.Sugared(logger.Test(t))
+	fs := newFilters(lggr, orm)
+
+	filter1 := types.Filter{ID: 1, Name: "filter1", EventName: "event1", EventSig: types.NewEventSignatureFromName("event1")}
+	filter2 := types.Filter{ID: 2, Name: "filter2", EventName: "event2", EventSig: types.NewEventSignatureFromName("event2")}
+	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
+
+	err := fs.LoadFilters(t.Context())
+	require.NoError(t, err)
+
+	const numGoroutines = 50
+	const incrementsPerGoroutine = 100
+
+	seqNumsFilter1 := make(chan int64, numGoroutines*incrementsPerGoroutine)
+	seqNumsFilter2 := make(chan int64, numGoroutines*incrementsPerGoroutine)
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines * 2)
+
+	for range numGoroutines {
+		go func() {
+			defer wg.Done()
+			for range incrementsPerGoroutine {
+				seqNum := fs.IncrementSeqNum(filter1.ID)
+				seqNumsFilter1 <- seqNum
+			}
+		}()
+	}
+
+	for range numGoroutines {
+		go func() {
+			defer wg.Done()
+			for range incrementsPerGoroutine {
+				seqNum := fs.IncrementSeqNum(filter2.ID)
+				seqNumsFilter2 <- seqNum
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(seqNumsFilter1)
+	close(seqNumsFilter2)
+
+	seenFilter1 := make(map[int64]struct{})
+	for seqNum := range seqNumsFilter1 {
+		_, exists := seenFilter1[seqNum]
+		require.False(t, exists, "duplicate sequence number %d found for filter1", seqNum)
+		seenFilter1[seqNum] = struct{}{}
+	}
+	require.Len(t, seenFilter1, numGoroutines*incrementsPerGoroutine, "expected %d unique sequence numbers for filter1", numGoroutines*incrementsPerGoroutine)
+
+	seenFilter2 := make(map[int64]struct{})
+	for seqNum := range seqNumsFilter2 {
+		_, exists := seenFilter2[seqNum]
+		require.False(t, exists, "duplicate sequence number %d found for filter2", seqNum)
+		seenFilter2[seqNum] = struct{}{}
+	}
+	require.Len(t, seenFilter2, numGoroutines*incrementsPerGoroutine, "expected %d unique sequence numbers for filter2", numGoroutines*incrementsPerGoroutine)
+
+	require.Equal(t, int64(numGoroutines*incrementsPerGoroutine), fs.seqNums[filter1.ID])
+	require.Equal(t, int64(numGoroutines*incrementsPerGoroutine), fs.seqNums[filter2.ID])
 }
 
 func TestFilters_UpdateStartingBlocks(t *testing.T) {

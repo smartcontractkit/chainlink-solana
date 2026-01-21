@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -26,11 +27,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -160,7 +160,7 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 }
 
 func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, eventName, codecIDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
 	if err != nil {
 		return codec.IdlEvent{}, err
 	}
@@ -227,9 +227,9 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 }
 
 // convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic
-// chainaccessor.SendRequestedEvent. This function is idempotent and performs a
+// ccipocr3.SendRequestedEvent. This function is idempotent and performs a
 // one-to-one mapping of event fields from the Solana format to the standard CCIP format.
-func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onrampAddr solana.PublicKey) ([]*chainaccessor.SendRequestedEvent, error) {
+func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onrampAddr solana.PublicKey) ([]*ccipocr3.SendRequestedEvent, error) {
 	iter, err := a.decodeLogsIntoSequences(consts.EventNameCCIPMessageSent, logs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode logs into sequences: %w", err)
@@ -239,7 +239,7 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 		return nil, fmt.Errorf("failed to convert all logs into generic ccip event, logs %d, events %d", len(logs), len(iter))
 	}
 
-	genericEvents := make([]*chainaccessor.SendRequestedEvent, 0)
+	genericEvents := make([]*ccipocr3.SendRequestedEvent, 0)
 	for _, seq := range iter {
 		event, ok := seq.Data.(*ccip.EventCCIPMessageSent)
 		if !ok {
@@ -260,11 +260,11 @@ func (a *SolanaAccessor) convertCCIPMessageSent(logs []logpollertypes.Log, onram
 			Receiver:       ccipocr3.UnknownAddress(event.Message.Receiver),
 			ExtraArgs:      ccipocr3.Bytes(event.Message.ExtraArgs),
 			FeeToken:       ccipocr3.UnknownAddress(event.Message.FeeToken.Bytes()),
-			FeeTokenAmount: codec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
+			FeeTokenAmount: solcommoncodec.DecodeLEToBigInt(event.Message.FeeTokenAmount.LeBytes[:]),
 			TokenAmounts:   convertTokenAmounts(event.Message.TokenAmounts),
-			FeeValueJuels:  codec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
+			FeeValueJuels:  solcommoncodec.DecodeLEToBigInt(event.Message.FeeValueJuels.LeBytes[:]),
 		}
-		genericEvents = append(genericEvents, &chainaccessor.SendRequestedEvent{
+		genericEvents = append(genericEvents, &ccipocr3.SendRequestedEvent{
 			DestChainSelector: msg.Header.DestChainSelector,
 			SequenceNumber:    msg.Header.SequenceNumber,
 			Message:           msg,
@@ -280,7 +280,7 @@ func convertTokenAmounts(transfers []ccip_router.SVM2AnyTokenTransfer) []ccipocr
 			SourcePoolAddress: transfer.SourcePoolAddress.Bytes(),
 			DestTokenAddress:  transfer.DestTokenAddress,
 			ExtraData:         transfer.ExtraData,
-			Amount:            codec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
+			Amount:            solcommoncodec.DecodeLEToBigInt(transfer.Amount.LeBytes[:]),
 			DestExecData:      transfer.DestExecData,
 		})
 	}

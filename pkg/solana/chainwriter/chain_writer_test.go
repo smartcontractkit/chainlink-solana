@@ -19,18 +19,21 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	ccipconsts "github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	ccipsolana "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	ccipconsts "github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/buffer_payload"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
+	solcodecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecTestUtils "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	solcodecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -1317,6 +1320,131 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 		_, err = cwNoEstimator.GetFeeComponents(ctx)
 		require.Error(t, err)
 	})
+}
+
+// Tests that the two versioned IDLs for the same method args encode to the same bytes
+func TestChainWriter_ParsePrograms(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	// mock client
+	rw := clientmocks.NewReaderWriter(t)
+	mc := *client.NewMultiClient(func(context.Context) (client.ReaderWriter, error) {
+		return rw, nil
+	})
+	// mock estimator
+	ge := feemocks.NewEstimator(t)
+	// mock txm
+	txm := txmMocks.NewTxManager(t)
+
+	invalidConfig := chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			"testIDLv1": {
+				IDL: "",
+			},
+		},
+	}
+
+	_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidConfig)
+	require.ErrorContains(t, err, "failed to unmarshal IDL for program testIDLv1 (tried both codecv2 and codec), error:")
+
+	cwConfig := chainwriter.ChainWriterConfig{
+		Programs: map[string]chainwriter.ProgramConfig{
+			"testIDLv1": {
+				IDL: solcodecv1.FetchChainWriterTestIDL(),
+				Methods: map[string]chainwriter.MethodConfig{
+					"TestItemArray1Type": {
+						ChainSpecificName: "TestItemArray1Type",
+					},
+				},
+			},
+			"testIDLv2": {
+				IDL: solcodecv2.FetchChainWriterTestIDL(),
+				Methods: map[string]chainwriter.MethodConfig{
+					"TestItemArray1Type": {
+						ChainSpecificName: "test_item_array1_type",
+					},
+				},
+			},
+		},
+	}
+
+	// initialize chain writer
+	cw, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, cwConfig)
+	require.NoError(t, err)
+
+	// Test v1 encoding - use codecTestUtils.TestItemAsArgs which has PascalCase field names
+	testArrayV1 := [1]codecTestUtils.TestItemAsArgs{{
+		Field:               1,
+		OracleID:            2,
+		OracleIDs:           [32]uint8{3},
+		AccountStruct:       codecTestUtils.AccountStruct{},
+		Accounts:            []solana.PublicKey{},
+		DifferentField:      "test",
+		BigField:            ag_binary.Int128{Lo: 5},
+		NestedDynamicStruct: codecTestUtils.NestedDynamic{FixedBytes: [2]uint8{6, 7}, Inner: codecTestUtils.InnerDynamic{IntVal: 8, S: "inner"}},
+		NestedStaticStruct:  codecTestUtils.NestedStatic{FixedBytes: [2]uint8{9, 10}, Inner: codecTestUtils.InnerStatic{IntVal: 11}},
+	}}
+
+	encodedPayloadv1, err := cw.EncodePayload(ctx, testArrayV1, chainwriter.MethodConfig{
+		ChainSpecificName: "TestItemArray1Type",
+	}, "testIDLv1", "TestItemArray1Type")
+	require.NoError(t, err)
+	require.NotNil(t, encodedPayloadv1)
+
+	// Anchor 0.3x IDL parsing results in snake_case field names. Create structs to match these field names.
+	type InnerDynamicV2 struct {
+		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
+		S       string
+	}
+	type InnerStaticV2 struct {
+		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
+		A       solana.PublicKey
+	}
+	type AccountStructV2 struct {
+		Account     solana.PublicKey
+		Account_str solana.PublicKey //nolint:revive // snake_case required to match Anchor IDL
+	}
+	type NestedDynamicV2 struct {
+		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
+		Inner       InnerDynamicV2
+	}
+	type NestedStaticV2 struct {
+		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
+		Inner       InnerStaticV2
+	}
+	type TestItemV2 struct {
+		Field                 int32
+		Oracle_id             uint8           //nolint:revive // snake_case required to match Anchor IDL
+		Oracle_ids            [32]uint8       //nolint:revive // snake_case required to match Anchor IDL
+		Account_struct        AccountStructV2 //nolint:revive // snake_case required to match Anchor IDL
+		Accounts              []solana.PublicKey
+		Different_field       string           //nolint:revive // snake_case required to match Anchor IDL
+		Big_field             ag_binary.Int128 //nolint:revive // snake_case required to match Anchor IDL
+		Nested_dynamic_struct NestedDynamicV2  //nolint:revive // snake_case required to match Anchor IDL
+		Nested_static_struct  NestedStaticV2   //nolint:revive // snake_case required to match Anchor IDL
+	}
+
+	// Test v2 encoding with matching struct (same data, different field names)
+	testArrayV2 := [1]TestItemV2{{
+		Field:                 1,
+		Oracle_id:             2,
+		Oracle_ids:            [32]uint8{3},
+		Account_struct:        AccountStructV2{},
+		Accounts:              []solana.PublicKey{},
+		Different_field:       "test",
+		Big_field:             ag_binary.Int128{Lo: 5},
+		Nested_dynamic_struct: NestedDynamicV2{Fixed_bytes: [2]uint8{6, 7}, Inner: InnerDynamicV2{Int_val: 8, S: "inner"}},
+		Nested_static_struct:  NestedStaticV2{Fixed_bytes: [2]uint8{9, 10}, Inner: InnerStaticV2{Int_val: 11}},
+	}}
+
+	encodedPayloadv2, err := cw.EncodePayload(ctx, testArrayV2, chainwriter.MethodConfig{
+		ChainSpecificName: "test_item_array1_type",
+	}, "testIDLv2", "TestItemArray1Type")
+	require.NoError(t, err)
+	require.NotNil(t, encodedPayloadv2)
+
+	// Both should encode to the same bytes (same data structure, just different field naming conventions)
+	require.Equal(t, encodedPayloadv1, encodedPayloadv2)
 }
 
 func mustBorshEncodeStruct(t *testing.T, data interface{}) []byte {

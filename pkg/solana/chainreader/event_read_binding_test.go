@@ -17,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -242,7 +243,7 @@ func expressionMatcher(t *testing.T, count int) func([]query.Expression) bool {
 	}
 }
 
-func newTestCodec(t *testing.T) *codec.ParsedTypes {
+func newTestCodec(t *testing.T) *solcommoncodec.ParsedTypes {
 	t.Helper()
 
 	rawIDL := fmt.Sprintf(basicEventIDL, testParamType)
@@ -250,7 +251,7 @@ func newTestCodec(t *testing.T) *codec.ParsedTypes {
 	var IDL codec.IDL
 	require.NoError(t, json.Unmarshal([]byte(rawIDL), &IDL))
 
-	idlDef, err := codec.FindDefinitionFromIDL(codec.ChainConfigTypeEventDef, "EventType", IDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
 
 	require.NoError(t, err)
 
@@ -258,9 +259,9 @@ func newTestCodec(t *testing.T) *codec.ParsedTypes {
 
 	require.NoError(t, err)
 
-	return &codec.ParsedTypes{
-		EncoderDefs: map[string]codec.Entry{codec.WrapItemType(true, namespace, genericName): entry},
-		DecoderDefs: map[string]codec.Entry{},
+	return &solcommoncodec.ParsedTypes{
+		EncoderDefs: map[string]solcommoncodec.Entry{solcommoncodec.WrapItemType(true, namespace, genericName): entry},
+		DecoderDefs: map[string]solcommoncodec.Entry{},
 	}
 }
 
