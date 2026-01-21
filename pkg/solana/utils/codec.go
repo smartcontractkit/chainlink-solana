@@ -31,6 +31,7 @@ func NewEventCodecEntry(filter types.Filter, includeDiscriminator bool, mod comm
 	}
 
 	// Backward compatibility: use legacy EventIdl if ContractIdl is empty
+	//nolint:staticcheck // intentional use of deprecated EventIdl for backward compatibility
 	entry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), includeDiscriminator, mod, builder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event codec entry from EventIdl: %w", err)
