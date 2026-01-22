@@ -1,3 +1,4 @@
+//nolint:revive // utils is an established package name in this codebase
 package utils
 
 import (
