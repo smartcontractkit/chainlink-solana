@@ -70,7 +70,7 @@ jobs:
             cd /repo/contracts &&\
             pnpm install --frozen-lockfile &&\
             anchor test &&\
-            chmod -R 755 ./target
+            chmod -R 755 ./target"
 
   rust_lint:
     name: Rust Lint
