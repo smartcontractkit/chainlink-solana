@@ -96,7 +96,6 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 		client: cl,
 	}
 
-	lggr.Info("log poller created")
 	lp.processBlocks = lp.processBlocksImpl
 
 	lp.Service, lp.eng = services.Config{
@@ -114,7 +113,6 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
-	lp.blockTime = time.Second
 
 	return lp
 }
