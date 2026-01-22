@@ -48,10 +48,6 @@ const encodeInstruction = (data) => {
 
 async function main() {
   // #region main
-  // Read the generated IDL.
-  const idl = JSON.parse(
-    fs.readFileSync("examples/hello-world/target/idl/hello_world.json", "utf8")
-  );
 
   // Address of the deployed program.
   const programId = new anchor.web3.PublicKey(

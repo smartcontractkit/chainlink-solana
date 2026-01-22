@@ -25,7 +25,7 @@ main() {
     #
     # Start the local validator. Use the old store.so built from e3a643e31b90947d482a8cb457d97f1e5f427780
     #
-    solana-test-validator -l migrate/test-ledger --bpf-program $PROGRAM_ID migrate/store.so --bpf-program 2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg target/deploy/access_controller.so --bpf-program Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS examples/hello-world/target/deploy/hello_world.so > migrate/validator.log &
+    solana-test-validator -l migrate/test-ledger --bpf-program $PROGRAM_ID migrate/store.so --bpf-program 2F5NEkMnCRkmahEAcQfTQcZv1xtGgrWFfjENtTwHLuKg target/deploy/access_controller.so > migrate/validator.log &
     #
     # Wait for the validator to start.
     #
