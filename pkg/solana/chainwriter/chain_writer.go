@@ -16,7 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	codec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -104,7 +105,7 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 				return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
 			}
 			methodName := methodConfig.ChainSpecificName
-			input, err := utils.NewCreateCodecEntry(solcommoncodec.ChainConfigTypeInstructionDef, inputMod, methodName, methodName, programConfig.IDL)
+			input, err := codec.NewCreateCodecEntry(solcommoncodec.ChainConfigTypeInstructionDef, inputMod, methodName, methodName, programConfig.IDL)
 			if err != nil {
 				return fmt.Errorf("failed to parse config for chainwriter program %s, method %s, error: %w", program, method, err)
 			}

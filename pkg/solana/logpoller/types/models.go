@@ -25,8 +25,14 @@ type Filter struct {
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
-	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventName == other.EventName &&
-		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths) && f.ContractIdl == other.ContractIdl
+	status := (f.Address == other.Address) && (f.EventSig == other.EventSig) && (f.EventName == other.EventName) && (f.SubkeyPaths.Equal(other.SubkeyPaths))
+	if (f.EventIdl.Event.Name != "") && (other.EventIdl.Event.Name != "") {
+		status = status && f.EventIdl.Equal(other.EventIdl)
+	}
+	if f.ContractIdl != "" && other.ContractIdl != "" {
+		status = status && f.ContractIdl == other.ContractIdl
+	}
+	return status
 }
 
 type Log struct {

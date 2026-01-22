@@ -19,9 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -257,7 +257,7 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		// Test with codec v1 (CodecEventIdl)
 		codecV1Filter := types.Filter{
 			Name:        "codecV1Filter",
-			ContractIdl: codec.FetchLogpollerTypeTestIDL(),
+			ContractIdl: codecv1.FetchLogpollerTypeTestIDL(),
 			EventName:   eventName,
 		}
 		const codecV1FilterID = int64(1)

@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
 )
 
 type filters struct {
@@ -210,7 +210,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := utils.NewEventCodecEntry(filter, true, nil, binary.LittleEndian())
+	cEntry, err := codec.NewEventCodecEntry(filter, true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
 	}

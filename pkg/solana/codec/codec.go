@@ -1,5 +1,5 @@
 //nolint:revive // utils is an established package name in this codebase
-package utils
+package codec
 
 import (
 	"fmt"
@@ -7,9 +7,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -24,7 +24,7 @@ func NewEventCodecEntry(filter types.Filter, includeDiscriminator bool, mod comm
 			return entry, nil
 		}
 		// Fall back to codec (legacy Anchor IDL format)
-		entry, err = codec.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
+		entry, err = codecv1.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create event codec entry: %w", err)
 		}
@@ -33,7 +33,7 @@ func NewEventCodecEntry(filter types.Filter, includeDiscriminator bool, mod comm
 
 	// Backward compatibility: use legacy EventIdl if ContractIdl is empty
 	//nolint:staticcheck // intentional use of deprecated EventIdl for backward compatibility
-	entry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), includeDiscriminator, mod, builder)
+	entry, err := codecv1.NewEventArgsEntry(filter.EventName, codecv1.EventIDLTypes(filter.EventIdl), includeDiscriminator, mod, builder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event codec entry from EventIdl: %w", err)
 	}
@@ -48,7 +48,7 @@ func NewCreateCodecEntry(cfgType solcommoncodec.ChainConfigType, mod commoncodec
 	if err == nil {
 		return input, nil
 	}
-	input, err = codec.CreateCodecEntryWrapper(cfgType, mod, onChainName, offChainName, idlString)
+	input, err = codecv1.CreateCodecEntryWrapper(cfgType, mod, onChainName, offChainName, idlString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create codec entry for %s, error: %w", offChainName, err)
 	}

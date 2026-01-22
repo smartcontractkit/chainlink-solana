@@ -17,7 +17,7 @@ supported at this time.
 
 Modifiers can be provided to assist in modifying property names, adding properties, etc.
 */
-package codec
+package codecv1
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ import (
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 const (
