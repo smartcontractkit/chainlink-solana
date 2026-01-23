@@ -980,12 +980,11 @@ func buildExecuteIxExact(bufferProgramID solana.PublicKey, admin solana.PublicKe
 
 	execute := ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
 	// 1) write variant index exactly like generated BaseVariant would
-	enc.Encode(execute) // uint8
-
+	_ = enc.Encode(execute) // uint8
 	// 2) encode params exactly like the generated MarshalWithEncoder
 	//    generated does: encoder.Encode(obj.Report); encoder.Encode(obj.Fail)
-	enc.Encode(&report)
-	enc.Encode(&fail)
+	_ = enc.Encode(&report)
+	_ = enc.Encode(&fail)
 
 	data := buf.Bytes()
 
