@@ -7,7 +7,8 @@ use common::{
 };
 
 use events::{
-    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportProcessed, ReportInProgress
+    ConfigSet, ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportInProgress,
+    ReportProcessed,
 };
 
 use context::*;
