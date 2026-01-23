@@ -615,7 +615,7 @@ func (c *chain) Start(ctx context.Context) error {
 			startAll = append(startAll, c.multiNode, c.txSender)
 		}
 		if c.cfg.Workflow.IsEnabled() {
-			c.lggr.Debug("starting LogPoller")
+			c.lggr.Debug("Starting LogPoller")
 			startAll = append(startAll, c.lp)
 		}
 		return ms.Start(ctx, startAll...)
