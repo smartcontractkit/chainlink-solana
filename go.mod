@@ -8,7 +8,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/gagliardetto/anchor-go v1.0.0
 	github.com/gagliardetto/binary v0.8.0
-	github.com/gagliardetto/solana-go v1.14.0
+	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gagliardetto/utilz v0.1.3
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/google/uuid v1.6.0
