@@ -10,7 +10,12 @@ pkg/bin
 v1/target
 
 sdk/*/target
-contracts/target
+
+contracts/target/*
+!contracts/target/idl/
+contracts/target/idl/*
+!contracts/target/idl/keystone-forwarder.json
+
 contracts/programs/*/target
 contracts/.anchor
 # keypair used by anchor/anchor test
