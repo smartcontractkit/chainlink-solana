@@ -31,9 +31,7 @@
     },
     {
       "name": "transferOwnership",
-      "docs": [
-        "Step 1 of 2-step ownership process: propose a new owner"
-      ],
+      "docs": ["Step 1 of 2-step ownership process: propose a new owner"],
       "accounts": [
         {
           "name": "state",
@@ -55,9 +53,7 @@
     },
     {
       "name": "acceptOwnership",
-      "docs": [
-        "Step 2 of 2-step ownership process: accept ownership"
-      ],
+      "docs": ["Step 2 of 2-step ownership process: accept ownership"],
       "accounts": [
         {
           "name": "state",
@@ -119,10 +115,7 @@
           "name": "signerAddresses",
           "type": {
             "vec": {
-              "array": [
-                "u8",
-                20
-              ]
+              "array": ["u8", 20]
             }
           }
         }
@@ -168,10 +161,7 @@
           "name": "signerAddresses",
           "type": {
             "vec": {
-              "array": [
-                "u8",
-                20
-              ]
+              "array": ["u8", 20]
             }
           }
         }
@@ -179,9 +169,7 @@
     },
     {
       "name": "closeOraclesConfig",
-      "docs": [
-        "Closes oracle config account"
-      ],
+      "docs": ["Closes oracle config account"],
       "accounts": [
         {
           "name": "state",
@@ -286,10 +274,7 @@
           {
             "name": "padding",
             "type": {
-              "array": [
-                "u8",
-                7
-              ]
+              "array": ["u8", 7]
             }
           },
           {
@@ -303,9 +288,7 @@
     },
     {
       "name": "ForwarderState",
-      "docs": [
-        "Account which represents a distinct instance of a forwarder."
-      ],
+      "docs": ["Account which represents a distinct instance of a forwarder."],
       "type": {
         "kind": "struct",
         "fields": [
@@ -340,10 +323,7 @@
           {
             "name": "transmissionId",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
@@ -365,10 +345,7 @@
             "type": {
               "array": [
                 {
-                  "array": [
-                    "u8",
-                    20
-                  ]
+                  "array": ["u8", 20]
                 },
                 32
               ]
@@ -446,10 +423,7 @@
         {
           "name": "transmissionId",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           },
           "index": false
         },
@@ -471,10 +445,7 @@
         {
           "name": "transmissionId",
           "type": {
-            "array": [
-              "u8",
-              32
-            ]
+            "array": ["u8", 32]
           },
           "index": false
         }
@@ -512,10 +483,7 @@
           "name": "signers",
           "type": {
             "vec": {
-              "array": [
-                "u8",
-                20
-              ]
+              "array": ["u8", 20]
             }
           },
           "index": false

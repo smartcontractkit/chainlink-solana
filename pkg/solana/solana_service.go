@@ -271,7 +271,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
-	// remove dummy signatures
+	// remove dummy signatures (were injected by tx.MarshalBinary)
 	tx.Signatures = tx.Signatures[:0]
 	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
@@ -729,7 +729,10 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 
 	txBytes := obj.GetBinary()
 
-	txJSON, _ := json.Marshal(obj)
+	txJSON, jsonErr := json.Marshal(obj)
+	if jsonErr != nil && len(txBytes) == 0 {
+		return nil, fmt.Errorf("failed to marshal tx data: %w", jsonErr)
+	}
 
 	switch pref {
 	case commonsol.EncodingBase64:
