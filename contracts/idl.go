@@ -2,7 +2,7 @@ package contracts
 
 import _ "embed"
 
-//go:embed target/idl/keystone-forwarder.json
+//go:embed target/idl/keystone_forwarder.json
 var forwarderIdl string
 
 // FetchCCIPRouterIDL returns
