@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/gofuzz v1.2.2
-	github.com/gagliardetto/solana-go v1.14.0
+	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260121163256-85accaf3d28d
 	github.com/smartcontractkit/chainlink-deployments-framework v0.75.0
