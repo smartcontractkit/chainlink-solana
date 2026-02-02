@@ -27,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
-	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 )
 
 var _ TxManager = (*txm.Txm)(nil)
@@ -89,57 +88,6 @@ func (r *Relayer) Start(ctx context.Context) error {
 		err := r.chain.Start(ctx)
 		if err != nil {
 			return err
-		}
-		if wfCfg := r.chain.Config().WF(); wfCfg.IsEnabled() {
-			if r.capabilitiesRegistry == nil {
-				r.lggr.Errorw("workflow config is provided but capabilities registry is not set")
-				return nil
-			}
-
-			var info relaytypes.ChainInfo
-
-			if wfCfg.Local() {
-				info = relaytypes.ChainInfo{
-					FamilyName:      "Solana",
-					ChainID:         r.chain.ID(),
-					NetworkName:     "testnet",
-					NetworkNameFull: "testnet",
-				}
-			} else {
-				info, err = r.GetChainInfo(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to get chainInfo: %w", err)
-				}
-			}
-
-			wt, err := writetarget.New(r.chain, r.chain.MultiClient(), r.chain.TxManager(), info, r.lggr)
-			if err != nil {
-				return fmt.Errorf("failed to initialise write target capability: %w", err)
-			}
-
-			dr, err := writetarget.NewDeriveRemaining(r.chain, r.chain.MultiClient(), wfCfg, r.lggr)
-			if err != nil {
-				return fmt.Errorf("failed to initialise derive remaining capability: %w", err)
-			}
-
-			err = r.capabilitiesRegistry.Add(ctx, wt)
-			if err != nil {
-				return fmt.Errorf("failed to register capability: %w", err)
-			}
-
-			capInfo, err := wt.Info(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get write target info: %w", err)
-			}
-
-			r.lggr.Infow("Registered write target", "chain_id", r.chain.ID(), "info", capInfo)
-
-			err = r.capabilitiesRegistry.Add(ctx, dr)
-			if err != nil {
-				return fmt.Errorf("failed to register capability: %w", err)
-			}
-
-			r.lggr.Infow("Registered derive remaining", "chain_id", r.chain.ID())
 		}
 
 		return nil

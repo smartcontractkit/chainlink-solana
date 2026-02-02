@@ -9,6 +9,12 @@ pub struct ReportProcessed {
 }
 
 #[event]
+pub struct ReportInProgress {
+    pub state: Pubkey,
+    pub transmission_id: [u8; 32],
+}
+
+#[event]
 pub struct ConfigSet {
     pub state: Pubkey,
     pub oracles_config: Pubkey,

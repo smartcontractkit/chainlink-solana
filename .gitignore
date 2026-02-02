@@ -20,6 +20,11 @@ contracts/artifacts/*
 !contracts/artifacts/localnet/
 ops/localnet.json
 test-ledger
+contracts/target
+#!contracts/target/idl/
+#!contracts/target/idl/*
+#contracts/target/idl/*
+#!contracts/target/idl/keystone_forwarder.json
 
 # TS
 node_modules
