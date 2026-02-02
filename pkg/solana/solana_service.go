@@ -2,6 +2,7 @@ package solana
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -270,6 +271,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction payload: %w", err)
 	}
+	// remove dummy signatures (were injected by tx.MarshalBinary)
+	tx.Signatures = tx.Signatures[:0]
 	forwarder := solana.PublicKey(req.Receiver)
 	r, err := ss.chain.Reader()
 	if err != nil {
@@ -283,10 +286,13 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	transactionID := txID.String()
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
-		cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
-		cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
+		if req.Cfg.ComputeLimit != nil {
+			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		}
 	}
 
+	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
 	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
@@ -322,12 +328,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
 	}
 
-	signature, err := ss.chain.TxManager().GetTransactionSig(transactionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction signature: %w", err)
-	}
-
-	return &commonsol.SubmitTransactionReply{Status: txStatus, Signature: commonsol.Signature(signature), IdempotencyKey: transactionID}, nil
+	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
@@ -636,7 +637,7 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 	var idl logpollertypes.EventIdl
-	err := json.Unmarshal(f.EventIdlJSON, &idl)
+	err := json.Unmarshal(f.ContractIdlJSON, &idl)
 	if err != nil {
 		return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
 	}
@@ -723,36 +724,71 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return nil, nil
 	}
 	if pref == "" {
-		pref = commonsol.EncodingJSON // default
+		pref = commonsol.EncodingBase64
 	}
 
 	txBytes := obj.GetBinary()
 
-	txJSON, jerr := json.Marshal(obj)
-
-	enc := pref
-	switch pref {
-	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
-		if jerr != nil {
-			// fall back to binary if available. Pick one policy.
-			if len(txBytes) == 0 {
-				return nil, fmt.Errorf("marshal to json failed: %w", jerr)
-			}
-
-			enc = commonsol.EncodingBase64 // fallback
-		}
-	default:
-		// If caller prefers binary but there are no bytes, try JSON.
-		if len(txBytes) == 0 && jerr == nil {
-			enc = commonsol.EncodingJSON
-		}
+	txJSON, jsonErr := json.Marshal(obj)
+	if jsonErr != nil && len(txBytes) == 0 {
+		return nil, fmt.Errorf("failed to marshal tx data: %w", jsonErr)
 	}
 
-	return &commonsol.DataBytesOrJSON{
-		RawDataEncoding: enc,
-		AsDecodedBinary: txBytes,
-		AsJSON:          txJSON, // nil if marshal failed; that’s fine if enc != JSON
-	}, nil
+	switch pref {
+	case commonsol.EncodingBase64:
+		if len(txBytes) != 0 {
+			return &commonsol.DataBytesOrJSON{
+				RawDataEncoding: commonsol.EncodingBase64,
+				AsDecodedBinary: txBytes,
+				AsJSON:          txJSON,
+			}, nil
+		}
+
+		// Fallback: decode ["<base64>", "base64"] manually
+		var arr []string
+		if err := json.Unmarshal(txJSON, &arr); err != nil {
+			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, string(txJSON))
+		}
+		if len(arr) != 2 {
+			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), string(txJSON))
+		}
+
+		s := arr[0]
+		enc := arr[1]
+		if enc != "base64" {
+			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, string(txJSON))
+		}
+
+		b, err := base64.StdEncoding.DecodeString(s)
+		if err != nil {
+			return nil, fmt.Errorf("base64 decode failed: %w", err)
+		}
+
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: commonsol.EncodingBase64,
+			AsDecodedBinary: b,
+			AsJSON:          txJSON,
+		}, nil
+
+	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
+		// Caller explicitly wants JSON. Return it even if bytes exist.
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: pref,
+			AsDecodedBinary: txBytes,
+			AsJSON:          txJSON,
+		}, nil
+
+	default:
+		// Treat unknown as base64 preference
+		if len(txBytes) == 0 {
+			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", string(txJSON))
+		}
+		return &commonsol.DataBytesOrJSON{
+			RawDataEncoding: commonsol.EncodingBase64,
+			AsDecodedBinary: txBytes,
+			AsJSON:          txJSON,
+		}, nil
+	}
 }
 
 func convertBlock(block *rpc.GetBlockResult) *commonsol.GetBlockReply {

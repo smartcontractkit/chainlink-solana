@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
-	"github.com/smartcontractkit/chainlink-solana/contracts/generated/buffer_payload"
 	"github.com/smartcontractkit/chainlink-solana/pkg/monitoring/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -876,16 +875,13 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		// initialize chain writer
 		bufferCW, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, bufferTXM, ge, cwConfig)
 		require.NoError(t, err)
-		buffer_payload.ProgramID = bufferProgramID
 
 		t.Run("submits as single transaction if tx small enough", func(t *testing.T) {
 			args := BufferArgs{
 				Report: make([]byte, 963),
 				Fail:   false,
 			}
-
-			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
-			require.NoError(t, err)
+			ix := buildExecuteIxExact(bufferProgramID, admin, args.Report, args.Fail)
 
 			tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(admin))
 			require.NoError(t, err)
@@ -908,8 +904,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 				Fail:   false,
 			}
 
-			ix, err := buffer_payload.NewExecuteInstruction(args.Report, args.Fail, admin, solana.SystemProgramID).ValidateAndBuild()
-			require.NoError(t, err)
+			ix := buildExecuteIxExact(bufferProgramID, admin, args.Report, args.Fail)
 
 			tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(admin))
 			require.NoError(t, err)
@@ -979,7 +974,27 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		})
 	})
 }
+func buildExecuteIxExact(bufferProgramID solana.PublicKey, admin solana.PublicKey, report []byte, fail bool) solana.Instruction {
+	buf := new(bytes.Buffer)
+	enc := ag_binary.NewBorshEncoder(buf)
 
+	execute := ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
+	// 1) write variant index exactly like generated BaseVariant would
+	_ = enc.Encode(execute) // uint8
+	// 2) encode params exactly like the generated MarshalWithEncoder
+	//    generated does: encoder.Encode(obj.Report); encoder.Encode(obj.Fail)
+	_ = enc.Encode(&report)
+	_ = enc.Encode(&fail)
+
+	data := buf.Bytes()
+
+	metas := solana.AccountMetaSlice{
+		solana.Meta(admin).WRITE().SIGNER(),
+		solana.Meta(solana.SystemProgramID),
+	}
+
+	return solana.NewInstruction(bufferProgramID, metas, data)
+}
 func TestChainWriter_CCIPOfframp(t *testing.T) {
 	t.Parallel()
 
