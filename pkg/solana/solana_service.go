@@ -745,7 +745,7 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		}
 
 		// Fallback: decode ["<base64>", "base64"] manually
-		var arr []any
+		var arr []string
 		if err := json.Unmarshal(txJSON, &arr); err != nil {
 			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, string(txJSON))
 		}
@@ -753,14 +753,8 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), string(txJSON))
 		}
 
-		s, ok := arr[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected base64 string got: %v", arr[0])
-		}
-		enc, ok := arr[1].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected encoding string got: %v", arr[1])
-		}
+		s := arr[0]
+		enc := arr[1]
 		if enc != "base64" {
 			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, string(txJSON))
 		}
