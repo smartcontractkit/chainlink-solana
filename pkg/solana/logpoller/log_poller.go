@@ -205,6 +205,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		}
 
 		log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
+		lp.lggr.Debugw("extracting subkey values", "filterID", filter.ID, "numPaths", len(filter.SubkeyPaths), "paths", filter.SubkeyPaths)
 		for idx, path := range filter.SubkeyPaths {
 			if len(path) == 0 {
 				continue
@@ -212,13 +213,17 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
+				lp.lggr.Errorw("failed to decode subkey", "filterID", filter.ID, "path", path, "error", decodeSubKeyErr)
 				return decodeSubKeyErr
 			}
+			lp.lggr.Debugw("decoded subkey value", "filterID", filter.ID, "path", path, "idx", idx, "value", subKeyVal, "valueType", fmt.Sprintf("%T", subKeyVal))
 
 			indexedVal, newIndexedValErr := types.NewIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
+				lp.lggr.Errorw("failed to create indexed value", "filterID", filter.ID, "path", path, "error", newIndexedValErr)
 				return newIndexedValErr
 			}
+			lp.lggr.Debugw("created indexed value", "filterID", filter.ID, "path", path, "indexedVal", indexedVal)
 
 			log.SubkeyValues[idx] = indexedVal
 		}

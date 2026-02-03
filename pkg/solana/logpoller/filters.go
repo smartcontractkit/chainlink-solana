@@ -560,14 +560,23 @@ func (fl *filters) DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, 
 	}
 	decodedEvent, err := decoder.CreateType(filter.EventName, false)
 	if err != nil || decodedEvent == nil {
+		lggr.Errorw("failed to create type for event", "eventName", filter.EventName, "error", err)
 		return nil, err
 	}
+	lggr.Debugw("decoding event", "eventName", filter.EventName, "rawLen", len(raw), "rawHex", fmt.Sprintf("%x", raw))
 	if err = decoder.Decode(ctx, raw, decodedEvent, filter.EventName); err != nil {
 		err = fmt.Errorf("failed to decode sub key raw data: %v, for filter: %s, for subKeyPath: %v, err: %w", raw, subKeyPath, filter.Name, err)
 		lggr.Criticalw(err.Error())
 		return nil, err
 	}
-	return ExtractField(decodedEvent, subKeyPath)
+	lggr.Debugw("decoded event successfully", "eventName", filter.EventName, "decodedEvent", fmt.Sprintf("%+v", decodedEvent), "decodedEventType", fmt.Sprintf("%T", decodedEvent))
+	result, extractErr := ExtractField(decodedEvent, subKeyPath)
+	if extractErr != nil {
+		lggr.Errorw("failed to extract field", "subKeyPath", subKeyPath, "error", extractErr)
+		return nil, extractErr
+	}
+	lggr.Debugw("extracted field value", "subKeyPath", subKeyPath, "result", result, "resultType", fmt.Sprintf("%T", result))
+	return result, nil
 }
 
 // ExtractField extracts the value of a field or nested subfield from a composite datatype composed
