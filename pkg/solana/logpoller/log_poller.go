@@ -230,7 +230,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 			log.ExpiresAt = &expiresAt
 		}
 
-		lp.lggr.Infof("found matching event %+v", log)
+		lp.lggr.Infow("found matching event", "log", log, "eventName", filter.EventName)
 
 		logs = append(logs, log)
 	}
@@ -409,7 +409,7 @@ consumedAllBlocks:
 
 			batch := []types.Block{block}
 			batch = appendBuffered(blocks, blocksChBuffer, batch)
-			lp.lggr.Infof("processing batch of %d blocks: [slots %d-%d]", len(batch), batch[0].SlotNumber, batch[len(batch)-1].SlotNumber)
+			lp.lggr.Infow("processing batch of blocks", "count",len(batch), "start", batch[0].SlotNumber, "end", batch[len(batch)-1].SlotNumber)
 			err = lp.processBlocks(ctx, batch)
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)
