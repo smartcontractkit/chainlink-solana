@@ -130,7 +130,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	}
 
 	j.lggr.Debugw("found events", "count", len(events), "slot", j.slotNumber)
-	
+
 	result := types.Block{
 		SlotNumber: j.slotNumber,
 		BlockHash:  &block.Blockhash,

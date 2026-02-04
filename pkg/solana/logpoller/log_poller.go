@@ -409,7 +409,7 @@ consumedAllBlocks:
 
 			batch := []types.Block{block}
 			batch = appendBuffered(blocks, blocksChBuffer, batch)
-			lp.lggr.Infow("processing batch of blocks", "count",len(batch), "start", batch[0].SlotNumber, "end", batch[len(batch)-1].SlotNumber)
+			lp.lggr.Infow("processing batch of blocks", "count", len(batch), "start", batch[0].SlotNumber, "end", batch[len(batch)-1].SlotNumber)
 			err = lp.processBlocks(ctx, batch)
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)
