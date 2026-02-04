@@ -146,6 +146,53 @@ func (_c *MockFilters_GetDistinctAddresses_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// GetFilters provides a mock function with no fields
+func (_m *MockFilters) GetFilters() map[string]types.Filter {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFilters")
+	}
+
+	var r0 map[string]types.Filter
+	if rf, ok := ret.Get(0).(func() map[string]types.Filter); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]types.Filter)
+		}
+	}
+
+	return r0
+}
+
+// MockFilters_GetFilters_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFilters'
+type MockFilters_GetFilters_Call struct {
+	*mock.Call
+}
+
+// GetFilters is a helper method to define mock.On call
+func (_e *MockFilters_Expecter) GetFilters() *MockFilters_GetFilters_Call {
+	return &MockFilters_GetFilters_Call{Call: _e.mock.On("GetFilters")}
+}
+
+func (_c *MockFilters_GetFilters_Call) Run(run func()) *MockFilters_GetFilters_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockFilters_GetFilters_Call) Return(_a0 map[string]types.Filter) *MockFilters_GetFilters_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFilters_GetFilters_Call) RunAndReturn(run func() map[string]types.Filter) *MockFilters_GetFilters_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetFiltersToBackfill provides a mock function with no fields
 func (_m *MockFilters) GetFiltersToBackfill() []types.Filter {
 	ret := _m.Called()

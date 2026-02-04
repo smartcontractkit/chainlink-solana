@@ -451,6 +451,22 @@ func (fl *filters) GetFiltersToBackfill() []types.Filter {
 	return result
 }
 
+// GetFilters returns a copy of all currently registered filters, keyed by filter name.
+// Returns an empty map if filters have not been loaded yet.
+func (fl *filters) GetFilters() map[string]types.Filter {
+	if !fl.loadedFilters.Load() {
+		return make(map[string]types.Filter)
+	}
+	fl.filtersMutex.RLock()
+	defer fl.filtersMutex.RUnlock()
+
+	result := make(map[string]types.Filter, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		result[filter.Name] = *filter
+	}
+	return result
+}
+
 func (fl *filters) MarkFilterBackfilled(ctx context.Context, filterID int64) error {
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
