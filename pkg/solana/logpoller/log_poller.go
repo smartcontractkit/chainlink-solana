@@ -54,7 +54,7 @@ type filtersI interface {
 	PruneFilters(ctx context.Context) error
 	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]types.PublicKey, error)
-	GetFilters() map[string]types.Filter
+	GetFilters(ctx context.Context) (map[string]types.Filter, error)
 	GetFiltersToBackfill() []types.Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	UpdateStartingBlocks(startingBlocks int64)
@@ -263,8 +263,10 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	return lp.filters.UnregisterFilter(ctx, name)
 }
 
-func (lp *Service) GetFilters() map[string]types.Filter {
-	return lp.filters.GetFilters()
+func (lp *Service) GetFilters(ctx context.Context) (map[string]types.Filter, error) {
+	ctx, cancel := lp.eng.Ctx(ctx)
+	defer cancel()
+	return lp.filters.GetFilters(ctx)
 }
 
 // Replay submits a new replay request. If there was already a new replay request

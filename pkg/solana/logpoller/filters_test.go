@@ -681,12 +681,14 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 func TestFilters_GetFilters(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 
-	t.Run("returns empty map when filters not loaded", func(t *testing.T) {
+	t.Run("returns error when load fails", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm)
-		result := fs.GetFilters()
-		require.NotNil(t, result)
-		require.Empty(t, result)
+		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db error")).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.Error(t, err)
+		require.Nil(t, result)
 	})
 
 	t.Run("returns empty map when no filters exist", func(t *testing.T) {
@@ -695,10 +697,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 
-		err := fs.LoadFilters(t.Context())
+		result, err := fs.GetFilters(t.Context())
 		require.NoError(t, err)
-
-		result := fs.GetFilters()
 		require.NotNil(t, result)
 		require.Empty(t, result)
 	})
@@ -723,10 +723,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
 
-		err := fs.LoadFilters(t.Context())
+		result, err := fs.GetFilters(t.Context())
 		require.NoError(t, err)
-
-		result := fs.GetFilters()
 		require.Len(t, result, 2)
 		require.Equal(t, filter1, result["filter1"])
 		require.Equal(t, filter2, result["filter2"])
@@ -751,10 +749,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{activeFilter, deletedFilter}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
 
-		err := fs.LoadFilters(t.Context())
+		result, err := fs.GetFilters(t.Context())
 		require.NoError(t, err)
-
-		result := fs.GetFilters()
 		require.Len(t, result, 1)
 		require.Equal(t, activeFilter, result["activeFilter"])
 		require.NotContains(t, result, "deletedFilter")
@@ -775,10 +771,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
 
-		err := fs.LoadFilters(t.Context())
+		result, err := fs.GetFilters(t.Context())
 		require.NoError(t, err)
-
-		result := fs.GetFilters()
 		require.Len(t, result, 1)
 
 		// Modify the returned filter
@@ -790,7 +784,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		result["newFilter"] = types.Filter{Name: "newFilter"}
 
 		// Get filters again and verify internal state was not affected
-		result2 := fs.GetFilters()
+		result2, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
 		require.Len(t, result2, 1)
 		require.Equal(t, int64(100), result2["filter1"].StartingBlock)
 		require.NotContains(t, result2, "newFilter")
@@ -823,7 +818,8 @@ func TestFilters_GetFilters(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for range readsPerGoroutine {
-					result := fs.GetFilters()
+					result, err := fs.GetFilters(t.Context())
+					require.NoError(t, err)
 					assert.Len(t, result, 1)
 					assert.Equal(t, filter1, result["filter1"])
 				}

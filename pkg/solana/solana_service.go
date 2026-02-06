@@ -186,7 +186,10 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 }
 
 func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) {
-	filters := ss.chain.LogPoller().GetFilters()
+	filters, err := ss.chain.LogPoller().GetFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
 	filterNames := make([]string, 0, len(filters))
 	for name := range filters {
 		filterNames = append(filterNames, name)
