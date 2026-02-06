@@ -67,6 +67,10 @@ func (h Hash) ToSolana() solana.Hash {
 	return solana.Hash(h)
 }
 
+func (h Hash) String() string {
+	return h.ToSolana().String()
+}
+
 type Signature solana.Signature
 
 // Scan implements Scanner for database/sql.
@@ -81,6 +85,10 @@ func (s Signature) Value() (driver.Value, error) {
 
 func (s Signature) ToSolana() solana.Signature {
 	return solana.Signature(s)
+}
+
+func (s Signature) String() string {
+	return s.ToSolana().String()
 }
 
 func scanFixedLengthArray(name string, maxLength int, src interface{}, dest []byte) error {

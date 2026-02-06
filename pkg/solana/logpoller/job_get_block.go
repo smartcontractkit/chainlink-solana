@@ -129,7 +129,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		events = append(events, txEvents...)
 	}
 
-	j.lggr.Debugf("found %d events at slot %d", len(events), j.slotNumber)
+	j.lggr.Debugw("found events", "count", len(events), "slot", j.slotNumber)
 
 	result := types.Block{
 		SlotNumber: j.slotNumber,
