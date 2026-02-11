@@ -22,7 +22,7 @@ import (
 	commoncfg "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -368,8 +368,8 @@ func TestProcess(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	lp := New(lggr, orm, cl, config.NewDefault())
 
-	var idlTypeInt64 codec.IdlType
-	var idlTypeString codec.IdlType
+	var idlTypeInt64 codecv1.IdlType
+	var idlTypeString codecv1.IdlType
 
 	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
 	require.NoError(t, err)
@@ -377,9 +377,9 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	idl := types.EventIdl{
-		Event: codec.IdlEvent{
+		Event: codecv1.IdlEvent{
 			Name: "myEvent",
-			Fields: []codec.IdlEventField{{
+			Fields: []codecv1.IdlEventField{{
 				Name: "A",
 				Type: idlTypeInt64,
 			}, {
@@ -387,7 +387,7 @@ func TestProcess(t *testing.T) {
 				Type: idlTypeString,
 			}},
 		},
-		Types: []codec.IdlTypeDef{},
+		Types: []codecv1.IdlTypeDef{},
 	}
 
 	filter := types.Filter{

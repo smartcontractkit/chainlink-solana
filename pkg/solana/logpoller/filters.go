@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -209,11 +210,10 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	cEntry, err := codec.NewEventCodecEntry(filter, true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
 	}
-
 	return solcommoncodec.EntryAsModifierRemoteCodec(cEntry, filter.EventName)
 }
 

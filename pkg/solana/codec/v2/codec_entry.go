@@ -1,12 +1,16 @@
 package codecv2
 
 import (
+	"encoding/json"
+	"fmt"
+
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
+	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 // No AccountIDLTypes, NewAccountEntry, NewPDAEntry required as chain_reader (codec based) has moved to chain_accessor (binding based)
@@ -37,6 +41,22 @@ type EventIDLTypes struct {
 	Types anchoridl.IdTypeDef_slice
 }
 
+// accepts contract idl string
+func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
+	var codecIDL anchoridl.Idl
+	if err := json.Unmarshal([]byte(contractIdl), &codecIDL); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal contract IDL for %s, error: %w", offChainName, err)
+	}
+
+	eventIdl, err := ExtractEventIDL(offChainName, codecIDL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract event IDL from codec: %w", err)
+	}
+
+	return NewEventArgsEntry(offChainName, EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}, true, nil, binary.LittleEndian())
+}
+
+// accepts struct containing event definition and types parsed from the contract idl
 func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	_, eventCodec, err := asStruct(createRefs(idlTypes.Types, builder), idlTypes.Event.Name)
 	if err != nil {
