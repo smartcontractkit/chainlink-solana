@@ -36,8 +36,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
@@ -141,7 +141,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 		{Name: "failed to register filter", ReadDef: eventReadDef, RegisterFilterError: fmt.Errorf("failed to register filter"), ExpectError: true},
 	}
 
-	boolType := codec.IdlType{}
+	boolType := codecv1.IdlType{}
 	require.NoError(t, boolType.UnmarshalJSON([]byte("\"bool\"")))
 
 	for _, tt := range testCases {
@@ -149,12 +149,12 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 			cfg := config.ContractReader{
 				Namespaces: map[string]config.ChainContractReader{
 					"myChainReader": {
-						IDL: codec.IDL{
-							Accounts: []codec.IdlTypeDef{{Name: "myAccount",
-								Type: codec.IdlTypeDefTy{
-									Kind:   codec.IdlTypeDefTyKindStruct,
-									Fields: &[]codec.IdlField{}}}},
-							Events: []codec.IdlEvent{{Name: "myEvent", Fields: []codec.IdlEventField{{Name: "a", Type: boolType}}}},
+						IDL: codecv1.IDL{
+							Accounts: []codecv1.IdlTypeDef{{Name: "myAccount",
+								Type: codecv1.IdlTypeDefTy{
+									Kind:   codecv1.IdlTypeDefTyKindStruct,
+									Fields: &[]codecv1.IdlField{}}}},
+							Events: []codecv1.IdlEvent{{Name: "myEvent", Fields: []codecv1.IdlEventField{{Name: "a", Type: boolType}}}},
 						},
 						Reads: map[string]config.ReadDefinition{
 							"myRead": tt.ReadDef},
@@ -411,23 +411,23 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 
 		testCases := []struct {
 			name          string
-			pdaDefinition codec.PDATypeDef
+			pdaDefinition codecv1.PDATypeDef
 			inputModifier codeccommon.ModifiersConfig
 			expected      solana.PublicKey
 			params        map[string]any
 		}{
 			{
 				name: "happy path",
-				pdaDefinition: codec.PDATypeDef{
+				pdaDefinition: codecv1.PDATypeDef{
 					Prefix: prefixBytes,
-					Seeds: []codec.PDASeed{
+					Seeds: []codecv1.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlType{AsString: codec.IdlTypeU64},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64},
 						},
 					},
 				},
@@ -439,16 +439,16 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			},
 			{
 				name: "with modifier and random field",
-				pdaDefinition: codec.PDATypeDef{
+				pdaDefinition: codecv1.PDATypeDef{
 					Prefix: prefixBytes,
-					Seeds: []codec.PDASeed{
+					Seeds: []codecv1.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlType{AsString: codec.IdlTypeU64},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64},
 						},
 					},
 				},
@@ -464,7 +464,7 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			},
 			{
 				name: "only prefix",
-				pdaDefinition: codec.PDATypeDef{
+				pdaDefinition: codecv1.PDATypeDef{
 					Prefix: prefixBytes,
 				},
 				expected: mustFindProgramAddress(t, programID, [][]byte{prefixBytes}),
@@ -472,16 +472,16 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			},
 			{
 				name: "no prefix",
-				pdaDefinition: codec.PDATypeDef{
+				pdaDefinition: codecv1.PDATypeDef{
 					Prefix: nil,
-					Seeds: []codec.PDASeed{
+					Seeds: []codecv1.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
 						},
 						{
 							Name: "Uint64Seed",
-							Type: codec.IdlType{AsString: codec.IdlTypeU64},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64},
 						},
 					},
 				},
@@ -493,12 +493,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 			},
 			{
 				name: "public key seed provided as bytes",
-				pdaDefinition: codec.PDATypeDef{
+				pdaDefinition: codecv1.PDATypeDef{
 					Prefix: prefixBytes,
-					Seeds: []codec.PDASeed{
+					Seeds: []codecv1.PDASeed{
 						{
 							Name: "PubKey",
-							Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+							Type: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
 						},
 					},
 				},
@@ -553,12 +553,12 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 		readDef := config.ReadDefinition{
 			ChainSpecificName: testutils.TestStructWithNestedStruct,
 			ReadType:          config.Account,
-			PDADefinition: codec.PDATypeDef{
+			PDADefinition: codecv1.PDATypeDef{
 				Prefix: prefixBytes,
-				Seeds: []codec.PDASeed{
+				Seeds: []codecv1.PDASeed{
 					{
 						Name: "PubKey",
-						Type: codec.IdlType{AsString: codec.IdlTypePublicKey},
+						Type: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
 					},
 				},
 			},
@@ -592,16 +592,16 @@ func TestSolanaChainReaderService_GetLatestValue(t *testing.T) {
 	})
 }
 
-func newTestIDLAndCodec(t *testing.T) (string, codec.IDL, types.RemoteCodec) {
+func newTestIDLAndCodec(t *testing.T) (string, codecv1.IDL, types.RemoteCodec) {
 	t.Helper()
 
-	var idl codec.IDL
+	var idl codecv1.IDL
 	if err := json.Unmarshal([]byte(testutils.JSONIDLWithAllTypes), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	entry, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+	entry, err := codecv1.NewIDLAccountCodec(idl, binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -1077,7 +1077,7 @@ func (r *chainReaderInterfaceTester) MaxWaitTimeForEvents() time.Duration {
 func makeTestCodec(t *testing.T, rawIDL string) types.RemoteCodec {
 	t.Helper()
 
-	testCodec, err := codec.NewIDLAccountCodec(mustUnmarshalIDL(t, rawIDL), binary.LittleEndian())
+	testCodec, err := codecv1.NewIDLAccountCodec(mustUnmarshalIDL(t, rawIDL), binary.LittleEndian())
 	if err != nil {
 		t.Logf("failed to create new codec from test IDL: %s", err.Error())
 		t.FailNow()
@@ -1259,8 +1259,8 @@ func (s *skipEventsChainReader) QueryKey(_ context.Context, _ types.BoundContrac
 	return nil, nil
 }
 
-func mustUnmarshalIDL(t *testing.T, rawIDL string) codec.IDL {
-	var idl codec.IDL
+func mustUnmarshalIDL(t *testing.T, rawIDL string) codecv1.IDL {
+	var idl codecv1.IDL
 	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()

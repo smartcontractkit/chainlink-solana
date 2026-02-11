@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 )
 
 //go:embed testutils/data_storage.json

@@ -1,4 +1,4 @@
-package codec_test
+package codecv1_test
 
 import (
 	"bytes"
@@ -19,9 +19,9 @@ import (
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	. "github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests" //nolint common practice to import test mods with .
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1/testutils"
 )
 
 const anyExtraValue = 3
@@ -161,7 +161,7 @@ func (it *codecInterfaceTester) GetCodec(t *testing.T) clcommontypes.Codec {
 		codecConfig.Configs["DummyNamespace."+offChainName] = codecEntryCfg
 	}
 
-	c, err := codec.NewCodec(codecConfig)
+	c, err := codecv1.NewCodec(codecConfig)
 	require.NoError(t, err)
 
 	return &compatibleItemTypeCodecWrapper{codec: c}
