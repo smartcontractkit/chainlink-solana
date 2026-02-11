@@ -77,6 +77,28 @@ const (
 	IdlTypeDefTyKindCustom = codecv1.IdlTypeDefTyKindCustom
 )
 
+const (
+	IdlTypeBool          = codecv1.IdlTypeBool
+	IdlTypeU8            = codecv1.IdlTypeU8
+	IdlTypeI8            = codecv1.IdlTypeI8
+	IdlTypeU16           = codecv1.IdlTypeU16
+	IdlTypeI16           = codecv1.IdlTypeI16
+	IdlTypeU32           = codecv1.IdlTypeU32
+	IdlTypeI32           = codecv1.IdlTypeI32
+	IdlTypeU64           = codecv1.IdlTypeU64
+	IdlTypeI64           = codecv1.IdlTypeI64
+	IdlTypeU128          = codecv1.IdlTypeU128
+	IdlTypeI128          = codecv1.IdlTypeI128
+	IdlTypeBytes         = codecv1.IdlTypeBytes
+	IdlTypeString        = codecv1.IdlTypeString
+	IdlTypePublicKey     = codecv1.IdlTypePublicKey
+	IdlTypeUnixTimestamp = codecv1.IdlTypeUnixTimestamp
+	IdlTypeHash          = codecv1.IdlTypeHash
+	IdlTypeDuration      = codecv1.IdlTypeDuration
+)
+
+const DefaultHashBitLength = codecv1.DefaultHashBitLength
+
 var NilIdlTypeDefTy = codecv1.NilIdlTypeDefTy
 
 func NewIdlStringType(asString IdlTypeAsString) IdlType {
