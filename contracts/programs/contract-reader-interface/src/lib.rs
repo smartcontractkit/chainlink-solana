@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use solana_program::pubkey;
+use anchor_lang::solana_program::pubkey;
 use std::mem::size_of;
 
 declare_id!("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE");

@@ -16,7 +16,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.29.0"
+anchor-lang = "0.30.0"
 static_assertions = "1.1.0"
 keystone-forwarder = { version = "0.1.0", path = "../keystone-forwarder", default-features = false, features = ["cpi"] }
 store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }

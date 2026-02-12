@@ -2,10 +2,10 @@ BIN_DIR = bin
 
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export PROJECT_SERUM_VERSION ?=v0.29.0
+export PROJECT_SERUM_VERSION ?=v0.31.0
 export PROJECT_SERUM_IMAGE ?= backpackapp/build:$(PROJECT_SERUM_VERSION)
 
-export ANCHOR_VERSION ?=v0.29.0
+export ANCHOR_VERSION ?=v0.30.0
 TARGET_DIR ?= $(PWD)/contracts/target
 
 LINUX=LINUX

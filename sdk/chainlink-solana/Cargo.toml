@@ -15,7 +15,6 @@ name = "chainlink_solana"
 default = []
 
 [dependencies]
-solana-program = { version = "2.1.10" }
 bytemuck = { version = "1.23.2", features = ["derive"] }
 borsh = { version = "0.10.3" }
 
