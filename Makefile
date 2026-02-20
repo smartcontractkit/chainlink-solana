@@ -70,7 +70,7 @@ build_js:
 	cd gauntlet && yarn install --frozen-lockfile && yarn bundle
 
 build_contracts:
-	docker run --rm -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
+	ANCHOR_BUILD_NO_VENDOR=1 docker run --rm -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
 
 build_contracts_local:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-local.sh
