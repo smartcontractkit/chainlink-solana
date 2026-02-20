@@ -14,9 +14,7 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-# Omit idl-build: IDL build fails with "cannot find value state/don_id/config_version" for
-# Accounts seeds that reference instruction/account fields (Anchor 0.31 + Rust 1.79). Use
-# checked-in idl/keystone_forwarder.json instead (copied to target/idl by anchor-build.sh).
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
@@ -27,5 +25,3 @@ arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 blake3 = "1.8.2"
 # Pin indexmap to 2.11.x; 2.12+ requires rustc 1.82, Solana tools ship 1.79
 indexmap = "2.11"
-# Pin zmij to 1.0.7; 1.0.8+ uses hint::select_unpredictable (Rust 1.88+), not in Solana tools 1.79
-zmij = "1.0.7"

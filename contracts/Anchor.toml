@@ -4,6 +4,8 @@ anchor_version = "0.31.0"
 [features]
 seeds = false
 skip-lint = false
+# Let IDL build succeed for keystone-forwarder (seeds from instruction data).
+resolution = false
 
 [programs.localnet]
 # note: replace underscores "_" with dashes "-" for "anchor test" to use declared program id

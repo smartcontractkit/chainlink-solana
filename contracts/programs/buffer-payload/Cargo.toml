@@ -18,7 +18,4 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
-anchor-spl = "0.31.0"
 bytemuck = "1.7"
-# Unify zeroize: curve25519-dalek wants ^1, solana-zk-sdk (via anchor-spl) wants ^1.7
-zeroize = "1.7"
