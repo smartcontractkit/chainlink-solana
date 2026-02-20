@@ -20,13 +20,3 @@ codegen-units = 1
 
 [profile.test]
 overflow-checks = true
-
-# Pin constant_time_eq to 0.3.x; 0.4.x requires Cargo edition2024 (Rust 1.85+),
-# which is not available in the Anchor build image (Cargo 1.79).
-# Vendored so the build works without git and with older Cargo.
-# zmij uses hint::select_unpredictable (Rust 1.88+); vendored build.rs treats
-# unknown rustc as old so zmij_no_select_unpredictable is set in Docker/CI.
-[patch.crates-io]
-constant_time_eq = { path = "vendor/constant_time_eq" }
-zmij = { path = "vendor/zmij" }
-

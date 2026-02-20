@@ -3094,8 +3094,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.7"
-
-[[patch.unused]]
-name = "constant_time_eq"
-version = "0.4.2"
+version = "1.0.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
