@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 0 * * 1' # check monday at midnight UTC
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   Solana-Update-Checker:
     runs-on: ubuntu-latest

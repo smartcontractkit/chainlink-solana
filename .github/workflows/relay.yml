@@ -6,6 +6,10 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   relay_run_unit_tests:
     name: Relay Run Unit Tests

@@ -5,6 +5,10 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+  actions: read
+
 defaults:
   run:
     working-directory: contracts
@@ -40,7 +44,7 @@ jobs:
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
       - name: Free Disk Space
-        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+        uses: smartcontractkit/.github/actions/free-disk-space@ca71236c9f9e1358597795ef7d433dd3d3df8dfb # free-disk-space/v1
       - uses: actions/checkout@v4
       - name: Cache cargo target dir
         uses: actions/cache@v4
@@ -87,7 +91,7 @@ jobs:
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
       - name: Free Disk Space
-        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+        uses: smartcontractkit/.github/actions/free-disk-space@ca71236c9f9e1358597795ef7d433dd3d3df8dfb # free-disk-space/v1
       - uses: actions/checkout@v4
       - name: Cache cargo target dir
         uses: actions/cache@v4
@@ -131,7 +135,7 @@ jobs:
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
       - name: Free Disk Space
-        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+        uses: smartcontractkit/.github/actions/free-disk-space@ca71236c9f9e1358597795ef7d433dd3d3df8dfb # free-disk-space/v1
       - name: Checkout sources
         uses: actions/checkout@v4
 

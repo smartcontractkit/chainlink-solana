@@ -4,6 +4,9 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+
 jobs:
   nix-packages-test:
     runs-on: ubuntu-latest

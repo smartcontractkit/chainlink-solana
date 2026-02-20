@@ -6,6 +6,10 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   tool_versions:
     name: Get the tool versions
@@ -14,7 +18,7 @@ jobs:
       nodejs_version: ${{ steps.tool-versions.outputs.nodejs_version }}
     steps:
       - uses: actions/checkout@v4
-      - uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
+      - uses: smartcontractkit/tool-versions-to-env-action@aabd5efbaf28005284e846c5cf3a02f2cba2f4c2 # v1.0.8
         id: tool-versions
 
   gauntlet_build:

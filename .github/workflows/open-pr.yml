@@ -10,6 +10,11 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
 jobs:
   create-commits-and-pr:
     permissions:

@@ -13,6 +13,12 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+  id-token: write
+  checks: write
+  pull-requests: write
+
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy

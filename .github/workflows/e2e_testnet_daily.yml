@@ -8,7 +8,7 @@ on:
         default: develop
         type: string
       test_secrets_override_key:
-        description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
+        description: 'Set to "1" or any value to use custom test secrets from E2E_TEST_SECRETS_OVERRIDE (avoids exposing all secrets)'
         required: false
         type: string
       team:
@@ -17,6 +17,13 @@ on:
         type: string
   schedule:
     - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+  checks: write
+  pull-requests: write
+
 # Only run 1 of this workflow at a time per PR
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -150,7 +157,7 @@ jobs:
           test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2Smoke/embedded $(args) ./smoke 2>&1 | tee /tmp/gotest.log
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
+          test_secrets_override_base64: ${{ inputs.test_secrets_override_key != '' && secrets.E2E_TEST_SECRETS_OVERRIDE || '' }}
           download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
           go_mod_path: ./integration-tests/go.mod
           cl_repo: ${{ env.CL_ECR }}

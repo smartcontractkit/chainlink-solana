@@ -3,7 +3,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *' # check every day at midnight UTC
-  
+
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   E2E-Solana-Image:
     uses: ./.github/workflows/open-pr.yml

@@ -6,6 +6,10 @@ on:
       - develop
   pull_request:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   wait_for_workflows:
     name: Wait for workflows
@@ -35,7 +39,7 @@ jobs:
       - name: Check out Code
         uses: actions/checkout@v4
       - name: Parse tool-versions file
-        uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
+        uses: smartcontractkit/tool-versions-to-env-action@aabd5efbaf28005284e846c5cf3a02f2cba2f4c2 # v1.0.8
         id: tool-versions
     outputs:
       go-version: ${{ steps.tool-versions.outputs.golang_version }}
