@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha3"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -29,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -157,6 +159,18 @@ func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName str
 	return nil
 }
 
+func extractEventIDL(eventName string, codecIDL codecv1.IDL) (codecv1.IdlEvent, error) {
+	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
+	if err != nil {
+		return codecv1.IdlEvent{}, err
+	}
+	eventIdl, isOk := idlDef.(codecv1.IdlEvent)
+	if !isOk {
+		return codecv1.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
+	}
+	return eventIdl, nil
+}
+
 // registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
 func (a *SolanaAccessor) registerFilterIfNotExists(
 	ctx context.Context,
@@ -168,13 +182,26 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		Retention: &defaultCCIPLogsRetention,
 	}
 
+	var codecIDL codecv1.IDL
+	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
+		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
+	}
+
+	eventIdl, err := extractEventIDL(eventName, codecIDL)
+	if err != nil {
+		return fmt.Errorf("failed to extract event IDL: %w", err)
+	}
+
+	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
+
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
 	filter := logpollertypes.Filter{
-		Address:         logpollertypes.PublicKey(address),
-		EventName:       eventName,
-		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
-		ContractIdl:     filterConfig.idl,
+		Address:   logpollertypes.PublicKey(address),
+		EventName: eventName,
+		EventSig:  logpollertypes.NewEventSignatureFromName(eventName),
+		EventIdl:  lpEventIDL,
+		// ContractIdl:     filterConfig.idl,
 		SubkeyPaths:     subKeyPaths,
 		StartingBlock:   conf.GetStartingBlock(),
 		Retention:       conf.GetRetention(),
