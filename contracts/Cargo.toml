@@ -2,7 +2,11 @@
 resolver = "2"
 members = [
   "programs/*",
-  "crates/*",
+  "crates/arrayvec",
+  "crates/chainlink-solana-data-feeds-cache",
+  # Exclude crates/chainlink-solana-data-streams: it uses solana-sdk 1.17 which
+  # pulls zeroize <1.4, conflicting with anchor-spl 0.31 (zeroize ^1.7).
+  # Not used by any program; only for off-chain/tests (cfg(not(target_os = "solana"))).
 ]
 
 [profile.dev]
@@ -16,4 +20,13 @@ codegen-units = 1
 
 [profile.test]
 overflow-checks = true
+
+# Pin constant_time_eq to 0.3.x; 0.4.x requires Cargo edition2024 (Rust 1.85+),
+# which is not available in the Anchor build image (Cargo 1.79).
+# Vendored so the build works without git and with older Cargo.
+# zmij uses hint::select_unpredictable (Rust 1.88+); vendored build.rs treats
+# unknown rustc as old so zmij_no_select_unpredictable is set in Docker/CI.
+[patch.crates-io]
+constant_time_eq = { path = "vendor/constant_time_eq" }
+zmij = { path = "vendor/zmij" }
 

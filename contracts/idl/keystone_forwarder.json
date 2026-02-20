@@ -1,12 +1,20 @@
 {
   "version": "0.1.0",
   "name": "keystone_forwarder",
+  "address": "whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz",
+  "metadata": {
+    "name": "keystone_forwarder",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Forwarder authenticates chainlink reports and relays them to designated receiver programs."
+  },
   "docs": [
     "Forwarder authenticates chainlink reports and relays them to designated receiver programs."
   ],
   "instructions": [
     {
       "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
       "docs": [
         "Initializes a new Forwarder instance and stores data in its state account"
       ],
@@ -31,6 +39,7 @@
     },
     {
       "name": "transferOwnership",
+      "discriminator": [32, 215, 22, 144, 238, 243, 169, 0],
       "docs": ["Step 1 of 2-step ownership process: propose a new owner"],
       "accounts": [
         {
@@ -47,12 +56,13 @@
       "args": [
         {
           "name": "proposedOwner",
-          "type": "publicKey"
+          "type": "pubkey"
         }
       ]
     },
     {
       "name": "acceptOwnership",
+      "discriminator": [30, 43, 213, 84, 172, 203, 104, 84],
       "docs": ["Step 2 of 2-step ownership process: accept ownership"],
       "accounts": [
         {
@@ -70,6 +80,7 @@
     },
     {
       "name": "initOraclesConfig",
+      "discriminator": [25, 109, 31, 120, 13, 44, 72, 235],
       "docs": [
         "Initialize oracles config which describes the set of oracles which",
         "are expected to sign a verified forwarder report. Many oracle config accounts",
@@ -123,6 +134,7 @@
     },
     {
       "name": "updateOraclesConfig",
+      "discriminator": [145, 61, 101, 203, 237, 110, 170, 193],
       "docs": [
         "Updates oracles config under circumstances where the designated",
         "signers or configuration parameters change"
@@ -169,6 +181,7 @@
     },
     {
       "name": "closeOraclesConfig",
+      "discriminator": [215, 195, 245, 158, 39, 152, 15, 190],
       "docs": ["Closes oracle config account"],
       "accounts": [
         {
@@ -200,6 +213,7 @@
     },
     {
       "name": "report",
+      "discriminator": [96, 121, 245, 84, 178, 45, 48, 91],
       "docs": [
         "The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report.",
         "After verification it will create a PDA to store the execution state if it does not exist.",
@@ -257,6 +271,7 @@
   "accounts": [
     {
       "name": "OraclesConfig",
+      "discriminator": [153, 175, 230, 85, 235, 101, 107, 140],
       "docs": [
         "Account which represent a set of oracles expected to sign a forwarder report."
       ],
@@ -288,6 +303,7 @@
     },
     {
       "name": "ForwarderState",
+      "discriminator": [211, 150, 18, 11, 12, 158, 235, 175],
       "docs": ["Account which represents a distinct instance of a forwarder."],
       "type": {
         "kind": "struct",
@@ -298,17 +314,18 @@
           },
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "proposedOwner",
-            "type": "publicKey"
+            "type": "pubkey"
           }
         ]
       }
     },
     {
       "name": "ExecutionState",
+      "discriminator": [31, 209, 35, 133, 132, 142, 151, 100],
       "docs": [
         "Account which stores status of a transmission.",
         "This account will never be closed because it provides persistent proof if a transmission was received on-chain."
@@ -318,7 +335,7 @@
         "fields": [
           {
             "name": "transmitter",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "transmissionId",
@@ -409,15 +426,16 @@
   "events": [
     {
       "name": "ReportProcessed",
+      "discriminator": [48, 88, 213, 133, 74, 113, 4, 255],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "receiver",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
@@ -436,10 +454,11 @@
     },
     {
       "name": "ReportInProgress",
+      "discriminator": [195, 155, 152, 235, 61, 149, 182, 1],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
@@ -453,15 +472,16 @@
     },
     {
       "name": "ConfigSet",
+      "discriminator": [15, 104, 59, 16, 236, 241, 8, 6],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "oraclesConfig",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
@@ -492,55 +512,58 @@
     },
     {
       "name": "ForwarderInitialize",
+      "discriminator": [159, 31, 132, 46, 0, 198, 223, 91],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "owner",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         }
       ]
     },
     {
       "name": "OwnershipTransfer",
+      "discriminator": [182, 234, 119, 37, 105, 210, 22, 38],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "currentOwner",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "proposedOwner",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         }
       ]
     },
     {
       "name": "OwnershipAcceptance",
+      "discriminator": [210, 153, 45, 4, 216, 55, 115, 233],
       "fields": [
         {
           "name": "state",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "previousOwner",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         },
         {
           "name": "newOwner",
-          "type": "publicKey",
+          "type": "pubkey",
           "index": false
         }
       ]

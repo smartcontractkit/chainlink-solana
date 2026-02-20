@@ -15,8 +15,9 @@ name = "chainlink_solana_data_feeds_cache"
 default = []
 
 [dependencies]
-anchor-spl = "0.30.0"
-anchor-lang = { version = "0.30.0", features = ["init-if-needed"] }
+anchor-spl = "0.31.0"
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+zeroize = "1.7"
 borsh = "0.9.1"
 borsh-derive = "0.9.1"
 data-feeds-cache = { path = "../../programs/data-feeds-cache", features = ["cpi"] }

@@ -1,3 +1,4 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 
 use access_controller::AccessController;

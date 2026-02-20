@@ -6,12 +6,12 @@ use arrayvec::arrayvec;
 // NOTE: ALL types in this file have to be verified to contain no padding via `cargo rustc -- -Zprint-type-sizes`!
 
 // 19 is what we can achieve with Solana's resource constraints
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path for IDL build.
 pub const MAX_ORACLES: usize = 19;
 // OCR2 is designed for a maximum of 31 oracles, and there are various assumptions made around this value.
 const_assert!(MAX_ORACLES <= 31);
 
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path for IDL build.
 pub const DIGEST_SIZE: usize = 32;
 
 pub const ONCHAIN_CONFIG_VERSION: u8 = 1;

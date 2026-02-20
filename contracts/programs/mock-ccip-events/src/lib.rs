@@ -1,3 +1,4 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 
 declare_id!("CGn5MQX5GK9qKqERhjnADhd6i2LiSF6XUC2ewUHND1Mw");

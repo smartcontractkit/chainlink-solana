@@ -1,3 +1,4 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 use static_assertions::const_assert;
 use std::mem;
@@ -18,7 +19,7 @@ pub enum ErrorCode {
     Full = 2,
 }
 
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path, and IDL doesn't need this for client use.
 pub const MAX_ADDRS: usize = 64;
 
 #[zero_copy]

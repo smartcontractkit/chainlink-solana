@@ -87,7 +87,7 @@ pub fn handler<'info>(
             // avoid double borrow to write discriminator
             {
                 let mut dst = feed_config_account_infos[i].try_borrow_mut_data()?;
-                dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&FeedConfig::discriminator());
+                dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&FeedConfig::DISCRIMINATOR);
             }
 
             AccountLoader::<FeedConfig>::try_from(&feed_config_account_infos[i])?
@@ -170,7 +170,7 @@ pub fn handler<'info>(
                 )?;
 
                 let mut dst = permission_flag_account_info.try_borrow_mut_data()?;
-                dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&WritePermissionFlag::discriminator());
+                dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&WritePermissionFlag::DISCRIMINATOR);
             }
 
             // ensure the flag has expected schema

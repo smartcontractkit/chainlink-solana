@@ -14,7 +14,8 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.30.0", features = ["init-if-needed"] }
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
 bytemuck = "1.7"

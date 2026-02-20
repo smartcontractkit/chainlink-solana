@@ -13,10 +13,12 @@ no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.30.0", features = [] }
-anchor-spl = "0.30.0"
+anchor-lang = { version = "0.31.0", features = [] }
+anchor-spl = "0.31.0"
+zeroize = "1.7"
 static_assertions = "1.1.0"
 access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
 store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }

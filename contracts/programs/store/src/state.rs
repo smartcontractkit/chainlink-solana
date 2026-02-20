@@ -1,7 +1,7 @@
 use crate::{ErrorCode, FEED_VERSION};
 use anchor_lang::prelude::*;
 
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path for IDL build.
 pub const HEADER_SIZE: usize = 192;
 
 #[account(zero_copy)]
