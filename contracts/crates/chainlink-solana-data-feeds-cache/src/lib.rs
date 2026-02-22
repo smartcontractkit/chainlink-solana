@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use data_feeds_cache::state::WorkflowMetadata;
 use anchor_lang::solana_program::account_info::AccountInfo;
+use data_feeds_cache::state::WorkflowMetadata;
 
 /// The data ids passed in must match the ordering of the decimal reports input.
 /// Developer is responsible for deriving the correct PDAs for the report before calling the function
