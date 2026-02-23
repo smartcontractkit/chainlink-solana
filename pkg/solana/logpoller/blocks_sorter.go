@@ -128,7 +128,7 @@ func (p *blocksSorter) readNextReadyBlock() *types.Block {
 func (p *blocksSorter) flushReadyBlocks(ctx context.Context) {
 	for {
 		block := p.readNextReadyBlock()
-		if block == nil {
+		if block == nil || block.Aborted {
 			return
 		}
 

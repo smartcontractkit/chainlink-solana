@@ -137,6 +137,12 @@ func NewGroup(workers int, lggr logger.SugaredLogger) *Group {
 	return g
 }
 
+func (g *Group) WithMaxRetryCount(c uint8) *Group {
+	g.maxRetryCount = c
+
+	return g
+}
+
 var _ services.Service = &Group{}
 
 func (g *Group) start(ctx context.Context) error {
@@ -231,6 +237,9 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 				// retry count starts at 0 so check if it equals max retry count to determine if it has reached the threshold
 				if retry.count >= g.maxRetryCount {
 					g.lggr.Criticalf("job %s exceeded max retry count %d. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, g.maxRetryCount, errors.Join(retry.errs...))
+					if err := retry.Abort(ctx); err != nil {
+						g.lggr.Criticalf("failed to abort retry: %s", err)
+					}
 					// Continue to avoid adding job back to retry map
 					continue
 				}

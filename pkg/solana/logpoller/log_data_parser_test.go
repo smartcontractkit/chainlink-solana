@@ -1,6 +1,9 @@
 package logpoller
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +25,8 @@ func TestLogDataParse_Error(t *testing.T) {
 		"Program cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ failed: custom program error: 0x1773",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 
 	require.Len(t, output, 2)
 
@@ -48,6 +52,38 @@ func TestLogDataParse_Error(t *testing.T) {
 	assert.Equal(t, expected, output[1])
 }
 
+func TestLogDataParse_IncompleteWithoutLogTruncatedMarker(t *testing.T) {
+	t.Parallel()
+
+	// No "Log truncated" line, but the invoke stack is not fully unwound:
+	// - We see a top-level invoke [1]
+	// - We never see "success" or "failed" for that program
+	logs := []string{
+		"Program ComputeBudget111111111111111111111111111111 invoke [1]",
+		"Program ComputeBudget111111111111111111111111111111 success",
+
+		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 invoke [1]",
+		"Program log: Instruction: CreateLog",
+		"Program data: HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 consumed 1477 of 200000 compute units",
+		// missing: "Program ... success" (or failed)
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	// We should have 2 ProgramOutputs (ComputeBudget + J1zQ...)
+	require.Len(t, output, 2)
+
+	// First one is complete
+	require.False(t, output[0].Truncated)
+	require.Equal(t, "ComputeBudget111111111111111111111111111111", output[0].Program)
+
+	// Second one should be treated as truncated/incomplete due to non-zero stack depth at end
+	require.True(t, output[1].Truncated)
+	require.Equal(t, "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4", output[1].Program)
+}
+
 func TestLogDataParse_SuccessBasic(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +98,8 @@ func TestLogDataParse_SuccessBasic(t *testing.T) {
 		"Program SAGE2HAwep459SNq61LHvjxPk4pLPEJLoMETef7f7EE success",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 
 	require.Len(t, output, 2)
 
@@ -165,7 +202,8 @@ func TestLogDataParse_SuccessComplex(t *testing.T) {
 		"Program HQ2UUt18uJqKaQFJhgV9zaTdQxUZjNrsKFgoEDquBkcx success",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 
 	require.Len(t, output, 11)
 
@@ -186,6 +224,208 @@ func TestLogDataParse_SuccessComplex(t *testing.T) {
 	require.Len(t, output[4].Logs, 6)
 }
 
+func TestLogDataParse_InvokeTooShallow(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+		// impossible case, just for testing: invoking with depth 1 (unnested) without original ix succeeding first
+		"Program ComputeBudget111111111111111111111111111111 invoke [1]",
+		"Program ComputeBudget111111111111111111111111111111 success",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+
+	var expectedErr *invokeDepthError
+	require.ErrorAs(t, err, &expectedErr)
+	require.Nil(t, output)
+}
+
+func TestLogDataParse_InvokeTooDeep(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+		// impossible case, just for testing: invoking with depth 3 without any invoke with depth 2
+		"Program ComputeBudget111111111111111111111111111111 invoke [1]",
+		"Program ComputeBudget111111111111111111111111111111 success",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+
+	var expectedErr *invokeDepthError
+	require.ErrorAs(t, err, &expectedErr)
+	require.Nil(t, output)
+}
+
+func TestLogDataParse_SuccessProgramIDs(t *testing.T) {
+	t.Parallel()
+
+	type testcase struct {
+		name string
+		logs []string
+	}
+
+	testcases := []testcase{
+		{
+			name: "MismatchedSuccess",
+			logs: []string{
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+				"Program ComputeBudget111111111111111111111111111111 invoke [2]",
+				// impossible case, just for testing: success program does not match invoked one
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+			},
+		},
+		{
+			name: "UnmatchedSuccess",
+			logs: []string{
+				// impossible case, a program succeeds without being invoked
+				"Program ComputeBudget111111111111111111111111111111 success",
+			},
+		},
+		{
+			name: "OutOfOrderSuccess",
+			logs: []string{
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+				// impossible case, a program succeeds without being invoked
+				"Program ComputeBudget111111111111111111111111111111 success",
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			output, err := ParseProgramLogs(tc.logs)
+
+			var expectedErr *programIDMismatchError
+			require.ErrorAs(t, err, &expectedErr)
+			require.Nil(t, output)
+		})
+	}
+}
+
+func TestLogDataParse_SuccessReturn(t *testing.T) {
+	t.Parallel()
+
+	aLog := "F01Jt3u5czkXAAAAAAAAAOcDAAAAAAAAktzUYhnCGzTkA3rgGjl/oA32R1w3keBaTpfMYn9NvVYPAAAAAAAAABcAAAAAAAAA5wMAAAAAAAB4AwAAAAAAAF9NPMHmx7GsuvJ4huHC9+ne5I/7uwHAU/6nHVD6quLEEAAAAEFBQUFCQkJCQ0NDQ0REREQgAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAVAAAAGB3PEEANAwAAAAAAAAAAAAAAAAAABpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEBAAAAfVthzhsr3oAUS2cJwgUfm23XD5bNQ/bRY2CMJccwNO8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/fwQAAAAAAABk5GUqAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXBILeOgMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+
+	anotherLog := "F01Jt3u5czkVAAAAAAAAAAEAAAAAAAAAYLMTvjqK9A1r+qhK8K5a/oLtYiVDjzEofKppWShLUREPAAAAAAAAABUAAAAAAAAAAQAAAAAAAAABAAAAAAAAAF9NPMHmx7GsuvJ4huHC9+ne5I/7uwHAU/6nHVD6quLEAwAAAAQFBiAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAABUAAAAYHc8QQA0DAAAAAAAAAAAAAAAAAAAGm4hX/quBhPtof2NGGMA12sQ53BrrO1WYoPAAAAAAAQEAAACtYGyUcVUwXssP2A8KanRuQp8PMcAbZ4A0v/xPDoFGeSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAGTkZSoCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABcEgt46AwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+	logsString := fmt.Sprintf(`Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]
+Program log: Instruction: ApproveChecked
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4457 of 600000 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C invoke [1]
+Program log: Instruction: CcipSend
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 invoke [2]
+Program log: Instruction: VerifyNotCursed
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 consumed 6997 of 524999 compute units
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 success
+Program FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi invoke [2]
+Program log: Instruction: GetFee
+Program FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi consumed 46019 of 481343 compute units
+Program return: FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi BpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAHkZSoCAAAAAABcEgt46AwAAAAAAAAAAAABAAAAZAAAAGQAAAAVAAAAGB3PEEANAwAAAAAAAAAAAAAAAAAAQA0DAAAAAAAAAAAAAAAAAAAA
+Program FeeQPGkKDeRV1MgoYfMH6L8o3KeuYjwUZrgn4LRKfjHi success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program log: Instruction: TransferChecked
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 6346 of 431550 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program log: Instruction: TransferChecked
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 6291 of 418794 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V invoke [2]
+Program log: Instruction: LockOrBurnTokens
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 invoke [3]
+Program log: Instruction: VerifyNotCursed
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 consumed 6997 of 366682 compute units
+Program RmnXLft1mSEwDgMKu2okYuHkiazxntFFcZFrrcXxYg7 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [3]
+Program log: Instruction: Burn
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4753 of 357207 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program data: zyX7mu/lDkMyZB6FXWyVFQIAeT7zUhwyy3BjUp8rmSZ0UUd+I8Z6cwEAAAAAAAAA7aXVf7lOOB4ObyqQDzIKJGnrRzl1fsbEObXd22CeZ40=
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V invoke [3]
+Program log: Instruction: ReturnData
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V consumed 1397 of 348485 compute units
+Program return: G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V successAAA==
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V success
+Program data: %s
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V consumed 64646 of 400837 compute units
+Program return: G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ
+Program G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V success
+Program data: %s
+Program Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C consumed 265023 of 595543 compute units
+Program return: Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C YLMTvjqK9A1r+qhK8K5a/oLtYiVDjzEofKppWShLURE=
+Program Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C success
+Program ComputeBudget111111111111111111111111111111 invoke [1]
+Program ComputeBudget111111111111111111111111111111 success`, aLog, anotherLog)
+
+	logs := strings.Split(logsString, "\n")
+	outputs, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{
+		{
+			Program: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+			Logs: []types.ProgramLog{
+				{Prefix: ">", Text: "Instruction: ApproveChecked"},
+			},
+			ComputeUnits: 4457,
+		},
+		{
+			Program: "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+			Logs: []types.ProgramLog{
+				{Prefix: ">", Text: "Instruction: CcipSend"},
+				{Prefix: ">>", Text: "Instruction: VerifyNotCursed"},
+				{Prefix: ">>", Text: "Instruction: GetFee"},
+				{Prefix: ">>", Text: "Instruction: TransferChecked"},
+				{Prefix: ">>", Text: "Instruction: TransferChecked"},
+				{Prefix: ">>", Text: "Instruction: LockOrBurnTokens"},
+				{Prefix: ">>>", Text: "Instruction: VerifyNotCursed"},
+				{Prefix: ">>>", Text: "Instruction: Burn"},
+				{Prefix: ">>>", Text: "Instruction: ReturnData"},
+			},
+			Events: []types.ProgramEvent{
+				{
+					Program: "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
+					Data:    "zyX7mu/lDkMyZB6FXWyVFQIAeT7zUhwyy3BjUp8rmSZ0UUd+I8Z6cwEAAAAAAAAA7aXVf7lOOB4ObyqQDzIKJGnrRzl1fsbEObXd22CeZ40=",
+					BlockData: types.BlockData{
+						TransactionLogIndex: 0,
+					},
+				},
+				{
+					Program: "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
+					Data:    aLog,
+					BlockData: types.BlockData{
+						TransactionLogIndex: 1,
+					},
+				},
+				{
+					Program: "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+					Data:    anotherLog,
+					BlockData: types.BlockData{
+						TransactionLogIndex: 2,
+					},
+				},
+			},
+			ComputeUnits: 265023,
+		},
+		{
+			Program: "ComputeBudget111111111111111111111111111111",
+		},
+	}
+
+	requireExpected(t, expected, outputs)
+}
+
 func TestLogDataParse_Events(t *testing.T) {
 	t.Parallel()
 
@@ -198,7 +438,8 @@ func TestLogDataParse_Events(t *testing.T) {
 		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 success",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 
 	require.Len(t, output, 1)
 	assert.Len(t, output[0].Events, 1)
@@ -237,7 +478,8 @@ func TestLogDataParse_NestedCCIPSend(t *testing.T) {
 		"Program 6LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL success",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 
 	require.Len(t, output, 1)
 	assert.Len(t, output[0].Events, 1)
@@ -395,7 +637,8 @@ func TestLogDataParse_LogTruncated(t *testing.T) {
 		"Program 11111111111111111111111111111111 success",
 	}
 
-	output := ParseProgramLogs(logs)
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
 	require.Len(t, output, 5)
 
 	require.False(t, output[0].Truncated)
@@ -417,4 +660,220 @@ func TestLogDataParse_LogTruncated(t *testing.T) {
 	require.True(t, output[4].Truncated)
 	require.Len(t, output[4].Events, 3)
 	require.Equal(t, "DF1ow4tspfHX9JwWJsAb9epbkA8hmpSEAtxXy1V27QBH", output[4].Program)
+}
+
+// Tests based on https://github.com/solana-foundation/anchor/blob/d9ef37b/ts/packages/anchor/tests/events.spec.ts
+func TestLogDataParse_MultipleInstructions(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"Program 11111111111111111111111111111111 invoke [1]",
+		"Program 11111111111111111111111111111111 success",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 invoke [1]",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 consumed 17867 of 200000 compute units",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{
+		{
+			Program: "11111111111111111111111111111111",
+		},
+		{
+			Program:      "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+			ComputeUnits: 17867,
+		},
+	}
+
+	requireExpected(t, expected, output)
+}
+
+func TestLogDataParse_MultipleTopLevelInstructions(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"Upgraded program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54", // this is ignored, we don't care about upgrades
+		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 invoke [1]",
+		"Program log: Instruction: CreateLog",
+		"Program data: HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA", // base64 encoded; borsh encoded with identifier
+		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 consumed 1477 of 200000 compute units",
+		"Program J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4 success",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 invoke [1]",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 consumed 17867 of 200000 compute units",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{
+		{
+			Program:      "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+			ComputeUnits: 1477,
+			Events: []types.ProgramEvent{
+				{
+					Program: "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4",
+					Data:    "HDQnaQjSWwkNAAAASGVsbG8sIFdvcmxkISoAAAAAAAAA",
+				},
+			},
+			Logs: []types.ProgramLog{{
+				Text:   "Instruction: CreateLog",
+				Prefix: ">",
+			}},
+		},
+		{
+			Program:      "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+			ComputeUnits: 17867,
+		},
+	}
+
+	requireExpected(t, expected, output)
+}
+
+func TestLogDataParse_DifferentStartLog(t *testing.T) {
+	t.Parallel()
+
+	// example program log output from solana explorer
+	logs := []string{
+		"Upgraded program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 invoke [1]",
+		"Program log: Instruction: BuyNft",
+		"Program 11111111111111111111111111111111 invoke [2]",
+		"Program data: UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
+		"Program 11111111111111111111111111111111 success",
+		"Program 11111111111111111111111111111111 invoke [2]",
+		"Program 11111111111111111111111111111111 success",
+		"Program 11111111111111111111111111111111 invoke [2]",
+		"Program 11111111111111111111111111111111 success",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+		"Program log: Instruction: Transfer",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 2549 of 141128 compute units",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+		"Program log: Instruction: CloseAccount",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 1745 of 135127 compute units",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+		"Program data: UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 consumed 73106 of 200000 compute units",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{{
+		Program: "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+		Logs: []types.ProgramLog{
+			{Prefix: ">", Text: "Instruction: BuyNft"},
+			{Prefix: ">>", Text: "Instruction: Transfer"},
+			{Prefix: ">>", Text: "Instruction: CloseAccount"},
+		},
+		Events: []types.ProgramEvent{
+			{
+				Program: "11111111111111111111111111111111",
+				Data:    "UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
+			},
+			{
+				Program: "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+				Data:    "UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
+				BlockData: types.BlockData{
+					TransactionLogIndex: 1,
+				},
+			},
+		},
+		ComputeUnits: 73106,
+	}}
+
+	requireExpected(t, expected, output)
+}
+
+func TestLogDataParse_FindEvent(t *testing.T) {
+	t.Parallel()
+
+	// example program log output from solana explorer
+	logs := []string{
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 invoke [1]",
+		"Program log: Instruction: CancelListing",
+		"Program log: TRANSFERRED SOME TOKENS",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+		"Program log: Instruction: Transfer",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 2549 of 182795 compute units",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+		"Program log: TRANSFERRED SOME TOKENS",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+		"Program log: Instruction: CloseAccount",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 1745 of 176782 compute units",
+		"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+		"Program data: Vtv9xLjCsE60Ati9kl3VVU/5y8DMMeC4LaGdMLkX8WU+G59Wsi3wfky8rnO9otGb56CTRerWx3hB5M/SlRYBdht0fi+crAgFYsJcx2CHszpSWRkXNxYQ6DxQ/JqIvKnLC/8Mln7310A=",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 consumed 31435 of 200000 compute units",
+		"Program J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54 success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{{
+		Program: "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+		Logs: []types.ProgramLog{
+			{Prefix: ">", Text: "Instruction: CancelListing"},
+			{Prefix: ">", Text: "TRANSFERRED SOME TOKENS"},
+			{Prefix: ">>", Text: "Instruction: Transfer"},
+			{Prefix: ">", Text: "TRANSFERRED SOME TOKENS"},
+			{Prefix: ">>", Text: "Instruction: CloseAccount"},
+		},
+		Events: []types.ProgramEvent{{
+			Program: "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+			Data:    "Vtv9xLjCsE60Ati9kl3VVU/5y8DMMeC4LaGdMLkX8WU+G59Wsi3wfky8rnO9otGb56CTRerWx3hB5M/SlRYBdht0fi+crAgFYsJcx2CHszpSWRkXNxYQ6DxQ/JqIvKnLC/8Mln7310A=",
+		}},
+		ComputeUnits: 31435,
+	}}
+
+	requireExpected(t, expected, output)
+}
+
+func TestLogDataParse_ProgramLogSuccess(t *testing.T) {
+	t.Parallel()
+
+	// example program log output from solana explorer
+	logs := []string{
+		"Program fake111111111111111111111111111111111111112 invoke [1]",
+		"Program log: i logged success",
+		"Program log: i logged success",
+		"Program fake111111111111111111111111111111111111112 consumed 1411 of 200000 compute units",
+		"Program fake111111111111111111111111111111111111112 success",
+	}
+
+	output, err := ParseProgramLogs(logs)
+	require.NoError(t, err)
+
+	expected := []types.ProgramOutput{{
+		Program: "fake111111111111111111111111111111111111112",
+		Logs: []types.ProgramLog{
+			{Prefix: ">", Text: "i logged success"},
+			{Prefix: ">", Text: "i logged success"},
+		},
+		ComputeUnits: 1411,
+	}}
+
+	requireExpected(t, expected, output)
+}
+
+func requireExpected(t *testing.T, expected []types.ProgramOutput, output []types.ProgramOutput) {
+	t.Helper()
+	require.Len(t, output, len(expected))
+	for i, o := range output {
+		require.Equal(t, expected[i], o, "mismatch at index %d", i)
+	}
+}
+
+var _ = debugPrintOutput // hack to mark the debug function as used, so the linter doesn't complain
+
+// helper function to print output for debugging, to be used on-demand during development
+func debugPrintOutput(t *testing.T, output []types.ProgramOutput) {
+	t.Helper()
+	j, err := json.MarshalIndent(output, "", "  ")
+	require.NoError(t, err)
+	fmt.Printf("%s\n", j)
 }

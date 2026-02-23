@@ -17,24 +17,29 @@ import (
 
 // getBlockJob is a job that fetches a block with transactions, converts logs into ProgramEvents and writes them into blocks channel
 type getBlockJob struct {
-	slotNumber       uint64
-	stopCh           services.StopRChan
-	client           RPCClient
-	blocks           chan types.Block
-	done             chan struct{}
-	parseProgramLogs func(logs []string) []types.ProgramOutput
-	lggr             logger.SugaredLogger
+	slotNumber        uint64
+	stopCh            services.StopRChan
+	client            RPCClient
+	blocks            chan types.Block
+	done              chan struct{}
+	parseProgramLogs  func(logs []string) ([]types.ProgramOutput, error)
+	cpiEventExtractor *CPIEventExtractor
+	lggr              logger.SugaredLogger
+	metrics           *solLpMetrics
+	aborted           bool
 }
 
-func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64) *getBlockJob {
+func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *getBlockJob {
 	return &getBlockJob{
-		client:           client,
-		blocks:           blocks,
-		slotNumber:       slotNumber,
-		done:             make(chan struct{}),
-		parseProgramLogs: ParseProgramLogs,
-		lggr:             lggr,
-		stopCh:           stopCh,
+		client:            client,
+		blocks:            blocks,
+		slotNumber:        slotNumber,
+		done:              make(chan struct{}),
+		parseProgramLogs:  ParseProgramLogs,
+		cpiEventExtractor: cpiEventExtractor,
+		lggr:              lggr,
+		stopCh:            stopCh,
+		metrics:           metrics,
 	}
 }
 
@@ -44,6 +49,21 @@ func (j *getBlockJob) String() string {
 
 func (j *getBlockJob) Done() <-chan struct{} {
 	return j.done
+}
+
+func (j *getBlockJob) Abort(ctx context.Context) error {
+	j.aborted = true
+	var abort types.Block
+	abort.Aborted = true
+	abort.SlotNumber = j.slotNumber
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case j.blocks <- abort:
+		close(j.done)
+	}
+
+	return nil
 }
 
 func (j *getBlockJob) Run(ctx context.Context) error {
@@ -125,8 +145,19 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		detail.trxSig = tx.Signatures[0] // according to Solana docs first signature is used as ID
 		detail.err = txWithMeta.Meta.Err
 
-		txEvents := j.messagesToEvents(txWithMeta.Meta.LogMessages, detail)
+		txOutcome := txSucceeded
+		if txWithMeta.Meta.Err != nil {
+			txOutcome = txReverted
+		}
+
+		txEvents := j.messagesToEvents(ctx, txWithMeta.Meta.LogMessages, detail, txOutcome)
 		events = append(events, txEvents...)
+
+		// Look for events corresponding to CPI filters
+		if j.cpiEventExtractor != nil && j.cpiEventExtractor.HasCPIFilters() {
+			cpiEvents := j.cpiEventExtractor.ExtractCPIEvents(tx, txWithMeta.Meta, detail, uint(len(txEvents)))
+			events = append(events, cpiEvents...)
+		}
 	}
 
 	j.lggr.Debugw("found events", "count", len(events), "slot", j.slotNumber)
@@ -146,10 +177,16 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	return nil
 }
 
-func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []types.ProgramEvent {
+func (j *getBlockJob) messagesToEvents(ctx context.Context, messages []string, detail eventDetail, txOutcome txOutcome) []types.ProgramEvent {
 	var logIdx uint
 	events := make([]types.ProgramEvent, 0, len(messages))
-	for _, outputs := range j.parseProgramLogs(messages) {
+	outputs, err := j.parseProgramLogs(messages)
+	if err != nil {
+		j.lggr.Errorf("failed to parse program logs at slot %d for tx %s. Skipping tx due to error: %v", detail.slotNumber, detail.trxSig, err)
+		j.metrics.IncrementTxsLogParsingError(ctx, txOutcome)
+		return events
+	}
+	for _, outputs := range outputs {
 		for i, event := range outputs.Events {
 			event.SlotNumber = detail.slotNumber
 			event.BlockHeight = detail.blockHeight
@@ -166,6 +203,7 @@ func (j *getBlockJob) messagesToEvents(messages []string, detail eventDetail) []
 
 		if outputs.Truncated {
 			j.lggr.Warnw("Encountered truncated logs", "program", outputs.Program, "detail", detail)
+			j.metrics.IncrementTruncatedTxs(ctx, txOutcome)
 		}
 
 		events = append(events, outputs.Events...)

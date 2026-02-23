@@ -125,6 +125,10 @@ func NewEventSignatureFromName(eventName string) EventSignature {
 	return EventSignature(solcommoncodec.NewDiscriminatorHashPrefix(eventName, false))
 }
 
+func NewMethodSignatureFromName(methodName string) EventSignature {
+	return EventSignature(solcommoncodec.NewMethodDiscriminatorHashPrefix(methodName))
+}
+
 // Scan implements Scanner for database/sql.
 func (s *EventSignature) Scan(src interface{}) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
@@ -158,7 +162,22 @@ func (e EventIdl) Equal(o EventIdl) bool {
 	return reflect.DeepEqual(e, o)
 }
 
+func (c *ExtraFilterConfig) Scan(src interface{}) error {
+	return scanJSON("ExtraFilterConfig", c, src)
+}
+
+func (c ExtraFilterConfig) Value() (driver.Value, error) {
+	if c.IsEmpty() {
+		return nil, nil
+	}
+	return json.Marshal(c)
+}
+
 func scanJSON(name string, dest, src interface{}) error {
+	if src == nil {
+		return nil
+	}
+
 	var bSrc []byte
 	switch src := src.(type) {
 	case string:

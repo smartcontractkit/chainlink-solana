@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
@@ -73,6 +74,7 @@ func TestAccountContant(t *testing.T) {
 		require.Equal(t, expectedMeta, result)
 	})
 }
+
 func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup resolves valid address with just one address", func(t *testing.T) {
 		expectedAddr := utils.GetRandomPubKey(t)
@@ -622,12 +624,13 @@ func TestLookupTables(t *testing.T) {
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
 					Name: "DerivedTable",
-					Accounts: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{
-						Name:       "InvalidTable",
-						Address:    invalidTable.String(),
-						IsSigner:   true,
-						IsWritable: true,
-					},
+					Accounts: chainwriter.Lookup{
+						AccountConstant: &chainwriter.AccountConstant{
+							Name:       "InvalidTable",
+							Address:    invalidTable.String(),
+							IsSigner:   true,
+							IsWritable: true,
+						},
 					},
 				},
 			},
@@ -724,19 +727,21 @@ func TestLookupTables(t *testing.T) {
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
 					Name: "DerivedTable",
-					Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
-						Name:      "DataAccountPDA",
-						PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
-						Seeds: []chainwriter.Seed{
-							{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}}},
+					Accounts: chainwriter.Lookup{
+						PDALookups: &chainwriter.PDALookups{
+							Name:      "DataAccountPDA",
+							PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+							Seeds: []chainwriter.Seed{
+								{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "seed1", Location: "seed1"}}},
+							},
+							IsSigner:   false,
+							IsWritable: false,
+							InternalField: chainwriter.InternalField{
+								TypeName: "LookupTableDataAccount",
+								Location: "LookupTable",
+								IDL:      testContractIDL,
+							},
 						},
-						IsSigner:   false,
-						IsWritable: false,
-						InternalField: chainwriter.InternalField{
-							TypeName: "LookupTableDataAccount",
-							Location: "LookupTable",
-							IDL:      testContractIDL,
-						}},
 					},
 				},
 			},
@@ -772,19 +777,21 @@ func TestLookupTables(t *testing.T) {
 			DerivedLookupTables: []chainwriter.DerivedLookupTable{
 				{
 					Name: "DerivedTable",
-					Accounts: chainwriter.Lookup{PDALookups: &chainwriter.PDALookups{
-						Name:      "DataAccountPDA",
-						PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
-						Seeds: []chainwriter.Seed{
-							{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "missing_seed", Location: "missing_seed"}}},
+					Accounts: chainwriter.Lookup{
+						PDALookups: &chainwriter.PDALookups{
+							Name:      "DataAccountPDA",
+							PublicKey: chainwriter.Lookup{AccountConstant: &chainwriter.AccountConstant{Name: "WriteTest", Address: programID.String()}},
+							Seeds: []chainwriter.Seed{
+								{Dynamic: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Name: "missing_seed", Location: "missing_seed"}}},
+							},
+							IsSigner:   false,
+							IsWritable: false,
+							InternalField: chainwriter.InternalField{
+								TypeName: "LookupTableDataAccount",
+								Location: "LookupTable",
+								IDL:      testContractIDL,
+							},
 						},
-						IsSigner:   false,
-						IsWritable: false,
-						InternalField: chainwriter.InternalField{
-							TypeName: "LookupTableDataAccount",
-							Location: "LookupTable",
-							IDL:      testContractIDL,
-						}},
 					},
 					Optional: true,
 				},
@@ -1101,7 +1108,7 @@ func InitializeDataAccount(
 	pda, _, err := solana.FindProgramAddress([][]byte{[]byte("lookup")}, programID)
 	require.NoError(t, err)
 
-	discriminator := chainwriter.GetDiscriminator("initializelookuptable")
+	discriminator := solcommoncodec.NewMethodDiscriminatorHashPrefix("initializelookuptable")
 
 	instructionData := append(discriminator[:], lookupTable.Bytes()...)
 

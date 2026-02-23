@@ -549,7 +549,7 @@ func (s *SolanaChainWriterService) EncodePayload(ctx context.Context, args any, 
 		return nil, fmt.Errorf("error encoding transaction payload: %w", err)
 	}
 
-	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	discriminator := solcommoncodec.NewMethodDiscriminatorHashPrefix(methodConfig.ChainSpecificName)
 	encodedPayload = append(discriminator[:], encodedPayload...)
 	return encodedPayload, nil
 }

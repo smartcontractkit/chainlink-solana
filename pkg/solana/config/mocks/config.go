@@ -654,6 +654,51 @@ func (_c *Config_FeeEstimatorMode_Call) RunAndReturn(run func() string) *Config_
 	return _c
 }
 
+// LogPollerCPIEventsEnabled provides a mock function with no fields
+func (_m *Config) LogPollerCPIEventsEnabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerCPIEventsEnabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Config_LogPollerCPIEventsEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerCPIEventsEnabled'
+type Config_LogPollerCPIEventsEnabled_Call struct {
+	*mock.Call
+}
+
+// LogPollerCPIEventsEnabled is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerCPIEventsEnabled() *Config_LogPollerCPIEventsEnabled_Call {
+	return &Config_LogPollerCPIEventsEnabled_Call{Call: _e.mock.On("LogPollerCPIEventsEnabled")}
+}
+
+func (_c *Config_LogPollerCPIEventsEnabled_Call) Run(run func()) *Config_LogPollerCPIEventsEnabled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerCPIEventsEnabled_Call) Return(_a0 bool) *Config_LogPollerCPIEventsEnabled_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerCPIEventsEnabled_Call) RunAndReturn(run func() bool) *Config_LogPollerCPIEventsEnabled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogPollerStartingLookback provides a mock function with no fields
 func (_m *Config) LogPollerStartingLookback() time.Duration {
 	ret := _m.Called()
