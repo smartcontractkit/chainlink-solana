@@ -13,7 +13,7 @@ import (
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
@@ -150,12 +150,12 @@ func GetSolanaChainWriterConfig(offrampProgramAddress string, fromAddress string
 	}
 
 	// validate CCIP Offramp IDL, errors not expected
-	var offrampIDL codecv1.IDL
+	var offrampIDL solanacodec.IDL
 	if err = json.Unmarshal([]byte(ccipOfframpIDL), &offrampIDL); err != nil {
 		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Offramp IDL, error: %w", err)
 	}
 	// validate CCIP Router IDL, errors not expected
-	var routerIDL codecv1.IDL
+	var routerIDL solanacodec.IDL
 	if err = json.Unmarshal([]byte(ccipRouterIDL), &routerIDL); err != nil {
 		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Router IDL, error: %w", err)
 	}

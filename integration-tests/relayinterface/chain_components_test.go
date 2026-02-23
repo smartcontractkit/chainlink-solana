@@ -48,7 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
@@ -1344,7 +1344,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	uint64ReadDef := config.ReadDefinition{
 		ChainSpecificName: "DataAccount",
 		ReadType:          config.Account,
-		PDADefinition: codecv1.PDATypeDef{
+		PDADefinition: codec.PDATypeDef{
 			Prefix: pdaDataPrefix,
 		},
 		OutputModifications: commoncodec.ModifiersConfig{
@@ -1361,7 +1361,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	readWithAddressHardCodedIntoResponseDef := config.ReadDefinition{
 		ChainSpecificName: "MultiRead1",
 		ReadType:          config.Account,
-		PDADefinition: codecv1.PDATypeDef{
+		PDADefinition: codec.PDATypeDef{
 			Prefix: []byte("multi_read1"),
 		},
 		ResponseAddressHardCoder: &commoncodec.HardCodeModifierConfig{
@@ -1383,21 +1383,21 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 	multiReadDef.MultiReader = &config.MultiReader{
 		Reads: []config.ReadDefinition{{
 			ChainSpecificName: "MultiRead2",
-			PDADefinition:     codecv1.PDATypeDef{Prefix: []byte("multi_read2")},
+			PDADefinition:     codec.PDATypeDef{Prefix: []byte("multi_read2")},
 			ReadType:          config.Account,
 		}},
 	}
 
 	idl := mustUnmarshalIDL(t, string(it.Helper.GetPrimaryIDL(t)))
-	idl.Accounts = append(idl.Accounts, codecv1.IdlTypeDef{
+	idl.Accounts = append(idl.Accounts, codec.IdlTypeDef{
 		Name: "USDPerToken",
-		Type: codecv1.IdlTypeDefTy{
-			Kind: codecv1.IdlTypeDefTyKindStruct,
-			Fields: &codecv1.IdlTypeDefStruct{
+		Type: codec.IdlTypeDefTy{
+			Kind: codec.IdlTypeDefTyKindStruct,
+			Fields: &codec.IdlTypeDefStruct{
 				{
 					Name: "tokenPrices",
-					Type: codecv1.IdlType{
-						AsIdlTypeVec: &codecv1.IdlTypeVec{Vec: codecv1.IdlType{AsIdlTypeDefined: &codecv1.IdlTypeDefined{Defined: "TimestampedPackedU224"}}},
+					Type: codec.IdlType{
+						AsIdlTypeVec: &codec.IdlTypeVec{Vec: codec.IdlType{AsIdlTypeDefined: &codec.IdlTypeDefined{Defined: "TimestampedPackedU224"}}},
 					},
 				},
 			},
@@ -1412,7 +1412,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					ReadUninitializedPDA: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("AAAAAAAAAA"),
 						},
 					},
@@ -1420,14 +1420,14 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					GetTokenPrices: {
 						ChainSpecificName: "USDPerToken",
 						ReadType:          config.Account,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("fee_billing_token_config"),
-							Seeds: []codecv1.PDASeed{
+							Seeds: []codec.PDASeed{
 								{
 									Name: "Tokens",
-									Type: codecv1.IdlType{
-										AsIdlTypeVec: &codecv1.IdlTypeVec{
-											Vec: codecv1.IdlType{AsString: codecv1.IdlTypePublicKey},
+									Type: codec.IdlType{
+										AsIdlTypeVec: &codec.IdlTypeVec{
+											Vec: codec.IdlType{AsString: codec.IdlTypePublicKey},
 										},
 									},
 								},
@@ -1440,9 +1440,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MultiRead: multiReadDef,
 					MultiReadWithParamsReuse: {
 						ChainSpecificName: "MultiRead3",
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: []byte("multi_read_with_params3"),
-							Seeds:  []codecv1.PDASeed{{Name: "ID", Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64}}},
+							Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
 							&commoncodec.HardCodeModifierConfig{
@@ -1454,9 +1454,9 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 							Reads: []config.ReadDefinition{
 								{
 									ChainSpecificName: "MultiRead4",
-									PDADefinition: codecv1.PDATypeDef{
+									PDADefinition: codec.PDATypeDef{
 										Prefix: []byte("multi_read_with_params4"),
-										Seeds:  []codecv1.PDASeed{{Name: "ID", Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64}}},
+										Seeds:  []codec.PDASeed{{Name: "ID", Type: codec.IdlType{AsString: codec.IdlTypeU64}}},
 									},
 									ReadType: config.Account,
 								},
@@ -1467,7 +1467,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodReturningUint64Slice: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1477,7 +1477,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodSettingUint64: {
 						ChainSpecificName: "DataAccount",
 						ReadType:          config.Account,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1487,7 +1487,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 					MethodReturningSeenStruct: {
 						ChainSpecificName: "TestStruct",
 						ReadType:          config.Account,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1505,12 +1505,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ChainSpecificName:       "TestStruct",
 						ReadType:                config.Account,
 						ErrOnMissingAccountData: true,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
-							Seeds: []codecv1.PDASeed{
+							Seeds: []codec.PDASeed{
 								{
 									Name: "I", // this is read from params passed in while reading the account, its analogous to ListIdx which is used while writing to chain
-									Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64},
+									Type: codec.IdlType{AsString: codec.IdlTypeU64},
 								},
 							},
 						},
@@ -1559,7 +1559,7 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 				Reads: map[string]config.ReadDefinition{
 					MethodReturningUint64: {
 						ChainSpecificName: "Data",
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaDataPrefix,
 						},
 						OutputModifications: commoncodec.ModifiersConfig{
@@ -1570,12 +1570,12 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractReaderConfig(t T
 						ChainSpecificName:       "TestStruct",
 						ReadType:                config.Account,
 						ErrOnMissingAccountData: true,
-						PDADefinition: codecv1.PDATypeDef{
+						PDADefinition: codec.PDATypeDef{
 							Prefix: pdaStructDataPrefix,
-							Seeds: []codecv1.PDASeed{
+							Seeds: []codec.PDASeed{
 								{
 									Name: "I",
-									Type: codecv1.IdlType{AsString: codecv1.IdlTypeU64},
+									Type: codec.IdlType{AsString: codec.IdlTypeU64},
 								},
 							},
 						},
@@ -2107,8 +2107,8 @@ func (it *SolanaChainComponentsInterfaceTester[T]) buildContractWriterConfig(t T
 	}
 }
 
-func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codecv1.IDL {
-	var idl codecv1.IDL
+func mustUnmarshalIDL[T WrappedTestingT[T]](t T, rawIDL string) codec.IDL {
+	var idl codec.IDL
 	if err := json.Unmarshal([]byte(rawIDL), &idl); err != nil {
 		t.Errorf("failed to unmarshal test IDL", err)
 		t.FailNow()

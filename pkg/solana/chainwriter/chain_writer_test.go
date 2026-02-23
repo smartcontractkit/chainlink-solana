@@ -30,9 +30,9 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
-	codecv1testutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1/testutils"
-	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
+	solcodecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecTestUtils "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	solcodecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
 	feemocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees/mocks"
 	txmMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -1338,9 +1338,6 @@ func TestChainWriter_GetFeeComponents(t *testing.T) {
 }
 
 // Tests that the two versioned IDLs for the same method args encode to the same bytes
-// 1. Create two codecs from two chain writer configs representing the same contract but with different IDL versions
-// 2. Encode the same data with each codec
-// 3. Verify that the encoded bytes are the same
 func TestChainWriter_ParsePrograms(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -1358,22 +1355,17 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 		Programs: map[string]chainwriter.ProgramConfig{
 			"testIDLv1": {
 				IDL: "",
-				Methods: map[string]chainwriter.MethodConfig{
-					"TestItemArray1Type": {
-						ChainSpecificName: "TestItemArray1Type",
-					},
-				},
 			},
 		},
 	}
 
 	_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidConfig)
-	require.ErrorContains(t, err, "failed to parse programs: failed to parse config for chainwriter program testIDLv1, method TestItemArray1Type")
+	require.ErrorContains(t, err, "failed to unmarshal IDL for program testIDLv1 (tried both codecv2 and codec), error:")
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{
 			"testIDLv1": {
-				IDL: codecv1.FetchChainWriterTestIDL(),
+				IDL: solcodecv1.FetchChainWriterTestIDL(),
 				Methods: map[string]chainwriter.MethodConfig{
 					"TestItemArray1Type": {
 						ChainSpecificName: "TestItemArray1Type",
@@ -1381,7 +1373,7 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 				},
 			},
 			"testIDLv2": {
-				IDL: codecv2.FetchChainWriterTestIDL(),
+				IDL: solcodecv2.FetchChainWriterTestIDL(),
 				Methods: map[string]chainwriter.MethodConfig{
 					"TestItemArray1Type": {
 						ChainSpecificName: "test_item_array1_type",
@@ -1396,16 +1388,16 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test v1 encoding - use codecTestUtils.TestItemAsArgs which has PascalCase field names
-	testArrayV1 := [1]codecv1testutils.TestItemAsArgs{{
+	testArrayV1 := [1]codecTestUtils.TestItemAsArgs{{
 		Field:               1,
 		OracleID:            2,
 		OracleIDs:           [32]uint8{3},
-		AccountStruct:       codecv1testutils.AccountStruct{},
+		AccountStruct:       codecTestUtils.AccountStruct{},
 		Accounts:            []solana.PublicKey{},
 		DifferentField:      "test",
 		BigField:            ag_binary.Int128{Lo: 5},
-		NestedDynamicStruct: codecv1testutils.NestedDynamic{FixedBytes: [2]uint8{6, 7}, Inner: codecv1testutils.InnerDynamic{IntVal: 8, S: "inner"}},
-		NestedStaticStruct:  codecv1testutils.NestedStatic{FixedBytes: [2]uint8{9, 10}, Inner: codecv1testutils.InnerStatic{IntVal: 11}},
+		NestedDynamicStruct: codecTestUtils.NestedDynamic{FixedBytes: [2]uint8{6, 7}, Inner: codecTestUtils.InnerDynamic{IntVal: 8, S: "inner"}},
+		NestedStaticStruct:  codecTestUtils.NestedStatic{FixedBytes: [2]uint8{9, 10}, Inner: codecTestUtils.InnerStatic{IntVal: 11}},
 	}}
 
 	encodedPayloadv1, err := cw.EncodePayload(ctx, testArrayV1, chainwriter.MethodConfig{

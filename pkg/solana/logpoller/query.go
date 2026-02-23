@@ -92,11 +92,6 @@ func (q *queryArgs) withEventIDL(eventIdl types.EventIdl) *queryArgs {
 	return q.withField("event_idl", eventIdl)
 }
 
-// withContractIDL sets the ContractIDL field in queryArgs.
-func (q *queryArgs) withContractIDL(contractIdl string) *queryArgs {
-	return q.withField("contract_idl", contractIdl)
-}
-
 // withSubKeyPaths sets the SubKeyPaths field in queryArgs.
 func (q *queryArgs) withSubKeyPaths(subKeyPaths [][]string) *queryArgs {
 	return q.withField("subkey_paths", subKeyPaths)

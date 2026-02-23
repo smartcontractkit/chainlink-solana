@@ -10,8 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 var (
@@ -285,19 +285,19 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error fetching account info for PDA account: %s, error: %w", accountMeta.PublicKey.String(), err))
 		}
 
-		var idlCodec codecv1.IDL
+		var idlCodec codec.IDL
 		if err = json.Unmarshal([]byte(pda.InternalField.IDL), &idlCodec); err != nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("failed to unmarshal IDL: %w", err))
 		}
 
 		internalType := pda.InternalField.TypeName
 
-		idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, internalType, idlCodec)
+		idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, internalType, idlCodec)
 		if err != nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error finding definition for type %s: %w", internalType, err))
 		}
 
-		input, err := codecv1.CreateCodecEntry(idlDef, internalType, idlCodec, nil)
+		input, err := codec.CreateCodecEntry(idlDef, internalType, idlCodec, nil)
 		if err != nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("failed to create codec entry for type %s, error: %w", internalType, err))
 		}

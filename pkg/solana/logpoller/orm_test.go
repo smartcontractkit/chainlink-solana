@@ -16,8 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
-	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -40,35 +39,14 @@ func TestLogPollerFilters(t *testing.T) {
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: types.EventIdl{
-					Event: codecv1.IdlEvent{
+					Event: codec.IdlEvent{
 						Name:   "MyEvent",
-						Fields: []codecv1.IdlEventField{{Name: "MyField", Type: codecv1.NewIdlStringType(codecv1.IdlTypeDuration), Index: true}},
+						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
 					},
-					Types: codecv1.IdlTypeDefSlice{
-						{Name: "NilType", Type: codecv1.IdlTypeDefTy{Kind: codecv1.IdlTypeDefTyKindStruct, Fields: &codecv1.IdlTypeDefStruct{}}},
+					Types: codec.IdlTypeDefSlice{
+						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
 					},
 				},
-				ContractIdl: codecv1.FetchLogpollerTypeTestIDL(),
-				Retention:   1000,
-				MaxLogsKept: 3,
-			},
-			{
-				Name:          "happy path",
-				Address:       types.PublicKey(pubKey),
-				EventName:     "event",
-				EventSig:      types.EventSignature{1, 2, 3},
-				StartingBlock: 1,
-				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
-				EventIdl: types.EventIdl{
-					Event: codecv1.IdlEvent{
-						Name:   "MyEvent",
-						Fields: []codecv1.IdlEventField{{Name: "MyField", Type: codecv1.NewIdlStringType(codecv1.IdlTypeDuration), Index: true}},
-					},
-					Types: codecv1.IdlTypeDefSlice{
-						{Name: "NilType", Type: codecv1.IdlTypeDefTy{Kind: codecv1.IdlTypeDefTyKindStruct, Fields: &codecv1.IdlTypeDefStruct{}}},
-					},
-				},
-				ContractIdl: codecv2.FetchLogpollerTypeTestIDL(),
 				Retention:   1000,
 				MaxLogsKept: 3,
 			},

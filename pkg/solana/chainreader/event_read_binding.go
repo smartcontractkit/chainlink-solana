@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -202,8 +202,8 @@ func (b *eventReadBinding) GetReadDefinition() config.ReadDefinition {
 	return b.readDefinition
 }
 
-func (b *eventReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
-	return codecv1.IDL{}, codecv1.IdlTypeDef{}, codecv1.IdlTypeDef{}
+func (b *eventReadBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef) {
+	return codec.IDL{}, codec.IdlTypeDef{}, codec.IdlTypeDef{}
 }
 
 func (b *eventReadBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig {

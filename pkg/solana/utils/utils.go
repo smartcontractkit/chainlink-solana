@@ -8,7 +8,7 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/internal"
 )
 

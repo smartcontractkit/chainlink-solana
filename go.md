@@ -230,6 +230,7 @@ flowchart LR
 	chainlink-solana/contracts --> chainlink-deployments-framework
 	chainlink-solana/contracts --> chainlink-solana
 	click chainlink-solana/contracts href "https://github.com/smartcontractkit/chainlink-solana"
+	chainlink-solana/integration-tests --> chainlink-solana/contracts
 	chainlink-solana/integration-tests --> chainlink/integration-tests
 	click chainlink-solana/integration-tests href "https://github.com/smartcontractkit/chainlink-solana"
 	chainlink-sui --> chainlink-aptos
@@ -266,7 +267,7 @@ flowchart LR
 	click chainlink-tron/relayer href "https://github.com/smartcontractkit/chainlink-tron"
 	chainlink/deployment --> ccip-contract-examples/chains/evm
 	chainlink/deployment --> chainlink-ccip/deployment
-	chainlink/deployment --> chainlink-solana/contracts
+	chainlink/deployment --> chainlink-deployments-framework
 	chainlink/deployment --> chainlink-sui/deployment
 	chainlink/deployment --> chainlink-testing-framework/lib
 	chainlink/deployment --> chainlink-ton/deployment

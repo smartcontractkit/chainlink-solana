@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestSolanaAddressModifier(t *testing.T) {

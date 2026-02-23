@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -25,18 +25,18 @@ type accountReadBinding struct {
 	prefix                   []byte // only used for PDA public key calculation
 	responseAddressHardCoder *commoncodec.HardCodeModifierConfig
 	readDefinition           config.ReadDefinition
-	idl                      codecv1.IDL
+	idl                      codec.IDL
 	inputIDLType             interface{}
-	outputIDLTypeDef         codecv1.IdlTypeDef
+	outputIDLTypeDef         codec.IdlTypeDef
 }
 
 func newAccountReadBinding(
 	namespace, genericName string,
 	isPda bool,
 	pdaPrefix []byte,
-	idl codecv1.IDL,
+	idl codec.IDL,
 	inputIDLType interface{},
-	outputIDLTypeDef codecv1.IdlTypeDef,
+	outputIDLTypeDef codec.IdlTypeDef,
 	readDefinition config.ReadDefinition,
 ) *accountReadBinding {
 	rb := &accountReadBinding{
@@ -110,7 +110,7 @@ func (b *accountReadBinding) GetReadDefinition() config.ReadDefinition {
 	return b.readDefinition
 }
 
-func (b *accountReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
+func (b *accountReadBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef) {
 	return b.idl, b.inputIDLType, b.outputIDLTypeDef
 }
 

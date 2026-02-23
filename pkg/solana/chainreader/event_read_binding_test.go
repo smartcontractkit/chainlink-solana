@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader/mocks"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -248,14 +248,15 @@ func newTestCodec(t *testing.T) *solcommoncodec.ParsedTypes {
 
 	rawIDL := fmt.Sprintf(basicEventIDL, testParamType)
 
-	var IDL codecv1.IDL
+	var IDL codec.IDL
 	require.NoError(t, json.Unmarshal([]byte(rawIDL), &IDL))
 
-	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
 
 	require.NoError(t, err)
 
-	entry, err := codecv1.CreateCodecEntry(idlDef, "GenericName", IDL, commoncodec.NewPathTraverseRenamer(map[string]string{"W": "A", "X": "B", "Y": "C", "Z": "D"}, true))
+	entry, err := codec.CreateCodecEntry(idlDef, "GenericName", IDL, commoncodec.NewPathTraverseRenamer(map[string]string{"W": "A", "X": "B", "Y": "C", "Z": "D"}, true))
+
 	require.NoError(t, err)
 
 	return &solcommoncodec.ParsedTypes{

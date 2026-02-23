@@ -2,10 +2,12 @@ package chainwriter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 
+	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	"github.com/gagliardetto/solana-go"
 	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -16,8 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	codec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	solcodecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcodecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -98,21 +101,71 @@ func NewSolanaChainWriterService(logger logger.Logger, client client.MultiClient
 
 func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error {
 	for program, programConfig := range config.Programs {
-		for method, methodConfig := range programConfig.Methods {
-			utils.InjectAddressModifier(methodConfig.InputModifications, nil)
-			inputMod, err := methodConfig.InputModifications.ToModifier(solcommoncodec.DecoderHooks...)
-			if err != nil {
-				return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
+		// Try to unmarshal as codecv2 IDL first
+		var codecv2IDL anchoridl.Idl
+		if err := json.Unmarshal([]byte(programConfig.IDL), &codecv2IDL); err == nil {
+			// Successfully unmarshaled as codecv2 IDL
+			if err := s.parseProgramCodecv2(program, programConfig, codecv2IDL); err != nil {
+				return err
 			}
-			methodName := methodConfig.ChainSpecificName
-			input, err := codec.NewCreateCodecEntry(solcommoncodec.ChainConfigTypeInstructionDef, inputMod, methodName, methodName, programConfig.IDL)
-			if err != nil {
-				return fmt.Errorf("failed to parse config for chainwriter program %s, method %s, error: %w", program, method, err)
+		} else {
+			// Fall back to codec IDL
+			var codecIDL solcodecv1.IDL
+			if err := json.Unmarshal([]byte(programConfig.IDL), &codecIDL); err != nil {
+				return fmt.Errorf("failed to unmarshal IDL for program %s (tried both codecv2 and codec), error: %w", program, err)
 			}
-			s.parsed.EncoderDefs[solcommoncodec.WrapItemType(true, program, method)] = input
+			if err := s.parseProgramCodec(program, programConfig, codecIDL); err != nil {
+				return err
+			}
 		}
 	}
 
+	return nil
+}
+
+func (s *SolanaChainWriterService) parseProgramCodec(program string, programConfig ProgramConfig, idl solcodecv1.IDL) error {
+	for method, methodConfig := range programConfig.Methods {
+		utils.InjectAddressModifier(methodConfig.InputModifications, nil)
+		idlDef, err := solcodecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
+		if err != nil {
+			return err
+		}
+
+		inputMod, err := methodConfig.InputModifications.ToModifier(solcommoncodec.DecoderHooks...)
+		if err != nil {
+			return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
+		}
+
+		input, err := solcodecv1.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
+		if err != nil {
+			return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
+		}
+
+		s.parsed.EncoderDefs[solcommoncodec.WrapItemType(true, program, method)] = input
+	}
+	return nil
+}
+
+func (s *SolanaChainWriterService) parseProgramCodecv2(program string, programConfig ProgramConfig, idl anchoridl.Idl) error {
+	for method, methodConfig := range programConfig.Methods {
+		utils.InjectAddressModifier(methodConfig.InputModifications, nil)
+		idlDef, err := solcodecv2.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
+		if err != nil {
+			return err
+		}
+
+		inputMod, err := methodConfig.InputModifications.ToModifier(solcommoncodec.DecoderHooks...)
+		if err != nil {
+			return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
+		}
+
+		input, err := solcodecv2.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
+		if err != nil {
+			return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
+		}
+
+		s.parsed.EncoderDefs[solcommoncodec.WrapItemType(true, program, method)] = input
+	}
 	return nil
 }
 
