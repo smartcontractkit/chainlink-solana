@@ -279,8 +279,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 
 	chainCfg := solcfg.Chain{
 		// Increase timeout for TransactionSender
-		TxTimeout:                 config.MustNewDuration(2 * time.Minute),
-		LogPollerCPIEventsEnabled: ptr.Ptr(false),
+		TxTimeout: config.MustNewDuration(2 * time.Minute),
 	}
 
 	solConfig := solcfg.TOMLConfig{
