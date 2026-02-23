@@ -101,11 +101,6 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
-	// CPI events require LOOPP mode to be enabled - TODO: remove once LOOPP FF is removed (NONEVM-3044)
-	if cfg.LogPollerCPIEventsEnabled() && !opts.LOOPPEnabled {
-		return nil, errors.New("LogPollerCPIEventsEnabled=true requires LOOPP mode")
-	}
-
 	chainID := *cfg.ChainID
 	switch chainID {
 	case "devnet":
