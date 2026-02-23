@@ -8,6 +8,8 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -17,11 +19,40 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
+type outcomeDependantTestMetric struct {
+	succeeded float64
+	reverted  float64
+}
+type solLpPromTest struct {
+	id                 string
+	txsTruncated       outcomeDependantTestMetric
+	txsLogParsingError outcomeDependantTestMetric
+}
+
+func (p solLpPromTest) assertEqual(t *testing.T) {
+	assert.InDelta(t, p.txsTruncated.succeeded, testutil.ToFloat64(promSolLp.txsTruncated.succeeded.WithLabelValues(p.id)), 0.0001, "mismatch: truncated succeeded")
+	assert.InDelta(t, p.txsTruncated.reverted, testutil.ToFloat64(promSolLp.txsTruncated.reverted.WithLabelValues(p.id)), 0.0001, "mismatch: truncated reverted")
+	assert.InDelta(t, p.txsLogParsingError.succeeded, testutil.ToFloat64(promSolLp.txsLogParsingError.succeeded.WithLabelValues(p.id)), 0.0001, "mismatch: log parsing error succeeded")
+	assert.InDelta(t, p.txsLogParsingError.reverted, testutil.ToFloat64(promSolLp.txsLogParsingError.reverted.WithLabelValues(p.id)), 0.0001, "mismatch: log parsing error reverted")
+}
+
+// resetPromMetricsForLabel clears the prometheus counters for the given label
+// to avoid counter accumulation across test runs when using -race or -count flags
+func resetPromMetricsForLabel(label string) {
+	promSolLp.txsTruncated.succeeded.DeleteLabelValues(label)
+	promSolLp.txsTruncated.reverted.DeleteLabelValues(label)
+	promSolLp.txsLogParsingError.succeeded.DeleteLabelValues(label)
+	promSolLp.txsLogParsingError.reverted.DeleteLabelValues(label)
+}
+
 func TestGetBlockJob(t *testing.T) {
 	const slotNumber = uint64(42)
+
 	t.Run("String contains slot number", func(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
-		job := newGetBlockJob(nil, nil, nil, lggr, slotNumber)
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, nil, nil, lggr, slotNumber, metrics, nil)
 		require.Equal(t, "getBlock for slotNumber: 42", job.String())
 	})
 	t.Run("Error if fails to get block", func(t *testing.T) {
@@ -30,8 +61,10 @@ func TestGetBlockJob(t *testing.T) {
 		expectedError := errors.New("rpc failed")
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(0, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
 	t.Run("Success if fails to get block because of pruning", func(t *testing.T) {
@@ -40,8 +73,10 @@ func TestGetBlockJob(t *testing.T) {
 		expectedError := errors.New("rpc failed")
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(nil, expectedError).Once()
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(slotNumber+1, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
 		require.Equal(t, types.Block{
@@ -60,8 +95,10 @@ func TestGetBlockJob(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
 		block := rpc.GetBlockResult{}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block number")
 	})
 	t.Run("Error if block time is not present", func(t *testing.T) {
@@ -70,8 +107,10 @@ func TestGetBlockJob(t *testing.T) {
 
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10))}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block time")
 	})
 	t.Run("Error if transaction field is not present", func(t *testing.T) {
@@ -79,8 +118,10 @@ func TestGetBlockJob(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: nil}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42: missing transaction field")
 	})
 	t.Run("Error if fails to get transaction", func(t *testing.T) {
@@ -88,8 +129,10 @@ func TestGetBlockJob(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes([]byte("{"))}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
-		err := job.Run(t.Context())
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42")
 	})
 	t.Run("Error if Tx has no signatures", func(t *testing.T) {
@@ -100,7 +143,9 @@ func TestGetBlockJob(t *testing.T) {
 		require.NoError(t, err)
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes(txB)}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected all transactions to have at least one signature 0 in slot 42")
 	})
@@ -112,7 +157,9 @@ func TestGetBlockJob(t *testing.T) {
 		require.NoError(t, err)
 		block := rpc.GetBlockResult{BlockHeight: ptr(uint64(10)), BlockTime: ptr(solana.UnixTimeSeconds(10)), Transactions: []rpc.TransactionWithMeta{{Transaction: rpc.DataBytesOrJSONFromBytes(txB)}}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber)
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected transaction to have meta. signature: 2AnZxg8HN2sGa7GC7iWGDgpXbEasqXQNEumCjvHUFDcBnfRKAdaN3SvKLhbQwheN15xDkL5D5mdX21A5gH1MdYB; slot: 42; idx: 0")
 	})
@@ -128,7 +175,9 @@ func TestGetBlockJob(t *testing.T) {
 			cancel()
 			return &block, nil
 		}).Once()
-		job := newGetBlockJob(ctx.Done(), client, make(chan types.Block), lggr, slotNumber)
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(ctx.Done(), client, make(chan types.Block), lggr, slotNumber, metrics, nil)
 		err = job.Run(ctx)
 		require.ErrorIs(t, err, context.Canceled)
 		select {
@@ -138,6 +187,7 @@ func TestGetBlockJob(t *testing.T) {
 		}
 	})
 	t.Run("Happy path", func(t *testing.T) {
+		resetPromMetricsForLabel(t.Name()) // Reset counters to avoid accumulation across test runs
 		client := mocks.NewRPCClient(t)
 		lggr := logger.Sugared(logger.Test(t))
 		tx1Signature := solana.Signature{4, 5, 6}
@@ -151,22 +201,28 @@ func TestGetBlockJob(t *testing.T) {
 		txWithMeta1 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx1Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log1", "log2"}}}
 		txWithMeta2 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx2Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log3"}}}
 		// tx3 must be ignored due to error
-		txWithMeta3 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(solana.Signature{10, 11}), Meta: &rpc.TransactionMeta{LogMessages: []string{"log4"}, Err: fmt.Errorf("some error")}}
+		txWithMeta3 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(solana.Signature{10, 11}), Meta: &rpc.TransactionMeta{LogMessages: []string{"log4", "Log truncated"}, Err: errors.New("some error")}}
 		height := uint64(41)
 		blockTime := solana.UnixTimeSeconds(128)
 		block := rpc.GetBlockResult{BlockHeight: &height, BlockTime: ptr(blockTime), Blockhash: solana.Hash{1, 2, 3}, Transactions: []rpc.TransactionWithMeta{txWithMeta1, txWithMeta2, txWithMeta3}}
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
-		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber)
-		job.parseProgramLogs = func(logs []string) []types.ProgramOutput {
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		job.parseProgramLogs = func(logs []string) ([]types.ProgramOutput, error) {
 			result := types.ProgramOutput{
 				Program: "myProgram",
 			}
 			for _, l := range logs {
+				if l == "Log truncated" {
+					result.Truncated = true
+					continue
+				}
 				result.Events = append(result.Events, types.ProgramEvent{Data: l, Program: "myProgram"})
 			}
-			return []types.ProgramOutput{result}
+			return []types.ProgramOutput{result}, nil
 		}
-		err := job.Run(t.Context())
+		err = job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
 		require.Equal(t, types.Block{
@@ -228,6 +284,62 @@ func TestGetBlockJob(t *testing.T) {
 				},
 			},
 		}, result)
+
+		// Verify metrics - use t.Name() as the unique ID to avoid cross-test pollution
+		expectedMetrics := solLpPromTest{
+			id:                 t.Name(),
+			txsTruncated:       outcomeDependantTestMetric{reverted: 1}, // the tx that was truncated also had an error
+			txsLogParsingError: outcomeDependantTestMetric{},
+		}
+		expectedMetrics.assertEqual(t)
+
+		select {
+		case <-job.Done():
+		default:
+			t.Fatal("expected job to be done")
+		}
+	})
+
+	t.Run("Unexpected parsing error", func(t *testing.T) {
+		resetPromMetricsForLabel(t.Name()) // Reset counters to avoid accumulation across test runs
+		client := mocks.NewRPCClient(t)
+		lggr := logger.Sugared(logger.Test(t))
+		tx1Signature := solana.Signature{4, 5, 6}
+		txSigToDataBytes := func(sig solana.Signature) *rpc.DataBytesOrJSON {
+			tx := solana.Transaction{Signatures: []solana.Signature{sig}}
+			binary, err := tx.MarshalBinary()
+			require.NoError(t, err)
+			return rpc.DataBytesOrJSONFromBytes(binary)
+		}
+		txWithMeta1 := rpc.TransactionWithMeta{Transaction: txSigToDataBytes(tx1Signature), Meta: &rpc.TransactionMeta{LogMessages: []string{"log1", "log2"}}}
+		height := uint64(41)
+		blockTime := solana.UnixTimeSeconds(128)
+		block := rpc.GetBlockResult{BlockHeight: &height, BlockTime: ptr(blockTime), Blockhash: solana.Hash{1, 2, 3}, Transactions: []rpc.TransactionWithMeta{txWithMeta1}}
+		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		job.parseProgramLogs = func(logs []string) ([]types.ProgramOutput, error) {
+			return nil, errors.New("unexpected test parsing error")
+		}
+		err = job.Run(t.Context())
+		require.NoError(t, err)
+		result := <-job.blocks
+
+		require.Equal(t, types.Block{
+			SlotNumber: slotNumber,
+			BlockHash:  &block.Blockhash,
+			Events:     []types.ProgramEvent{}, // could not process tx due to parsing error
+		}, result)
+
+		// Verify metrics - use t.Name() as the unique ID to avoid cross-test pollution
+		expectedMetrics := solLpPromTest{
+			id:                 t.Name(),
+			txsTruncated:       outcomeDependantTestMetric{},
+			txsLogParsingError: outcomeDependantTestMetric{succeeded: 1}, // the tx whose logs failed to parse had succeeded onchain
+		}
+		expectedMetrics.assertEqual(t)
+
 		select {
 		case <-job.Done():
 		default:

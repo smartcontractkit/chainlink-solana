@@ -634,7 +634,7 @@ func TestGetChainInfo(t *testing.T) {
 	cfg := solcfg.NewDefault()
 	cfg.ChainID = &chainEnvName
 
-	c, err := NewChain(cfg, ChainOpts{Logger: logger.Test(t)})
+	c, err := NewChain(cfg, ChainOpts{Logger: logger.Test(t), LOOPPEnabled: true})
 	require.NoError(t, err)
 
 	chainInfo, err := c.GetChainInfo(t.Context())
@@ -647,4 +647,45 @@ func TestGetChainInfo(t *testing.T) {
 		NetworkNameFull: familyName + "-" + chainEnvName,
 	}
 	require.Equal(t, cf, chainInfo)
+}
+
+func TestNewChain_CPIEventsRequiresLOOPP(t *testing.T) {
+	chainEnvName := "devnet"
+
+	t.Run("CPI events enabled without LOOPP mode fails", func(t *testing.T) {
+		cfg := solcfg.NewDefault()
+		cfg.ChainID = &chainEnvName
+		cfg.Chain.LogPollerCPIEventsEnabled = ptr(true)
+
+		_, err := NewChain(cfg, ChainOpts{
+			Logger:       logger.Test(t),
+			LOOPPEnabled: false,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "LogPollerCPIEventsEnabled=true requires LOOPP mode")
+	})
+
+	t.Run("CPI events enabled with LOOPP mode succeeds", func(t *testing.T) {
+		cfg := solcfg.NewDefault()
+		cfg.ChainID = &chainEnvName
+		cfg.Chain.LogPollerCPIEventsEnabled = ptr(true)
+
+		_, err := NewChain(cfg, ChainOpts{
+			Logger:       logger.Test(t),
+			LOOPPEnabled: true,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("CPI events disabled without LOOPP mode succeeds", func(t *testing.T) {
+		cfg := solcfg.NewDefault()
+		cfg.ChainID = &chainEnvName
+		cfg.Chain.LogPollerCPIEventsEnabled = ptr(false)
+
+		_, err := NewChain(cfg, ChainOpts{
+			Logger:       logger.Test(t),
+			LOOPPEnabled: false,
+		})
+		require.NoError(t, err)
+	})
 }

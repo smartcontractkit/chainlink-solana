@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -25,6 +27,17 @@ func NewDiscriminatorHashPrefix(name string, isAccount bool) []byte {
 	}
 
 	return sum[:DiscriminatorLength]
+}
+
+func NewMethodDiscriminatorHashPrefix(name string) [DiscriminatorLength]byte {
+	sum := sha256.Sum256([]byte("global:" + ToSnakeCase(name)))
+	return [DiscriminatorLength]byte(sum[:DiscriminatorLength])
+}
+
+func ToSnakeCase(s string) string {
+	s = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(s, "${1}_${2}")
+	s = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`).ReplaceAllString(s, "${1}_${2}")
+	return strings.ToLower(s)
 }
 
 type Discriminator struct {

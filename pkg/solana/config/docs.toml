@@ -57,6 +57,9 @@ ComputeUnitLimitDefault = 200_000 # Default
 EstimateComputeUnitLimit = false # Default
 # LogPollerStartingLookback
 LogPollerStartingLookback = '24h' # Default
+# LogPollerCPIEventsEnabled - Flag for LogPoller listening to CPI Events.
+# CPI events require LOOPP mode to function correctly.
+LogPollerCPIEventsEnabled = true # Default
 
 [MultiNode]
 # Enabled enables the multinode feature.

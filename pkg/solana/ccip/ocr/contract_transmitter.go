@@ -119,7 +119,8 @@ func XXXNewContractTransmitterTestsOnly(
 		report ocr3types.ReportWithInfo[[]byte],
 		rs, ss [][32]byte,
 		vs [32]byte,
-		extraDataCodec ccipocr3.ExtraDataCodecBundle) (string, string, any, error) {
+		extraDataCodec ccipocr3.ExtraDataCodecBundle,
+	) (string, string, any, error) {
 		_, _, args, err := toCalldataFn(rawReportCtx, report, rs, ss, vs, extraDataCodec)
 		return contractName, method, args, err
 	}

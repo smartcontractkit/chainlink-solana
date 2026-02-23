@@ -16,8 +16,10 @@ import (
 	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
-var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipRouterIDL = idl.FetchCCIPRouterIDL()
+var (
+	ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
+	ccipRouterIDL  = idl.FetchCCIPRouterIDL()
+)
 
 const (
 	destTokenAddress              = "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"

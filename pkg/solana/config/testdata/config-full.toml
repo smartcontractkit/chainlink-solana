@@ -24,6 +24,7 @@ BlockHistoryBatchLoadSize = 10
 ComputeUnitLimitDefault = 100000
 EstimateComputeUnitLimit = false
 LogPollerStartingLookback = '24h0m0s'
+LogPollerCPIEventsEnabled = true
 
 [Workflow]
 AcceptanceTimeout = '42s'

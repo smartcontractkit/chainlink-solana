@@ -13,9 +13,10 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip/consts"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
@@ -140,6 +141,8 @@ func createSolanaAccessor(t *testing.T, mockProgram, sender, receiver, feeToken 
 	lggr := logger.Test(t)
 
 	cfg := config.NewDefault()
+	cpiEnabled := false
+	cfg.Chain.LogPollerCPIEventsEnabled = &cpiEnabled
 	solanaClient, err := client.NewClient(url, cfg, 5*time.Second, lggr)
 	require.NoError(t, err)
 
@@ -149,7 +152,9 @@ func createSolanaAccessor(t *testing.T, mockProgram, sender, receiver, feeToken 
 
 	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
 	orm := logpoller.NewORM(chainsel.TEST_22222222222222222222222222222222222222222222.ChainID, dbx, lggr)
-	lp := logpoller.New(logger.Sugared(lggr), orm, solanaClient, cfg) // LP started by chain accessor
+	lp, err := logpoller.New(logger.Sugared(lggr), orm, solanaClient, cfg, "test-chain-id") // LP started by chain accessor
+	require.NoError(t, err)
+
 	t.Cleanup(func() {
 		_ = lp.Close
 	})

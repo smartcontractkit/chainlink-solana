@@ -1,13 +1,11 @@
 package chainwriter
 
 import (
-	"crypto/sha256"
 	_ "embed"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
@@ -191,17 +189,4 @@ func traversePath(data any, path []string) ([]any, error) {
 	default:
 		return nil, errors.New("unexpected type encountered at path: " + path[0])
 	}
-}
-
-func GetDiscriminator(instruction string) [8]byte {
-	fullHash := sha256.Sum256([]byte("global:" + ToSnakeCase(instruction)))
-	var discriminator [8]byte
-	copy(discriminator[:], fullHash[:8])
-	return discriminator
-}
-
-func ToSnakeCase(s string) string {
-	s = regexp.MustCompile(`([a-z0-9])([A-Z])`).ReplaceAllString(s, "${1}_${2}")
-	s = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`).ReplaceAllString(s, "${1}_${2}")
-	return strings.ToLower(s)
 }

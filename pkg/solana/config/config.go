@@ -43,6 +43,7 @@ type Config interface {
 
 	// log poller
 	LogPollerStartingLookback() time.Duration
+	LogPollerCPIEventsEnabled() bool
 
 	// workflow
 	WF() Workflow
@@ -129,6 +130,7 @@ type Chain struct {
 	ComputeUnitLimitDefault   *uint32
 	EstimateComputeUnitLimit  *bool
 	LogPollerStartingLookback *config.Duration
+	LogPollerCPIEventsEnabled *bool
 }
 
 type Node struct {
