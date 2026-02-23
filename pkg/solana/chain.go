@@ -72,8 +72,6 @@ type ChainOpts struct {
 	Logger   logger.Logger
 	KeyStore core.Keystore
 	DS       sqlutil.DataSource
-	// LOOPPEnabled should be set to true when running as a LOOPP plugin. Remove once LOOPP FF is removed (NONEVM-3044)
-	LOOPPEnabled bool
 }
 
 func (o *ChainOpts) Validate() (err error) {

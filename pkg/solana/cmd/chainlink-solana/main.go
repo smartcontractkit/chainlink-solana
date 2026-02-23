@@ -88,10 +88,9 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 	c.SubService(emitter)
 
 	opts := solana.ChainOpts{
-		Logger:       c.Logger,
-		KeyStore:     keystore,
-		DS:           c.ds,
-		LOOPPEnabled: true,
+		Logger:   c.Logger,
+		KeyStore: keystore,
+		DS:       c.ds,
 	}
 
 	chain, err := solana.NewChain(&cfg.Solana, opts)
