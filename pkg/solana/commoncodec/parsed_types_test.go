@@ -10,8 +10,8 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 func TestEncodeDecodeBigInt(t *testing.T) {
@@ -49,10 +49,10 @@ func newTestCodec(t *testing.T) *solcommoncodec.ParsedTypes {
 
 	rawIDL := fmt.Sprintf(basicEventIDL, testParamType)
 
-	var IDL codecv1.IDL
+	var IDL codec.IDL
 	require.NoError(t, json.Unmarshal([]byte(rawIDL), &IDL))
 
-	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
+	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, "EventType", IDL)
 
 	require.NoError(t, err)
 
@@ -60,7 +60,7 @@ func newTestCodec(t *testing.T) *solcommoncodec.ParsedTypes {
 		commoncodec.NewRenamer(map[string]string{"X": "A", "Y": "B"}),
 	}
 
-	entry, err := codecv1.CreateCodecEntry(idlDef, "GenericName", IDL, mods)
+	entry, err := codec.CreateCodecEntry(idlDef, "GenericName", IDL, mods)
 
 	require.NoError(t, err)
 

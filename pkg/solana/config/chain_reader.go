@@ -8,7 +8,7 @@ import (
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 )
 
 const (
@@ -67,7 +67,7 @@ type ContractReader struct {
 }
 
 type ChainContractReader struct {
-	codecv1.IDL    `json:"anchorIDL"`
+	codec.IDL      `json:"anchorIDL"`
 	*PollingFilter `json:"pollingFilter,omitempty"`
 	// Reads key is the off-chain name for this read.
 	Reads map[string]ReadDefinition `json:"reads"`
@@ -97,7 +97,7 @@ type ReadDefinition struct {
 	ErrOnMissingAccountData bool                        `json:"errOnMissingAccountData,omitempty"`
 	InputModifications      commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	OutputModifications     commoncodec.ModifiersConfig `json:"outputModifications,omitempty"`
-	PDADefinition           codecv1.PDATypeDef          `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
+	PDADefinition           codec.PDATypeDef            `json:"pdaDefinition,omitempty"` // Only used for PDA account reads
 	MultiReader             *MultiReader                `json:"multiReader,omitempty"`
 	EventDefinitions        *EventDefinitions           `json:"eventDefinitions,omitempty"`
 	// ResponseAddressHardCoder hardcodes the address of the contract into the defined field in the response.

@@ -14,8 +14,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/lib/pq"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
 )
 
 type PublicKey solana.PublicKey
@@ -144,7 +144,7 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl codecv1.EventIDLTypes
+type EventIdl codec.EventIDLTypes
 
 func (e *EventIdl) Scan(src interface{}) error {
 	return scanJSON("EventIdl", e, src)

@@ -1,4 +1,4 @@
-package codecv1
+package codec
 
 /*
 copied from https://github.com/gagliardetto/anchor-go where the IDL definition is not importable due to being defined

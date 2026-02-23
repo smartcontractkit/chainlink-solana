@@ -7,15 +7,13 @@ import (
 )
 
 type Filter struct {
-	ID            int64 // only for internal usage. Values set externally are ignored.
-	Name          string
-	Address       PublicKey
-	EventName     string
-	EventSig      EventSignature
-	StartingBlock int64
-	// Deprecated: Use ContractIdl instead. EventIdl is kept for backward compatibility.
+	ID              int64 // only for internal usage. Values set externally are ignored.
+	Name            string
+	Address         PublicKey
+	EventName       string
+	EventSig        EventSignature
+	StartingBlock   int64
 	EventIdl        EventIdl
-	ContractIdl     string
 	SubkeyPaths     SubKeyPaths
 	Retention       time.Duration
 	MaxLogsKept     int64
@@ -25,14 +23,8 @@ type Filter struct {
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
-	status := (f.Address == other.Address) && (f.EventSig == other.EventSig) && (f.EventName == other.EventName) && (f.SubkeyPaths.Equal(other.SubkeyPaths))
-	if (f.EventIdl.Event.Name != "") && (other.EventIdl.Event.Name != "") {
-		status = status && f.EventIdl.Equal(other.EventIdl)
-	}
-	if f.ContractIdl != "" && other.ContractIdl != "" {
-		status = status && f.ContractIdl == other.ContractIdl
-	}
-	return status
+	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventName == other.EventName &&
+		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
 }
 
 type Log struct {

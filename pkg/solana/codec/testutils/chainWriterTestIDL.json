@@ -1,31 +1,49 @@
 {
   "version": "0.1.0",
-  "name": "test_item_event_type",
-  "instructions": [],
-  "events": [
+  "name": "test_item_array1",
+  "instructions": [
     {
-      "name": "TestItem",
-      "fields": [
-        { "name": "Field", "type": "i32" },
-        { "name": "OracleId", "type": "u8" },
-        { "name": "OracleIds", "type": { "array": ["u8", 32] } },
-        { "name": "AccountStruct", "type": { "defined": "AccountStruct" } },
-        { "name": "Accounts", "type": { "vec": "publicKey" } },
-        { "name": "DifferentField", "type": "string" },
-        { "name": "BigField", "type": "i128" },
+      "name": "TestItemArray1Type",
+      "accounts": [],
+      "args": [
         {
-          "name": "NestedDynamicStruct",
-          "type": { "defined": "NestedDynamic" }
-        },
-        { "name": "NestedStaticStruct", "type": { "defined": "NestedStatic" } }
+          "name": "TestItemArray1Type",
+          "type": {
+            "array": [
+              {
+                "defined": "TestItem"
+              },
+              1
+            ]
+          }
+        }
       ]
-    },
-    {
-      "name": "TestEvent",
-      "fields": [{ "name": "Field1", "type": "i64" }]
     }
   ],
   "types": [
+    {
+      "name": "TestItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "Field", "type": "i32" },
+          { "name": "OracleId", "type": "u8" },
+          { "name": "OracleIds", "type": { "array": ["u8", 32] } },
+          { "name": "AccountStruct", "type": { "defined": "AccountStruct" } },
+          { "name": "Accounts", "type": { "vec": "publicKey" } },
+          { "name": "DifferentField", "type": "string" },
+          { "name": "BigField", "type": "i128" },
+          {
+            "name": "NestedDynamicStruct",
+            "type": { "defined": "NestedDynamic" }
+          },
+          {
+            "name": "NestedStaticStruct",
+            "type": { "defined": "NestedStatic" }
+          }
+        ]
+      }
+    },
     {
       "name": "AccountStruct",
       "type": {

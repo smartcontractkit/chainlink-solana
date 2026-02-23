@@ -1,4 +1,4 @@
-package codecv1
+package codec
 
 import (
 	"fmt"
