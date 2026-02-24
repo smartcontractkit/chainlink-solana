@@ -317,6 +317,30 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
 		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
 		require.NoError(t, err)
+		assert.Equal(t, int64(12), lp.LogPoller.lastProcessedSlot)
+	})
+	t.Run("Updates lastProcessedSlot incrementally on partial failure", func(t *testing.T) {
+		lp := newMockedLP(t)
+		blocks := make(chan types.Block, 3)
+		blocks <- types.Block{SlotNumber: 11}
+		blocks <- types.Block{SlotNumber: 12}
+
+		expectedErr := errors.New("simulated processing error")
+		callCount := 0
+		lp.LogPoller.processBlocks = func(_ context.Context, _ []types.Block) error {
+			callCount++
+			if callCount == 1 {
+				blocks <- types.Block{SlotNumber: 13}
+				close(blocks)
+				return nil
+			}
+			return expectedErr
+		}
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
+		require.ErrorIs(t, err, expectedErr)
+		assert.Equal(t, int64(12), lp.LogPoller.lastProcessedSlot)
 	})
 }
 
