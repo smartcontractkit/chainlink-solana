@@ -1,11 +1,13 @@
 package chainaccessor
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	offramp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	feequoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/fee_quoter"
 	ccipchainaccessor "github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -40,6 +43,7 @@ type AccessorLogPoller interface {
 	HasFilter(context.Context, string) bool
 	RegisterFilter(context.Context, logpollertypes.Filter) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
+	CPIEventsEnabled() bool
 }
 
 type SolanaAccessor struct {
@@ -204,11 +208,15 @@ func (a *SolanaAccessor) Sync(ctx context.Context, contractName string, contract
 	}
 	addr := solana.PublicKeyFromBytes(contractAddress)
 
+	a.lggr.Debugw("Sync: binding contract", "contract", contractName, "address", addr.String())
+	if err := a.pdaCache.updateCache(contractName, addr); err != nil {
+		return fmt.Errorf("failed to update pda cache: %w", err)
+	}
+
 	if err := a.bindContractEvent(ctx, contractName, addr); err != nil {
 		return fmt.Errorf("failed to bind contract event: %w", err)
 	}
-	a.lggr.Debugw("Sync: binding contract", "contract", contractName, "address", addr.String())
-	return a.pdaCache.updateCache(contractName, addr)
+	return nil
 }
 
 // Solana as source chain methods
@@ -247,12 +255,19 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 		query.Confidence(primitives.Finalized),
 	}
 
+	// Hack to handle duplicate filters: we multiply the count by 2 if CPI events are enabled
+	// and prefer the CPI events over the normal events if multiple are returned per seq num range.
+	count := seqNumRange.End() - seqNumRange.Start() + 1
+	if a.logPoller.CPIEventsEnabled() {
+		count *= 2
+	}
+
 	limitSort := query.LimitAndSort{
 		SortBy: []query.SortBy{
 			query.NewSortBySequence(query.Asc),
 		},
 		Limit: query.Limit{
-			Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+			Count: uint64(count),
 		},
 	}
 
@@ -261,6 +276,8 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch filtered logs from log poller: %w", err)
 	}
+
+	a.lggr.Debugw("MsgsBetweenSeqNums pre deduplication", "numLogs", len(logs), "count", count)
 
 	a.lggr.Infow("queried MsgsBetweenSeqNums",
 		"numMsgs", len(logs),
@@ -272,6 +289,14 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 	events, err := a.convertCCIPMessageSent(logs, onrampAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert solana message sent event to generic CCIP type: %w", err)
+	}
+
+	// Deduplicate by SequenceNumber, preferring CPI events (higher LogIndex)
+	if a.logPoller.CPIEventsEnabled() {
+		events, err = a.deduplicateEvents(events, logs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deduplicate events:%w", err)
+		}
 	}
 
 	msgs := make([]ccipocr3.Message, 0)
@@ -774,4 +799,54 @@ func batchPDAs(addrs []solana.PublicKey) [][]solana.PublicKey {
 	}
 
 	return batchAddrs
+}
+
+// deduplicateEvents removes duplicate events for the same SequenceNumber,
+// keeping the one with the highest LogIndex (CPI events have higher LogIndex than log-based events).
+// events and logs must be parallel arrays (events[i] came from logs[i]).
+func (a *SolanaAccessor) deduplicateEvents(events []*ccipocr3.SendRequestedEvent, logs []logpollertypes.Log) ([]*ccipocr3.SendRequestedEvent, error) {
+	if len(events) == 0 {
+		return events, nil
+	}
+
+	if len(events) != len(logs) {
+		return events, fmt.Errorf("deduplicateEvents: events and logs have different lengths; events:%d logs:%d", len(events), len(logs))
+	}
+
+	type eventWithLogIndex struct {
+		event    *ccipocr3.SendRequestedEvent
+		logIndex int64
+	}
+
+	bestBySeqNum := make(map[ccipocr3.SeqNum]eventWithLogIndex)
+	for i, event := range events {
+		seqNum := event.SequenceNumber
+		if seqNum == 0 {
+			a.lggr.Errorw("deduplicateEvents: sequence number is 0", "event", event, "log", logs[i])
+			continue
+		}
+		existing, exists := bestBySeqNum[seqNum]
+		if !exists || logs[i].LogIndex > existing.logIndex {
+			if exists {
+				a.lggr.Debugw("deduplicateEvents: replacing event with higher LogIndex",
+					"seqNum", seqNum,
+					"newLogIndex", logs[i].LogIndex,
+					"existingLogIndex", existing.logIndex,
+				)
+			}
+			bestBySeqNum[seqNum] = eventWithLogIndex{event: event, logIndex: logs[i].LogIndex}
+		}
+	}
+
+	values := make([]*ccipocr3.SendRequestedEvent, 0, len(bestBySeqNum))
+	for _, ewl := range bestBySeqNum {
+		values = append(values, ewl.event)
+	}
+	slices.SortFunc(values, func(a, b *ccipocr3.SendRequestedEvent) int {
+		return cmp.Compare(a.SequenceNumber, b.SequenceNumber)
+	})
+
+	a.lggr.Debugw("deduplicateEvents", "before count:", len(events), "after count:", len(values))
+
+	return values, nil
 }

@@ -40,6 +40,7 @@ BlockHistoryBatchLoadSize = 20 # Default
 ComputeUnitLimitDefault = 200_000 # Default
 EstimateComputeUnitLimit = false # Default
 LogPollerStartingLookback = '24h' # Default
+LogPollerCPIEventsEnabled = true # Default
 ```
 
 
@@ -205,6 +206,13 @@ EstimateComputeUnitLimit enables or disables compute unit limit estimations per 
 LogPollerStartingLookback = '24h' # Default
 ```
 LogPollerStartingLookback
+
+### LogPollerCPIEventsEnabled
+```toml
+LogPollerCPIEventsEnabled = true # Default
+```
+LogPollerCPIEventsEnabled - Flag for LogPoller listening to CPI Events.
+CPI events require LOOPP mode to function correctly.
 
 ## MultiNode
 ```toml

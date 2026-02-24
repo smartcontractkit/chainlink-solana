@@ -11,6 +11,7 @@ import (
 type Job interface {
 	String() string
 	Run(context.Context) error
+	Abort(ctx context.Context) error
 }
 
 type retryableJob struct {
@@ -27,6 +28,10 @@ func (j retryableJob) String() string {
 
 func (j retryableJob) Run(ctx context.Context) error {
 	return j.job.Run(ctx)
+}
+
+func (j retryableJob) Abort(ctx context.Context) error {
+	return j.job.Abort(ctx)
 }
 
 type failedJob struct {

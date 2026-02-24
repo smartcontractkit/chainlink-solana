@@ -2,6 +2,7 @@ package keystone_forwarder_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/binary"
@@ -448,11 +449,11 @@ func TestKeystoneForwarder(t *testing.T) {
 		// because this fails to find the correct slot sometimes.
 		var lookupTableAddress solana.PublicKey
 		for attempt := 0; attempt < 3; attempt++ {
-			lookupTableAddress, err = common.SetupLookupTable(t.Context(), solanaClient, deployerKey, lookupAccounts)
+			lookupTableAddress, err = setupLookupTableWithSafeSlot(t.Context(), solanaClient, deployerKey, lookupAccounts)
 			if err == nil {
 				break
 			}
-			if attempt < 5 {
+			if attempt < 2 {
 				t.Logf("SetupLookupTable attempt %d failed: %v, retrying...", attempt+1, err)
 				time.Sleep(500 * time.Millisecond)
 			}
@@ -869,4 +870,44 @@ func getOraclesConfigAddress(t *testing.T, state solana.PublicKey, donId uint32,
 		keystone_forwarder.ProgramID,
 	)
 	return oraclesConfigAddress
+}
+
+func setupLookupTableWithSafeSlot(ctx context.Context, client *rpc.Client, admin solana.PrivateKey, entries []solana.PublicKey) (solana.PublicKey, error) {
+	slot, err := client.GetSlot(ctx, rpc.CommitmentConfirmed)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	// common.SetupLookupTable uses (slot - 1). When slot is 0 this underflows to MaxUint64 and fails.
+	createSlot := slot
+	if slot > 1 {
+		createSlot = slot - 1
+	}
+
+	table, createIx, err := common.NewCreateLookupTableInstruction(admin.PublicKey(), admin.PublicKey(), createSlot)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	_, err = common.SendAndConfirmWithLookupTablesAndRetries(
+		ctx,
+		client,
+		[]solana.Instruction{createIx},
+		admin,
+		rpc.CommitmentConfirmed,
+		map[solana.PublicKey]solana.PublicKeySlice{},
+	)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	if err = common.ExtendLookupTable(ctx, client, table, admin, entries); err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	if err = common.AwaitSlotChange(ctx, client); err != nil {
+		return solana.PublicKey{}, err
+	}
+
+	return table, nil
 }

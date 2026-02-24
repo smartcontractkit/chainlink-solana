@@ -49,6 +49,7 @@ type LogPoller interface {
 	GetLatestBlock(ctx context.Context) (int64, error)
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
 	Replay(fromBlock int64)
+	CPIEventsEnabled() bool
 }
 
 type Chain interface {
@@ -367,7 +368,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		return nil, err
 	}
 
-	ch.lp = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), orm, ch.multiClient, cfg)
+	ch.lp, err = logpoller.New(logger.Sugared(logger.Named(lggr, "LogPoller")), orm, ch.multiClient, cfg, ch.id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize solana log poller: %w", err)
+	}
 	solTxm, err := txm.NewTxm(ch.id, tc, sendTx, cfg, ks, lggr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize solana txm: %w", err)

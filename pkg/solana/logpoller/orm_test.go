@@ -70,6 +70,20 @@ func TestLogPollerFilters(t *testing.T) {
 				Retention:     1000,
 				MaxLogsKept:   3,
 			},
+			{
+				Name:          "CPI filter with dest program and method signature",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "cpi_event",
+				EventSig:      types.EventSignature{4, 5, 6},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a"}}),
+				Retention:     1000,
+				MaxLogsKept:   3,
+				ExtraFilterConfig: types.ExtraFilterConfig{
+					DestProgram:     newRandomPublicKey(t),
+					MethodSignature: types.EventSignature{7, 8, 9, 10, 11, 12, 13, 14},
+				},
+			},
 		}
 
 		for _, filter := range filters {

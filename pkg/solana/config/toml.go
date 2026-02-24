@@ -235,6 +235,9 @@ func (c *Chain) SetFrom(f *Chain) {
 	if f.LogPollerStartingLookback != nil {
 		c.LogPollerStartingLookback = f.LogPollerStartingLookback
 	}
+	if f.LogPollerCPIEventsEnabled != nil {
+		c.LogPollerCPIEventsEnabled = f.LogPollerCPIEventsEnabled
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -435,6 +438,10 @@ func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 
 func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
 	return c.Chain.LogPollerStartingLookback.Duration()
+}
+
+func (c *TOMLConfig) LogPollerCPIEventsEnabled() bool {
+	return *c.Chain.LogPollerCPIEventsEnabled
 }
 
 func (c *TOMLConfig) ListNodes() Nodes {

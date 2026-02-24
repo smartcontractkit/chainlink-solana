@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -63,6 +64,28 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 	if err := d.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
 	}
+
+	rawNodes := make([]map[string]string, 0, len(cfg.Solana.Nodes))
+	for _, n := range cfg.Solana.Nodes {
+		if n == nil || n.URL == nil {
+			continue
+		}
+		rawNodes = append(rawNodes, map[string]string{"URL": n.URL.String()})
+	}
+	chainID := ""
+	if cfg.Solana.ChainID != nil {
+		chainID = *cfg.Solana.ChainID
+	}
+	emitter := loop.NewPluginRelayerConfigEmitter(
+		c.Logger,
+		beholder.GetClient().Config.AuthPublicKeyHex,
+		chainID,
+		rawNodes,
+	)
+	if err := emitter.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start plugin relayer config emitter: %w", err)
+	}
+	c.SubService(emitter)
 
 	opts := solana.ChainOpts{
 		Logger:   c.Logger,

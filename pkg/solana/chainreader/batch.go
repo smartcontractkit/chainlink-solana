@@ -30,9 +30,7 @@ type batchResultWithErr struct {
 	err                 error
 }
 
-var (
-	ErrMissingAccountData = errors.New("account data not found")
-)
+var ErrMissingAccountData = errors.New("account data not found")
 
 type MultipleAccountGetter interface {
 	GetMultipleAccountData(context.Context, ...solana.PublicKey) ([]*rpc.Account, error)

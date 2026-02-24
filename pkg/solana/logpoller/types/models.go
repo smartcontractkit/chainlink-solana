@@ -20,11 +20,41 @@ type Filter struct {
 	IsDeleted       bool // only for internal usage. Values set externally are ignored.
 	IsBackfilled    bool // only for internal usage. Values set externally are ignored.
 	IncludeReverted bool
+	// Storing CPI Event Filter Configuration in a separate field.
+	// Eventually we will want to deobfuscate the CPI Filter in the db.
+	ExtraFilterConfig ExtraFilterConfig
+}
+
+// ExtraFilterConfig stores CPI Event Filter Configuration.
+type ExtraFilterConfig struct {
+	DestProgram     PublicKey      `json:"dest_program,omitempty"`
+	MethodSignature EventSignature `json:"method_signature,omitempty"`
+}
+
+func (c ExtraFilterConfig) IsEmpty() bool {
+	return c.DestProgram == PublicKey{} && c.MethodSignature == EventSignature{}
+}
+
+func (c ExtraFilterConfig) Equal(other ExtraFilterConfig) bool {
+	return c.DestProgram == other.DestProgram && c.MethodSignature == other.MethodSignature
 }
 
 func (f Filter) MatchSameLogs(other Filter) bool {
 	return f.Address == other.Address && f.EventSig == other.EventSig && f.EventName == other.EventName &&
-		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths)
+		f.EventIdl.Equal(other.EventIdl) && f.SubkeyPaths.Equal(other.SubkeyPaths) &&
+		f.ExtraFilterConfig.Equal(other.ExtraFilterConfig)
+}
+
+func (f Filter) IsCPIFilter() bool {
+	return !f.ExtraFilterConfig.IsEmpty()
+}
+
+func (f Filter) GetCPIFilterConfig() ExtraFilterConfig {
+	return f.ExtraFilterConfig
+}
+
+func (f *Filter) SetCPIFilterConfig(cfg ExtraFilterConfig) {
+	f.ExtraFilterConfig = cfg
 }
 
 type Log struct {
@@ -66,7 +96,8 @@ type ProgramLog struct {
 type ProgramEvent struct {
 	Program string
 	BlockData
-	Data string
+	Data  string
+	IsCPI bool
 }
 
 type ProgramOutput struct {
@@ -80,6 +111,7 @@ type ProgramOutput struct {
 }
 
 type Block struct {
+	Aborted    bool
 	SlotNumber uint64
 	BlockHash  *solana.Hash
 	Events     []ProgramEvent

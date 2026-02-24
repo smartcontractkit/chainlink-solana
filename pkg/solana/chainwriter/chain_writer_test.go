@@ -49,9 +49,11 @@ type BufferArgs struct {
 	Fail   bool
 }
 
-var ccipOfframpIDL = ccipsolana.FetchCCIPOfframpIDL()
-var testContractIDL = chainwriter.FetchTestContractIDL()
-var testBufferContractIDL = chainwriter.FetchTestBufferContractIDL()
+var (
+	ccipOfframpIDL        = ccipsolana.FetchCCIPOfframpIDL()
+	testContractIDL       = chainwriter.FetchTestContractIDL()
+	testBufferContractIDL = chainwriter.FetchTestBufferContractIDL()
+)
 
 func TestChainWriter_GetAddresses(t *testing.T) {
 	ctx := t.Context()
@@ -974,6 +976,7 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		})
 	})
 }
+
 func buildExecuteIxExact(bufferProgramID solana.PublicKey, admin solana.PublicKey, report []byte, fail bool) solana.Instruction {
 	buf := new(bytes.Buffer)
 	enc := ag_binary.NewBorshEncoder(buf)
@@ -995,6 +998,7 @@ func buildExecuteIxExact(bufferProgramID solana.PublicKey, admin solana.PublicKe
 
 	return solana.NewInstruction(bufferProgramID, metas, data)
 }
+
 func TestChainWriter_CCIPOfframp(t *testing.T) {
 	t.Parallel()
 
