@@ -10,7 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	commoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 func TestDiscriminator(t *testing.T) {

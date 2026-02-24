@@ -1,9 +1,9 @@
-package codec
+package codecv1
 
 import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 type AccountIDLTypes struct {
