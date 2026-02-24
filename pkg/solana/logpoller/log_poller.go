@@ -434,6 +434,13 @@ consumedAllBlocks:
 			if err != nil {
 				return fmt.Errorf("error processing blocks: %w", err)
 			}
+
+			// nolint:gosec
+			// G115: integer overflow conversion uint64 -> int64
+			highestInBatch := int64(batch[len(batch)-1].SlotNumber)
+			if highestInBatch > lp.lastProcessedSlot {
+				lp.lastProcessedSlot = highestInBatch
+			}
 		}
 	}
 
