@@ -684,7 +684,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("returns error when load fails", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db error")).Once()
 
 		result, err := fs.GetFilters(t.Context())
@@ -694,7 +694,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("returns empty map when no filters exist", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 
@@ -706,7 +706,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("returns all filters keyed by name", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 
 		filter1 := types.Filter{
 			ID:        1,
@@ -733,7 +733,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("excludes deleted filters", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 
 		activeFilter := types.Filter{
 			ID:        1,
@@ -759,7 +759,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("returns a copy that does not affect internal state", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 
 		filter1 := types.Filter{
 			ID:            1,
@@ -794,7 +794,7 @@ func TestFilters_GetFilters(t *testing.T) {
 
 	t.Run("concurrent access is safe", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
-		fs := newFilters(lggr, orm)
+		fs := newFilters(lggr, orm, nil)
 
 		filter1 := types.Filter{
 			ID:        1,
