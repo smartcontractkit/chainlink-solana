@@ -247,24 +247,13 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 
 	eventName := filterConfig.chainSpecificName
 
-	var codecIDL codecv1.IDL
-	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
-		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
-	}
-
-	eventIdl, err := extractEventIDL(eventName, codecIDL)
-	if err != nil {
-		return fmt.Errorf("failed to extract event IDL: %w", err)
-	}
-
-	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
 	filter := logpollertypes.Filter{
 		Address:         logpollertypes.PublicKey(sourceAddr),
 		EventName:       eventName,
 		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
-		EventIdl:        lpEventIDL,
+		ContractIdl:     filterConfig.idl,
 		SubkeyPaths:     subKeyPaths,
 		StartingBlock:   conf.GetStartingBlock(),
 		Retention:       conf.GetRetention(),
