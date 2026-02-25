@@ -3,7 +3,8 @@ name: Analyze API Changes
 on:
   pull_request: {}
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   root-module:

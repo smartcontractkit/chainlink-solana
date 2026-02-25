@@ -1,4 +1,7 @@
 name: e2e_testnet_daily
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:

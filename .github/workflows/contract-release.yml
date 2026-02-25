@@ -1,4 +1,7 @@
 name: release_artifacts
+permissions:
+  contents: read
+
 on:
   push:
     tags:

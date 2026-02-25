@@ -1,4 +1,6 @@
 name: gauntlet
+permissions:
+  contents: read
 
 on:
   pull_request:

@@ -5,6 +5,9 @@
 # PRs with assignees are exempt from auto stale marking, it's the responsibility of the assignee to get the PR progressed either with review/merge or closure.
 name: Manage stale Issues and PRs
 
+permissions:
+  contents: read
+
 on:
   schedule:
     - cron: "0 0 * * *" # Will be triggered every day at midnight UTC

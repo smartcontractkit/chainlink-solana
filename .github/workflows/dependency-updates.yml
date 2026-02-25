@@ -1,4 +1,7 @@
 name: DependencyUpdater
+permissions:
+  contents: read
+
 on: 
   workflow_dispatch:
   schedule:

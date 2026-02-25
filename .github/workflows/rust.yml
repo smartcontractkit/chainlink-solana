@@ -1,4 +1,7 @@
 name: rust
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
@@ -154,7 +157,7 @@ jobs:
           docker load --input docker-build.tar
 
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: "./integration-tests/go.mod"
           check-latest: true
@@ -218,7 +221,7 @@ jobs:
         run: |
           docker load --input docker-build.tar
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: "./go.mod"
           check-latest: true

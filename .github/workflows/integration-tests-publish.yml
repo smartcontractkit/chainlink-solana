@@ -1,6 +1,9 @@
 name: Integration Tests Publish
 # Publish the compiled integration tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:

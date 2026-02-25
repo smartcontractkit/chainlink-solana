@@ -1,4 +1,6 @@
 name: Open PR With Signed Commit
+permissions:
+  contents: read
 
 on:
   workflow_call:
