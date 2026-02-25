@@ -79,6 +79,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64
 		withEventSig(filter.EventSig).
 		withStartingBlock(filter.StartingBlock).
 		withEventIDL(filter.EventIdl).
+		withContractIDL(filter.ContractIdl).
 		withSubKeyPaths(filter.SubkeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
 		withIncludeReverted(filter.IncludeReverted).
