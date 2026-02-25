@@ -11,9 +11,8 @@ import (
 	codeccommon "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1/testutils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -93,11 +92,11 @@ func TestChainReaderConfig(t *testing.T) {
 	})
 }
 
-var nilIDL = codec.IDL{
+var nilIDL = codecv1.IDL{
 	Version: "0.1.0",
 	Name:    "myProgram",
-	Accounts: codec.IdlTypeDefSlice{
-		{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+	Accounts: codecv1.IdlTypeDefSlice{
+		{Name: "NilType", Type: codecv1.IdlTypeDefTy{Kind: codecv1.IdlTypeDefTyKindStruct, Fields: &codecv1.IdlTypeDefStruct{}}},
 	},
 }
 
