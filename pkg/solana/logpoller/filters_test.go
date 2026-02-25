@@ -820,7 +820,7 @@ func TestFilters_GetFilters(t *testing.T) {
 				defer wg.Done()
 				for range readsPerGoroutine {
 					result, err := fs.GetFilters(t.Context())
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					assert.Len(t, result, 1)
 					assert.Equal(t, filter1, result["filter1"])
 				}
