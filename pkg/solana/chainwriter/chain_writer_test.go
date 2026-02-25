@@ -1359,12 +1359,17 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 		Programs: map[string]chainwriter.ProgramConfig{
 			"testIDLv1": {
 				IDL: "",
+				Methods: map[string]chainwriter.MethodConfig{
+					"TestItemArray1Type": {
+						ChainSpecificName: "TestItemArray1Type",
+					},
+				},
 			},
 		},
 	}
 
 	_, err := chainwriter.NewSolanaChainWriterService(testutils.NewNullLogger(), mc, txm, ge, invalidConfig)
-	require.ErrorContains(t, err, "failed to unmarshal IDL for program testIDLv1 (tried both codecv2 and codec), error:")
+	require.ErrorContains(t, err, "failed to parse programs: failed to parse config for chainwriter program testIDLv1, method TestItemArray1Type")
 
 	cwConfig := chainwriter.ChainWriterConfig{
 		Programs: map[string]chainwriter.ProgramConfig{

@@ -1,6 +1,7 @@
 package codecv2
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -36,6 +37,22 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl anchor
 	}
 
 	return entry, nil
+}
+
+// 1. parse idl
+// 2. find definition from idl
+// 3. create codec entry
+func CreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, mod commoncodec.Modifier, onChainName, offChainName, idlString string) (entry solcommoncodec.Entry, err error) {
+	var idl anchoridl.Idl
+	err = json.Unmarshal([]byte(idlString), &idl)
+	if err != nil {
+		return nil, err
+	}
+	idlDefinition, err := FindDefinitionFromIDL(cfgType, onChainName, idl)
+	if err != nil {
+		return nil, err
+	}
+	return CreateCodecEntry(idlDefinition, offChainName, idl, mod)
 }
 
 func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl anchoridl.Idl) (interface{}, error) {

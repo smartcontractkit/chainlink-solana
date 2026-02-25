@@ -94,6 +94,22 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 	return entry, nil
 }
 
+// 1. parse idl
+// 2. find definition from idl
+// 3. create codec entry
+func CreateCodecEntryWrapper(cfgType solcommoncodec.ChainConfigType, mod basecodec.Modifier, onChainName, offChainName, idlString string) (entry solcommoncodec.Entry, err error) {
+	var idl IDL
+	err = json.Unmarshal([]byte(idlString), &idl)
+	if err != nil {
+		return nil, err
+	}
+	idlDefinition, err := FindDefinitionFromIDL(cfgType, onChainName, idl)
+	if err != nil {
+		return nil, err
+	}
+	return CreateCodecEntry(idlDefinition, offChainName, idl, mod)
+}
+
 func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
