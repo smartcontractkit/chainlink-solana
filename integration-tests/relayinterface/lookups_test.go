@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	keyMocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/mocks"

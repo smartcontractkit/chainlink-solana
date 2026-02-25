@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 func TestSolanaCrossChainAmountCodec(t *testing.T) {

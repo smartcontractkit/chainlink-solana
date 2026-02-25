@@ -13,7 +13,7 @@ import (
 	commonencodings "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 const (
