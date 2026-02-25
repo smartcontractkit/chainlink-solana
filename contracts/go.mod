@@ -107,7 +107,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.90 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5 // indirect
-	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260224184415-9950bebea20c // indirect
+	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260225165959-ca7f453e0dcc // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.0 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
