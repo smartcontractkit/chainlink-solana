@@ -274,6 +274,8 @@ func (j testJob) String() string {
 	return "testJob"
 }
 
+func (j testJob) Abort(ctx context.Context) error { return nil }
+
 func (j testJob) Run(ctx context.Context) error {
 	return j.job(ctx)
 }
@@ -287,6 +289,8 @@ type retryJob struct {
 func (j *retryJob) String() string {
 	return fmt.Sprintf("retryJob: %d", j.name)
 }
+
+func (j *retryJob) Abort(ctx context.Context) error { return nil }
 
 func (j *retryJob) Run(ctx context.Context) error {
 	if j.count < 2 {

@@ -1,0 +1,42 @@
+{
+  "accounts": [{
+    "name": "TopLevelStruct",
+    "type": {
+      "kind": "struct",
+      "fields": [{
+        "name": "circularOne",
+        "type": {
+          "defined": "TypeOne"
+        }
+      }, {
+        "name": "circularTwo",
+        "type": {
+          "defined": "TypeTwo"
+        }
+      }]
+    }
+  }],
+  "types": [{
+    "name": "TypeOne",
+    "type": {
+      "kind": "struct",
+      "fields": [{
+        "name": "circular",
+        "type": {
+          "defined": "TypeTwo"
+        }
+      }]
+    }
+  }, {
+    "name": "TypeTwo",
+    "type": {
+      "kind": "struct",
+      "fields": [{
+        "name": "circular",
+        "type": {
+          "defined": "TypeOne"
+        }
+      }]
+    }
+  }]
+}

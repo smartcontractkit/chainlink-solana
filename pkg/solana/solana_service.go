@@ -185,6 +185,18 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 	return res, nil
 }
 
+func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) {
+	filters, err := ss.chain.LogPoller().GetFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	filterNames := make([]string, 0, len(filters))
+	for name := range filters {
+		filterNames = append(filterNames, name)
+	}
+	return filterNames, nil
+}
+
 var (
 	errMissingEventSigPrimitive = errors.New("missing event signature primitive in filter query")
 	errMissingAddressPrimitive  = errors.New("missing address primitive in filter query")

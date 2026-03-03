@@ -26,8 +26,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/utils"
@@ -403,13 +403,13 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
 }
 
-func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codec.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codecv1.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
 	mod, err := modCfg.ToModifier(solcommoncodec.DecoderHooks...)
 	if err != nil {
 		return err
 	}
 
-	cEntry, err := codec.CreateCodecEntry(idlDefinition, genericName, idl, mod)
+	cEntry, err := codecv1.CreateCodecEntry(idlDefinition, genericName, idl, mod)
 	if err != nil {
 		return err
 	}
@@ -429,12 +429,12 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 
 			switch read.ReadType {
 			case config.Account:
-				idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
+				idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, read.ChainSpecificName, nameSpaceDef.IDL)
 				if err != nil {
 					return err
 				}
 
-				accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+				accountIDLDef, isOk := idlDef.(codecv1.IdlTypeDef)
 				if !isOk {
 					return fmt.Errorf("unexpected type %T from IDL definition for account read: %q, with chainSpecificName: %q, of type: %q", accountIDLDef, genericName, read.ChainSpecificName, read.ReadType)
 				}
@@ -460,7 +460,7 @@ func (s *ContractReaderService) initNamespace(namespaces map[string]config.Chain
 	return nil
 }
 
-func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codec.IDL, outputIDLDef codec.IdlTypeDef, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addAccountRead(namespace string, genericName string, idl codecv1.IDL, outputIDLDef codecv1.IdlTypeDef, readDefinition config.ReadDefinition) error {
 	reads := []read{{readName: genericName, useParams: true, errOnMissingAccountData: readDefinition.ErrOnMissingAccountData}}
 	if readDefinition.MultiReader != nil {
 		multiRead, err := s.addMultiAccountReadToCodec(namespace, readDefinition, idl)
@@ -470,7 +470,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		reads = append(reads, multiRead...)
 	}
 
-	var inputIDLDef interface{} = codec.NilIdlTypeDefTy
+	var inputIDLDef interface{} = codecv1.NilIdlTypeDefTy
 	isPDA := false
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
@@ -489,7 +489,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedTypes, namespace string, genericName string, idl codec.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedTypes, namespace string, genericName string, idl codecv1.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
 	if err := s.addCodecDef(parsed, true, namespace, genericName, idl, inputIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
@@ -497,10 +497,10 @@ func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedType
 	return s.addCodecDef(parsed, false, namespace, genericName, idl, outputIDLDef, readDefinition.OutputModifications)
 }
 
-func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codec.IDL) ([]read, error) {
+func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, readDefinition config.ReadDefinition, idl codecv1.IDL) ([]read, error) {
 	var reads []read
 	for _, mr := range readDefinition.MultiReader.Reads {
-		idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
+		idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, mr.ChainSpecificName, idl)
 		if err != nil {
 			return nil, err
 		}
@@ -509,12 +509,12 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 			return nil, fmt.Errorf("unexpected read type %q for dynamic hard coder read: %q in namespace: %q", mr.ReadType, mr.ChainSpecificName, namespace)
 		}
 
-		accountIDLDef, isOk := idlDef.(codec.IdlTypeDef)
+		accountIDLDef, isOk := idlDef.(codecv1.IdlTypeDef)
 		if !isOk {
 			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
 		}
 
-		var inputIDLDef interface{} = codec.NilIdlTypeDefTy
+		var inputIDLDef interface{} = codecv1.NilIdlTypeDefTy
 		isPDA := false
 
 		// Create PDA read binding if PDA prefix or seeds configs are populated
@@ -589,7 +589,7 @@ func (s *ContractReaderService) addAddressResponseHardCoderModifier(namespace st
 func (s *ContractReaderService) addEventRead(
 	common *config.PollingFilter,
 	namespace, genericName string,
-	idl codec.IDL,
+	idl codecv1.IDL,
 	readDefinition config.ReadDefinition,
 	events EventsReader,
 ) error {
@@ -599,7 +599,7 @@ func (s *ContractReaderService) addEventRead(
 
 	conf := readDefinition.EventDefinitions
 
-	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, readDefinition.ChainSpecificName, idl)
+	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, readDefinition.ChainSpecificName, idl)
 	if err != nil {
 		return err
 	}
@@ -609,7 +609,7 @@ func (s *ContractReaderService) addEventRead(
 		return fmt.Errorf("failed to set polling filter overrides: %w", err)
 	}
 
-	eventIdl, isOk := idlDef.(codec.IdlEvent)
+	eventIdl, isOk := idlDef.(codecv1.IdlEvent)
 	if !isOk {
 		return fmt.Errorf(
 			"unexpected type from IDL definition for event read: %q, with chainSpecificName: %q, of type: %q",
@@ -624,7 +624,7 @@ func (s *ContractReaderService) addEventRead(
 	applyIndexedFieldTuple(subkeys, conf.IndexedField2, 2)
 	applyIndexedFieldTuple(subkeys, conf.IndexedField3, 3)
 
-	eventDef := codec.EventIDLTypes{Event: eventIdl, Types: idl.Types}
+	eventDef := codecv1.EventIDLTypes{Event: eventIdl, Types: idl.Types}
 
 	if err := s.addReadToCodec(s.parsed, namespace, genericName, idl, eventIdl, eventIdl, readDefinition); err != nil {
 		return err
@@ -667,7 +667,7 @@ func toLPFilter(
 	name string,
 	conf config.PollingFilter,
 	subKeyPaths [][]string,
-	eventIdl codec.EventIDLTypes,
+	eventIdl codecv1.EventIDLTypes,
 ) logpollertypes.Filter {
 	return logpollertypes.Filter{
 		EventName:       name,

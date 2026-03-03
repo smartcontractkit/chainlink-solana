@@ -27,10 +27,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -60,6 +61,14 @@ type filterConfig struct {
 	indexedField1     *string
 	indexedField2     *string
 	indexedField3     *string
+	// cpi filter specific fields
+	cpiBackup        bool // skip this filter when CPI is enabled
+	destContractName string
+	methodName       string
+}
+
+func (f filterConfig) isCPIFilter() bool {
+	return f.destContractName != ""
 }
 
 var (
@@ -78,6 +87,8 @@ var (
 	cctpMsgSentSrcDomainPath = "SourceDomain"
 
 	ccipCCTPMessageSentEventName = "CcipCctpMessageSentEvent"
+
+	rmnRemoteCPIEventMethodName = "cpiEvent"
 )
 
 // Map of relevant events and their metadata required to build the codec and bind program addresses
@@ -90,6 +101,7 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 			indexedField0:     &msgSentSrcChainPath,
 			indexedField1:     &msgSentDestChainPath,
 			indexedField2:     &msgSentSeqNumPath,
+			cpiBackup:         true,
 		},
 	},
 	consts.ContractNameOffRamp: {
@@ -114,6 +126,21 @@ var eventFilterConfigMap = map[string]map[string]filterConfig{
 			includeReverted:   false,
 			indexedField0:     &cctpMsgSentNoncePath,
 			indexedField1:     &cctpMsgSentSrcDomainPath,
+		},
+	},
+}
+
+var cpiFilterConfigMap = map[string]map[string]filterConfig{
+	consts.ContractNameRouter: {
+		consts.EventNameCCIPMessageSent: {
+			destContractName:  consts.ContractNameRMNRemote,
+			chainSpecificName: consts.EventNameCCIPMessageSent,
+			methodName:        rmnRemoteCPIEventMethodName,
+			idl:               ccipRouterIDL,
+			includeReverted:   false,
+			indexedField0:     &msgSentSrcChainPath,
+			indexedField1:     &msgSentDestChainPath,
+			indexedField2:     &msgSentSeqNumPath,
 		},
 	},
 }
@@ -145,44 +172,82 @@ var eventFilterSubkeyIndexMap = map[string]map[string]uint64{
 // Supports OnRamp and OffRamp contract types with their respective event filters.
 // Returns an error if filter registration fails.
 func (a *SolanaAccessor) bindContractEvent(ctx context.Context, contractName string, address solana.PublicKey) error {
-	eventsMap, exists := eventFilterConfigMap[contractName]
-	if !exists {
-		return nil // No events to bind for unknown contract types
+	cpiEnabled := a.logPoller.CPIEventsEnabled()
+
+	// Register normal event filters if this contract has any
+	if eventsMap, exists := eventFilterConfigMap[contractName]; exists {
+		for eventName, config := range eventsMap {
+			if cpiEnabled && config.cpiBackup {
+				continue
+			}
+			if err := a.registerFilterIfNotExists(ctx, config, address, solana.PublicKey{}); err != nil {
+				return fmt.Errorf("failed to register filter for event %s: %w", eventName, err)
+			}
+		}
 	}
 
-	for eventName, config := range eventsMap {
-		if err := a.registerFilterIfNotExists(ctx, config.chainSpecificName, address, config); err != nil {
-			return fmt.Errorf("failed to register filter for event %s: %w", eventName, err)
+	// Try to bind CPI filters only if CPI events are enabled
+	if cpiEnabled {
+		if err := a.tryBindCPIFilters(ctx, contractName); err != nil {
+			return fmt.Errorf("failed to bind CPI filters: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func extractEventIDL(eventName string, codecIDL codec.IDL) (codec.IdlEvent, error) {
-	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
-	if err != nil {
-		return codec.IdlEvent{}, err
+func (a *SolanaAccessor) tryBindCPIFilters(ctx context.Context, contractName string) error {
+	for sourceContractName, eventConfigs := range cpiFilterConfigMap {
+		for _, cfg := range eventConfigs {
+			if contractName != sourceContractName && contractName != cfg.destContractName {
+				continue
+			}
+
+			sourceAddr, sourceErr := a.pdaCache.getBinding(sourceContractName)
+			destAddr, destErr := a.pdaCache.getBinding(cfg.destContractName)
+			if sourceErr != nil || destErr != nil {
+				continue
+			}
+
+			if sourceAddr.Equals(solana.PublicKey{}) || destAddr.Equals(solana.PublicKey{}) {
+				return fmt.Errorf("source or dest is empty: sourceAddr: %s, destAddr: %s", sourceAddr.String(), destAddr.String())
+			}
+
+			if err := a.registerFilterIfNotExists(ctx, cfg, sourceAddr, destAddr); err != nil {
+				return fmt.Errorf("failed to register CPI filter for event %s: %w", cfg.chainSpecificName, err)
+			}
+		}
 	}
-	eventIdl, isOk := idlDef.(codec.IdlEvent)
+	return nil
+}
+
+func extractEventIDL(eventName string, codecIDL codecv1.IDL) (codecv1.IdlEvent, error) {
+	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeEventDef, eventName, codecIDL)
+	if err != nil {
+		return codecv1.IdlEvent{}, err
+	}
+	eventIdl, isOk := idlDef.(codecv1.IdlEvent)
 	if !isOk {
-		return codec.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
+		return codecv1.IdlEvent{}, fmt.Errorf("unexpected type from IDL definition for event read: %q", eventName)
 	}
 	return eventIdl, nil
 }
 
 // registerFilterIfNotExists registers a filter for the given event if it doesn't already exist.
+// For CPI filters, destAddr must be provided; for regular filters, it's ignored.
 func (a *SolanaAccessor) registerFilterIfNotExists(
 	ctx context.Context,
-	eventName string,
-	address solana.PublicKey,
 	filterConfig filterConfig,
+	sourceAddr solana.PublicKey,
+	destAddr solana.PublicKey,
 ) error {
 	conf := config.PollingFilter{
 		Retention: &defaultCCIPLogsRetention,
 	}
 
-	var codecIDL codec.IDL
+	eventName := filterConfig.chainSpecificName
+
+	var codecIDL codecv1.IDL
 	if err := json.Unmarshal([]byte(filterConfig.idl), &codecIDL); err != nil {
 		return fmt.Errorf("unexpected error: invalid CCIP OffRamp IDL, error: %w", err)
 	}
@@ -193,11 +258,10 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	lpEventIDL := logpollertypes.EventIdl{Event: eventIdl, Types: codecIDL.Types}
-
 	subKeyPaths := processSubKeyPaths(filterConfig)
 
 	filter := logpollertypes.Filter{
-		Address:         logpollertypes.PublicKey(address),
+		Address:         logpollertypes.PublicKey(sourceAddr),
 		EventName:       eventName,
 		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
 		EventIdl:        lpEventIDL,
@@ -208,7 +272,17 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 		IncludeReverted: filterConfig.includeReverted,
 	}
 
-	filterName := deriveName(filter)
+	if filterConfig.isCPIFilter() {
+		filter.SetCPIFilterConfig(logpollertypes.ExtraFilterConfig{
+			DestProgram:     logpollertypes.PublicKey(destAddr),
+			MethodSignature: logpollertypes.NewMethodSignatureFromName(filterConfig.methodName),
+		})
+	}
+
+	filterName, err := deriveName(filter)
+	if err != nil {
+		return fmt.Errorf("failed to derive filter name: %w", err)
+	}
 
 	// Filter already registered so return early
 	if hasFilter := a.logPoller.HasFilter(ctx, filterName); hasFilter {
@@ -217,7 +291,21 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 
 	filter.Name = filterName
 
-	a.lggr.Debugw("registering log poller filter", "name", filterName, "eventName", eventName, "eventSig", filter.EventSig.String(), "address", address)
+	if filterConfig.isCPIFilter() {
+		a.lggr.Debugw("registering CPI log poller filter",
+			"name", filterName,
+			"eventName", eventName,
+			"eventSig", filter.EventSig.String(),
+			"sourceAddr", sourceAddr,
+			"destAddr", destAddr,
+			"methodSig", filter.ExtraFilterConfig.MethodSignature)
+	} else {
+		a.lggr.Debugw("registering normal log poller filter",
+			"name", filterName,
+			"eventName", eventName,
+			"eventSig", filter.EventSig.String(),
+			"address", sourceAddr)
+	}
 
 	if err := a.logPoller.RegisterFilter(ctx, filter); err != nil {
 		return fmt.Errorf("failed to register logpoller filter: %w", err)
@@ -287,20 +375,32 @@ func convertTokenAmounts(transfers []ccip_router.SVM2AnyTokenTransfer) []ccipocr
 	return genericTokenAmounts
 }
 
-func deriveName(filter logpollertypes.Filter) string {
+func deriveName(filter logpollertypes.Filter) (string, error) {
 	// include eventSig, readDef, address, subkeyPaths, indexedSubkeys
 	data := filter.EventSig[:]
 	data = append(data, filter.Address.ToSolana().Bytes()...)
 	data = append(data, []byte(filter.EventName)...)
 
-	for _, sub := range filter.SubkeyPaths {
-		for _, key := range sub {
-			data = append(data, []byte(key)...)
+	if len(filter.SubkeyPaths) > 0 {
+		b, err := json.Marshal(filter.SubkeyPaths)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal subkey path: %w", err)
 		}
+		data = append(data, b...)
 	}
+
+	if filter.IsCPIFilter() {
+		data = append(data, filter.ExtraFilterConfig.DestProgram[:]...)
+		data = append(data, filter.ExtraFilterConfig.MethodSignature[:]...)
+	}
+
 	hash := sha3.Sum256(data)
 
-	return fmt.Sprintf("%s.%s.%x", filter.EventName, filter.Address.String(), hash[:])
+	if filter.IsCPIFilter() {
+		return fmt.Sprintf("cpi.%s.%s.%x", filter.EventName, filter.Address.String(), hash[:]), nil
+	}
+
+	return fmt.Sprintf("%s.%s.%x", filter.EventName, filter.Address.String(), hash[:]), nil
 }
 
 func processSubKeyPaths(cfg filterConfig) [][]string {
@@ -597,8 +697,7 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 
 		a.lggr.Debugw("decoded executed event", "event", stateChange)
 
-		executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)] =
-			append(executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)], ccipocr3.SeqNum(stateChange.SequenceNumber))
+		executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)] = append(executed[ccipocr3.ChainSelector(stateChange.SourceChainSelector)], ccipocr3.SeqNum(stateChange.SequenceNumber))
 	}
 
 	a.lggr.Debugw("executed results", "map", executed)
@@ -607,7 +706,8 @@ func (a *SolanaAccessor) processExecutionStateChangesEvents(logs []logpollertype
 }
 
 func validateExecutionStateChangedEvent(
-	ev *ccip.EventExecutionStateChanged, rangesByChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange) error {
+	ev *ccip.EventExecutionStateChanged, rangesByChain map[ccipocr3.ChainSelector][]ccipocr3.SeqNumRange,
+) error {
 	if ev == nil {
 		return errors.New("execution state changed event is nil")
 	}
@@ -804,6 +904,14 @@ func (a *SolanaAccessor) decodeLogsIntoSequences(
 				return nil, err
 			}
 			sequences[idx].Data = e
+			a.lggr.Infow("Decoded CCIPMessageSent event",
+				"seqNum", e.Message.Header.SequenceNumber,
+				"sourceChain", e.Message.Header.SourceChainSelector,
+				"destChain", e.Message.Header.DestChainSelector,
+				"filterID", logs[idx].FilterID,
+				"address", logs[idx].Address.ToSolana().String(),
+				"eventSig", logs[idx].EventSig.String(),
+			)
 		case consts.EventNameExecutionStateChanged:
 			e := &ccip.EventExecutionStateChanged{}
 			if err := bin.UnmarshalBorsh(e, logs[idx].Data); err != nil {

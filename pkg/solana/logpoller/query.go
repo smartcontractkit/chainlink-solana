@@ -130,6 +130,10 @@ func (q *queryArgs) withIncludeReverted(includeReverted bool) *queryArgs {
 	return q.withField("include_reverted", includeReverted)
 }
 
+func (q *queryArgs) withExtraFilterConfig(cfg types.ExtraFilterConfig) *queryArgs {
+	return q.withField("extra_filter_config", cfg)
+}
+
 func logsQuery(clause string) string {
 	// TODO: using DISTINCT in a query is less efficient but required because of duplicate logs coming from multipler filters
 	return fmt.Sprintf(`SELECT DISTINCT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)

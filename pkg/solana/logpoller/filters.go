@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -39,14 +39,16 @@ type filters struct {
 	seqNumsMutex           sync.Mutex
 	decoders               map[int64]types.Decoder
 	discriminatorExtractor solcommoncodec.DiscriminatorExtractor
+	cpiEventExtractor      *CPIEventExtractor
 }
 
-func newFilters(lggr logger.Logger, orm ORM) *filters {
+func newFilters(lggr logger.Logger, orm ORM, cpiEventExtractor *CPIEventExtractor) *filters {
 	return &filters{
 		orm:                    orm,
 		lggr:                   logger.Sugared(lggr),
 		decoders:               make(map[int64]types.Decoder),
 		discriminatorExtractor: solcommoncodec.NewDiscriminatorExtractor(),
+		cpiEventExtractor:      cpiEventExtractor,
 	}
 }
 
@@ -209,7 +211,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codec.NewEventArgsEntry(filter.EventName, codec.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	cEntry, err := codecv1.NewEventArgsEntry(filter.EventName, codecv1.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
 	}
@@ -249,9 +251,17 @@ func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {
 		fl.filtersToBackfill[filter.ID] = struct{}{}
 	}
 
-	programID := filter.Address.ToSolana().String()
-	fl.knownPrograms[programID]++
-	fl.knownDiscriminators[filter.EventSig]++
+	if filter.IsCPIFilter() {
+		if fl.cpiEventExtractor != nil {
+			fl.cpiEventExtractor.AddFilter(filter)
+		} else {
+			fl.lggr.Critical("cpiEventExtractor is nil but filter is a CPI filter")
+		}
+	} else {
+		programID := filter.Address.ToSolana().String()
+		fl.knownPrograms[programID]++
+		fl.knownDiscriminators[filter.EventSig]++
+	}
 }
 
 // UnregisterFilter will mark the filter with the given name for pruning and async prune all corresponding logs.
@@ -320,22 +330,30 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 		delete(fl.filtersByAddress, filter.Address)
 	}
 
-	programID := filter.Address.ToSolana().String()
-	if refcount, ok := fl.knownPrograms[programID]; ok {
-		refcount--
-		if refcount > 0 {
-			fl.knownPrograms[programID] = refcount
+	if filter.IsCPIFilter() {
+		if fl.cpiEventExtractor != nil {
+			fl.cpiEventExtractor.RemoveFilter(filter)
 		} else {
-			delete(fl.knownPrograms, programID)
+			fl.lggr.Critical("cpiEventExtractor is nil but filter is a CPI filter")
 		}
-	}
+	} else {
+		programID := filter.Address.ToSolana().String()
+		if refcount, ok := fl.knownPrograms[programID]; ok {
+			refcount--
+			if refcount > 0 {
+				fl.knownPrograms[programID] = refcount
+			} else {
+				delete(fl.knownPrograms, programID)
+			}
+		}
 
-	if refcount, ok := fl.knownDiscriminators[filter.EventSig]; ok {
-		refcount--
-		if refcount > 0 {
-			fl.knownDiscriminators[filter.EventSig] = refcount
-		} else {
-			delete(fl.knownDiscriminators, filter.EventSig)
+		if refcount, ok := fl.knownDiscriminators[filter.EventSig]; ok {
+			refcount--
+			if refcount > 0 {
+				fl.knownDiscriminators[filter.EventSig] = refcount
+			} else {
+				delete(fl.knownDiscriminators, filter.EventSig)
+			}
 		}
 	}
 }
@@ -365,7 +383,7 @@ func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]types.PublicKey,
 
 // MatchingFilters - returns iterator to go through all matching filters.
 // Requires LoadFilters to be called at least once.
-func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.EventSignature) iter.Seq[types.Filter] {
+func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.EventSignature, isCPI bool) iter.Seq[types.Filter] {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to matchingFilters")
 		return nil
@@ -384,6 +402,9 @@ func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.Ev
 				fl.lggr.Errorw("expected filter to exist in filtersByID", "filterID", filterID)
 				continue
 			}
+			if filter.IsCPIFilter() != isCPI {
+				continue
+			}
 			if !yield(*filter) {
 				return
 			}
@@ -391,7 +412,7 @@ func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.Ev
 	}
 }
 
-// MatchchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,
+// MatchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,
 // this will be called on every new event that happens on the blockchain, so it's important it returns immediately if it
 // doesn't match any registered filters.
 func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter] {
@@ -404,20 +425,24 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter
 	}
 
 	discriminator := fl.discriminatorExtractor.Extract(event.Data)
-	isKnown := func() (ok bool) {
-		fl.filtersMutex.RLock()
-		defer fl.filtersMutex.RUnlock()
 
-		if _, ok = fl.knownPrograms[event.Program]; !ok {
+	// already filtered to only include matching events for CPI events
+	if !event.IsCPI {
+		isKnown := func() (ok bool) {
+			fl.filtersMutex.RLock()
+			defer fl.filtersMutex.RUnlock()
+
+			if _, ok = fl.knownPrograms[event.Program]; !ok {
+				return ok
+			}
+
+			_, ok = fl.knownDiscriminators[discriminator]
 			return ok
 		}
 
-		_, ok = fl.knownDiscriminators[discriminator]
-		return ok
-	}
-
-	if !isKnown() {
-		return nil
+		if !isKnown() {
+			return nil
+		}
 	}
 
 	addr, err := solana.PublicKeyFromBase58(event.Program)
@@ -426,7 +451,7 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter
 		return nil
 	}
 
-	return fl.matchingFilters(types.PublicKey(addr), discriminator)
+	return fl.matchingFilters(types.PublicKey(addr), discriminator, event.IsCPI)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue
@@ -449,6 +474,22 @@ func (fl *filters) GetFiltersToBackfill() []types.Filter {
 	}
 
 	return result
+}
+
+// GetFilters returns a copy of all currently registered filters, keyed by filter name.
+func (fl *filters) GetFilters(ctx context.Context) (map[string]types.Filter, error) {
+	err := fl.LoadFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fl.filtersMutex.RLock()
+	defer fl.filtersMutex.RUnlock()
+
+	result := make(map[string]types.Filter, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		result[filter.Name] = *filter
+	}
+	return result, nil
 }
 
 func (fl *filters) MarkFilterBackfilled(ctx context.Context, filterID int64) error {

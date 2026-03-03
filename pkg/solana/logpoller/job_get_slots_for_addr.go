@@ -29,6 +29,7 @@ type getSlotsForAddressJob struct {
 
 	storeSlot func(slot uint64)
 	done      chan struct{}
+	aborted   bool
 	workers   WorkerGroup
 }
 
@@ -51,6 +52,12 @@ func (f *getSlotsForAddressJob) String() string {
 
 func (f *getSlotsForAddressJob) Done() <-chan struct{} {
 	return f.done
+}
+
+func (f *getSlotsForAddressJob) Abort(ctx context.Context) error {
+	f.aborted = true
+	close(f.done)
+	return nil
 }
 
 func (f *getSlotsForAddressJob) Run(ctx context.Context) error {

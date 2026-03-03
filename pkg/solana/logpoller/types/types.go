@@ -14,8 +14,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/lib/pq"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 )
 
 type PublicKey solana.PublicKey
@@ -125,6 +125,10 @@ func NewEventSignatureFromName(eventName string) EventSignature {
 	return EventSignature(solcommoncodec.NewDiscriminatorHashPrefix(eventName, false))
 }
 
+func NewMethodSignatureFromName(methodName string) EventSignature {
+	return EventSignature(solcommoncodec.NewMethodDiscriminatorHashPrefix(methodName))
+}
+
 // Scan implements Scanner for database/sql.
 func (s *EventSignature) Scan(src interface{}) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
@@ -144,7 +148,7 @@ type Decoder interface {
 	Decode(_ context.Context, raw []byte, into any, itemType string) error
 }
 
-type EventIdl codec.EventIDLTypes
+type EventIdl codecv1.EventIDLTypes
 
 func (e *EventIdl) Scan(src interface{}) error {
 	return scanJSON("EventIdl", e, src)
@@ -158,7 +162,22 @@ func (e EventIdl) Equal(o EventIdl) bool {
 	return reflect.DeepEqual(e, o)
 }
 
+func (c *ExtraFilterConfig) Scan(src interface{}) error {
+	return scanJSON("ExtraFilterConfig", c, src)
+}
+
+func (c ExtraFilterConfig) Value() (driver.Value, error) {
+	if c.IsEmpty() {
+		return nil, nil
+	}
+	return json.Marshal(c)
+}
+
 func scanJSON(name string, dest, src interface{}) error {
+	if src == nil {
+		return nil
+	}
+
 	var bSrc []byte
 	switch src := src.(type) {
 	case string:

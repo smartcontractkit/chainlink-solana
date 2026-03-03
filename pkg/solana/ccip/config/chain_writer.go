@@ -13,11 +13,13 @@ import (
 	idl "github.com/smartcontractkit/chainlink-ccip/chains/solana"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainwriter"
-	solanacodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 )
 
-var ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
-var ccipRouterIDL = idl.FetchCCIPRouterIDL()
+var (
+	ccipOfframpIDL = idl.FetchCCIPOfframpIDL()
+	ccipRouterIDL  = idl.FetchCCIPRouterIDL()
+)
 
 const (
 	destTokenAddress              = "Info.AbstractReports.Messages.TokenAmounts.DestTokenAddress"
@@ -150,12 +152,12 @@ func GetSolanaChainWriterConfig(offrampProgramAddress string, fromAddress string
 	}
 
 	// validate CCIP Offramp IDL, errors not expected
-	var offrampIDL solanacodec.IDL
+	var offrampIDL codecv1.IDL
 	if err = json.Unmarshal([]byte(ccipOfframpIDL), &offrampIDL); err != nil {
 		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Offramp IDL, error: %w", err)
 	}
 	// validate CCIP Router IDL, errors not expected
-	var routerIDL solanacodec.IDL
+	var routerIDL codecv1.IDL
 	if err = json.Unmarshal([]byte(ccipRouterIDL), &routerIDL); err != nil {
 		return chainwriter.ChainWriterConfig{}, fmt.Errorf("unexpected error: invalid CCIP Router IDL, error: %w", err)
 	}

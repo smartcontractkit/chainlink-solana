@@ -32,18 +32,19 @@ type EncodedLogCollector struct {
 	engine *services.Engine
 
 	// dependencies and configuration
-	client RPCClient
-	lggr   logger.SugaredLogger
+	client            RPCClient
+	lggr              logger.SugaredLogger
+	cpiEventExtractor *CPIEventExtractor
 
 	workers *worker.Group
+	metrics *solLpMetrics
 }
 
-func NewEncodedLogCollector(
-	client RPCClient,
-	lggr logger.Logger,
-) *EncodedLogCollector {
+func NewEncodedLogCollector(client RPCClient, lggr logger.Logger, chainID string, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *EncodedLogCollector {
 	c := &EncodedLogCollector{
-		client: client,
+		client:            client,
+		metrics:           metrics,
+		cpiEventExtractor: cpiEventExtractor,
 	}
 
 	c.Service, c.engine = services.Config{
@@ -56,6 +57,18 @@ func NewEncodedLogCollector(
 	}.NewServiceEngine(lggr)
 	c.lggr = c.engine
 
+	return c
+}
+
+func (c *EncodedLogCollector) WithMaxGroupRetryCount(cc uint8) *EncodedLogCollector {
+	c.Service, c.engine = services.Config{
+		Name: "EncodedLogCollector",
+		NewSubServices: func(lggr logger.Logger) []services.Service {
+			c.workers = worker.NewGroup(worker.DefaultWorkerCount, logger.Sugared(lggr)).WithMaxRetryCount(cc)
+
+			return []services.Service{c.workers}
+		},
+	}.NewServiceEngine(c.lggr)
 	return c
 }
 
@@ -73,7 +86,7 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []t
 		slotsForAddressJobs[i] = newGetSlotsForAddress(c.lggr, c.client, c.workers, storeSlot, address, fromSlot, toSlot)
 		err := c.workers.Do(ctx, slotsForAddressJobs[i])
 		if err != nil {
-			return nil, fmt.Errorf("could not shedule job to fetch slots for address: %w", err)
+			return nil, fmt.Errorf("could not schedule job to fetch slots for address: %w", err)
 		}
 	}
 
@@ -99,7 +112,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	blocks := make(chan types.Block)
 	getBlockJobs := make([]*getBlockJob, len(slots))
 	for i, slot := range slots {
-		getBlockJobs[i] = newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot)
+		getBlockJobs[i] = newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot, c.metrics, c.cpiEventExtractor)
 		err := c.workers.Do(ctx, getBlockJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
@@ -115,6 +128,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 				continue
 			}
 		}
+
 		close(blocks)
 	}()
 
@@ -140,6 +154,7 @@ func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresse
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("failed to schedule blocks to fetch: %w", err)
 	}
+
 	blocksSorter, sortedBlocks := newBlocksSorter(unorderedBlocks, c.lggr, slotsToFetch)
 	err = blocksSorter.Start(ctx)
 	if err != nil {

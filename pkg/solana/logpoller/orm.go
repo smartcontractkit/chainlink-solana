@@ -82,6 +82,7 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64
 		withSubKeyPaths(filter.SubkeyPaths).
 		withIsBackfilled(filter.IsBackfilled).
 		withIncludeReverted(filter.IncludeReverted).
+		withExtraFilterConfig(filter.ExtraFilterConfig).
 		toArgs()
 	if err != nil {
 		return 0, err
@@ -91,15 +92,16 @@ func (o *DSORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64
 	// https://github.com/jmoiron/sqlx/issues/91, https://github.com/jmoiron/sqlx/issues/428
 	query := `
 		INSERT INTO solana.log_poller_filters
-		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled, include_reverted)
-			VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled, :include_reverted)
+		    (chain_id, name, address, event_name, event_sig, starting_block, event_idl, subkey_paths, retention, max_logs_kept, is_backfilled, include_reverted, extra_filter_config)
+			VALUES (:chain_id, :name, :address, :event_name, :event_sig, :starting_block, :event_idl, :subkey_paths, :retention, :max_logs_kept, :is_backfilled, :include_reverted, :extra_filter_config)
 	  	ON CONFLICT (chain_id, name) WHERE NOT is_deleted DO UPDATE SET 
 	  	                                                        event_name = EXCLUDED.event_name,
 	  	                                                        starting_block = EXCLUDED.starting_block,
 	  	                                                        retention = EXCLUDED.retention,
 	  	                                                        max_logs_kept = EXCLUDED.max_logs_kept,
 	  	                                                        is_backfilled = EXCLUDED.is_backfilled,
-	  	                                                        include_reverted = EXCLUDED.include_reverted
+	  	                                                        include_reverted = EXCLUDED.include_reverted,
+	  	                                                        extra_filter_config = EXCLUDED.extra_filter_config
 		RETURNING id;`
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)

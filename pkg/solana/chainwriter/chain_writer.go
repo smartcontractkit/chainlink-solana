@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	solcodecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcodecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
@@ -110,7 +110,7 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 			}
 		} else {
 			// Fall back to codec IDL
-			var codecIDL solcodecv1.IDL
+			var codecIDL codecv1.IDL
 			if err := json.Unmarshal([]byte(programConfig.IDL), &codecIDL); err != nil {
 				return fmt.Errorf("failed to unmarshal IDL for program %s (tried both codecv2 and codec), error: %w", program, err)
 			}
@@ -123,10 +123,10 @@ func (s *SolanaChainWriterService) parsePrograms(config ChainWriterConfig) error
 	return nil
 }
 
-func (s *SolanaChainWriterService) parseProgramCodec(program string, programConfig ProgramConfig, idl solcodecv1.IDL) error {
+func (s *SolanaChainWriterService) parseProgramCodec(program string, programConfig ProgramConfig, idl codecv1.IDL) error {
 	for method, methodConfig := range programConfig.Methods {
 		utils.InjectAddressModifier(methodConfig.InputModifications, nil)
-		idlDef, err := solcodecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
+		idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (s *SolanaChainWriterService) parseProgramCodec(program string, programConf
 			return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
 		}
 
-		input, err := solcodecv1.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
+		input, err := codecv1.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
 		if err != nil {
 			return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
 		}
@@ -149,7 +149,7 @@ func (s *SolanaChainWriterService) parseProgramCodec(program string, programConf
 func (s *SolanaChainWriterService) parseProgramCodecv2(program string, programConfig ProgramConfig, idl anchoridl.Idl) error {
 	for method, methodConfig := range programConfig.Methods {
 		utils.InjectAddressModifier(methodConfig.InputModifications, nil)
-		idlDef, err := solcodecv2.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
+		idlDef, err := codecv2.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeInstructionDef, methodConfig.ChainSpecificName, idl)
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func (s *SolanaChainWriterService) parseProgramCodecv2(program string, programCo
 			return fmt.Errorf("failed to create input modifications for method %s.%s, error: %w", program, method, err)
 		}
 
-		input, err := solcodecv2.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
+		input, err := codecv2.CreateCodecEntry(idlDef, methodConfig.ChainSpecificName, idl, inputMod)
 		if err != nil {
 			return fmt.Errorf("failed to create codec entry for method %s.%s, error: %w", program, method, err)
 		}
@@ -549,7 +549,7 @@ func (s *SolanaChainWriterService) EncodePayload(ctx context.Context, args any, 
 		return nil, fmt.Errorf("error encoding transaction payload: %w", err)
 	}
 
-	discriminator := GetDiscriminator(methodConfig.ChainSpecificName)
+	discriminator := solcommoncodec.NewMethodDiscriminatorHashPrefix(methodConfig.ChainSpecificName)
 	encodedPayload = append(discriminator[:], encodedPayload...)
 	return encodedPayload, nil
 }

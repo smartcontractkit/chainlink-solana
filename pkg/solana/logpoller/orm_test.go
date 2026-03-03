@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -39,12 +39,12 @@ func TestLogPollerFilters(t *testing.T) {
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: types.EventIdl{
-					Event: codec.IdlEvent{
+					Event: codecv1.IdlEvent{
 						Name:   "MyEvent",
-						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+						Fields: []codecv1.IdlEventField{{Name: "MyField", Type: codecv1.NewIdlStringType(codecv1.IdlTypeDuration), Index: true}},
 					},
-					Types: codec.IdlTypeDefSlice{
-						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+					Types: codecv1.IdlTypeDefSlice{
+						{Name: "NilType", Type: codecv1.IdlTypeDefTy{Kind: codecv1.IdlTypeDefTyKindStruct, Fields: &codecv1.IdlTypeDefStruct{}}},
 					},
 				},
 				Retention:   1000,
@@ -69,6 +69,20 @@ func TestLogPollerFilters(t *testing.T) {
 				SubkeyPaths:   nil,
 				Retention:     1000,
 				MaxLogsKept:   3,
+			},
+			{
+				Name:          "CPI filter with dest program and method signature",
+				Address:       types.PublicKey(pubKey),
+				EventName:     "cpi_event",
+				EventSig:      types.EventSignature{4, 5, 6},
+				StartingBlock: 1,
+				SubkeyPaths:   types.SubKeyPaths([][]string{{"a"}}),
+				Retention:     1000,
+				MaxLogsKept:   3,
+				ExtraFilterConfig: types.ExtraFilterConfig{
+					DestProgram:     newRandomPublicKey(t),
+					MethodSignature: types.EventSignature{7, 8, 9, 10, 11, 12, 13, 14},
+				},
 			},
 		}
 

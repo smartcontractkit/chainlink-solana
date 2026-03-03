@@ -22,7 +22,7 @@ import (
 	commoncfg "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -36,21 +36,24 @@ type mockedLP struct {
 	LogPoller *Service
 }
 
-func newMockedLPwithConfig(t *testing.T, cfg config.Config) mockedLP {
+func newMockedLPwithConfig(t *testing.T, cfg config.Config, chainID string) mockedLP {
 	result := mockedLP{
 		ORM:     mocks.NewMockORM(t),
 		Client:  mocks.NewRPCClient(t),
 		Loader:  mocks.NewMockLogsLoader(t),
 		Filters: mocks.NewMockFilters(t),
 	}
-	result.LogPoller = New(logger.TestSugared(t), result.ORM, result.Client, cfg)
+
+	var err error
+	result.LogPoller, err = New(logger.TestSugared(t), result.ORM, result.Client, cfg, chainID)
+	require.NoError(t, err)
 	result.LogPoller.loader = result.Loader
 	result.LogPoller.filters = result.Filters
 	return result
 }
 
 func newMockedLP(t *testing.T) mockedLP {
-	return newMockedLPwithConfig(t, config.NewDefault())
+	return newMockedLPwithConfig(t, config.NewDefault(), chainID)
 }
 
 func TestLogPoller_run(t *testing.T) {
@@ -237,7 +240,7 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 	cfg := config.NewDefault()
 	cfg.Chain.BlockTime = commoncfg.MustNewDuration(600 * time.Millisecond)
 	cfg.Chain.LogPollerStartingLookback = commoncfg.MustNewDuration(600 * time.Second)
-	lp := newMockedLPwithConfig(t, cfg)
+	lp := newMockedLPwithConfig(t, cfg, chainID)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -280,6 +283,7 @@ func Test_GetLastProcessedSlot(t *testing.T) {
 
 func TestLogPoller_processBlocksRange(t *testing.T) {
 	t.Parallel()
+
 	t.Run("Returns error if failed to start backfill", func(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to start backfill")
@@ -307,8 +311,8 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 	t.Run("Happy path", func(t *testing.T) {
 		lp := newMockedLP(t)
 		blocks := make(chan types.Block, 2)
-		blocks <- types.Block{}
-		blocks <- types.Block{}
+		blocks <- types.Block{SlotNumber: 11}
+		blocks <- types.Block{SlotNumber: 12}
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
 		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
@@ -366,10 +370,11 @@ func TestProcess(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
 	lggr := logger.Sugared(logger.Test(t))
-	lp := New(lggr, orm, cl, config.NewDefault())
+	lp, err := New(lggr, orm, cl, config.NewDefault(), chainID)
+	require.NoError(t, err)
 
-	var idlTypeInt64 codec.IdlType
-	var idlTypeString codec.IdlType
+	var idlTypeInt64 codecv1.IdlType
+	var idlTypeString codecv1.IdlType
 
 	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
 	require.NoError(t, err)
@@ -377,9 +382,9 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	idl := types.EventIdl{
-		Event: codec.IdlEvent{
+		Event: codecv1.IdlEvent{
 			Name: "myEvent",
-			Fields: []codec.IdlEventField{{
+			Fields: []codecv1.IdlEventField{{
 				Name: "A",
 				Type: idlTypeInt64,
 			}, {
@@ -387,7 +392,7 @@ func TestProcess(t *testing.T) {
 				Type: idlTypeString,
 			}},
 		},
-		Types: []codec.IdlTypeDef{},
+		Types: []codecv1.IdlTypeDef{},
 	}
 
 	filter := types.Filter{
@@ -588,7 +593,8 @@ func TestBackgroundWorkerRun(t *testing.T) {
 	lggr := logger.TestSugared(t)
 	orm := mocks.NewMockORM(t)
 	cl := mocks.NewRPCClient(t)
-	lp := New(lggr, orm, cl, config.NewDefault())
+	lp, err := New(lggr, orm, cl, config.NewDefault(), chainID)
+	require.NoError(t, err)
 
 	filter1 := types.Filter{ID: 1, Name: "Filter A"}
 	filter2 := types.Filter{ID: 2, Name: "Filter B"}

@@ -54,6 +54,7 @@ type filtersI interface {
 	PruneFilters(ctx context.Context) error
 	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]types.PublicKey, error)
+	GetFilters(ctx context.Context) (map[string]types.Filter, error)
 	GetFiltersToBackfill() []types.Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	UpdateStartingBlocks(startingBlocks int64)
@@ -85,15 +86,27 @@ type Service struct {
 	client            RPCClient
 	loader            logsLoader
 	filters           filtersI
+	cpiEventExtractor *CPIEventExtractor
 	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
+	metrics           *solLpMetrics
 }
 
-func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *Service {
+func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, chainID string) (*Service, error) {
 	lp := &Service{
 		orm:    orm,
 		client: cl,
+	}
+
+	if cfg.LogPollerCPIEventsEnabled() {
+		lp.cpiEventExtractor = NewCPIEventExtractor(lggr)
+	}
+
+	var err error
+	lp.metrics, err = NewSolLpMetrics(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
 	lp.processBlocks = lp.processBlocksImpl
@@ -102,8 +115,8 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 		Name:  "LogPoller",
 		Start: lp.start,
 		NewSubServices: func(lggr logger.Logger) []services.Service {
-			lp.filters = newFilters(lggr, orm)
-			loader := NewEncodedLogCollector(cl, lggr)
+			lp.filters = newFilters(lggr, orm, lp.cpiEventExtractor)
+			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor)
 			lp.loader = loader
 			return []services.Service{loader}
 		},
@@ -114,13 +127,21 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config) *S
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
 
-	return lp
+	return lp, nil
 }
 
-func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, processBlocks func(ctx context.Context, blocks []types.Block) error) *Service {
-	lp := New(lggr, orm, client, cfg)
+func NewWithCustomProcessor(lggr logger.SugaredLogger, orm ORM, client RPCClient, cfg config.Config, chainID string, processBlocks func(ctx context.Context, blocks []types.Block) error) (*Service, error) {
+	lp, err := New(lggr, orm, client, cfg, chainID)
+	if err != nil {
+		return nil, err
+	}
 	lp.processBlocks = processBlocks
-	return lp
+	return lp, nil
+}
+
+// CPIEventsEnabled returns true if CPI event extraction is enabled for this log poller.
+func (lp *Service) CPIEventsEnabled() bool {
+	return lp.cpiEventExtractor != nil
 }
 
 const BackgroundWorkerInterval = 10 * time.Minute
@@ -260,6 +281,12 @@ func (lp *Service) UnregisterFilter(ctx context.Context, name string) error {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 	return lp.filters.UnregisterFilter(ctx, name)
+}
+
+func (lp *Service) GetFilters(ctx context.Context) (map[string]types.Filter, error) {
+	ctx, cancel := lp.eng.Ctx(ctx)
+	defer cancel()
+	return lp.filters.GetFilters(ctx)
 }
 
 // Replay submits a new replay request. If there was already a new replay request
