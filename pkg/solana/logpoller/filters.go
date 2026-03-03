@@ -454,6 +454,21 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter
 	return fl.matchingFilters(types.PublicKey(addr), discriminator, event.IsCPI)
 }
 
+func (fl *filters) GetFilters(ctx context.Context) (map[string]types.Filter, error) {
+	err := fl.LoadFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fl.filtersMutex.RLock()
+	defer fl.filtersMutex.RUnlock()
+
+	result := make(map[string]types.Filter, len(fl.filtersByID))
+	for _, filter := range fl.filtersByID {
+		result[filter.Name] = *filter
+	}
+	return result, nil
+}
+
 // GetFiltersToBackfill - returns copy of backfill queue
 // Requires LoadFilters to be called at least once.
 func (fl *filters) GetFiltersToBackfill() []types.Filter {
