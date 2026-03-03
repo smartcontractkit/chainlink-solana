@@ -27,21 +27,23 @@ export default class AddAccess extends SolanaCommand {
     const accessAddress = new PublicKey(this.flags.address)
 
     console.log(`Giving access to ${accessAddress}...`)
-    const tx = await program.rpc.addAccess({
-      accounts: {
+    const ix = await program.methods
+      .addAccess()
+      .accounts({
         state: state,
-        owner: this.wallet.payer.publicKey,
+        owner: this.wallet.publicKey,
         address: accessAddress,
-      },
-      signers: [this.wallet.payer],
-    })
+      })
+      .instruction()
 
-    logger.success(`Access given on tx ${tx}`)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, accessController.idl)([ix])
+
+    logger.success(`Access given on tx ${txhash}`)
 
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, address, { state: state.toString() }),
+          tx: this.wrapResponse(txhash, address, { state: state.toString() }),
           contract: state.toString(),
         },
       ],
