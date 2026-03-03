@@ -1,121 +1,124 @@
 {
-  "version": "0.1.0",
-  "name": "keystone_forwarder",
   "address": "whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz",
   "metadata": {
     "name": "keystone_forwarder",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Forwarder authenticates chainlink reports and relays them to designated receiver programs."
+    "description": "Created with Anchor"
   },
   "docs": [
     "Forwarder authenticates chainlink reports and relays them to designated receiver programs."
   ],
   "instructions": [
     {
-      "name": "initialize",
-      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "name": "accept_ownership",
       "docs": [
-        "Initializes a new Forwarder instance and stores data in its state account"
+        "Step 2 of 2-step ownership process: accept ownership"
+      ],
+      "discriminator": [
+        172,
+        23,
+        43,
+        13,
+        238,
+        213,
+        85,
+        150
       ],
       "accounts": [
         {
           "name": "state",
-          "isMut": true,
-          "isSigner": true
+          "writable": true
         },
         {
-          "name": "owner",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "proposed_owner",
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "transferOwnership",
-      "discriminator": [32, 215, 22, 144, 238, 243, 169, 0],
-      "docs": ["Step 1 of 2-step ownership process: propose a new owner"],
+      "name": "close_oracles_config",
+      "docs": [
+        "Closes oracle config account"
+      ],
+      "discriminator": [
+        218,
+        201,
+        210,
+        221,
+        4,
+        102,
+        230,
+        110
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "currentOwner",
-          "isMut": false,
-          "isSigner": true
+          "name": "oracles_config",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "proposedOwner",
-          "type": "pubkey"
+          "name": "_don_id",
+          "type": "u32"
+        },
+        {
+          "name": "_config_version",
+          "type": "u32"
         }
       ]
     },
     {
-      "name": "acceptOwnership",
-      "discriminator": [30, 43, 213, 84, 172, 203, 104, 84],
-      "docs": ["Step 2 of 2-step ownership process: accept ownership"],
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "proposedOwner",
-          "isMut": false,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "initOraclesConfig",
-      "discriminator": [25, 109, 31, 120, 13, 44, 72, 235],
+      "name": "init_oracles_config",
       "docs": [
         "Initialize oracles config which describes the set of oracles which",
         "are expected to sign a verified forwarder report. Many oracle config accounts",
         "may exist for a forwarder because more than one DON may be allowed to sign",
         "reports for a forwarder."
       ],
+      "discriminator": [
+        250,
+        243,
+        125,
+        192,
+        247,
+        209,
+        38,
+        35
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "oraclesConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "oracles_config",
+          "writable": true
         },
         {
           "name": "owner",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
         {
-          "name": "donId",
+          "name": "don_id",
           "type": "u32"
         },
         {
-          "name": "configVersion",
+          "name": "config_version",
           "type": "u32"
         },
         {
@@ -123,97 +126,52 @@
           "type": "u8"
         },
         {
-          "name": "signerAddresses",
+          "name": "signer_addresses",
           "type": {
             "vec": {
-              "array": ["u8", 20]
+              "array": [
+                "u8",
+                20
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "updateOraclesConfig",
-      "discriminator": [145, 61, 101, 203, 237, 110, 170, 193],
+      "name": "initialize",
       "docs": [
-        "Updates oracles config under circumstances where the designated",
-        "signers or configuration parameters change"
+        "Initializes a new Forwarder instance and stores data in its state account"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
       ],
       "accounts": [
         {
           "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "oraclesConfig",
-          "isMut": true,
-          "isSigner": false
+          "writable": true,
+          "signer": true
         },
         {
           "name": "owner",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
-      "args": [
-        {
-          "name": "donId",
-          "type": "u32"
-        },
-        {
-          "name": "configVersion",
-          "type": "u32"
-        },
-        {
-          "name": "f",
-          "type": "u8"
-        },
-        {
-          "name": "signerAddresses",
-          "type": {
-            "vec": {
-              "array": ["u8", 20]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "closeOraclesConfig",
-      "discriminator": [215, 195, 245, 158, 39, 152, 15, 190],
-      "docs": ["Closes oracle config account"],
-      "accounts": [
-        {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "oraclesConfig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "owner",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "donId",
-          "type": "u32"
-        },
-        {
-          "name": "configVersion",
-          "type": "u32"
-        }
-      ]
+      "args": []
     },
     {
       "name": "report",
-      "discriminator": [96, 121, 245, 84, 178, 45, 48, 91],
       "docs": [
         "The report instruction verifies the report by checking it's ECDSA signatures and ensuring that f + 1 nodes have signed the report.",
         "After verification it will create a PDA to store the execution state if it does not exist.",
@@ -223,41 +181,41 @@
         "this number including adding more accounts in the ctx.remaining_accounts and/or using address",
         "lookup tables. Please refer to ../../docs/forwarder/README.md#L140"
       ],
+      "discriminator": [
+        96,
+        121,
+        245,
+        84,
+        178,
+        45,
+        48,
+        91
+      ],
       "accounts": [
         {
-          "name": "state",
-          "isMut": false,
-          "isSigner": false
+          "name": "state"
         },
         {
-          "name": "oraclesConfig",
-          "isMut": true,
-          "isSigner": false
+          "name": "oracles_config",
+          "writable": true
         },
         {
           "name": "transmitter",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "forwarderAuthority",
-          "isMut": false,
-          "isSigner": false
+          "name": "forwarder_authority"
         },
         {
-          "name": "executionState",
-          "isMut": true,
-          "isSigner": false
+          "name": "execution_state",
+          "writable": true
         },
         {
-          "name": "receiverProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "receiver_program"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "system_program"
         }
       ],
       "args": [
@@ -266,66 +224,326 @@
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "transfer_ownership",
+      "docs": [
+        "Step 1 of 2-step ownership process: propose a new owner"
+      ],
+      "discriminator": [
+        65,
+        177,
+        215,
+        73,
+        53,
+        45,
+        99,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true
+        },
+        {
+          "name": "current_owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "proposed_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "update_oracles_config",
+      "docs": [
+        "Updates oracles config under circumstances where the designated",
+        "signers or configuration parameters change"
+      ],
+      "discriminator": [
+        237,
+        218,
+        118,
+        168,
+        138,
+        38,
+        225,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "state"
+        },
+        {
+          "name": "oracles_config",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "don_id",
+          "type": "u32"
+        },
+        {
+          "name": "config_version",
+          "type": "u32"
+        },
+        {
+          "name": "f",
+          "type": "u8"
+        },
+        {
+          "name": "signer_addresses",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
     {
+      "name": "ExecutionState",
+      "discriminator": [
+        31,
+        209,
+        35,
+        133,
+        132,
+        142,
+        151,
+        100
+      ]
+    },
+    {
+      "name": "ForwarderState",
+      "discriminator": [
+        211,
+        150,
+        18,
+        11,
+        12,
+        158,
+        235,
+        175
+      ]
+    },
+    {
       "name": "OraclesConfig",
-      "discriminator": [153, 175, 230, 85, 235, 101, 107, 140],
-      "docs": [
-        "Account which represent a set of oracles expected to sign a forwarder report."
-      ],
+      "discriminator": [
+        153,
+        175,
+        230,
+        85,
+        235,
+        101,
+        107,
+        140
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ConfigSet",
+      "discriminator": [
+        15,
+        104,
+        59,
+        16,
+        236,
+        241,
+        8,
+        6
+      ]
+    },
+    {
+      "name": "ForwarderInitialize",
+      "discriminator": [
+        159,
+        31,
+        132,
+        46,
+        0,
+        198,
+        223,
+        91
+      ]
+    },
+    {
+      "name": "OwnershipAcceptance",
+      "discriminator": [
+        210,
+        153,
+        45,
+        4,
+        216,
+        55,
+        115,
+        233
+      ]
+    },
+    {
+      "name": "OwnershipTransfer",
+      "discriminator": [
+        182,
+        234,
+        119,
+        37,
+        105,
+        210,
+        22,
+        38
+      ]
+    },
+    {
+      "name": "ReportInProgress",
+      "discriminator": [
+        195,
+        155,
+        152,
+        235,
+        61,
+        149,
+        182,
+        1
+      ]
+    },
+    {
+      "name": "ReportProcessed",
+      "discriminator": [
+        48,
+        88,
+        213,
+        133,
+        74,
+        113,
+        4,
+        255
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidProposedOwner",
+      "msg": "Invalid proposed owner"
+    },
+    {
+      "code": 6001,
+      "name": "ExcessSigners",
+      "msg": "Signers exceed max limit"
+    },
+    {
+      "code": 6002,
+      "name": "SignersNotSortedInIncreasingOrder",
+      "msg": "Signer addresses must strictly increase"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidReport",
+      "msg": "Report does not meet minimum length"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidSignatureCount",
+      "msg": "Invalid signature count"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSignature",
+      "msg": "Invalid signature"
+    },
+    {
+      "code": 6006,
+      "name": "UnauthorizedSigner",
+      "msg": "Unauthorized signer"
+    },
+    {
+      "code": 6007,
+      "name": "DuplicateSignatures",
+      "msg": "Duplicate signatures"
+    },
+    {
+      "code": 6008,
+      "name": "ExecutionAlreadySucceded",
+      "msg": "Execution already succeded"
+    },
+    {
+      "code": 6009,
+      "name": "FaultToleranceMustBePositive",
+      "msg": "Fault tolerance must be positive"
+    },
+    {
+      "code": 6010,
+      "name": "InsufficientSigners",
+      "msg": "Insufficient Signers"
+    },
+    {
+      "code": 6011,
+      "name": "ForwarderReportExpected",
+      "msg": "Forwarder Report Expected"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidAccountHash",
+      "msg": "Invalid Account Hash"
+    }
+  ],
+  "types": [
+    {
+      "name": "ConfigSet",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "configId",
-            "type": "u64"
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracles_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "don_id",
+            "type": "u32"
+          },
+          {
+            "name": "config_version",
+            "type": "u32"
           },
           {
             "name": "f",
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "signers",
             "type": {
-              "array": ["u8", 7]
+              "vec": {
+                "array": [
+                  "u8",
+                  20
+                ]
+              }
             }
-          },
-          {
-            "name": "signerAddresses",
-            "type": {
-              "defined": "SignerAddressList"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "ForwarderState",
-      "discriminator": [211, 150, 18, 11, 12, 158, 235, 175],
-      "docs": ["Account which represents a distinct instance of a forwarder."],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "proposedOwner",
-            "type": "pubkey"
           }
         ]
       }
     },
     {
       "name": "ExecutionState",
-      "discriminator": [31, 209, 35, 133, 132, 142, 151, 100],
       "docs": [
         "Account which stores status of a transmission.",
         "This account will never be closed because it provides persistent proof if a transmission was received on-chain."
@@ -338,9 +556,12 @@
             "type": "pubkey"
           },
           {
-            "name": "transmissionId",
+            "name": "transmission_id",
             "type": {
-              "array": ["u8", 32]
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
@@ -349,11 +570,182 @@
           }
         ]
       }
-    }
-  ],
-  "types": [
+    },
+    {
+      "name": "ForwarderInitialize",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ForwarderState",
+      "docs": [
+        "Account which represents a distinct instance of a forwarder."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OraclesConfig",
+      "docs": [
+        "Account which represent a set of oracles expected to sign a forwarder report."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config_id",
+            "type": "u64"
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "signer_addresses",
+            "type": {
+              "defined": {
+                "name": "SignerAddressList"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipAcceptance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipTransfer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportInProgress",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "transmission_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportProcessed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": "pubkey"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "transmission_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "result",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "SignerAddressList",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
       "type": {
         "kind": "struct",
         "fields": [
@@ -362,7 +754,10 @@
             "type": {
               "array": [
                 {
-                  "array": ["u8", 20]
+                  "array": [
+                    "u8",
+                    20
+                  ]
                 },
                 32
               ]
@@ -374,206 +769,6 @@
           }
         ]
       }
-    },
-    {
-      "name": "ForwarderError",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "InvalidProposedOwner"
-          },
-          {
-            "name": "ExcessSigners"
-          },
-          {
-            "name": "SignersNotSortedInIncreasingOrder"
-          },
-          {
-            "name": "InvalidReport"
-          },
-          {
-            "name": "InvalidSignatureCount"
-          },
-          {
-            "name": "InvalidSignature"
-          },
-          {
-            "name": "UnauthorizedSigner"
-          },
-          {
-            "name": "DuplicateSignatures"
-          },
-          {
-            "name": "ExecutionAlreadySucceded"
-          },
-          {
-            "name": "FaultToleranceMustBePositive"
-          },
-          {
-            "name": "InsufficientSigners"
-          },
-          {
-            "name": "ForwarderReportExpected"
-          },
-          {
-            "name": "InvalidAccountHash"
-          }
-        ]
-      }
-    }
-  ],
-  "events": [
-    {
-      "name": "ReportProcessed",
-      "discriminator": [48, 88, 213, 133, 74, 113, 4, 255],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "receiver",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "transmissionId",
-          "type": {
-            "array": ["u8", 32]
-          },
-          "index": false
-        },
-        {
-          "name": "result",
-          "type": "bool",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ReportInProgress",
-      "discriminator": [195, 155, 152, 235, 61, 149, 182, 1],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "transmissionId",
-          "type": {
-            "array": ["u8", 32]
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ConfigSet",
-      "discriminator": [15, 104, 59, 16, 236, 241, 8, 6],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "oraclesConfig",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "donId",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "configVersion",
-          "type": "u32",
-          "index": false
-        },
-        {
-          "name": "f",
-          "type": "u8",
-          "index": false
-        },
-        {
-          "name": "signers",
-          "type": {
-            "vec": {
-              "array": ["u8", 20]
-            }
-          },
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "ForwarderInitialize",
-      "discriminator": [159, 31, 132, 46, 0, 198, 223, 91],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "owner",
-          "type": "pubkey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipTransfer",
-      "discriminator": [182, 234, 119, 37, 105, 210, 22, 38],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "currentOwner",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "proposedOwner",
-          "type": "pubkey",
-          "index": false
-        }
-      ]
-    },
-    {
-      "name": "OwnershipAcceptance",
-      "discriminator": [210, 153, 45, 4, 216, 55, 115, 233],
-      "fields": [
-        {
-          "name": "state",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "previousOwner",
-          "type": "pubkey",
-          "index": false
-        },
-        {
-          "name": "newOwner",
-          "type": "pubkey",
-          "index": false
-        }
-      ]
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "Unauthorized",
-      "msg": "The signer is unauthorized"
     }
   ]
 }
