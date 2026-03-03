@@ -1,37 +1,44 @@
 {
-  "address": "3aptuodC9cwzwVkeEWJwRB25Hz4FP3FTysc3cb2zETTh",
+  "address": "ECL8142j2YQAvs9R9geSsRnkVH2wLEi7soJCRyJ74cfL",
   "metadata": {
-    "name": "item_slice_type_idl",
+    "name": "test_item_event_type",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
   "instructions": [
     {
-      "name": "test_item_slice_type",
-      "discriminator": [
-        252,
-        0,
-        175,
-        183,
-        86,
-        235,
-        217,
-        80
-      ],
-      "accounts": [],
-      "args": [
+      "name": "emit_test_event",
+      "discriminator": [12, 234, 217, 128, 7, 55, 197, 165],
+      "accounts": [
         {
-          "name": "test_item_slice_type",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "TestItem"
-              }
-            }
-          }
+          "name": "signer",
+          "signer": true
         }
-      ]
+      ],
+      "args": []
+    },
+    {
+      "name": "emit_test_item",
+      "discriminator": [148, 214, 22, 109, 182, 121, 232, 107],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "events": [
+    {
+      "name": "TestEvent",
+      "discriminator": [28, 52, 39, 105, 8, 210, 91, 9]
+    },
+    {
+      "name": "TestItem",
+      "discriminator": [119, 183, 160, 247, 84, 104, 222, 251]
     }
   ],
   "types": [
@@ -91,10 +98,7 @@
           {
             "name": "fixed_bytes",
             "type": {
-              "array": [
-                "u8",
-                2
-              ]
+              "array": ["u8", 2]
             }
           },
           {
@@ -116,10 +120,7 @@
           {
             "name": "fixed_bytes",
             "type": {
-              "array": [
-                "u8",
-                2
-              ]
+              "array": ["u8", 2]
             }
           },
           {
@@ -129,6 +130,18 @@
                 "name": "InnerStatic"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TestEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field1",
+            "type": "i64"
           }
         ]
       }
@@ -149,10 +162,7 @@
           {
             "name": "oracle_ids",
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {

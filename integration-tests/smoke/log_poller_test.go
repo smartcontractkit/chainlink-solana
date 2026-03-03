@@ -76,7 +76,9 @@ func TestEventLoader(t *testing.T) {
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
-	lp := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, config.NewDefault(), parser.ProcessBlocks)
+	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(0), nil).Maybe()
+	lp, err := logpoller.NewWithCustomProcessor(logger.TestSugared(t), orm, cl, config.NewDefault(), "test-chain-id", parser.ProcessBlocks)
+	require.NoError(t, err)
 
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() {
@@ -153,8 +155,10 @@ func TestTruncatedLogs(t *testing.T) {
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).Return(nil).Once()
 	orm.EXPECT().GetLatestBlock(mock.Anything).Return(0, sql.ErrNoRows)
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(0), nil).Maybe()
 	lggr, observed := logger.TestObservedSugared(t, zapcore.DebugLevel)
-	lp := logpoller.New(lggr, orm, cl, config.NewDefault())
+	lp, err := logpoller.New(lggr, orm, cl, config.NewDefault(), "test-chain-id")
+	require.NoError(t, err)
 
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() {
@@ -324,7 +328,7 @@ func (s *logSender) sendInstruction(
 ) error {
 	s.t.Helper()
 
-	recent, err := s.client.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
+	recent, err := s.client.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return err
 	}

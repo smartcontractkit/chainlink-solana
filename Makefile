@@ -151,4 +151,4 @@ upgrade-e2e-core-deps:
 
 .PHONY: format-contracts
 format-contracts:
-	cd ./contracts && cargo fmt && go fmt ./... && pnpm format 
+	cd ./contracts && cargo fmt && go fmt ./... && pnpm format
