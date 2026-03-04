@@ -19,8 +19,8 @@ import (
 )
 
 type Head struct {
-	BlockHeight *uint64
-	BlockHash   *solana.Hash
+	SlotNumber *uint64
+	BlockHash  *solana.Hash
 }
 
 func (h *Head) BlockNumber() int64 {
@@ -28,15 +28,15 @@ func (h *Head) BlockNumber() int64 {
 		return 0
 	}
 	// nolint:gosec
-	// G115: integer overflow conversion uint64 -&gt; int64
-	return int64(*h.BlockHeight)
+	// G115: integer overflow conversion uint64 -> int64
+	return int64(*h.SlotNumber)
 }
 
 func (h *Head) BlockDifficulty() *big.Int    { return nil } // Not relevant for Solana
 func (h *Head) GetTotalDifficulty() *big.Int { return nil } // Not relevant for Solana
 
 func (h *Head) IsValid() bool {
-	return h != nil && h.BlockHeight != nil && *h.BlockHeight > 0 && h.BlockHash != nil
+	return h != nil && h.SlotNumber != nil && *h.SlotNumber > 0 && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
@@ -159,14 +159,19 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 	ctx, cancel, chStopInFlight, rawRPC := m.acquireQueryCtx(ctx, m.contextDuration)
 	defer cancel()
 
+	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentConfirmed)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, err
 	}
 
 	head := &Head{
-		BlockHeight: &result.Value.LastValidBlockHeight,
-		BlockHash:   &result.Value.Blockhash,
+		SlotNumber: &slot,
+		BlockHash:  &result.Value.Blockhash,
 	}
 	if !head.IsValid() {
 		return nil, errors.New("invalid head")
@@ -180,14 +185,19 @@ func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, erro
 	ctx, cancel, chStopInFlight, rawRPC := m.acquireQueryCtx(ctx, m.contextDuration)
 	defer cancel()
 
+	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
 	}
 
 	head := &Head{
-		BlockHeight: &result.Value.LastValidBlockHeight,
-		BlockHash:   &result.Value.Blockhash,
+		SlotNumber: &slot,
+		BlockHash:  &result.Value.Blockhash,
 	}
 	if !head.IsValid() {
 		return nil, errors.New("invalid head")
