@@ -36,7 +36,7 @@ func (h *Head) BlockDifficulty() *big.Int    { return nil } // Not relevant for 
 func (h *Head) GetTotalDifficulty() *big.Int { return nil } // Not relevant for Solana
 
 func (h *Head) IsValid() bool {
-	return h != nil && h.SlotNumber != nil && *h.SlotNumber > 0 && h.BlockHash != nil
+	return h != nil && h.SlotNumber != nil && h.BlockHash != nil
 }
 
 var _ mn.RPCClient[mn.StringID, *Head] = (*MultiNodeClient)(nil)
