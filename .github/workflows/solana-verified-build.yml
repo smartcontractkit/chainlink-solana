@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - develop
+      - feature/anchor-0.31
 
 jobs:
   changes:

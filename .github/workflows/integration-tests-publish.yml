@@ -5,10 +5,11 @@ on:
   push:
     branches:
       - develop
+      - feature/anchor-0.31
   workflow_dispatch:
 
 env:
-  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:develop
+  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:${{ github.ref_name }}
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 jobs:
