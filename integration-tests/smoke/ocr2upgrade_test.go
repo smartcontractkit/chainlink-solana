@@ -3,10 +3,9 @@ package smoke
 import (
 	"fmt"
 	"maps"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
@@ -32,16 +30,9 @@ func TestSolanaOCRV2UpgradeSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	envOutPath := filepath.Join(os.TempDir(), fmt.Sprintf("sol-ocr2-%s-%s", name, devenv.DefaultEnvOutFile))
-	state, sg := setupOCR2UpgradeEnvironment(t, name, env, config, "previous", envOutPath)
-	envOut := &devenv.EnvOutput{
-		OcrAddress:     sg.OcrAddress,
-		FeedAddress:    sg.FeedAddress,
-		RPCURLExternal: state.Common.ChainDetails.RPCURLExternal,
-		WSURLExternal:  state.Common.ChainDetails.WSURLExternal,
-	}
+	state, sg := setupOCR2UpgradeEnvironment(t, name, env, config, "previous")
 
-	validateRoundsFromEnv(t, name, envOut, sg, *config.OCR2.NumberOfRounds)
+	validateUpgradeRounds(t, name, sg.OcrAddress, sg, *config.OCR2.NumberOfRounds)
 
 	log.Info().Msg("---------------------------------------------")
 	log.Info().Msg("|           REDEPLOYING CONTRACTS           |")
@@ -51,13 +42,10 @@ func TestSolanaOCRV2UpgradeSmoke(t *testing.T) {
 	log.Info().Msg("|                                           |")
 	log.Info().Msg("---------------------------------------------")
 
-	validateRoundsFromEnv(t, name, envOut, sg, *config.OCR2.NumberOfRounds)
+	validateUpgradeRounds(t, name, sg.OcrAddress, sg, *config.OCR2.NumberOfRounds)
 }
 
-// setupOCR2UpgradeEnvironment sets up OCR2 and returns the state for
-// subsequent contract upgrades. Unlike setupOCR2Environment, it returns the
-// full state so the caller can call UpgradeContracts.
-func setupOCR2UpgradeEnvironment(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig, subDir, envOutPath string) (*common.OCRv2TestState, *gauntlet.SolanaGauntlet) {
+func setupOCR2UpgradeEnvironment(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig, subDir string) (*common.OCRv2TestState, *gauntlet.SolanaGauntlet) {
 	name := "gauntlet-" + testname
 	state, err := common.NewOCRv2State(t, 1, name, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
@@ -72,7 +60,7 @@ func setupOCR2UpgradeEnvironment(t *testing.T, testname string, testenv map[stri
 	state.DeployContracts(utils.ContractsDir, subDir)
 
 	gauntletCopyPath := utils.ProjectRoot + "/" + name
-	if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { // nolint:gosec
+	if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { //nolint:gosec
 		require.NoError(t, err, "output: "+string(out))
 	}
 
@@ -128,14 +116,41 @@ func setupOCR2UpgradeEnvironment(t *testing.T, testname string, testenv map[stri
 
 	state.CreateJobs()
 
-	envOut := &devenv.EnvOutput{
-		OcrAddress:     sg.OcrAddress,
-		FeedAddress:    sg.FeedAddress,
-		RPCURLExternal: state.Common.ChainDetails.RPCURLExternal,
-		WSURLExternal:  state.Common.ChainDetails.WSURLExternal,
-		GauntletPath:   gauntletCopyPath,
-	}
-	_ = envOut.Write(envOutPath)
-
 	return state, sg
+}
+
+func validateUpgradeRounds(t *testing.T, testname string, ocrAddress string, sg *gauntlet.SolanaGauntlet, rounds int) {
+	t.Helper()
+	stuck := 0
+	successfulRounds := 0
+	prevRound := gauntlet.Transmission{RoundID: 0}
+
+	for successfulRounds < rounds {
+		time.Sleep(6 * time.Second)
+		require.Less(t, stuck, 10, fmt.Sprintf("%s: Rounds have been stuck for more than 10 iterations", testname))
+
+		log.Info().Str("Transmission", ocrAddress).Msg("Inspecting transmissions")
+		transmissions, err := sg.FetchTransmissions(ocrAddress)
+		require.NoError(t, err)
+		if len(transmissions) <= 1 {
+			log.Info().Str("Contract", ocrAddress).Msg(fmt.Sprintf("%s: No Transmissions", testname))
+			stuck++
+			continue
+		}
+		currentRound := common.GetLatestRound(transmissions)
+		if prevRound.RoundID == 0 {
+			prevRound = currentRound
+		}
+		if currentRound.RoundID <= prevRound.RoundID {
+			log.Info().Str("Transmission", ocrAddress).Msg(fmt.Sprintf("%s: No new transmissions", testname))
+			stuck++
+			continue
+		}
+		log.Info().Str("Contract", ocrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.RoundID).Msg(fmt.Sprintf("%s: New answer found", testname))
+		require.Equal(t, int64(5), currentRound.Answer, fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
+		require.Less(t, prevRound.RoundID, currentRound.RoundID)
+		prevRound = currentRound
+		successfulRounds++
+		stuck = 0
+	}
 }

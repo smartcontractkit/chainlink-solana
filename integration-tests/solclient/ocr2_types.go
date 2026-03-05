@@ -1,4 +1,4 @@
-package devenv
+package solclient
 
 import (
 	"time"
@@ -10,15 +10,15 @@ import (
 // chainlink/integration-tests/contracts. Contains all parameters needed for
 // confighelper.ContractSetConfigArgsForTests.
 type OffChainAggregatorV2Config struct {
-	DeltaProgress                          Duration
-	DeltaResend                            Duration
-	DeltaRound                             Duration
-	DeltaGrace                             Duration
-	DeltaStage                             Duration
-	MaxDurationQuery                       Duration
-	MaxDurationObservation                 Duration
-	MaxDurationReport                      Duration
-	MaxDurationShouldAcceptFinalizedReport Duration
+	DeltaProgress                           Duration
+	DeltaResend                             Duration
+	DeltaRound                              Duration
+	DeltaGrace                              Duration
+	DeltaStage                              Duration
+	MaxDurationQuery                        Duration
+	MaxDurationObservation                  Duration
+	MaxDurationReport                       Duration
+	MaxDurationShouldAcceptFinalizedReport  Duration
 	MaxDurationShouldTransmitAcceptedReport Duration
 	RMax                                    uint8
 	S                                       []int

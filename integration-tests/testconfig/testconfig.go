@@ -16,8 +16,6 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
-
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
@@ -252,14 +250,56 @@ func (c *TestConfig) GetNodeConfig() *ctf_config.NodeConfig {
 
 func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 	var chainID string
-	var url []string
+	var urls []string
 	if c.GetChainID != nil {
 		chainID = c.GetChainID()
 	}
 	if c.GetURL != nil {
-		url = c.GetURL()
+		urls = c.GetURL()
 	}
-	return devenv.DefaultSolanaCLNodeConfig(chainID, url)
+
+	var nodeEntries strings.Builder
+	for i, u := range urls {
+		fmt.Fprintf(&nodeEntries, "\n[[Solana.Nodes]]\nName = 'primary-%d'\nURL = '%s'\n", i, u)
+	}
+
+	return fmt.Sprintf(`[Log]
+Level = 'debug'
+
+[WebServer]
+HTTPPort = 6688
+SecureCookies = false
+SessionTimeout = '999h0m0s'
+[WebServer.TLS]
+HTTPSPort = 0
+[WebServer.RateLimit]
+Authenticated = 2000
+Unauthenticated = 100
+
+[Feature]
+FeedsManager = true
+LogPoller = true
+UICSAKeys = true
+
+[OCR2]
+Enabled = true
+
+[P2P.V2]
+Enabled = true
+DeltaDial = '5s'
+DeltaReconcile = '5s'
+ListenAddresses = ['0.0.0.0:6690']
+
+[[Solana]]
+Enabled = true
+ChainID = '%s'
+TxTimeout = '2m0s'
+
+[Solana.MultiNode]
+Enabled = true
+SyncThreshold = 170
+VerifyChainID = false
+%s`, chainID, nodeEntries.String()), nil
 }
 
 var embeddedConfigs embed.FS
