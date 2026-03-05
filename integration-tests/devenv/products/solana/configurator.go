@@ -156,6 +156,9 @@ func (m *Configurator) ConfigureJobsAndContracts(
 	if err != nil {
 		return fmt.Errorf("failed to create gauntlet: %w", err)
 	}
+	if cfg.GauntletNetwork != "" {
+		sg.G.Network = cfg.GauntletNetwork
+	}
 
 	gauntletConfig := map[string]string{
 		"SECRET":      fmt.Sprintf("\"%s\"", sol.Secret),

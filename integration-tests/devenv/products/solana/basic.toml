@@ -39,3 +39,4 @@ image = "postgres:15"
 [[ocr2_solana]]
 node_count = 6
 number_of_rounds = 10
+gauntlet_network = "solana-devenv"

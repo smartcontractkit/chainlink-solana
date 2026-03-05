@@ -35,6 +35,7 @@ type OCR2Solana struct {
 	NodeCount        int               `toml:"node_count"`
 	NumberOfRounds   int               `toml:"number_of_rounds"`
 	GauntletPath     string            `toml:"gauntlet_path"`
+	GauntletNetwork  string            `toml:"gauntlet_network"`
 	OcrAddress       string            `toml:"ocr_address"`
 	FeedAddress      string            `toml:"feed_address"`
 	LinkAddress      string            `toml:"link_address"`

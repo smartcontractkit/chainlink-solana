@@ -28,6 +28,8 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 	cfg := pdConfig.Config[0]
 	sg, err := gauntlet.NewSolanaGauntlet(cfg.GauntletPath)
 	require.NoError(t, err, "Failed to reconstruct gauntlet from saved path")
+	sg.G.Network = cfg.GauntletNetwork
+	sg.G.Command = "gauntlet-nobuild"
 
 	validateRounds(t, cfg.OcrAddress, sg, cfg.NumberOfRounds)
 }
