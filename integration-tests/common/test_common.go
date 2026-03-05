@@ -18,14 +18,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
+	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
-	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
@@ -49,11 +51,9 @@ type Clients struct {
 }
 
 type ChainlinkClient struct {
-	ChainlinkClientDocker *test_env.ClCluster
-	ChainlinkClientK8s    []*client.ChainlinkK8sClient
-	ChainlinkNodes        []*client.ChainlinkClient
-	NKeys                 []client.NodeKeysBundle
-	AccountAddresses      []string
+	ChainlinkNodes   []*clclient.ChainlinkClient
+	NKeys            []clclient.NodeKeysBundle
+	AccountAddresses []string
 }
 
 type Config struct {
@@ -112,7 +112,6 @@ func (m *OCRv2TestState) DeployCluster(t *testing.T, contractsDir string) {
 			return
 		}
 
-		// Setting up the URLs
 		m.Common.ChainDetails.RPCURLExternal = m.Common.Env.URLs["sol"][0]
 		m.Common.ChainDetails.WSURLExternal = m.Common.Env.URLs["sol"][1]
 
@@ -125,13 +124,17 @@ func (m *OCRv2TestState) DeployCluster(t *testing.T, contractsDir string) {
 		m.Common.ChainDetails.MockserverURLInternal = m.Common.Env.URLs["qa_mock_adapter_internal"][0]
 		m.Common.ChainDetails.MockServerEndpoint = "five"
 	} else {
-		env, err := test_env.NewTestEnv()
+		err := framework.DefaultNetwork(nil)
 		require.NoError(m.Config.T, err)
-		sol := testenvsol.NewSolana([]string{env.DockerNetwork.Name}, *m.Config.TestConfig.Common.DevnetImage, m.Common.AccountDetails.PublicKey).WithTestLogger(t)
+
+		sol := testenvsol.NewSolana(
+			[]string{framework.DefaultNetworkName},
+			*m.Config.TestConfig.Common.DevnetImage,
+			m.Common.AccountDetails.PublicKey,
+		).WithTestLogger(t)
 		err = sol.StartContainer()
 		require.NoError(m.Config.T, err)
 
-		// Setting the External RPC url for Gauntlet
 		m.Common.ChainDetails.RPCUrls = []string{sol.InternalHTTPURL}
 		m.Common.ChainDetails.RPCURLExternal = sol.ExternalHTTPURL
 		m.Common.ChainDetails.WSURLExternal = sol.ExternalWsURL
@@ -142,26 +145,65 @@ func (m *OCRv2TestState) DeployCluster(t *testing.T, contractsDir string) {
 			m.Common.ChainDetails.WSURLExternal = (*m.Config.TestConfig.Common.WsURLs)[0]
 		}
 
-		b, err := test_env.NewCLTestEnvBuilder().
-			WithNonEVM().
-			WithTestInstance(m.Config.T).
-			WithTestConfig(m.Config.TestConfig).
-			WithMockAdapter().
-			WithCLNodes(*m.Config.TestConfig.OCR2.NodeCount).
-			WithCLNodeOptions(m.Common.TestEnvDetails.NodeOpts...).
-			WithStandardCleanup().
-			WithTestEnv(env)
+		mockAdapter := testenvctf.NewParrot([]string{framework.DefaultNetworkName}).WithTestInstance(t)
+		err = mockAdapter.StartContainer()
 		require.NoError(m.Config.T, err)
-		env, err = b.Build()
+
+		nodeConfigTOML, err := m.Config.TestConfig.GetNodeConfigTOML()
 		require.NoError(m.Config.T, err)
-		m.Common.DockerEnv = &SolCLClusterTestEnv{
-			CLClusterTestEnv: env,
-			Sol:              sol,
-			Parrot:           env.MockAdapter,
+
+		clImage := fmt.Sprintf("%s:%s", *m.Config.TestConfig.ChainlinkImage.Image, *m.Config.TestConfig.ChainlinkImage.Version)
+		nodeCount := *m.Config.TestConfig.OCR2.NodeCount
+		nodeSpecs := make([]*clnode.Input, nodeCount)
+		for i := 0; i < nodeCount; i++ {
+			nodeSpecs[i] = &clnode.Input{
+				Node: &clnode.NodeInput{
+					Image:               clImage,
+					TestConfigOverrides: nodeConfigTOML,
+					EnvVars:             m.Common.TestEnvDetails.NodeContainerEnvs,
+				},
+			}
 		}
-		// Setting up Mock adapter
-		m.Clients.ParrotClient = env.MockAdapter
-		m.Common.ChainDetails.MockserverURLInternal = m.Clients.ParrotClient.InternalEndpoint
+
+		testNameParts := strings.Split(t.Name(), "/")
+		nodeSetSuffix := strings.ToLower(testNameParts[len(testNameParts)-1])
+
+		nodeSetInput := &ns.Input{
+			Name:               fmt.Sprintf("sol-ocr-%s", nodeSetSuffix),
+			Nodes:              nodeCount,
+			OverrideMode:       "each",
+			HTTPPortRangeStart: 20000,
+			P2PPortRangeStart:  22000,
+			DbInput: &postgres.Input{
+				Image: "postgres:15",
+			},
+			NodeSpecs: nodeSpecs,
+		}
+
+		nsOut, err := ns.NewSharedDBNodeSet(nodeSetInput, nil)
+		require.NoError(m.Config.T, err)
+
+		clients := make([]*clclient.ChainlinkClient, len(nsOut.CLNodes))
+		for i, n := range nsOut.CLNodes {
+			c, err := clclient.NewChainlinkClient(&clclient.Config{
+				URL:        n.Node.ExternalURL,
+				Email:      n.Node.APIAuthUser,
+				Password:   n.Node.APIAuthPassword,
+				InternalIP: n.Node.InternalIP,
+			})
+			require.NoError(m.Config.T, err)
+			clients[i] = c
+		}
+
+		m.Common.DockerEnv = &SolCLClusterTestEnv{
+			Sol:     sol,
+			Parrot:  mockAdapter,
+			Clients: clients,
+			NodeSet: nsOut,
+		}
+
+		m.Clients.ParrotClient = mockAdapter
+		m.Common.ChainDetails.MockserverURLInternal = mockAdapter.InternalEndpoint
 		m.Common.ChainDetails.MockServerEndpoint = "mockserver-bridge"
 		err = m.Clients.ParrotClient.SetAdapterRoute(&parrot.Route{
 			Path:               "/mockserver-bridge",
@@ -225,12 +267,6 @@ func (m *OCRv2TestState) SetupClients() {
 	solClient, err := m.NewSolanaClientSetup(m.Clients.SolanaClient.Config)
 	m.Clients.SolanaClient = solClient
 	require.NoError(m.Config.T, err)
-	if *m.Config.TestConfig.Common.InsideK8s {
-		m.Clients.ChainlinkClient.ChainlinkClientK8s, err = client.ConnectChainlinkNodes(m.Common.Env)
-		require.NoError(m.Config.T, err)
-	} else {
-		m.Clients.ChainlinkClient.ChainlinkClientDocker = m.Common.DockerEnv.CLClusterTestEnv.ClCluster
-	}
 }
 
 // DeployContracts deploys contracts
@@ -254,9 +290,7 @@ func (m *OCRv2TestState) UpgradeContracts(baseDir, subDir string) {
 	cd, err := solclient.NewContractDeployer(m.Clients.SolanaClient, nil)
 	require.NoError(m.Config.T, err)
 
-	// fetch corresponding program address for program
 	programIDBuilder := func(programName string) string {
-		// remove extra directories + .so suffix from lookup
 		programName, _ = strings.CutSuffix(filepath.Base(programName), ".so")
 		ids := map[string]string{
 			"ocr_2":             m.Common.ChainDetails.ProgramAddresses.OCR2,
@@ -281,12 +315,11 @@ func (m *OCRv2TestState) UpgradeContracts(baseDir, subDir string) {
 
 // CreateJobs creating OCR jobs and EA stubs
 func (m *OCRv2TestState) CreateJobs() {
-	// Setting up RPC used for external network funding
 	c := rpc.New(m.Common.ChainDetails.RPCURLExternal)
 	wsc, err := ws.Connect(testcontext.Get(m.Config.T), m.Common.ChainDetails.WSURLExternal)
 	require.NoError(m.Config.T, err, "Error connecting to websocket client")
 
-	relayConfig := job.JSONConfig{
+	relayConfig := devenv.JSONConfig{
 		"nodeEndpointHTTP": m.Common.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    m.Common.ChainDetails.ProgramAddresses.OCR2,
 		"transmissionsID":  m.Gauntlet.FeedAddress,
@@ -294,17 +327,17 @@ func (m *OCRv2TestState) CreateJobs() {
 		"chainID":          m.Common.ChainDetails.ChainID,
 	}
 	boostratInternalIP := m.Clients.ChainlinkClient.ChainlinkNodes[0].InternalIP()
-	bootstrapPeers := []client.P2PData{
+	bootstrapPeers := []clclient.P2PData{
 		{
 			InternalIP:   boostratInternalIP,
 			InternalPort: "6690",
 			PeerID:       m.Clients.ChainlinkClient.NKeys[0].PeerID,
 		},
 	}
-	jobSpec := &client.OCR2TaskJobSpec{
+	jobSpec := &devenv.TaskJobSpec{
 		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
+		OCR2OracleSpec: devenv.OracleSpec{
 			ContractID:                        m.Gauntlet.OcrAddress,
 			Relay:                             m.Common.ChainDetails.ChainName,
 			RelayConfig:                       relayConfig,
@@ -312,16 +345,16 @@ func (m *OCRv2TestState) CreateJobs() {
 			OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
+			ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
 		},
 	}
-	sourceValueBridge := client.BridgeTypeAttributes{
+	sourceValueBridge := clclient.BridgeTypeAttributes{
 		Name:        "mockserver-bridge",
 		URL:         fmt.Sprintf("%s/%s", m.Common.ChainDetails.MockserverURLInternal, m.Common.ChainDetails.MockServerEndpoint),
 		RequestData: "{}",
 	}
 
-	observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
+	observationSource := clclient.ObservationSourceSpecBridge(&sourceValueBridge)
 	bridgeInfo := BridgeInfo{ObservationSource: observationSource}
 
 	err = m.Clients.ChainlinkClient.ChainlinkNodes[0].MustCreateBridge(&sourceValueBridge)
@@ -331,7 +364,6 @@ func (m *OCRv2TestState) CreateJobs() {
 	require.NoError(m.Config.T, err, "Error creating job")
 
 	for nIdx, node := range m.Clients.ChainlinkClient.ChainlinkNodes {
-		// Skipping bootstrap
 		if nIdx == 0 {
 			continue
 		}
@@ -343,7 +375,7 @@ func (m *OCRv2TestState) CreateJobs() {
 			require.NoError(m.Config.T, err, "Error sending funds")
 		}
 
-		sourceValueBridge := client.BridgeTypeAttributes{
+		sourceValueBridge := clclient.BridgeTypeAttributes{
 			Name:        "mockserver-bridge",
 			URL:         fmt.Sprintf("%s/%s", m.Common.ChainDetails.MockserverURLInternal, m.Common.ChainDetails.MockServerEndpoint),
 			RequestData: "{}",
@@ -352,11 +384,11 @@ func (m *OCRv2TestState) CreateJobs() {
 		_, err := node.CreateBridge(&sourceValueBridge)
 		require.NoError(m.Config.T, err, "Error creating bridge")
 
-		jobSpec := &client.OCR2TaskJobSpec{
+		jobSpec := &devenv.TaskJobSpec{
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: bridgeInfo.ObservationSource,
-			OCR2OracleSpec: job.OCR2OracleSpec{
+			OCR2OracleSpec: devenv.OracleSpec{
 				ContractID:                        m.Gauntlet.OcrAddress,
 				Relay:                             m.Common.ChainDetails.ChainName,
 				RelayConfig:                       relayConfig,
@@ -364,7 +396,7 @@ func (m *OCRv2TestState) CreateJobs() {
 				OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID),
 				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
+				ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig:                      PluginConfigToTomlFormat(observationSource),
 			},
@@ -375,16 +407,9 @@ func (m *OCRv2TestState) CreateJobs() {
 }
 
 func (m *OCRv2TestState) SetChainlinkNodes() {
-	// retrieve client from K8s client
-	chainlinkNodes := []*client.ChainlinkClient{}
-	if *m.Config.TestConfig.Common.InsideK8s {
-		for i := range m.Clients.ChainlinkClient.ChainlinkClientK8s {
-			chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientK8s[i].ChainlinkClient)
-		}
-	} else {
-		chainlinkNodes = append(chainlinkNodes, m.Clients.ChainlinkClient.ChainlinkClientDocker.NodeAPIs()...)
+	if m.Common.DockerEnv != nil && len(m.Common.DockerEnv.Clients) > 0 {
+		m.Clients.ChainlinkClient.ChainlinkNodes = m.Common.DockerEnv.Clients
 	}
-	m.Clients.ChainlinkClient.ChainlinkNodes = chainlinkNodes
 }
 
 func GetLatestRound(transmissions []gauntlet.Transmission) gauntlet.Transmission {

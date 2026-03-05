@@ -12,9 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
-
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
@@ -244,7 +243,7 @@ func (m *OCRv2) createProposal(version uint64) error {
 }
 
 // Configure sets offchain config in multiple transactions
-func (m *OCRv2) Configure(cfg contracts.OffChainAggregatorV2Config) error {
+func (m *OCRv2) Configure(cfg devenv.OffChainAggregatorV2Config) error {
 	_, _, _, _, version, cfgBytes, err := confighelper.ContractSetConfigArgsForTests(
 		cfg.DeltaProgress.Duration(),
 		cfg.DeltaResend.Duration(),
@@ -308,12 +307,12 @@ func (m *OCRv2) DumpState() error {
 	return nil
 }
 
-func (m *OCRv2) GetContractData(ctx context.Context) (*contracts.OffchainAggregatorData, error) {
+func (m *OCRv2) GetContractData(ctx context.Context) (*devenv.OffchainAggregatorData, error) {
 	panic("implement me")
 }
 
 // ProposeConfig sets oracles with payee addresses
-func (m *OCRv2) proposeConfig(ocConfig contracts.OffChainAggregatorV2Config) error {
+func (m *OCRv2) proposeConfig(ocConfig devenv.OffChainAggregatorV2Config) error {
 	log.Info().Str("Program Address", m.ProgramWallet.PublicKey().String()).Msg("Proposing new config")
 	payer := m.Client.DefaultWallet
 	oracles := make([]ocr_2.NewOracle, 0)

@@ -12,18 +12,18 @@ import (
 	"github.com/lib/pq"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/chainlink"
 	mockadapter "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mock-adapter"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/sol"
-	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
@@ -41,9 +41,9 @@ type Common struct {
 }
 
 type TestEnvDetails struct {
-	TestDuration time.Duration
-	K8Config     *environment.Config
-	NodeOpts     []test_env.ClNodeOption
+	TestDuration      time.Duration
+	K8Config          *environment.Config
+	NodeContainerEnvs map[string]string
 }
 
 type ChainDetails struct {
@@ -58,9 +58,10 @@ type ChainDetails struct {
 }
 
 type SolCLClusterTestEnv struct {
-	*test_env.CLClusterTestEnv
-	Sol    *testenvsol.Solana
-	Parrot *ctftestenv.Parrot
+	Sol     *testenvsol.Solana
+	Parrot  *ctftestenv.Parrot
+	Clients []*clclient.ChainlinkClient
+	NodeSet *ns.Output
 }
 
 type AccountDetails struct {
@@ -73,14 +74,12 @@ type ContractNodeInfo struct {
 	OCR2                    *solclient.OCRv2
 	Store                   *solclient.Store
 	BootstrapNodeIdx        int
-	BootstrapNode           *client.ChainlinkClient
-	BootstrapNodeK8s        *client.ChainlinkK8sClient
-	BootstrapNodeKeysBundle client.NodeKeysBundle
+	BootstrapNode           *clclient.ChainlinkClient
+	BootstrapNodeKeysBundle clclient.NodeKeysBundle
 	BootstrapBridgeInfo     BridgeInfo
 	NodesIdx                []int
-	Nodes                   []*client.ChainlinkClient
-	NodesK8s                []*client.ChainlinkK8sClient
-	NodeKeysBundle          []client.NodeKeysBundle
+	Nodes                   []*clclient.ChainlinkClient
+	NodeKeysBundle          []clclient.NodeKeysBundle
 	BridgeInfos             []BridgeInfo
 }
 
@@ -91,11 +90,7 @@ type BridgeInfo struct {
 
 // Those functions may be common with another chains and should be moved to another lib
 
-type NodeKeysBundle struct {
-	OCR2Key *client.OCR2Key
-	PeerID  string
-	TXKey   *client.TxKey
-}
+type NodeKeysBundle = clclient.NodeKeysBundle
 
 func New(testConfig *tc.TestConfig) *Common {
 	var c *Common
@@ -149,8 +144,8 @@ func New(testConfig *tc.TestConfig) *Common {
 	return c
 }
 
-func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client.NodeKeysBundle, error) {
-	nkb := make([]client.NodeKeysBundle, 0)
+func (c *Common) CreateNodeKeysBundle(nodes []*clclient.ChainlinkClient) ([]clclient.NodeKeysBundle, error) {
+	nkb := make([]clclient.NodeKeysBundle, 0)
 	for _, n := range nodes {
 		p2pkeys, err := n.MustReadP2PKeys()
 		if err != nil {
@@ -166,7 +161,7 @@ func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client
 		if err != nil {
 			return nil, err
 		}
-		nkb = append(nkb, client.NodeKeysBundle{
+		nkb = append(nkb, clclient.NodeKeysBundle{
 			PeerID:  peerID,
 			OCR2Key: *ocrKey,
 			TXKey:   *txKey,
@@ -175,7 +170,7 @@ func (c *Common) CreateNodeKeysBundle(nodes []*client.ChainlinkClient) ([]client
 	return nkb, nil
 }
 
-func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.Float) error {
+func FundOracles(c *solclient.Client, nkb []clclient.NodeKeysBundle, amount *big.Float) error {
 	for _, nk := range nkb {
 		addr := nk.TXKey.Data.Attributes.PublicKey
 		if err := c.Fund(addr, amount); err != nil {
@@ -185,91 +180,56 @@ func FundOracles(c *solclient.Client, nkb []client.NodeKeysBundle, amount *big.F
 	return nil
 }
 
-func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockURL string, isK8s bool) error {
+func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo, mockURL string, _ bool) error {
 	for i, nodesInfo := range ContractsIdxMapToContractsNodeInfo {
-		// Bootstrap node first
-		var err error
-		var nodeContractPairID string
-		if isK8s {
-			nodeContractPairID, err = BuildNodeContractPairID(nodesInfo.BootstrapNodeK8s.ChainlinkClient, nodesInfo.OCR2.Address())
-		} else {
-			nodeContractPairID, err = BuildNodeContractPairID(nodesInfo.BootstrapNode, nodesInfo.OCR2.Address())
-		}
+		nodeContractPairID, err := BuildNodeContractPairID(nodesInfo.BootstrapNode, nodesInfo.OCR2.Address())
 		if err != nil {
 			return err
 		}
-		sourceValueBridge := client.BridgeTypeAttributes{
+		sourceValueBridge := clclient.BridgeTypeAttributes{
 			Name:        nodeContractPairID,
 			URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 			RequestData: "{}",
 		}
-		observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
-		if isK8s {
-			err = nodesInfo.BootstrapNodeK8s.MustCreateBridge(&sourceValueBridge)
-		} else {
-			err = nodesInfo.BootstrapNode.MustCreateBridge(&sourceValueBridge)
-		}
+		observationSource := clclient.ObservationSourceSpecBridge(&sourceValueBridge)
+		err = nodesInfo.BootstrapNode.MustCreateBridge(&sourceValueBridge)
 		if err != nil {
 			return err
 		}
-		juelsBridge := client.BridgeTypeAttributes{
+		juelsBridge := clclient.BridgeTypeAttributes{
 			Name:        nodeContractPairID + "juels",
 			URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 			RequestData: "{}",
 		}
-		juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
-		if isK8s {
-			err = nodesInfo.BootstrapNodeK8s.MustCreateBridge(&juelsBridge)
-		} else {
-			err = nodesInfo.BootstrapNode.MustCreateBridge(&juelsBridge)
-		}
+		juelsSource := clclient.ObservationSourceSpecBridge(&juelsBridge)
+		err = nodesInfo.BootstrapNode.MustCreateBridge(&juelsBridge)
 		if err != nil {
 			return err
 		}
 		ContractsIdxMapToContractsNodeInfo[i].BootstrapBridgeInfo = BridgeInfo{ObservationSource: observationSource, JuelsSource: juelsSource}
-		// Other nodes later
-		var nodeCount int
-		if isK8s {
-			nodeCount = len(nodesInfo.NodesK8s)
-		} else {
-			nodeCount = len(nodesInfo.Nodes)
-		}
-		for j := 0; j < nodeCount; j++ {
-			var clClient *client.ChainlinkClient
-			if isK8s {
-				clClient = nodesInfo.NodesK8s[j].ChainlinkClient
-			} else {
-				clClient = nodesInfo.Nodes[j]
-			}
+		for j := 0; j < len(nodesInfo.Nodes); j++ {
+			clClient := nodesInfo.Nodes[j]
 			nodeContractPairID, err := BuildNodeContractPairID(clClient, nodesInfo.OCR2.Address())
 			if err != nil {
 				return err
 			}
-			sourceValueBridge := client.BridgeTypeAttributes{
+			sourceValueBridge := clclient.BridgeTypeAttributes{
 				Name:        nodeContractPairID,
 				URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 				RequestData: "{}",
 			}
-			observationSource := client.ObservationSourceSpecBridge(&sourceValueBridge)
-			if isK8s {
-				err = nodesInfo.NodesK8s[j].MustCreateBridge(&sourceValueBridge)
-			} else {
-				err = nodesInfo.Nodes[j].MustCreateBridge(&sourceValueBridge)
-			}
+			observationSource := clclient.ObservationSourceSpecBridge(&sourceValueBridge)
+			err = nodesInfo.Nodes[j].MustCreateBridge(&sourceValueBridge)
 			if err != nil {
 				return err
 			}
-			juelsBridge := client.BridgeTypeAttributes{
+			juelsBridge := clclient.BridgeTypeAttributes{
 				Name:        nodeContractPairID + "juels",
 				URL:         fmt.Sprintf("%s/%s", mockURL, "five"),
 				RequestData: "{}",
 			}
-			juelsSource := client.ObservationSourceSpecBridge(&juelsBridge)
-			if isK8s {
-				err = nodesInfo.NodesK8s[j].MustCreateBridge(&juelsBridge)
-			} else {
-				err = nodesInfo.Nodes[j].MustCreateBridge(&juelsBridge)
-			}
+			juelsSource := clclient.ObservationSourceSpecBridge(&juelsBridge)
+			err = nodesInfo.Nodes[j].MustCreateBridge(&juelsBridge)
 			if err != nil {
 				return err
 			}
@@ -279,40 +239,33 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 	return nil
 }
 
-func PluginConfigToTomlFormat(pluginConfig string) job.JSONConfig {
-	return job.JSONConfig{
+func PluginConfigToTomlFormat(pluginConfig string) devenv.JSONConfig {
+	return devenv.JSONConfig{
 		"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", pluginConfig),
 	}
 }
 
 func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
-	var bootstrapNodeInternalIP string
-	var nodeCount int
-	if *c.TestConfig.Common.InsideK8s {
-		nodeCount = len(contractNodeInfo.NodesK8s)
-		bootstrapNodeInternalIP = contractNodeInfo.BootstrapNodeK8s.InternalIP()
-	} else {
-		nodeCount = len(contractNodeInfo.Nodes)
-		bootstrapNodeInternalIP = contractNodeInfo.BootstrapNode.InternalIP()
-	}
-	relayConfig := job.JSONConfig{
+	bootstrapNodeInternalIP := contractNodeInfo.BootstrapNode.InternalIP()
+	nodeCount := len(contractNodeInfo.Nodes)
+	relayConfig := devenv.JSONConfig{
 		"nodeEndpointHTTP": c.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
 		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
 		"storeProgramID":   contractNodeInfo.Store.ProgramAddress(),
 		"chainID":          c.ChainDetails.ChainID,
 	}
-	bootstrapPeers := []client.P2PData{
+	bootstrapPeers := []clclient.P2PData{
 		{
 			InternalIP:   bootstrapNodeInternalIP,
 			InternalPort: "6690",
 			PeerID:       contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
 		},
 	}
-	jobSpec := &client.OCR2TaskJobSpec{
+	jobSpec := &devenv.TaskJobSpec{
 		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
-		OCR2OracleSpec: job.OCR2OracleSpec{
+		OCR2OracleSpec: devenv.OracleSpec{
 			ContractID:                        contractNodeInfo.OCR2.Address(),
 			Relay:                             c.ChainDetails.ChainName,
 			RelayConfig:                       relayConfig,
@@ -320,27 +273,20 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
+			ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
 		},
 	}
-	if *c.TestConfig.Common.InsideK8s {
-		if _, err := contractNodeInfo.BootstrapNodeK8s.MustCreateJob(jobSpec); err != nil {
-			s, _ := jobSpec.String()
-			return fmt.Errorf("failed creating job for boostrap node: %w\n spec:\n%s", err, s)
-		}
-	} else {
-		if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
-			s, _ := jobSpec.String()
-			return fmt.Errorf("failed creating job for boostrap node: %w\n spec:\n%s", err, s)
-		}
+	if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
+		s, _ := jobSpec.String()
+		return fmt.Errorf("failed creating job for boostrap node: %w\n spec:\n%s", err, s)
 	}
 
 	for nIdx := 0; nIdx < nodeCount; nIdx++ {
-		jobSpec := &client.OCR2TaskJobSpec{
+		jobSpec := &devenv.TaskJobSpec{
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
-			OCR2OracleSpec: job.OCR2OracleSpec{
+			OCR2OracleSpec: devenv.OracleSpec{
 				ContractID:                        contractNodeInfo.OCR2.Address(),
 				Relay:                             c.ChainDetails.ChainName,
 				RelayConfig:                       relayConfig,
@@ -348,27 +294,20 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
 				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: sqlutil.Interval(15 * time.Second),
+				ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig:                      PluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
 			},
 		}
-		if *c.TestConfig.Common.InsideK8s {
-			n := contractNodeInfo.NodesK8s[nIdx]
-			if _, err := n.MustCreateJob(jobSpec); err != nil {
-				return fmt.Errorf("failed creating job for node %s: %w", n.URL(), err)
-			}
-		} else {
-			n := contractNodeInfo.Nodes[nIdx]
-			if _, err := n.MustCreateJob(jobSpec); err != nil {
-				return fmt.Errorf("failed creating job for node %s: %w", n.URL(), err)
-			}
+		n := contractNodeInfo.Nodes[nIdx]
+		if _, err := n.MustCreateJob(jobSpec); err != nil {
+			return fmt.Errorf("failed creating job for node %s: %w", n.URL(), err)
 		}
 	}
 	return nil
 }
 
-func BuildNodeContractPairID(node *client.ChainlinkClient, ocr2Addr string) (string, error) {
+func BuildNodeContractPairID(node *clclient.ChainlinkClient, ocr2Addr string) (string, error) {
 	csaKeys, resp, err := node.ReadCSAKeys()
 	if err != nil {
 		return "", err

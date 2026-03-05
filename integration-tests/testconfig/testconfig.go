@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/barkimedes/go-deepcopy"
 	"github.com/google/uuid"
@@ -17,18 +16,15 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig/ocr2"
-	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
 type TestConfig struct {
@@ -263,45 +259,7 @@ func (c *TestConfig) GetNodeConfigTOML() (string, error) {
 	if c.GetURL != nil {
 		url = c.GetURL()
 	}
-
-	mnConfig := solcfg.NewDefaultMultiNodeConfig()
-	mnConfig.MultiNode.Enabled = ptr.Ptr(true)
-	mnConfig.MultiNode.SyncThreshold = ptr.Ptr(uint32(170))
-	mnConfig.MultiNode.VerifyChainID = ptr.Ptr(false)
-
-	var nodes []*solcfg.Node
-	for i, u := range url {
-		nodes = append(nodes, &solcfg.Node{
-			Name: ptr.Ptr(fmt.Sprintf("primary-%d", i)),
-			URL:  config.MustParseURL(u),
-		})
-	}
-
-	chainCfg := solcfg.Chain{
-		// Increase timeout for TransactionSender
-		TxTimeout: config.MustNewDuration(2 * time.Minute),
-	}
-
-	solConfig := solcfg.TOMLConfig{
-		Enabled:   ptr.Ptr(true),
-		ChainID:   ptr.Ptr(chainID),
-		Nodes:     nodes,
-		MultiNode: mnConfig,
-		Chain:     chainCfg,
-	}
-	baseConfig := node.NewBaseConfig()
-	baseConfig.Solana = solcfg.TOMLConfigs{
-		&solConfig,
-	}
-	baseConfig.OCR2.Enabled = ptr.Ptr(true)
-	baseConfig.P2P.V2.Enabled = ptr.Ptr(true)
-	fiveSecondDuration := config.MustNewDuration(5 * time.Second)
-
-	baseConfig.P2P.V2.DeltaDial = fiveSecondDuration
-	baseConfig.P2P.V2.DeltaReconcile = fiveSecondDuration
-	baseConfig.P2P.V2.ListenAddresses = &[]string{"0.0.0.0:6690"}
-
-	return baseConfig.TOMLString()
+	return devenv.DefaultSolanaCLNodeConfig(chainID, url)
 }
 
 var embeddedConfigs embed.FS

@@ -1,9 +1,15 @@
+// OCR2 smoke tests -- migrated from chainlink/integration-tests test_env + nodeclient
+// to CTF simple_node_set + clclient (Phase 1 of Solana test decoupling).
+// Previous dependencies on chainlink/integration-tests, chainlink/deployment,
+// and chainlink/v2 have been removed.
 package smoke
 
 import (
 	"fmt"
 	"maps"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,10 +18,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
@@ -43,32 +48,35 @@ func TestSolanaOCRV2Smoke(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			_, sg := startOCR2DataFeedsSmokeTest(t, test.name, test.env, config, "")
-			validateRounds(t, test.name, sg, *config.OCR2.NumberOfRounds)
+
+			envOutPath := filepath.Join(os.TempDir(), fmt.Sprintf("sol-ocr2-%s-%s", test.name, devenv.DefaultEnvOutFile))
+
+			envOut, sg := setupOCR2Environment(t, test.name, test.env, config, "", envOutPath)
+			validateRoundsFromEnv(t, test.name, envOut, sg, *config.OCR2.NumberOfRounds)
 		})
 	}
 }
 
-func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig, subDir string) (*common.OCRv2TestState, *gauntlet.SolanaGauntlet) {
+// setupOCR2Environment is the setup phase: deploys cluster, contracts, creates
+// jobs, and writes the environment output to envOutPath. Returns the env output
+// and gauntlet instance for the assertion phase.
+func setupOCR2Environment(t *testing.T, testname string, testenv map[string]string, config tc.TestConfig, subDir, envOutPath string) (*devenv.EnvOutput, *gauntlet.SolanaGauntlet) {
 	name := "gauntlet-" + testname
 	state, err := common.NewOCRv2State(t, 1, name, &config)
 	require.NoError(t, err, "Could not setup the ocrv2 state")
 	if len(testenv) > 0 {
-		state.Common.TestEnvDetails.NodeOpts = append(state.Common.TestEnvDetails.NodeOpts, func(n *test_env.ClNode) {
-			if n.ContainerEnvs == nil {
-				n.ContainerEnvs = map[string]string{}
-			}
-			maps.Copy(n.ContainerEnvs, testenv)
-		})
+		if state.Common.TestEnvDetails.NodeContainerEnvs == nil {
+			state.Common.TestEnvDetails.NodeContainerEnvs = map[string]string{}
+		}
+		maps.Copy(state.Common.TestEnvDetails.NodeContainerEnvs, testenv)
 	}
 
 	state.DeployCluster(t, utils.ContractsDir)
 	state.DeployContracts(utils.ContractsDir, subDir)
-	if state.Common.Env.WillUseRemoteRunner() {
-		return state, nil
+	if state.Common.Env != nil && state.Common.Env.WillUseRemoteRunner() {
+		return nil, nil
 	}
 
-	// copy gauntlet folder to run in parallel (gauntlet generates an output file that is read by the e2e tests - causes conflict if shared)
 	gauntletCopyPath := utils.ProjectRoot + "/" + name
 	if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { // nolint:gosec
 		require.NoError(t, err, "output: "+string(out))
@@ -109,7 +117,6 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 		sg.LinkAddress = *config.SolanaConfig.LinkTokenAddress
 		sg.VaultAddress = *config.SolanaConfig.VaultAddress
 	} else {
-		// Deploying LINK in case of localnet
 		err = sg.DeployLinkToken()
 		require.NoError(t, err)
 	}
@@ -127,7 +134,6 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 
 	_, err = sg.DeployOCR2()
 	require.NoError(t, err, "Error deploying OCR")
-	// Generating default OCR2 config
 	ocr2Config := ocr_config.NewOCR2Config(state.Clients.ChainlinkClient.NKeys, sg.ProposalAddress, sg.VaultAddress, *config.SolanaConfig.Secret)
 	ocr2Config.Default()
 	sg.OCR2Config = ocr2Config
@@ -136,13 +142,30 @@ func startOCR2DataFeedsSmokeTest(t *testing.T, testname string, testenv map[stri
 	require.NoError(t, err)
 
 	state.CreateJobs()
-	return state, sg
+
+	envOut := &devenv.EnvOutput{
+		OcrAddress:     sg.OcrAddress,
+		FeedAddress:    sg.FeedAddress,
+		RPCURLExternal: state.Common.ChainDetails.RPCURLExternal,
+		WSURLExternal:  state.Common.ChainDetails.WSURLExternal,
+		GauntletPath:   gauntletCopyPath,
+	}
+	err = envOut.Write(envOutPath)
+	require.NoError(t, err, "Failed to write env output")
+	log.Info().Str("path", envOutPath).Msg("Wrote env-out.toml")
+
+	return envOut, sg
 }
 
-func validateRounds(t *testing.T, testname string, sg *gauntlet.SolanaGauntlet, rounds int) {
+// validateRoundsFromEnv is the assertion phase: uses the environment output and
+// gauntlet to validate that OCR rounds are progressing.
+func validateRoundsFromEnv(t *testing.T, testname string, envOut *devenv.EnvOutput, sg *gauntlet.SolanaGauntlet, rounds int) {
+	if envOut == nil || sg == nil {
+		return
+	}
 	name := "gauntlet" + testname
+	ocrAddress := envOut.OcrAddress
 
-	// Test start
 	stuck := 0
 	successFullRounds := 0
 	prevRound := gauntlet.Transmission{
@@ -151,11 +174,11 @@ func validateRounds(t *testing.T, testname string, sg *gauntlet.SolanaGauntlet, 
 	for successFullRounds < rounds {
 		time.Sleep(time.Second * 6)
 		require.Less(t, stuck, 10, fmt.Sprintf("%s: Rounds have been stuck for more than 10 iterations", name))
-		log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")
-		transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
+		log.Info().Str("Transmission", ocrAddress).Msg("Inspecting transmissions")
+		transmissions, err := sg.FetchTransmissions(ocrAddress)
 		require.NoError(t, err)
 		if len(transmissions) <= 1 {
-			log.Info().Str("Contract", sg.OcrAddress).Msg(fmt.Sprintf("%s: No Transmissions", name))
+			log.Info().Str("Contract", ocrAddress).Msg(fmt.Sprintf("%s: No Transmissions", name))
 			stuck++
 			continue
 		}
@@ -164,11 +187,11 @@ func validateRounds(t *testing.T, testname string, sg *gauntlet.SolanaGauntlet, 
 			prevRound = currentRound
 		}
 		if currentRound.RoundID <= prevRound.RoundID {
-			log.Info().Str("Transmission", sg.OcrAddress).Msg(fmt.Sprintf("%s: No new transmissions", name))
+			log.Info().Str("Transmission", ocrAddress).Msg(fmt.Sprintf("%s: No new transmissions", name))
 			stuck++
 			continue
 		}
-		log.Info().Str("Contract", sg.OcrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.RoundID).Msg(fmt.Sprintf("%s: New answer found", name))
+		log.Info().Str("Contract", ocrAddress).Interface("Answer", currentRound.Answer).Int64("RoundID", currentRound.RoundID).Msg(fmt.Sprintf("%s: New answer found", name))
 		require.Equal(t, currentRound.Answer, int64(5), fmt.Sprintf("Actual: %d, Expected: 5", currentRound.Answer))
 		require.Less(t, prevRound.RoundID, currentRound.RoundID, fmt.Sprintf("Expected round %d to be less than %d", prevRound.RoundID, currentRound.RoundID))
 		prevRound = currentRound

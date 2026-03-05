@@ -10,8 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/common"
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
@@ -46,12 +44,10 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 			state, err := common.NewOCRv2State(t, 1, name, &config)
 			require.NoError(t, err, "Could not setup the ocrv2 state")
 			if len(test.env) > 0 {
-				state.Common.TestEnvDetails.NodeOpts = append(state.Common.TestEnvDetails.NodeOpts, func(n *test_env.ClNode) {
-					if n.ContainerEnvs == nil {
-						n.ContainerEnvs = map[string]string{}
-					}
-					maps.Copy(n.ContainerEnvs, test.env)
-				})
+				if state.Common.TestEnvDetails.NodeContainerEnvs == nil {
+					state.Common.TestEnvDetails.NodeContainerEnvs = map[string]string{}
+				}
+				maps.Copy(state.Common.TestEnvDetails.NodeContainerEnvs, test.env)
 			}
 
 			state.DeployCluster(t, utils.ContractsDir)
@@ -60,7 +56,6 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 				return
 			}
 
-			// copy gauntlet folder to run in parallel (gauntlet generates an output file that is read by the e2e tests - causes conflict if shared)
 			gauntletCopyPath := utils.ProjectRoot + "/" + name
 			if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { // nolint:gosec
 				require.NoError(t, err, "output: "+string(out))
@@ -100,7 +95,6 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 				sg.LinkAddress = *config.SolanaConfig.LinkTokenAddress
 				sg.VaultAddress = *config.SolanaConfig.VaultAddress
 			} else {
-				// Deploying LINK in case of localnet
 				err = sg.DeployLinkToken()
 				require.NoError(t, err)
 			}
@@ -118,7 +112,6 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 
 			_, err = sg.DeployOCR2()
 			require.NoError(t, err, "Error deploying OCR")
-			// Generating default OCR2 config
 			ocr2Config := ocr_config.NewOCR2Config(state.Clients.ChainlinkClient.NKeys, sg.ProposalAddress, sg.VaultAddress, *config.SolanaConfig.Secret)
 			ocr2Config.Default()
 			sg.OCR2Config = ocr2Config
@@ -128,14 +121,12 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 
 			state.CreateJobs()
 
-			// Test start
 			stuck := 0
 			successFullRounds := 0
 			prevRound := gauntlet.Transmission{
 				RoundID: 0,
 			}
 			for successFullRounds < *config.OCR2.NumberOfRounds {
-				// Since it is a soak bumping the stuck count
 				require.Less(t, stuck, 100, "Rounds have been stuck for more than 10 iterations")
 				log.Info().Str("Transmission", sg.OcrAddress).Msg("Inspecting transmissions")
 				transmissions, err := sg.FetchTransmissions(sg.OcrAddress)
