@@ -3,15 +3,18 @@ package devenv
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
-	"github.com/gagliardetto/solana-go"
+	solanago "github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
@@ -20,7 +23,7 @@ import (
 func newProduct(name string) (Product, error) {
 	switch name {
 	case "ocr2_solana":
-		return NewConfigurator(), nil
+		return solana.NewConfigurator(), nil
 	default:
 		return nil, fmt.Errorf("unknown product type: %s", name)
 	}
@@ -41,7 +44,7 @@ func NewEnvironment(ctx context.Context) error {
 
 	// Derive localnet keys if not provided
 	if in.Solana.PublicKey == "" || in.Solana.PrivateKey == "" {
-		pk, pkErr := solana.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
+		pk, pkErr := solanago.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
 		if pkErr != nil {
 			return fmt.Errorf("failed to decode default localnet private key: %w", pkErr)
 		}
@@ -61,7 +64,7 @@ func NewEnvironment(ctx context.Context) error {
 	if err := sol.StartContainer(); err != nil {
 		return fmt.Errorf("failed to start solana container: %w", err)
 	}
-	in.Solana.Out = &SolanaOutput{
+	in.Solana.Out = &solana.SolanaOutput{
 		InternalHTTPURL: sol.InternalHTTPURL,
 		ExternalHTTPURL: sol.ExternalHTTPURL,
 		ExternalWsURL:   sol.ExternalWsURL,
@@ -89,9 +92,9 @@ func NewEnvironment(ctx context.Context) error {
 		return fmt.Errorf("failed to start parrot: %w", err)
 	}
 	if in.Parrot == nil {
-		in.Parrot = &ParrotInput{}
+		in.Parrot = &solana.ParrotInput{}
 	}
-	in.Parrot.Out = &ParrotOutput{
+	in.Parrot.Out = &solana.ParrotOutput{
 		InternalEndpoint: mockAdapter.InternalEndpoint,
 		ExternalEndpoint: mockAdapter.ExternalEndpoint,
 	}
@@ -167,6 +170,20 @@ func NewEnvironment(ctx context.Context) error {
 	L.Info().Str("BootstrapNode", in.NodeSets[0].Out.CLNodes[0].Node.ExternalURL).Send()
 	for _, n := range in.NodeSets[0].Out.CLNodes[1:] {
 		L.Info().Str("Node", n.Node.ExternalURL).Send()
+	}
+	return nil
+}
+
+func setupParrotRoutes(p interface{ SetAdapterRoute(route *parrot.Route) error }) error {
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		if err := p.SetAdapterRoute(&parrot.Route{
+			Path:               "/mockserver-bridge",
+			Method:             method,
+			ResponseBody:       5,
+			ResponseStatusCode: http.StatusOK,
+		}); err != nil {
+			return fmt.Errorf("failed to set parrot route %s: %w", method, err)
+		}
 	}
 	return nil
 }

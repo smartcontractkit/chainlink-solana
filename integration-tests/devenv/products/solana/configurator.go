@@ -1,22 +1,25 @@
-package devenv
+package solana
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"math/big"
-	"net/http"
+	"os"
 	"os/exec"
 	"text/template"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
+
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products"
 
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
@@ -24,28 +27,18 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
 
-type OCR2Solana struct {
-	NodeCount        int               `toml:"node_count"`
-	NumberOfRounds   int               `toml:"number_of_rounds"`
-	GauntletPath     string            `toml:"gauntlet_path"`
-	OcrAddress       string            `toml:"ocr_address"`
-	FeedAddress      string            `toml:"feed_address"`
-	LinkAddress      string            `toml:"link_address"`
-	VaultAddress     string            `toml:"vault_address"`
-	ProposalAddress  string            `toml:"proposal_address"`
-	ProgramAddresses *ProgramAddresses `toml:"program_addresses"`
-}
+var L = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.InfoLevel).With().Fields(map[string]any{"component": "ocr2_solana"}).Logger()
 
-type OCR2SolanaConfigurator struct {
+type Configurator struct {
 	Config []*OCR2Solana `toml:"ocr2_solana"`
 }
 
-func NewConfigurator() *OCR2SolanaConfigurator {
-	return &OCR2SolanaConfigurator{}
+func NewConfigurator() *Configurator {
+	return &Configurator{}
 }
 
-func (m *OCR2SolanaConfigurator) Load() error {
-	cfg, err := Load[OCR2SolanaConfigurator]()
+func (m *Configurator) Load() error {
+	cfg, err := products.Load[Configurator]()
 	if err != nil {
 		return fmt.Errorf("failed to load product config: %w", err)
 	}
@@ -53,8 +46,8 @@ func (m *OCR2SolanaConfigurator) Load() error {
 	return nil
 }
 
-func (m *OCR2SolanaConfigurator) Store(_ string, _ int) error {
-	return Store(m)
+func (m *Configurator) Store(_ string, _ int) error {
+	return products.Store(".", m)
 }
 
 var solanaNodeConfigTmpl = template.Must(template.New("solana-cl-config").Parse(`
@@ -101,7 +94,7 @@ URL = '{{ $url }}'
 {{ end }}
 `))
 
-func (m *OCR2SolanaConfigurator) GenerateNodesConfig(
+func (m *Configurator) GenerateNodesConfig(
 	_ context.Context,
 	sol *SolanaInput,
 	_ *ParrotInput,
@@ -123,7 +116,7 @@ func (m *OCR2SolanaConfigurator) GenerateNodesConfig(
 	return buf.String(), nil
 }
 
-func (m *OCR2SolanaConfigurator) GenerateNodesSecrets(
+func (m *Configurator) GenerateNodesSecrets(
 	_ context.Context,
 	_ *SolanaInput,
 	_ *ParrotInput,
@@ -134,7 +127,7 @@ func (m *OCR2SolanaConfigurator) GenerateNodesSecrets(
 
 // ConfigureJobsAndContracts deploys OCR2 contracts via Gauntlet and creates
 // CL node jobs. Anchor program binaries are already deployed by NewEnvironment.
-func (m *OCR2SolanaConfigurator) ConfigureJobsAndContracts(
+func (m *Configurator) ConfigureJobsAndContracts(
 	ctx context.Context,
 	_ int,
 	sol *SolanaInput,
@@ -154,7 +147,6 @@ func (m *OCR2SolanaConfigurator) ConfigureJobsAndContracts(
 		return fmt.Errorf("failed to create node keys: %w", err)
 	}
 
-	// Copy gauntlet working directory
 	gauntletCopyPath := utils.ProjectRoot + "/gauntlet-ocr2-setup"
 	if out, cpErr := exec.Command("cp", "-r", utils.ProjectRoot+"/gauntlet", gauntletCopyPath).Output(); cpErr != nil { //nolint:gosec
 		return fmt.Errorf("failed to copy gauntlet: %s: %w", string(out), cpErr)
@@ -235,7 +227,7 @@ func (m *OCR2SolanaConfigurator) ConfigureJobsAndContracts(
 	return nil
 }
 
-func (m *OCR2SolanaConfigurator) createJobs(
+func (m *Configurator) createJobs(
 	sol *SolanaInput,
 	pr *ParrotInput,
 	cl []*clclient.ChainlinkClient,
@@ -363,18 +355,4 @@ func createNodeKeysBundle(clients []*clclient.ChainlinkClient, chainName, chainI
 		})
 	}
 	return nkb, nil
-}
-
-func setupParrotRoutes(p interface{ SetAdapterRoute(route *parrot.Route) error }) error {
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
-		if err := p.SetAdapterRoute(&parrot.Route{
-			Path:               "/mockserver-bridge",
-			Method:             method,
-			ResponseBody:       5,
-			ResponseStatusCode: http.StatusOK,
-		}); err != nil {
-			return fmt.Errorf("failed to set parrot route %s: %w", method, err)
-		}
-	}
-	return nil
 }

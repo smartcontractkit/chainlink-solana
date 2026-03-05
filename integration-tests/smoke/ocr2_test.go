@@ -8,7 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 )
 
@@ -20,7 +21,7 @@ const defaultEnvOutPath = "../devenv/env-out.toml"
 // CL_SOLANA_CMD env vars passed to containers at startup). This test has
 // zero knowledge of the plugin mode -- it just reads env-out.toml.
 func TestSolanaOCRV2Smoke(t *testing.T) {
-	pdConfig, err := devenv.LoadOutput[devenv.OCR2SolanaConfigurator](defaultEnvOutPath)
+	pdConfig, err := products.LoadOutput[solana.Configurator](defaultEnvOutPath)
 	require.NoError(t, err, "Failed to load product config from env-out.toml")
 	require.NotEmpty(t, pdConfig.Config, "No OCR2 Solana config found in env-out.toml")
 

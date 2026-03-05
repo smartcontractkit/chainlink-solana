@@ -1,4 +1,4 @@
-package devenv
+package solana
 
 import (
 	"bytes"
@@ -28,7 +28,6 @@ type TaskJobSpec struct {
 	ForwardingAllowed bool   `toml:"forwardingAllowed"`
 }
 
-// OracleSpec defines the job spec for OCR2 jobs.
 type OracleSpec struct {
 	UpdatedAt                         time.Time            `toml:"-"`
 	CreatedAt                         time.Time            `toml:"-"`

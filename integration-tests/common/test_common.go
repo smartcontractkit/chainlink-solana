@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
@@ -319,7 +319,7 @@ func (m *OCRv2TestState) CreateJobs() {
 	wsc, err := ws.Connect(testcontext.Get(m.Config.T), m.Common.ChainDetails.WSURLExternal)
 	require.NoError(m.Config.T, err, "Error connecting to websocket client")
 
-	relayConfig := devenv.JSONConfig{
+	relayConfig := solana.JSONConfig{
 		"nodeEndpointHTTP": m.Common.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    m.Common.ChainDetails.ProgramAddresses.OCR2,
 		"transmissionsID":  m.Gauntlet.FeedAddress,
@@ -334,10 +334,10 @@ func (m *OCRv2TestState) CreateJobs() {
 			PeerID:       m.Clients.ChainlinkClient.NKeys[0].PeerID,
 		},
 	}
-	jobSpec := &devenv.TaskJobSpec{
+	jobSpec := &solana.TaskJobSpec{
 		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
-		OCR2OracleSpec: devenv.OracleSpec{
+		OCR2OracleSpec: solana.OracleSpec{
 			ContractID:                        m.Gauntlet.OcrAddress,
 			Relay:                             m.Common.ChainDetails.ChainName,
 			RelayConfig:                       relayConfig,
@@ -345,7 +345,7 @@ func (m *OCRv2TestState) CreateJobs() {
 			OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[0].TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
+			ContractConfigTrackerPollInterval: *solana.NewInterval(15 * time.Second),
 		},
 	}
 	sourceValueBridge := clclient.BridgeTypeAttributes{
@@ -384,11 +384,11 @@ func (m *OCRv2TestState) CreateJobs() {
 		_, err := node.CreateBridge(&sourceValueBridge)
 		require.NoError(m.Config.T, err, "Error creating bridge")
 
-		jobSpec := &devenv.TaskJobSpec{
+		jobSpec := &solana.TaskJobSpec{
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: bridgeInfo.ObservationSource,
-			OCR2OracleSpec: devenv.OracleSpec{
+			OCR2OracleSpec: solana.OracleSpec{
 				ContractID:                        m.Gauntlet.OcrAddress,
 				Relay:                             m.Common.ChainDetails.ChainName,
 				RelayConfig:                       relayConfig,
@@ -396,7 +396,7 @@ func (m *OCRv2TestState) CreateJobs() {
 				OCRKeyBundleID:                    null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(m.Clients.ChainlinkClient.NKeys[nIdx].TXKey.Data.ID),
 				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
+				ContractConfigTrackerPollInterval: *solana.NewInterval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig:                      PluginConfigToTomlFormat(observationSource),
 			},

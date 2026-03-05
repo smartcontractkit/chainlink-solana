@@ -1,22 +1,4 @@
-package devenv
-
-import (
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-)
-
-type ProductInfo struct {
-	Name      string `toml:"name"`
-	Instances int    `toml:"instances"`
-}
-
-// Cfg is the top-level environment config, mirroring devenv.Cfg
-// but with Solana-specific infrastructure instead of EVM blockchain.
-type Cfg struct {
-	Products []*ProductInfo `toml:"products"`
-	Solana   *SolanaInput   `toml:"solana"`
-	Parrot   *ParrotInput   `toml:"parrot"`
-	NodeSets []*ns.Input    `toml:"nodesets" validate:"required"`
-}
+package solana
 
 type SolanaInput struct {
 	Image      string       `toml:"image"`
@@ -31,6 +13,7 @@ type SolanaOutput struct {
 	InternalHTTPURL string `toml:"internal_http_url"`
 	ExternalHTTPURL string `toml:"external_http_url"`
 	ExternalWsURL   string `toml:"external_ws_url"`
+	ContainerName   string `toml:"container_name"`
 }
 
 type ParrotInput struct {
@@ -46,4 +29,16 @@ type ProgramAddresses struct {
 	OCR2             string `toml:"ocr2"`
 	AccessController string `toml:"access_controller"`
 	Store            string `toml:"store"`
+}
+
+type OCR2Solana struct {
+	NodeCount        int               `toml:"node_count"`
+	NumberOfRounds   int               `toml:"number_of_rounds"`
+	GauntletPath     string            `toml:"gauntlet_path"`
+	OcrAddress       string            `toml:"ocr_address"`
+	FeedAddress      string            `toml:"feed_address"`
+	LinkAddress      string            `toml:"link_address"`
+	VaultAddress     string            `toml:"vault_address"`
+	ProposalAddress  string            `toml:"proposal_address"`
+	ProgramAddresses *ProgramAddresses `toml:"program_addresses"`
 }

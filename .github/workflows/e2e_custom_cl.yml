@@ -220,7 +220,7 @@ jobs:
         uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
         with:
           repository: "chainlink"
-          tag: solana.8ac5fcc771e6ede8e63b015a2a7e90315b24f274 #${{ github.sha }} hardcode image to speed up
+          tag: solana.8ac5fcc771e6ede8e63b015a2a7e90315b24f274 #${{ github.sha }}
           aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
       - name: Checkout Chainlink repo
@@ -283,9 +283,9 @@ jobs:
       matrix:
         include:
           - variant: embedded
-            configs: env.toml
+            configs: env.toml,products/solana/basic.toml
           - variant: plugins
-            configs: env.toml,env-plugins.toml
+            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
       CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:solana.8ac5fcc771e6ede8e63b015a2a7e90315b24f274 #${{ github.sha }}
@@ -308,12 +308,6 @@ jobs:
         env:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
-      - name: Download contract artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts
-          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-
       - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
 
@@ -331,19 +325,19 @@ jobs:
         working-directory: integration-tests
         run: go mod download
 
+      - name: Download contract artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+
       - name: Setup Environment
-        working-directory: integration-tests
-        env:
-          CTF_CONFIGS: ${{ matrix.configs }}
-        run: |
-          echo "Setting up environment: ${{ matrix.variant }} (configs: ${{ matrix.configs }})"
-          go test -v -count=1 -timeout 30m -run TestSetupEnvironment ./devenv/
+        working-directory: integration-tests/devenv
+        run: go run ./cmd u ${{ matrix.configs }}
 
       - name: Run Smoke Test
-        working-directory: integration-tests
-        run: |
-          echo "Running smoke test for: $CHAINLINK_IMAGE, variant: ${{ matrix.variant }}"
-          go test -v -count=1 -timeout 30m -run TestSolanaOCRV2Smoke ./smoke/
+        working-directory: integration-tests/smoke
+        run: go test -v -timeout 30m -run TestSolanaOCRV2Smoke
 
       - name: Show Docker containers status
         if: failure()

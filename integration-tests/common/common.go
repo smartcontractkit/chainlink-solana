@@ -23,7 +23,7 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	chainConfig "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
+	solanaprod "github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	tc "github.com/smartcontractkit/chainlink-solana/integration-tests/testconfig"
@@ -239,8 +239,8 @@ func CreateBridges(ContractsIdxMapToContractsNodeInfo map[int]*ContractNodeInfo,
 	return nil
 }
 
-func PluginConfigToTomlFormat(pluginConfig string) devenv.JSONConfig {
-	return devenv.JSONConfig{
+func PluginConfigToTomlFormat(pluginConfig string) solanaprod.JSONConfig {
+	return solanaprod.JSONConfig{
 		"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", pluginConfig),
 	}
 }
@@ -248,7 +248,7 @@ func PluginConfigToTomlFormat(pluginConfig string) devenv.JSONConfig {
 func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error {
 	bootstrapNodeInternalIP := contractNodeInfo.BootstrapNode.InternalIP()
 	nodeCount := len(contractNodeInfo.Nodes)
-	relayConfig := devenv.JSONConfig{
+	relayConfig := solanaprod.JSONConfig{
 		"nodeEndpointHTTP": c.ChainDetails.RPCUrls,
 		"ocr2ProgramID":    contractNodeInfo.OCR2.ProgramAddress(),
 		"transmissionsID":  contractNodeInfo.Store.TransmissionsAddress(),
@@ -262,10 +262,10 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 			PeerID:       contractNodeInfo.BootstrapNodeKeysBundle.PeerID,
 		},
 	}
-	jobSpec := &devenv.TaskJobSpec{
+	jobSpec := &solanaprod.TaskJobSpec{
 		Name:    fmt.Sprintf("sol-OCRv2-%s-%s", "bootstrap", uuid.New().String()),
 		JobType: "bootstrap",
-		OCR2OracleSpec: devenv.OracleSpec{
+		OCR2OracleSpec: solanaprod.OracleSpec{
 			ContractID:                        contractNodeInfo.OCR2.Address(),
 			Relay:                             c.ChainDetails.ChainName,
 			RelayConfig:                       relayConfig,
@@ -273,7 +273,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 			OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.OCR2Key.Data.ID),
 			TransmitterID:                     null.StringFrom(contractNodeInfo.BootstrapNodeKeysBundle.TXKey.Data.ID),
 			ContractConfigConfirmations:       1,
-			ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
+			ContractConfigTrackerPollInterval: *solanaprod.NewInterval(15 * time.Second),
 		},
 	}
 	if _, err := contractNodeInfo.BootstrapNode.MustCreateJob(jobSpec); err != nil {
@@ -282,11 +282,11 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 	}
 
 	for nIdx := 0; nIdx < nodeCount; nIdx++ {
-		jobSpec := &devenv.TaskJobSpec{
+		jobSpec := &solanaprod.TaskJobSpec{
 			Name:              fmt.Sprintf("sol-OCRv2-%d-%s", nIdx, uuid.New().String()),
 			JobType:           "offchainreporting2",
 			ObservationSource: contractNodeInfo.BridgeInfos[nIdx].ObservationSource,
-			OCR2OracleSpec: devenv.OracleSpec{
+			OCR2OracleSpec: solanaprod.OracleSpec{
 				ContractID:                        contractNodeInfo.OCR2.Address(),
 				Relay:                             c.ChainDetails.ChainName,
 				RelayConfig:                       relayConfig,
@@ -294,7 +294,7 @@ func (c *Common) CreateJobsForContract(contractNodeInfo *ContractNodeInfo) error
 				OCRKeyBundleID:                    null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].OCR2Key.Data.ID),
 				TransmitterID:                     null.StringFrom(contractNodeInfo.NodeKeysBundle[nIdx].TXKey.Data.ID),
 				ContractConfigConfirmations:       1,
-				ContractConfigTrackerPollInterval: *devenv.NewInterval(15 * time.Second),
+				ContractConfigTrackerPollInterval: *solanaprod.NewInterval(15 * time.Second),
 				PluginType:                        "median",
 				PluginConfig:                      PluginConfigToTomlFormat(contractNodeInfo.BridgeInfos[nIdx].JuelsSource),
 			},
