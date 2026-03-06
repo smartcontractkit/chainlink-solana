@@ -32,7 +32,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo

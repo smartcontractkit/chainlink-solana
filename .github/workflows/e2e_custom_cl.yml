@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
       - name: Setup go
         uses: actions/setup-go@v5
         with:
@@ -44,8 +42,6 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -65,39 +61,17 @@ jobs:
             contracts:
               - 'contracts/**'
 
-  solana-test-image-exists:
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: Check If Solana Test Image Exists
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check-image-exists.outputs.exists }}
-    steps:
-      - name: Check if image exists in ECR
-        id: check-image-exists
-        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
-        with:
-          repository: chainlink-solana-tests
-          tag: ${{ github.sha }}
-          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -111,14 +85,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [contract-changes,get_projectserum_version]
     if: needs.contract-changes.outputs.changed == 'true'
     steps:
       - name: Checkout previous release
         uses: actions/checkout@v4
         with:
-          repository: smartcontractkit/chainlink-solana
           ref: v1.0.2 # set to v1.1.0 after v1.1.0 is deployed to mainnet
       - name: build contracts
         id: previous
@@ -203,8 +176,6 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
 
       - name: Get core ref
         id: get-core-ref
@@ -273,8 +244,6 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
@@ -291,7 +260,7 @@ jobs:
         env:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
-      - name: Install Solana CLI
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
         run: ./scripts/install-solana-ci.sh
 
       - name: Install gauntlet
@@ -372,8 +341,6 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
