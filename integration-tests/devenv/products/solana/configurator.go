@@ -141,6 +141,9 @@ func (m *Configurator) ConfigureJobsAndContracts(
 	if err != nil {
 		return fmt.Errorf("failed to create CL clients: %w", err)
 	}
+	for i, c := range cl {
+		c.Config.InternalIP = nodeSets[0].Out.CLNodes[i].Node.InternalIP
+	}
 
 	nKeys, err := createNodeKeysBundle(cl, "solana", sol.ChainID)
 	if err != nil {
@@ -254,6 +257,8 @@ func (m *Configurator) createJobs(
 			PeerID:       nKeys[0].PeerID,
 		},
 	}
+
+	fmt.Printf("BootstrapperPeers: %+v", bootstrapPeers)
 
 	mockBridgeURL := fmt.Sprintf("%s/%s", pr.Out.InternalEndpoint, "mockserver-bridge")
 	sourceValueBridge := clclient.BridgeTypeAttributes{
