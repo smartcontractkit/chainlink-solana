@@ -68,6 +68,7 @@ func NewEnvironment(ctx context.Context) error {
 		InternalHTTPURL: sol.InternalHTTPURL,
 		ExternalHTTPURL: sol.ExternalHTTPURL,
 		ExternalWsURL:   sol.ExternalWsURL,
+		ContainerName:   sol.ContainerName,
 	}
 
 	// Deploy anchor program binaries (infra-level, before product configurators)

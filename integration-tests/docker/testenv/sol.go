@@ -200,6 +200,45 @@ func (s *Solana) getContainerRequest(inactiveFeatures InactiveFeatures) (*tc.Con
 	}, nil
 }
 
+// FindSolanaByName looks up a running Solana container by its Docker name
+// and returns a reconnected Solana handle with the same external/internal URLs.
+func FindSolanaByName(ctx context.Context, name string) (*Solana, error) {
+	c, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{
+		ContainerRequest: tc.ContainerRequest{Name: name},
+		Reuse:            true,
+		Started:          true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find solana container %q: %w", name, err)
+	}
+
+	host, err := test_env.GetHost(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get host for container %q: %w", name, err)
+	}
+	httpPort, err := c.MappedPort(ctx, test_env.NatPort(SolHTTPPort))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get http port for container %q: %w", name, err)
+	}
+	wsPort, err := c.MappedPort(ctx, test_env.NatPort(SolWSPort))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ws port for container %q: %w", name, err)
+	}
+
+	sol := &Solana{
+		EnvComponent: test_env.EnvComponent{
+			ContainerName: name,
+			Container:     c,
+		},
+		ExternalHTTPURL: fmt.Sprintf("http://%s:%s", host, httpPort.Port()),
+		InternalHTTPURL: fmt.Sprintf("http://%s:%s", name, SolHTTPPort),
+		ExternalWsURL:   fmt.Sprintf("ws://%s:%s", host, wsPort.Port()),
+		InternalWsURL:   fmt.Sprintf("ws://%s:%s", name, SolWSPort),
+		l:               log.Logger,
+	}
+	return sol, nil
+}
+
 type FeatureStatuses struct {
 	Features []FeatureStatus
 	// note: there are other unused params in the json response

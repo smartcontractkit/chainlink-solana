@@ -13,7 +13,6 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 	"golang.org/x/sync/errgroup"
 
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
@@ -346,21 +345,6 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 	}, nil
 }
 
-func (c *ContractDeployer) DeployProgramRemote(programName string, env *environment.Environment) error {
-	log.Debug().Str("Program", programName).Msg("Deploying program")
-	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
-	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
-	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
-	if err != nil {
-		return err
-	}
-	stdOutBytes, stdErrBytes, _ := env.Client.ExecuteInPod(env.Cfg.Namespace, pl.Items[0].Name, "sol-val", strings.Split(cmd, " "))
-	log.Debug().Str("STDOUT", string(stdOutBytes)).Str("STDERR", string(stdErrBytes)).Str("CMD", cmd).Send()
-	return nil
-}
-
 func BuildProgramIDKeypairPath(programName string) string {
 	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	return filepath.Join("programs", programKeyFileName)
@@ -493,23 +477,6 @@ func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
 	}
 	log.Debug().Interface("Keys", c.Client.ProgramWallets).Msg("Program wallets")
 	return nil
-}
-
-func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string, env *environment.Environment) error {
-	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
-	if err != nil {
-		return err
-	}
-	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
-	g := errgroup.Group{}
-
-	for idx := range contractBinaries {
-		g.Go(func() error {
-			return c.DeployProgramRemote(contractBinaries[idx], env)
-		})
-	}
-
-	return g.Wait()
 }
 
 func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
