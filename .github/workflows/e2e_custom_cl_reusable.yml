@@ -85,7 +85,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
     strategy:
       fail-fast: false
       matrix:
@@ -136,7 +136,7 @@ jobs:
         run: go run ./cmd u ${{ matrix.configs }}
 
       - name: Run Smoke Test
-        working-directory: integration-tests/smoke
+        working-directory: integration-tests/tests
         run: go test -v -timeout 30m -run TestSolanaOCRV2Smoke
 
       - name: Show Docker containers status
@@ -150,7 +150,7 @@ jobs:
           name: smoke-test-logs-${{ matrix.variant }}
           path: |
             integration-tests/devenv/logs/
-            integration-tests/smoke/logs/
+            integration-tests/tests/logs/
           retention-days: 1
 
   e2e_custom_run_smoke_tests:

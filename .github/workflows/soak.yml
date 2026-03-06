@@ -50,7 +50,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
     strategy:
       fail-fast: false
       matrix:
