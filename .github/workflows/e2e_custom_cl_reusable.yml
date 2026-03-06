@@ -133,7 +133,9 @@ jobs:
 
       - name: Setup Environment
         working-directory: integration-tests/devenv
-        run: go run ./cmd u ${{ matrix.configs }}
+        env:
+          CONFIGS: ${{ matrix.configs }}
+        run: go run ./cmd u "$CONFIGS"
 
       - name: Run Smoke Test
         working-directory: integration-tests/tests

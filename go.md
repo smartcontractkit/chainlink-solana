@@ -187,20 +187,17 @@ flowchart LR
 	chainlink-solana/contracts --> chainlink-solana
 	click chainlink-solana/contracts href "https://github.com/smartcontractkit/chainlink-solana"
 	chainlink-solana/integration-tests --> chainlink-solana/contracts
-	chainlink-solana/integration-tests --> chainlink-testing-framework/lib
+	chainlink-solana/integration-tests --> chainlink-testing-framework/framework/components/fake
 	click chainlink-solana/integration-tests href "https://github.com/smartcontractkit/chainlink-solana"
 	chainlink-sui
 	click chainlink-sui href "https://github.com/smartcontractkit/chainlink-sui"
 	chainlink-testing-framework/framework --> chainlink-testing-framework/lib/grafana
 	chainlink-testing-framework/framework --> chainlink-testing-framework/wasp
 	click chainlink-testing-framework/framework href "https://github.com/smartcontractkit/chainlink-testing-framework"
-	chainlink-testing-framework/lib --> chainlink-testing-framework/parrot
-	chainlink-testing-framework/lib --> chainlink-testing-framework/seth
-	click chainlink-testing-framework/lib href "https://github.com/smartcontractkit/chainlink-testing-framework"
+	chainlink-testing-framework/framework/components/fake --> chainlink-testing-framework/framework
+	click chainlink-testing-framework/framework/components/fake href "https://github.com/smartcontractkit/chainlink-testing-framework"
 	chainlink-testing-framework/lib/grafana
 	click chainlink-testing-framework/lib/grafana href "https://github.com/smartcontractkit/chainlink-testing-framework"
-	chainlink-testing-framework/parrot
-	click chainlink-testing-framework/parrot href "https://github.com/smartcontractkit/chainlink-testing-framework"
 	chainlink-testing-framework/seth
 	click chainlink-testing-framework/seth href "https://github.com/smartcontractkit/chainlink-testing-framework"
 	chainlink-testing-framework/wasp
@@ -262,9 +259,8 @@ flowchart LR
 
 	subgraph chainlink-testing-framework-repo[chainlink-testing-framework]
 		 chainlink-testing-framework/framework
-		 chainlink-testing-framework/lib
+		 chainlink-testing-framework/framework/components/fake
 		 chainlink-testing-framework/lib/grafana
-		 chainlink-testing-framework/parrot
 		 chainlink-testing-framework/seth
 		 chainlink-testing-framework/wasp
 	end
