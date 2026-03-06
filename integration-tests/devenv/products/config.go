@@ -1,3 +1,4 @@
+// copy of chainlink/devenv/products/config.go
 package products
 
 import (

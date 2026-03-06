@@ -11,9 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
-	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
-	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	solcomp "github.com/smartcontractkit/chainlink-solana/integration-tests/components/solana"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/fakes"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
@@ -40,33 +40,28 @@ func NewEnvironment(ctx context.Context) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Derive localnet keys if not provided
-	if in.Solana.PublicKey == "" || in.Solana.PrivateKey == "" {
-		pk, pkErr := solanago.PrivateKeyFromBase58(solclient.DefaultPrivateKeysSolValidator[1])
-		if pkErr != nil {
-			return fmt.Errorf("failed to decode default localnet private key: %w", pkErr)
-		}
-		in.Solana.PublicKey = pk.PublicKey().String()
-		in.Solana.PrivateKey = fmt.Sprintf("[%s]", formatBuffer([]byte(pk)))
+	// Always derive public/private key values from env private key.
+	// If env is unset, default to localnet validator key.
+	keyBase58 := os.Getenv("SOLANA_PRIVATE_KEY")
+	if keyBase58 == "" {
+		keyBase58 = solclient.DefaultPrivateKeysSolValidator[1]
 	}
+	pk, pkErr := solanago.PrivateKeyFromBase58(keyBase58)
+	if pkErr != nil {
+		return fmt.Errorf("failed to decode SOLANA_PRIVATE_KEY: %w", pkErr)
+	}
+	in.Solana.PublicKey = pk.PublicKey().String()
+	in.Solana.PrivateKey = fmt.Sprintf("[%s]", formatBuffer([]byte(pk)))
 
 	// Phase 3: Start Solana container
 	if in.Solana.Image == "" {
 		in.Solana.Image = "anzaxyz/agave:v2.1.21"
 	}
-	solOut, err := testenvsol.NewSolana(ctx, &testenvsol.Input{
-		Image:     in.Solana.Image,
-		PublicKey: in.Solana.PublicKey,
-	})
+	solOut, err := solcomp.NewSolana(ctx, in.Solana.Image, in.Solana.PublicKey, in.Solana.Out)
 	if err != nil {
 		return fmt.Errorf("failed to start solana container: %w", err)
 	}
-	in.Solana.Out = &solana.SolanaOutput{
-		InternalHTTPURL: solOut.InternalHTTPURL,
-		ExternalHTTPURL: solOut.ExternalHTTPURL,
-		ExternalWsURL:   solOut.ExternalWsURL,
-		ContainerName:   solOut.ContainerName,
-	}
+	in.Solana.Out = solOut
 
 	// Deploy anchor program binaries (infra-level, before product configurators)
 	solClient := &solclient.Client{}

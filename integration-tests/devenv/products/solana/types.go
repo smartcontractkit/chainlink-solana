@@ -1,21 +1,5 @@
 package solana
 
-type SolanaInput struct {
-	Image      string       `toml:"image"`
-	ChainID    string       `toml:"chain_id"`
-	PublicKey  string       `toml:"public_key"`
-	PrivateKey string       `toml:"private_key"`
-	Secret     string       `toml:"secret"`
-	Out        *SolanaOutput `toml:"out"`
-}
-
-type SolanaOutput struct {
-	InternalHTTPURL string `toml:"internal_http_url"`
-	ExternalHTTPURL string `toml:"external_http_url"`
-	ExternalWsURL   string `toml:"external_ws_url"`
-	ContainerName   string `toml:"container_name"`
-}
-
 type ProgramAddresses struct {
 	OCR2             string `toml:"ocr2"`
 	AccessController string `toml:"access_controller"`

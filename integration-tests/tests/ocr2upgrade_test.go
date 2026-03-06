@@ -1,4 +1,4 @@
-package smoke
+package tests
 
 import (
 	"context"
@@ -11,10 +11,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
+	solcomp "github.com/smartcontractkit/chainlink-solana/integration-tests/components/solana"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
-	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/gauntlet"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 )
@@ -58,7 +58,7 @@ func upgradeContracts(t *testing.T, infraCfg *devenv.Cfg, cfg *solana.OCR2Solana
 	containerName := infraCfg.Solana.Out.ContainerName
 	require.NotEmpty(t, containerName, "Solana container name not found in env-out.toml")
 
-	solOut, err := testenvsol.FindSolanaByName(ctx, containerName)
+	solOut, err := solcomp.FindSolanaByName(ctx, containerName)
 	require.NoError(t, err, "Failed to find Solana container by name")
 
 	solClient := &solclient.Client{}

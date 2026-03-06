@@ -1,4 +1,4 @@
-package testenv
+package solana
 
 import (
 	"context"
@@ -40,9 +40,12 @@ var idJSONRaw = `
 `
 
 type Input struct {
-	Image     string  `toml:"image"`
-	PublicKey string  `toml:"public_key"`
-	Out       *Output `toml:"out"`
+	Image      string  `toml:"image"`
+	ChainID    string  `toml:"chain_id"`
+	PublicKey  string  `toml:"-"`
+	PrivateKey string  `toml:"-"`
+	Secret     string  `toml:"secret"`
+	Out        *Output `toml:"out"`
 }
 
 type Output struct {
@@ -55,10 +58,10 @@ type Output struct {
 	Container       tc.Container `toml:"-"`
 }
 
-func NewSolana(ctx context.Context, in *Input) (*Output, error) {
-	if in.Out != nil && in.Out.UseCache {
+func NewSolana(ctx context.Context, image, publicKey string, cachedOut *Output) (*Output, error) {
+	if cachedOut != nil && cachedOut.UseCache {
 		framework.L.Info().Msg("Using cached Solana container")
-		return in.Out, nil
+		return cachedOut, nil
 	}
 
 	containerName := framework.DefaultTCName("solana")
@@ -68,7 +71,7 @@ func NewSolana(ctx context.Context, in *Input) (*Output, error) {
 		return nil, err
 	}
 
-	cReq, err := getContainerRequest(containerName, in.Image, in.PublicKey, inactiveMainnetFeatures)
+	cReq, err := getContainerRequest(containerName, image, publicKey, inactiveMainnetFeatures)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +106,6 @@ func NewSolana(ctx context.Context, in *Input) (*Output, error) {
 		InternalWsURL:   fmt.Sprintf("ws://%s:%s", containerName, SolWSPort),
 		Container:       c,
 	}
-	in.Out = out
-
 	framework.L.Info().
 		Str("ExternalHTTPURL", out.ExternalHTTPURL).
 		Str("InternalHTTPURL", out.InternalHTTPURL).

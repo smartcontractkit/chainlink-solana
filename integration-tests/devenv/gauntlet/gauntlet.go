@@ -1,4 +1,5 @@
 // Package gauntlet enables the framework to interface with the chainlink gauntlet project
+// Copied from chainlink-testing-framework/lib/gauntlet to avoid depending on deprecated CTF packages.
 package gauntlet
 
 import (

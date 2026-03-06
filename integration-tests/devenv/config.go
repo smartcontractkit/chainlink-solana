@@ -1,3 +1,4 @@
+// copy of chainlink/devenv/products/config.go
 package devenv
 
 import (
@@ -77,4 +78,3 @@ func BaseConfigPath() (string, error) {
 	L.Debug().Str("Configs", configs).Msg("Getting base config path")
 	return strings.Split(configs, ",")[0], nil
 }
-

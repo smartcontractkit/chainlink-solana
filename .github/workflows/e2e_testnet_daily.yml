@@ -61,7 +61,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
@@ -80,28 +80,39 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+      - name: Check if image exists in ECR
+        id: check-image-exists
+        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
         with:
-          repository: chainlink
+          repository: "chainlink"
           tag: solana.${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-      - name: Build Image
-        if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
+      - name: Checkout Chainlink repo
+        if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
+        uses: actions/checkout@v4
         with:
-          should_checkout: true
-          cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
-          dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          repository: smartcontractkit/chainlink
+          ref: ${{ github.event.inputs.cl_branch_ref }}
+
+      - name: Build Image
+        if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
+        uses: smartcontractkit/.github/actions/ctf-build-image@ctf-build-image/v1
+        with:
+          dockerfile: core/chainlink.Dockerfile
+          image-tag: solana.${{ github.sha }}
+          go-get-overrides: |
+            chainlink-solana=${{ github.event.pull_request.head.sha }}
+          # registry inputs
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          aws-account-number: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          docker-registry-url: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
+          docker-repository-name: chainlink
+          # GATI inputs
+          gati-role-arn: ${{ secrets.AWS_ROLE_ARN_GATI_READONLY }}
+          gati-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL}}
 
   e2e_custom_run_smoke_tests:
     name: E2E Smoke Tests (${{ matrix.variant }})
@@ -115,12 +126,13 @@ jobs:
       matrix:
         include:
           - variant: embedded
-            configs: env.toml,products/solana/basic.toml
+            configs: env-testnet.toml,products/solana/basic.toml
           - variant: plugins
-            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
+            configs: env-testnet.toml,products/solana/basic.toml,products/solana/plugins.toml
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
       CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
+      SOLANA_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4

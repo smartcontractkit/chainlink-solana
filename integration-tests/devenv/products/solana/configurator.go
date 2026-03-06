@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/components/solana"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products"
 
 	ocr_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
@@ -96,7 +97,7 @@ URL = '{{ $url }}'
 
 func (m *Configurator) GenerateNodesConfig(
 	_ context.Context,
-	sol *SolanaInput,
+	sol *solana.Input,
 	_ []*ns.Input,
 ) (string, error) {
 	L.Info().Msg("Generating Solana CL node configuration")
@@ -117,7 +118,7 @@ func (m *Configurator) GenerateNodesConfig(
 
 func (m *Configurator) GenerateNodesSecrets(
 	_ context.Context,
-	_ *SolanaInput,
+	_ *solana.Input,
 	_ []*ns.Input,
 ) (string, error) {
 	return "", nil
@@ -128,7 +129,7 @@ func (m *Configurator) GenerateNodesSecrets(
 func (m *Configurator) ConfigureJobsAndContracts(
 	ctx context.Context,
 	_ int,
-	sol *SolanaInput,
+	sol *solana.Input,
 	fakesURL string,
 	nodeSets []*ns.Input,
 ) error {
@@ -232,7 +233,7 @@ func (m *Configurator) ConfigureJobsAndContracts(
 }
 
 func (m *Configurator) createJobs(
-	sol *SolanaInput,
+	sol *solana.Input,
 	fakesURL string,
 	cl []*clclient.ChainlinkClient,
 	nKeys []clclient.NodeKeysBundle,
