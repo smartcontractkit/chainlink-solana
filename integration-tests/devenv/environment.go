@@ -3,7 +3,6 @@ package devenv
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
@@ -11,11 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	testenvctf "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/products/solana"
 	testenvsol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
+	"github.com/smartcontractkit/chainlink-solana/integration-tests/devenv/fakes"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/solclient"
 	"github.com/smartcontractkit/chainlink-solana/integration-tests/utils"
 )
@@ -52,29 +50,28 @@ func NewEnvironment(ctx context.Context) error {
 		in.Solana.PrivateKey = fmt.Sprintf("[%s]", formatBuffer([]byte(pk)))
 	}
 
-	// Phase 3: Start Solana container (replaces blockchain.NewBlockchainNetwork)
+	// Phase 3: Start Solana container
 	if in.Solana.Image == "" {
 		in.Solana.Image = "anzaxyz/agave:v2.1.21"
 	}
-	sol := testenvsol.NewSolana(
-		[]string{framework.DefaultNetworkName},
-		in.Solana.Image,
-		in.Solana.PublicKey,
-	)
-	if err := sol.StartContainer(); err != nil {
+	solOut, err := testenvsol.NewSolana(ctx, &testenvsol.Input{
+		Image:     in.Solana.Image,
+		PublicKey: in.Solana.PublicKey,
+	})
+	if err != nil {
 		return fmt.Errorf("failed to start solana container: %w", err)
 	}
 	in.Solana.Out = &solana.SolanaOutput{
-		InternalHTTPURL: sol.InternalHTTPURL,
-		ExternalHTTPURL: sol.ExternalHTTPURL,
-		ExternalWsURL:   sol.ExternalWsURL,
-		ContainerName:   sol.ContainerName,
+		InternalHTTPURL: solOut.InternalHTTPURL,
+		ExternalHTTPURL: solOut.ExternalHTTPURL,
+		ExternalWsURL:   solOut.ExternalWsURL,
+		ContainerName:   solOut.ContainerName,
 	}
 
 	// Deploy anchor program binaries (infra-level, before product configurators)
 	solClient := &solclient.Client{}
 	solClient.Config = solClient.Config.Default()
-	solClient.Config.URLs = []string{sol.ExternalHTTPURL, sol.ExternalWsURL}
+	solClient.Config.URLs = []string{solOut.ExternalHTTPURL, solOut.ExternalWsURL}
 	solClient, err = solclient.NewClient(solClient.Config)
 	if err != nil {
 		return fmt.Errorf("failed to create solana client: %w", err)
@@ -83,25 +80,12 @@ func NewEnvironment(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create contract deployer: %w", err)
 	}
-	if err := cd.DeployAnchorProgramsRemoteDocker(utils.ContractsDir, "", sol, solclient.BuildProgramIDKeypairPath); err != nil {
+	if err := cd.DeployAnchorProgramsRemoteDocker(utils.ContractsDir, "", solOut.Container, solclient.BuildProgramIDKeypairPath); err != nil {
 		return fmt.Errorf("failed to deploy anchor programs: %w", err)
 	}
 
-	// Phase 4: Start Parrot (replaces fake.NewDockerFakeDataProvider)
-	mockAdapter := testenvctf.NewParrot([]string{framework.DefaultNetworkName})
-	if err := mockAdapter.StartContainer(); err != nil {
-		return fmt.Errorf("failed to start parrot: %w", err)
-	}
-	if in.Parrot == nil {
-		in.Parrot = &solana.ParrotInput{}
-	}
-	in.Parrot.Out = &solana.ParrotOutput{
-		InternalEndpoint: mockAdapter.InternalEndpoint,
-		ExternalEndpoint: mockAdapter.ExternalEndpoint,
-	}
-	if err := setupParrotRoutes(mockAdapter); err != nil {
-		return fmt.Errorf("failed to setup parrot routes: %w", err)
-	}
+	// Phase 4: Fakes server endpoint (started externally via fakes/cmd)
+	fakesURL := fmt.Sprintf("%s:%d", framework.HostDockerInternal(), fakes.FakeServicePort)
 
 	// Phase 5: Product configurators -- generate node config overrides
 	productConfigurators := make([]Product, 0)
@@ -116,12 +100,12 @@ func NewEnvironment(ctx context.Context) error {
 			return fmt.Errorf("failed to load product config: %w", err)
 		}
 
-		configOverrides, err := p.GenerateNodesConfig(ctx, in.Solana, in.Parrot, in.NodeSets)
+		configOverrides, err := p.GenerateNodesConfig(ctx, in.Solana, in.NodeSets)
 		if err != nil {
 			return fmt.Errorf("failed to generate CL nodes config: %w", err)
 		}
 
-		secretsOverrides, err := p.GenerateNodesSecrets(ctx, in.Solana, in.Parrot, in.NodeSets)
+		secretsOverrides, err := p.GenerateNodesSecrets(ctx, in.Solana, in.NodeSets)
 		if err != nil {
 			return fmt.Errorf("failed to generate CL nodes secrets: %w", err)
 		}
@@ -157,7 +141,7 @@ func NewEnvironment(ctx context.Context) error {
 				ctx,
 				productInstance,
 				in.Solana,
-				in.Parrot,
+				fakesURL,
 				in.NodeSets,
 			); err != nil {
 				return fmt.Errorf("failed to setup product deployment: %w", err)
@@ -171,20 +155,6 @@ func NewEnvironment(ctx context.Context) error {
 	L.Info().Str("BootstrapNode", in.NodeSets[0].Out.CLNodes[0].Node.ExternalURL).Send()
 	for _, n := range in.NodeSets[0].Out.CLNodes[1:] {
 		L.Info().Str("Node", n.Node.ExternalURL).Send()
-	}
-	return nil
-}
-
-func setupParrotRoutes(p interface{ SetAdapterRoute(route *parrot.Route) error }) error {
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
-		if err := p.SetAdapterRoute(&parrot.Route{
-			Path:               "/mockserver-bridge",
-			Method:             method,
-			ResponseBody:       5,
-			ResponseStatusCode: http.StatusOK,
-		}); err != nil {
-			return fmt.Errorf("failed to set parrot route %s: %w", method, err)
-		}
 	}
 	return nil
 }

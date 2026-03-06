@@ -7,14 +7,8 @@ on:
         required: true
         default: develop
         type: string
-      team:
-        description: Team to run the tests for (e.g. BIX, CCIP)
-        required: true
-        type: string
-        default: BIX
 
 env:
-  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
   MOD_CACHE_VERSION: 1
 
@@ -66,8 +60,6 @@ jobs:
           - variant: plugins
             configs: env.toml,products/solana/basic.toml,products/solana/soak.toml,products/solana/plugins.toml
     needs: [e2e_custom_build_artifacts]
-    env:
-      CHAINLINK_IMAGE: ${{ env.CL_ECR }}:${{ github.event.inputs.cl_image_tag }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -110,8 +102,14 @@ jobs:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
 
+      - name: Start fakes server
+        working-directory: integration-tests
+        run: go run ./fakes/cmd &
+
       - name: Setup Environment
         working-directory: integration-tests/devenv
+        env:
+          CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:${{ github.event.inputs.cl_image_tag }}
         run: go run ./cmd u ${{ matrix.configs }}
 
       - name: Run Soak Test

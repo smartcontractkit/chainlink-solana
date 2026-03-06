@@ -13,12 +13,12 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
+	tc "github.com/testcontainers/testcontainers-go"
 	"golang.org/x/sync/errgroup"
 
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
@@ -351,13 +351,13 @@ func BuildProgramIDKeypairPath(programName string) string {
 }
 
 // DeployProgramRemoteLocal takes in a programIDBuilder which allows for building the program keypair path from the name or passing the deployed program address
-func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
+func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, container tc.Container, programIDBuilder func(string) string) error {
 	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
 
 	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programIDBuilder(programName), programPath)
 	log.Info().Str("Cmd", cmd).Msg("Deploying " + programName)
-	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
+	_, res, err := container.Exec(context.Background(), strings.Split(cmd, " "))
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,7 @@ func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
 	return nil
 }
 
-func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
+func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, container tc.Container, programIDBuilder func(string) string) error {
 	contractBinaries, err := c.Client.ListDirFilenamesByExt(filepath.Join(baseDir, subDir), ".so")
 	if err != nil {
 		return err
@@ -489,7 +489,7 @@ func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir stri
 
 	for idx := range contractBinaries {
 		g.Go(func() error {
-			return c.DeployProgramRemoteLocal(filepath.Join(subDir, contractBinaries[idx]), sol, programIDBuilder)
+			return c.DeployProgramRemoteLocal(filepath.Join(subDir, contractBinaries[idx]), container, programIDBuilder)
 		})
 	}
 

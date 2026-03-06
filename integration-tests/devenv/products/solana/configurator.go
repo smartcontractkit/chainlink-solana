@@ -97,7 +97,6 @@ URL = '{{ $url }}'
 func (m *Configurator) GenerateNodesConfig(
 	_ context.Context,
 	sol *SolanaInput,
-	_ *ParrotInput,
 	_ []*ns.Input,
 ) (string, error) {
 	L.Info().Msg("Generating Solana CL node configuration")
@@ -119,7 +118,6 @@ func (m *Configurator) GenerateNodesConfig(
 func (m *Configurator) GenerateNodesSecrets(
 	_ context.Context,
 	_ *SolanaInput,
-	_ *ParrotInput,
 	_ []*ns.Input,
 ) (string, error) {
 	return "", nil
@@ -131,7 +129,7 @@ func (m *Configurator) ConfigureJobsAndContracts(
 	ctx context.Context,
 	_ int,
 	sol *SolanaInput,
-	pr *ParrotInput,
+	fakesURL string,
 	nodeSets []*ns.Input,
 ) error {
 	L.Info().Msg("Configuring OCR2 Solana jobs and contracts")
@@ -215,7 +213,7 @@ func (m *Configurator) ConfigureJobsAndContracts(
 		return fmt.Errorf("failed to configure OCR2: %w", err)
 	}
 
-	if err := m.createJobs(sol, pr, cl, nKeys, sg); err != nil {
+	if err := m.createJobs(sol, fakesURL, cl, nKeys, sg); err != nil {
 		return fmt.Errorf("failed to create jobs: %w", err)
 	}
 
@@ -235,7 +233,7 @@ func (m *Configurator) ConfigureJobsAndContracts(
 
 func (m *Configurator) createJobs(
 	sol *SolanaInput,
-	pr *ParrotInput,
+	fakesURL string,
 	cl []*clclient.ChainlinkClient,
 	nKeys []clclient.NodeKeysBundle,
 	sg *gauntlet.SolanaGauntlet,
@@ -258,7 +256,7 @@ func (m *Configurator) createJobs(
 		},
 	}
 
-	mockBridgeURL := fmt.Sprintf("%s/%s", pr.Out.InternalEndpoint, "mockserver-bridge")
+	mockBridgeURL := fmt.Sprintf("%s/%s", fakesURL, "mockserver-bridge")
 	sourceValueBridge := clclient.BridgeTypeAttributes{
 		Name:        "mockserver-bridge",
 		URL:         mockBridgeURL,
@@ -310,8 +308,6 @@ func (m *Configurator) createJobs(
 			return fmt.Errorf("failed to create bridge on node %d: %w", nIdx, err)
 		}
 
-		fmt.Printf("Worker %d bridge created: %+v", nIdx, workerBridge)
-
 		pluginConfig := JSONConfig{
 			"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", observationSource),
 		}
@@ -333,7 +329,6 @@ func (m *Configurator) createJobs(
 				PluginConfig:                      pluginConfig,
 			},
 		}
-
 		if _, err := cl[nIdx].MustCreateJob(workerSpec); err != nil {
 			return fmt.Errorf("failed to create job on node %d: %w", nIdx, err)
 		}

@@ -58,12 +58,12 @@ func upgradeContracts(t *testing.T, infraCfg *devenv.Cfg, cfg *solana.OCR2Solana
 	containerName := infraCfg.Solana.Out.ContainerName
 	require.NotEmpty(t, containerName, "Solana container name not found in env-out.toml")
 
-	sol, err := testenvsol.FindSolanaByName(ctx, containerName)
+	solOut, err := testenvsol.FindSolanaByName(ctx, containerName)
 	require.NoError(t, err, "Failed to find Solana container by name")
 
 	solClient := &solclient.Client{}
 	solClient.Config = solClient.Config.Default()
-	solClient.Config.URLs = []string{sol.ExternalHTTPURL, sol.ExternalWsURL}
+	solClient.Config.URLs = []string{solOut.ExternalHTTPURL, solOut.ExternalWsURL}
 	solClient, err = solclient.NewClient(solClient.Config)
 	require.NoError(t, err, "Failed to create Solana client")
 
@@ -85,6 +85,6 @@ func upgradeContracts(t *testing.T, infraCfg *devenv.Cfg, cfg *solana.OCR2Solana
 		return val
 	}
 
-	err = cd.DeployAnchorProgramsRemoteDocker(upgradeDir, "", sol, programIDBuilder)
+	err = cd.DeployAnchorProgramsRemoteDocker(upgradeDir, "", solOut.Container, programIDBuilder)
 	require.NoError(t, err, "Failed to upgrade contracts")
 }

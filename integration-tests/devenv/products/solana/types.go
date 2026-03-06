@@ -16,15 +16,6 @@ type SolanaOutput struct {
 	ContainerName   string `toml:"container_name"`
 }
 
-type ParrotInput struct {
-	Out *ParrotOutput `toml:"out"`
-}
-
-type ParrotOutput struct {
-	InternalEndpoint string `toml:"internal_endpoint"`
-	ExternalEndpoint string `toml:"external_endpoint"`
-}
-
 type ProgramAddresses struct {
 	OCR2             string `toml:"ocr2"`
 	AccessController string `toml:"access_controller"`
