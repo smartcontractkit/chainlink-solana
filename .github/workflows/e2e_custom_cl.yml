@@ -8,10 +8,6 @@ on:
         required: true
         default: develop
         type: string
-      solana_ref:
-        description: "The chainlink-solana ref to checkout"
-        required: false
-        type: string
 
 env:
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -31,7 +27,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
       - name: Setup go
         uses: actions/setup-go@v5
         with:
@@ -51,7 +46,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -104,7 +98,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -212,7 +205,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
 
       - name: Get core ref
         id: get-core-ref
@@ -232,7 +224,7 @@ jobs:
         uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
         with:
           repository: "chainlink"
-          tag: solana.8ac5fcc771e6ede8e63b015a2a7e90315b24f274 #${{ github.sha }}
+          tag: solana.${{ github.sha }}
           aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
 
       - name: Checkout Chainlink repo
@@ -260,30 +252,6 @@ jobs:
           gati-role-arn: ${{ secrets.AWS_ROLE_ARN_GATI_READONLY }}
           gati-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL}}
 
-  build_test_image:
-    environment: integration
-    if: contains(join(github.event.pull_request.labels.*.name, ' '), 'build-test-image')
-    permissions:
-      id-token: write
-      contents: read
-    name: Build Test Image
-    runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts]
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v4
-        with:
-          repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || github.event.pull_request.head.sha }}
-
-      - name: Build Image
-        uses: ./.github/actions/build-test-image
-        with:
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-
   e2e_custom_run_smoke_tests_matrix:
     name: E2E Smoke Tests (${{ matrix.variant }})
     environment: integration
@@ -307,7 +275,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
@@ -378,13 +345,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: [e2e_custom_run_smoke_tests_matrix]
     if: always()
+
     steps:
       - name: Check results
+        env:
+          MATRIX_RESULT: ${{ needs.e2e_custom_run_smoke_tests_matrix.result }}
         run: |
-          if [[ "${{ needs.e2e_custom_run_smoke_tests_matrix.result }}" == "success" ]]; then
+          if [[ "${MATRIX_RESULT}" == "success" ]]; then
             echo "All smoke tests passed."
           else
-            echo "Smoke tests failed: ${{ needs.e2e_custom_run_smoke_tests_matrix.result }}"
+            echo "Smoke tests failed: ${MATRIX_RESULT}"
             exit 1
           fi
 
@@ -404,7 +374,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-solana
-          ref: ${{ inputs.solana_ref || '' }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1

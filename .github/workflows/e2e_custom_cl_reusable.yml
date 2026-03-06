@@ -58,7 +58,6 @@ jobs:
     name: E2E Custom Build Artifacts
     environment: integration
     permissions:
-      id-token: write
       contents: read
     runs-on: ubuntu-latest-32cores-128GB
     needs: [get_projectserum_version]
@@ -79,7 +78,6 @@ jobs:
     name: E2E Smoke Tests (${{ matrix.variant }})
     environment: integration
     permissions:
-      id-token: write
       contents: read
     runs-on: ubuntu-latest-16cores-64GB
     strategy:
@@ -129,7 +127,9 @@ jobs:
 
       - name: Setup Environment
         working-directory: integration-tests/devenv
-        run: go run ./cmd u ${{ matrix.configs }}
+        env:
+          CONFIGS: ${{ matrix.configs }}
+        run: go run ./cmd u "$CONFIGS"
 
       - name: Run Smoke Test
         working-directory: integration-tests/smoke
@@ -154,12 +154,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [e2e_custom_run_smoke_tests_matrix]
     if: always()
+
     steps:
       - name: Check results
+        env:
+          MATRIX_RESULT: ${{ needs.e2e_custom_run_smoke_tests_matrix.result }}
         run: |
-          if [[ "${{ needs.e2e_custom_run_smoke_tests_matrix.result }}" == "success" ]]; then
+          if [[ "${MATRIX_RESULT}" == "success" ]]; then
             echo "All smoke tests passed."
           else
-            echo "Smoke tests failed: ${{ needs.e2e_custom_run_smoke_tests_matrix.result }}"
+            echo "Smoke tests failed: ${MATRIX_RESULT}"
             exit 1
           fi
