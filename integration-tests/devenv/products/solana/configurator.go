@@ -283,6 +283,8 @@ func (m *Configurator) createJobs(
 		},
 	}
 
+	fmt.Printf("bootstrapSpec: %+v", bootstrapSpec)
+
 	if err := cl[0].MustCreateBridge(&sourceValueBridge); err != nil {
 		return fmt.Errorf("failed to create bridge on bootstrap: %w", err)
 	}
@@ -312,6 +314,8 @@ func (m *Configurator) createJobs(
 			return fmt.Errorf("failed to create bridge on node %d: %w", nIdx, err)
 		}
 
+		fmt.Printf("Worker %d bridge created: %+v", nIdx, workerBridge)
+
 		pluginConfig := JSONConfig{
 			"juelsPerFeeCoinSource": fmt.Sprintf("\"\"\"\n%s\n\"\"\"", observationSource),
 		}
@@ -333,6 +337,9 @@ func (m *Configurator) createJobs(
 				PluginConfig:                      pluginConfig,
 			},
 		}
+
+		fmt.Printf("workerSpec for node %d: %+v", nIdx, workerSpec)
+
 		if _, err := cl[nIdx].MustCreateJob(workerSpec); err != nil {
 			return fmt.Errorf("failed to create job on node %d: %w", nIdx, err)
 		}
