@@ -8,23 +8,12 @@ on:
         required: true
         default: develop
         type: string
-      team:
-        description: Team to run the tests for (e.g. BIX, CCIP)
-        required: true
-        type: string
-  workflow_call:
-    inputs:
       solana_ref:
+        description: "The chainlink-solana ref to checkout"
         required: false
         type: string
-        description: "The chainlink-solana ref to checkout"
-    secrets:
-      CHAINLINK_IMAGE:
-        required: false
-        description: "Full ECR image URI with tag (e.g. <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>)"
 
 env:
-  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
   MOD_CACHE_VERSION: 1
 
@@ -211,7 +200,6 @@ jobs:
 
   get-core-ref:
     name: Get Core Ref
-    if: ${{ !secrets.CHAINLINK_IMAGE }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -232,7 +220,6 @@ jobs:
 
   e2e_custom_build_custom_chainlink_image:
     needs: [ get-core-ref ]
-    if: ${{ !secrets.CHAINLINK_IMAGE }}
     name: E2E Custom Build Custom CL Image
     runs-on: ubuntu-latest-16cores-64GB
     environment: integration
@@ -314,7 +301,7 @@ jobs:
             configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
-      CHAINLINK_IMAGE: ${{ secrets.CHAINLINK_IMAGE || format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
+      CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -411,7 +398,7 @@ jobs:
     needs: [contract-changes,e2e_program_upgrade_generate_artifacts,e2e_custom_build_custom_chainlink_image, check_test_compilation]
     if: needs.contract-changes.outputs.changed == 'true' && needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
     env:
-      CHAINLINK_IMAGE: ${{ secrets.CHAINLINK_IMAGE || format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
+      CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
