@@ -258,8 +258,6 @@ func (m *Configurator) createJobs(
 		},
 	}
 
-	fmt.Printf("BootstrapperPeers: %+v", bootstrapPeers)
-
 	mockBridgeURL := fmt.Sprintf("%s/%s", pr.Out.InternalEndpoint, "mockserver-bridge")
 	sourceValueBridge := clclient.BridgeTypeAttributes{
 		Name:        "mockserver-bridge",
@@ -282,8 +280,6 @@ func (m *Configurator) createJobs(
 			ContractConfigTrackerPollInterval: *NewInterval(15 * time.Second),
 		},
 	}
-
-	fmt.Printf("bootstrapSpec: %+v", bootstrapSpec)
 
 	if err := cl[0].MustCreateBridge(&sourceValueBridge); err != nil {
 		return fmt.Errorf("failed to create bridge on bootstrap: %w", err)
@@ -337,8 +333,6 @@ func (m *Configurator) createJobs(
 				PluginConfig:                      pluginConfig,
 			},
 		}
-
-		fmt.Printf("workerSpec for node %d: %+v", nIdx, workerSpec)
 
 		if _, err := cl[nIdx].MustCreateJob(workerSpec); err != nil {
 			return fmt.Errorf("failed to create job on node %d: %w", nIdx, err)
