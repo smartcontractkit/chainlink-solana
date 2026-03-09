@@ -99,6 +99,9 @@ jobs:
       - name: Build Image
         if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
         uses: smartcontractkit/.github/actions/ctf-build-image@ctf-build-image/v1
+        env:
+          # otherwise image building will fail, because pipeline doesn't have access to private repositories (could be fixed with GATI)
+          CL_INSTALL_PRIVATE_PLUGINS: "false"
         with:
           dockerfile: core/chainlink.Dockerfile
           image-tag: solana.${{ github.sha }}
