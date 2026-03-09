@@ -74,7 +74,7 @@ jobs:
         with:
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          role-duration-seconds: 14400
+          role-duration-seconds: 3600
           mask-aws-account-id: true
 
       - name: Authenticate to ECR
