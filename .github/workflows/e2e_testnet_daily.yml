@@ -7,14 +7,7 @@ on:
         required: true
         default: develop
         type: string
-      test_secrets_override_key:
-        description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
-        required: false
-        type: string
-      team:
-        description: Team to run the tests for (e.g. BIX, CCIP)
-        required: true
-        type: string
+
   schedule:
     - cron: '0 6 * * *'
 # Only run 1 of this workflow at a time per PR
