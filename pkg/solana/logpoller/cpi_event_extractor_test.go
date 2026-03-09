@@ -493,4 +493,300 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 		require.Len(t, events, 1)
 		require.Equal(t, sourceProgram.ToSolana().String(), events[0].Program)
 	})
+
+	t.Run("extracts Anchor emit_cpi event using direct format", func(t *testing.T) {
+		extractor := NewCPIEventExtractor(logger.Sugared(logger.Test(t)))
+
+		sourceProgram := newRandomPublicKey(t)
+		destProgram := newRandomPublicKey(t)
+		anchorMethodSig := types.AnchorCPIEventDiscriminator()
+		eventSig := newRandomEventSignature(t)
+
+		filter := types.Filter{
+			ID:       1,
+			Name:     "anchor-cpi-filter",
+			Address:  sourceProgram,
+			EventSig: eventSig,
+			ExtraFilterConfig: types.ExtraFilterConfig{
+				DestProgram:     destProgram,
+				MethodSignature: anchorMethodSig,
+			},
+		}
+		extractor.AddFilter(filter)
+
+		eventPayload := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+		eventData := append(eventSig[:], eventPayload...)
+		innerInstData := append(anchorMethodSig[:], eventData...)
+
+		tx := &solana.Transaction{
+			Message: solana.Message{
+				AccountKeys: []solana.PublicKey{
+					solana.PublicKey(sourceProgram),
+					solana.PublicKey(destProgram),
+				},
+				Instructions: []solana.CompiledInstruction{
+					{ProgramIDIndex: 0},
+				},
+			},
+		}
+
+		meta := &rpc.TransactionMeta{
+			InnerInstructions: []rpc.InnerInstruction{
+				{
+					Index: 0,
+					Instructions: []rpc.CompiledInstruction{
+						{
+							ProgramIDIndex: 1,
+							Data:           innerInstData,
+							StackHeight:    2,
+						},
+					},
+				},
+			},
+		}
+
+		detail := eventDetail{slotNumber: 200}
+		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+
+		require.Len(t, events, 1)
+		require.True(t, events[0].IsCPI)
+		require.Equal(t, sourceProgram.ToSolana().String(), events[0].Program)
+
+		decodedData, err := base64.StdEncoding.DecodeString(events[0].Data)
+		require.NoError(t, err)
+		require.Equal(t, eventData, decodedData)
+	})
+
+	t.Run("rejects vec-format CPI event with mismatched declared length", func(t *testing.T) {
+		extractor := NewCPIEventExtractor(logger.Sugared(logger.Test(t)))
+
+		sourceProgram := newRandomPublicKey(t)
+		destProgram := newRandomPublicKey(t)
+		methodSig := newRandomEventSignature(t)
+
+		filter := types.Filter{
+			ID:       1,
+			Name:     "ccip-cpi-filter",
+			Address:  sourceProgram,
+			EventSig: newRandomEventSignature(t),
+			ExtraFilterConfig: types.ExtraFilterConfig{
+				DestProgram:     destProgram,
+				MethodSignature: methodSig,
+			},
+		}
+		extractor.AddFilter(filter)
+
+		eventData := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+		wrongLen := make([]byte, 4)
+		binary.LittleEndian.PutUint32(wrongLen, uint32(len(eventData)+99)) //nolint:gosec
+		innerInstData := append(methodSig[:], append(wrongLen, eventData...)...)
+
+		tx := &solana.Transaction{
+			Message: solana.Message{
+				AccountKeys: []solana.PublicKey{
+					solana.PublicKey(sourceProgram),
+					solana.PublicKey(destProgram),
+				},
+				Instructions: []solana.CompiledInstruction{
+					{ProgramIDIndex: 0},
+				},
+			},
+		}
+
+		meta := &rpc.TransactionMeta{
+			InnerInstructions: []rpc.InnerInstruction{
+				{
+					Index: 0,
+					Instructions: []rpc.CompiledInstruction{
+						{
+							ProgramIDIndex: 1,
+							Data:           innerInstData,
+							StackHeight:    2,
+						},
+					},
+				},
+			},
+		}
+
+		detail := eventDetail{slotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		require.Empty(t, events)
+	})
+
+	t.Run("rejects vec-format CPI event with zero declared length", func(t *testing.T) {
+		extractor := NewCPIEventExtractor(logger.Sugared(logger.Test(t)))
+
+		sourceProgram := newRandomPublicKey(t)
+		destProgram := newRandomPublicKey(t)
+		methodSig := newRandomEventSignature(t)
+
+		filter := types.Filter{
+			ID:       1,
+			Name:     "ccip-cpi-filter",
+			Address:  sourceProgram,
+			EventSig: newRandomEventSignature(t),
+			ExtraFilterConfig: types.ExtraFilterConfig{
+				DestProgram:     destProgram,
+				MethodSignature: methodSig,
+			},
+		}
+		extractor.AddFilter(filter)
+
+		eventData := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+		zeroLen := []byte{0x00, 0x00, 0x00, 0x00}
+		innerInstData := append(methodSig[:], append(zeroLen, eventData...)...)
+
+		tx := &solana.Transaction{
+			Message: solana.Message{
+				AccountKeys: []solana.PublicKey{
+					solana.PublicKey(sourceProgram),
+					solana.PublicKey(destProgram),
+				},
+				Instructions: []solana.CompiledInstruction{
+					{ProgramIDIndex: 0},
+				},
+			},
+		}
+
+		meta := &rpc.TransactionMeta{
+			InnerInstructions: []rpc.InnerInstruction{
+				{
+					Index: 0,
+					Instructions: []rpc.CompiledInstruction{
+						{
+							ProgramIDIndex: 1,
+							Data:           innerInstData,
+							StackHeight:    2,
+						},
+					},
+				},
+			},
+		}
+
+		detail := eventDetail{slotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		require.Empty(t, events)
+	})
+
+	t.Run("falls back to outer program when StackHeight is zero", func(t *testing.T) {
+		extractor := NewCPIEventExtractor(logger.Sugared(logger.Test(t)))
+
+		outerProgram := newRandomPublicKey(t)
+		destProgram := newRandomPublicKey(t)
+		methodSig := newRandomEventSignature(t)
+
+		filter := types.Filter{
+			ID:       1,
+			Name:     "cpi-filter-stackheight-zero",
+			Address:  outerProgram,
+			EventSig: newRandomEventSignature(t),
+			ExtraFilterConfig: types.ExtraFilterConfig{
+				DestProgram:     destProgram,
+				MethodSignature: methodSig,
+			},
+		}
+		extractor.AddFilter(filter)
+
+		eventData := []byte{0xCA, 0xFE, 0xBA, 0xBE}
+		vecLengthPrefix := make([]byte, 4)
+		binary.LittleEndian.PutUint32(vecLengthPrefix, uint32(len(eventData))) //nolint:gosec
+		innerInstData := append(methodSig[:], append(vecLengthPrefix, eventData...)...)
+
+		tx := &solana.Transaction{
+			Message: solana.Message{
+				AccountKeys: []solana.PublicKey{
+					solana.PublicKey(outerProgram),
+					solana.PublicKey(destProgram),
+				},
+				Instructions: []solana.CompiledInstruction{
+					{ProgramIDIndex: 0},
+				},
+			},
+		}
+
+		meta := &rpc.TransactionMeta{
+			InnerInstructions: []rpc.InnerInstruction{
+				{
+					Index: 0,
+					Instructions: []rpc.CompiledInstruction{
+						{
+							ProgramIDIndex: 1,
+							Data:           innerInstData,
+							StackHeight:    0,
+						},
+					},
+				},
+			},
+		}
+
+		detail := eventDetail{slotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+
+		require.Len(t, events, 1)
+		require.True(t, events[0].IsCPI)
+		require.Equal(t, outerProgram.ToSolana().String(), events[0].Program)
+	})
+}
+
+func TestExtractAnchorCPIEventData(t *testing.T) {
+	t.Run("returns event data after discriminator", func(t *testing.T) {
+		disc := types.AnchorCPIEventDiscriminator()
+		payload := []byte{0x01, 0x02, 0x03, 0x04}
+		data := append(disc[:], payload...)
+
+		result, ok := extractAnchorCPIEventData(data)
+		require.True(t, ok)
+		require.Equal(t, payload, result)
+	})
+
+	t.Run("rejects data too short", func(t *testing.T) {
+		data := make([]byte, MethodDiscriminatorLen)
+		result, ok := extractAnchorCPIEventData(data)
+		require.False(t, ok)
+		require.Nil(t, result)
+	})
+}
+
+func TestExtractVecCPIEventData(t *testing.T) {
+	t.Run("returns event data with valid vec prefix", func(t *testing.T) {
+		disc := make([]byte, MethodDiscriminatorLen)
+		payload := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+		vecLen := make([]byte, 4)
+		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload))) //nolint:gosec
+		data := append(disc, append(vecLen, payload...)...)
+
+		result, ok := extractVecCPIEventData(data)
+		require.True(t, ok)
+		require.Equal(t, payload, result)
+	})
+
+	t.Run("rejects mismatched declared length", func(t *testing.T) {
+		disc := make([]byte, MethodDiscriminatorLen)
+		payload := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+		vecLen := make([]byte, 4)
+		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload)+10)) //nolint:gosec
+		data := append(disc, append(vecLen, payload...)...)
+
+		result, ok := extractVecCPIEventData(data)
+		require.False(t, ok)
+		require.Nil(t, result)
+	})
+
+	t.Run("rejects zero declared length", func(t *testing.T) {
+		disc := make([]byte, MethodDiscriminatorLen)
+		payload := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+		vecLen := []byte{0x00, 0x00, 0x00, 0x00}
+		data := append(disc, append(vecLen, payload...)...)
+
+		result, ok := extractVecCPIEventData(data)
+		require.False(t, ok)
+		require.Nil(t, result)
+	})
+
+	t.Run("rejects data shorter than legacy offset", func(t *testing.T) {
+		data := make([]byte, CPIEventDataOffsetLegacy-1)
+		result, ok := extractVecCPIEventData(data)
+		require.False(t, ok)
+		require.Nil(t, result)
+	})
 }
