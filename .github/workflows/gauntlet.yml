@@ -89,4 +89,10 @@ jobs:
       - name: Install
         run: nix develop -c yarn --cwd ./gauntlet install --frozen-lockfile
       - name: test:ci
-        run: nix develop -c yarn --cwd ./gauntlet test:ci
+        run: nix develop -c yarn --cwd ./gauntlet test --ci --collectCoverage
+      - name: Upload gauntlet coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauntlet-coverage
+          path: gauntlet/coverage/lcov.info

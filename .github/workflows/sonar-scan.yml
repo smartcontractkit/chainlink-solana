@@ -88,6 +88,15 @@ jobs:
           name: gauntlet-eslint-report
           if_no_artifact_found: warn
 
+      - name: Download gauntlet coverage
+        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
+        with:
+          workflow: gauntlet.yml
+          workflow_conclusion: ""
+          name_is_regexp: true
+          name: gauntlet-coverage
+          if_no_artifact_found: warn
+
       - name: Set SonarQube Report Paths
         id: sonarqube_report_paths
         shell: bash
@@ -95,6 +104,7 @@ jobs:
           {
             echo "sonarqube_tests_report_paths=$(find . -type f -name output.txt | paste -sd "," -)"
             echo "sonarqube_coverage_report_paths=$(find . -type f -name '*coverage.txt' | paste -sd "," -)"
+            echo "sonarqube_javascript_lcov_paths=$(find . -type f -name 'lcov.info' | paste -sd "," -)"
             echo "sonarqube_golangci_report_paths=$(find . -type f -name 'golangci-*-report.xml' -printf "%p,")"
             echo "sonarqube_eslint_report_paths=$(find -type f -name 'eslint-report.json' -printf "%p")" >> $GITHUB_OUTPUT
           } >> "$GITHUB_OUTPUT"
@@ -110,6 +120,7 @@ jobs:
           args: >
             -Dsonar.go.tests.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_tests_report_paths }}
             -Dsonar.go.coverage.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_coverage_report_paths }}
+            -Dsonar.javascript.lcov.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_javascript_lcov_paths }}
             -Dsonar.go.golangci-lint.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_golangci_report_paths }}
             -Dsonar.eslint.reportPaths=${{ steps.sonarqube_report_paths.outputs.sonarqube_eslint_report_paths }}
         env:
