@@ -7,6 +7,11 @@ on:
         required: true
         default: develop
         type: string
+      cl_image_ecr:
+        description: Name of the AWS ECR repository containing the Chainlink image (without AWS account and region, e.g. "chainlink")
+        required: false
+        type: string
+        default: chainlink
 
 env:
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -109,11 +114,11 @@ jobs:
       - name: Setup Environment
         working-directory: integration-tests/devenv
         env:
-          CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:${{ github.event.inputs.cl_image_tag }}
+          CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/${{ github.event.inputs.cl_image_ecr }}:${{ github.event.inputs.cl_image_tag }}
         run: go run ./cmd u ${{ matrix.configs }}
 
       - name: Run Soak Test
-        working-directory: integration-tests/smoke
+        working-directory: integration-tests/tests
         run: go test -v -timeout 4h -run TestSolanaOCRV2Soak
 
       - name: Show Docker containers status
@@ -127,5 +132,5 @@ jobs:
           name: soak-test-logs-${{ matrix.variant }}
           path: |
             integration-tests/devenv/logs/
-            integration-tests/smoke/logs/
+            integration-tests/tests/logs/
           retention-days: 7
