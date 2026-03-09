@@ -1,5 +1,5 @@
 import { KMSWallet } from './kmsWallet'
-import { KMSClient, GetPublicKeyCommand, SignCommand } from '@aws-sdk/client-kms'
+import { KMSClient, GetPublicKeyCommand } from '@aws-sdk/client-kms'
 import { PublicKey, Transaction, VersionedTransaction, TransactionMessage } from '@solana/web3.js'
 
 // Mock AWS KMS client (preserve SigningAlgorithmSpec for type correctness)
@@ -28,7 +28,8 @@ jest.mock('@chainlink/gauntlet-core/dist/utils', () => ({
 }))
 
 // Ed25519 DER SubjectPublicKeyInfo: 12-byte header + 32-byte key
-const DER_ED25519_HEADER = new Uint8Array(12)
+const DER_ED25519_HEADER_LENGTH = 12
+const DER_ED25519_HEADER = new Uint8Array(DER_ED25519_HEADER_LENGTH)
 const MOCK_ED25519_PUBKEY = new Uint8Array(32).fill(1)
 const MOCK_PUBKEY_DER = new Uint8Array([...DER_ED25519_HEADER, ...MOCK_ED25519_PUBKEY])
 const MOCK_SIGNATURE = new Uint8Array(64).fill(2)
@@ -63,7 +64,8 @@ describe('KMSWallet', () => {
     })
 
     it('throws when public key has wrong length', async () => {
-      mockSend.mockResolvedValueOnce({ PublicKey: new Uint8Array(20) })
+      const invalidKeyLength = 20
+      mockSend.mockResolvedValueOnce({ PublicKey: new Uint8Array(invalidKeyLength) })
 
       await expect(KMSWallet.create('key-123', 'us-east-1')).rejects.toThrow('Expected 32-byte Ed25519 public key')
     })
@@ -134,8 +136,8 @@ describe('KMSWallet', () => {
       tx2.recentBlockhash = '11111111111111111111111111111111'
 
       const signed = await wallet.signAllTransactions([tx1, tx2])
-
-      expect(signed).toHaveLength(2)
+      const expectedTxCount = 2
+      expect(signed).toHaveLength(expectedTxCount)
       expect(mockSend).toHaveBeenCalledTimes(3)
     })
   })

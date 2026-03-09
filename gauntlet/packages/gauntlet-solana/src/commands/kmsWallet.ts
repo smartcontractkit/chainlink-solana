@@ -14,8 +14,8 @@ const ED25519_PUBKEY_LENGTH = 32
 
 export class KMSWallet extends SolanaWallet {
   publicKey: PublicKey
-  private client: KMSClient
-  private keyId: string
+  private readonly client: KMSClient
+  private readonly keyId: string
 
   private constructor(client: KMSClient, keyId: string, publicKey: PublicKey) {
     super()
@@ -24,7 +24,7 @@ export class KMSWallet extends SolanaWallet {
     this.publicKey = publicKey
   }
 
-  static create = async (keyId: string, keyRegion: string): Promise<KMSWallet> => {
+  static readonly create = async (keyId: string, keyRegion: string): Promise<KMSWallet> => {
     const client = new KMSClient({ region: keyRegion })
 
     const response = await client.send(new GetPublicKeyCommand({ KeyId: keyId }))

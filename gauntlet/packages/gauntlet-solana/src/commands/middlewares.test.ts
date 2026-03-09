@@ -21,7 +21,9 @@ jest.mock('@chainlink/gauntlet-core/dist/utils', () => ({
   },
   assertions: {
     assert: jest.fn((condition: boolean, message: string) => {
-      if (!condition) throw new Error(message)
+      if (!condition) {
+        throw new Error(message)
+      }
     }),
   },
 }))
