@@ -39,6 +39,8 @@ gauntlet/packages/gauntlet-solana-contracts/artifacts/programId
 gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
 # Multisig local env
 gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
+# Genesis mainnet env (operator-specific, was previously untracked)
+gauntlet/packages/gauntlet-solana-contracts/networks/.env.genesis-mainnet
 
 # test
 id.json
@@ -60,4 +62,5 @@ eslint-report.json
 override*.toml
 # go work files
 go.work*
-gauntlet-*/
+# Only ignore gauntlet-* dirs at repo root (e.g. build artifacts), not gauntlet/packages/gauntlet-*
+/gauntlet-*/
