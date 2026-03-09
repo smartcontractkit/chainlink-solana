@@ -35,7 +35,7 @@ describe('KMSWallet', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockSend = jest.fn()
-    ;(KMSClient as unknown as jest.Mock).mockImplementation(() => ({
+    ;((KMSClient as unknown) as jest.Mock).mockImplementation(() => ({
       send: mockSend,
     }))
   })
@@ -55,17 +55,13 @@ describe('KMSWallet', () => {
     it('throws when PublicKey is missing from KMS response', async () => {
       mockSend.mockResolvedValueOnce({})
 
-      await expect(KMSWallet.create('key-123', 'us-east-1')).rejects.toThrow(
-        'Failed to retrieve public key from KMS',
-      )
+      await expect(KMSWallet.create('key-123', 'us-east-1')).rejects.toThrow('Failed to retrieve public key from KMS')
     })
 
     it('throws when public key has wrong length', async () => {
       mockSend.mockResolvedValueOnce({ PublicKey: new Uint8Array(20) })
 
-      await expect(KMSWallet.create('key-123', 'us-east-1')).rejects.toThrow(
-        'Expected 32-byte Ed25519 public key',
-      )
+      await expect(KMSWallet.create('key-123', 'us-east-1')).rejects.toThrow('Expected 32-byte Ed25519 public key')
     })
   })
 
@@ -107,18 +103,14 @@ describe('KMSWallet', () => {
     })
 
     it('throws when KMS returns no signature', async () => {
-      mockSend
-        .mockResolvedValueOnce({ PublicKey: MOCK_PUBKEY_DER })
-        .mockResolvedValueOnce({})
+      mockSend.mockResolvedValueOnce({ PublicKey: MOCK_PUBKEY_DER }).mockResolvedValueOnce({})
 
       const wallet = await KMSWallet.create('key-123', 'us-east-1')
       const tx = new Transaction()
       tx.feePayer = wallet.publicKey
       tx.recentBlockhash = '11111111111111111111111111111111'
 
-      await expect(wallet.signTransaction(tx)).rejects.toThrow(
-        'KMS signing failed: no signature returned',
-      )
+      await expect(wallet.signTransaction(tx)).rejects.toThrow('KMS signing failed: no signature returned')
     })
   })
 
