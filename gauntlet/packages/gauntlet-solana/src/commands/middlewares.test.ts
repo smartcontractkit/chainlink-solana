@@ -83,9 +83,7 @@ describe('withWallet', () => {
       process.env.KMS_KEY_REGION = 'us-east-1'
       mockCommand.flags = { withKms: true }
 
-      await expect(withWallet(mockCommand as any, mockNext)).rejects.toThrow(
-        'Missing KMS_KEY_ID environment variable',
-      )
+      await expect(withWallet(mockCommand as any, mockNext)).rejects.toThrow('Missing KMS_KEY_ID environment variable')
       expect(mockCreate).not.toHaveBeenCalled()
     })
 
