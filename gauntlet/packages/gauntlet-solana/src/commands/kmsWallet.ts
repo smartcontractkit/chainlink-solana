@@ -1,5 +1,5 @@
 import { PublicKey, Transaction, VersionedTransaction, Keypair } from '@solana/web3.js'
-import { KMSClient, GetPublicKeyCommand, SignCommand } from '@aws-sdk/client-kms'
+import { KMSClient, GetPublicKeyCommand, SignCommand, SigningAlgorithmSpec } from '@aws-sdk/client-kms'
 import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaWallet, WalletTypes } from './wallet'
 
@@ -63,7 +63,7 @@ export class KMSWallet extends SolanaWallet {
         KeyId: this.keyId,
         Message: msg,
         MessageType: 'RAW',
-        SigningAlgorithm: 'ED25519_SHA_512' as any,
+        SigningAlgorithm: SigningAlgorithmSpec.ED25519_SHA_512,
       }),
     )
 

@@ -2,12 +2,16 @@ import { KMSWallet } from './kmsWallet'
 import { KMSClient, GetPublicKeyCommand, SignCommand } from '@aws-sdk/client-kms'
 import { PublicKey, Transaction, VersionedTransaction, TransactionMessage } from '@solana/web3.js'
 
-// Mock AWS KMS client
-jest.mock('@aws-sdk/client-kms', () => ({
-  KMSClient: jest.fn(),
-  GetPublicKeyCommand: jest.fn(),
-  SignCommand: jest.fn(),
-}))
+// Mock AWS KMS client (preserve SigningAlgorithmSpec for type correctness)
+jest.mock('@aws-sdk/client-kms', () => {
+  const actual = jest.requireActual<typeof import('@aws-sdk/client-kms')>('@aws-sdk/client-kms')
+  return {
+    ...actual,
+    KMSClient: jest.fn(),
+    GetPublicKeyCommand: jest.fn(),
+    SignCommand: jest.fn(),
+  }
+})
 
 // Mock logger to avoid console output during tests
 jest.mock('@chainlink/gauntlet-core/dist/utils', () => ({

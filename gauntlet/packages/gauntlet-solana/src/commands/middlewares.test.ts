@@ -55,7 +55,7 @@ describe('withWallet', () => {
       const mockWallet = { publicKey: new PublicKey(new Uint8Array(32).fill(1)) }
       mockCreate.mockResolvedValue(mockWallet)
 
-      await withWallet(mockCommand as any, mockNext)
+      await withWallet(mockCommand as Parameters<typeof withWallet>[0], mockNext)
 
       expect(mockCreate).toHaveBeenCalledWith('arn:aws:kms:us-east-1:123:key/abc', 'us-east-1')
       expect(mockCommand.wallet).toBe(mockWallet)
@@ -71,7 +71,7 @@ describe('withWallet', () => {
       const mockWallet = { publicKey: new PublicKey(new Uint8Array(32).fill(1)) }
       mockCreate.mockResolvedValue(mockWallet)
 
-      await withWallet(mockCommand as any, mockNext)
+      await withWallet(mockCommand as Parameters<typeof withWallet>[0], mockNext)
 
       expect(mockCreate).toHaveBeenCalledWith('key-123', 'eu-west-1')
       expect(mockCommand.wallet).toBe(mockWallet)
@@ -83,7 +83,9 @@ describe('withWallet', () => {
       process.env.KMS_KEY_REGION = 'us-east-1'
       mockCommand.flags = { withKms: true }
 
-      await expect(withWallet(mockCommand as any, mockNext)).rejects.toThrow('Missing KMS_KEY_ID environment variable')
+      await expect(withWallet(mockCommand as Parameters<typeof withWallet>[0], mockNext)).rejects.toThrow(
+        'Missing KMS_KEY_ID environment variable',
+      )
       expect(mockCreate).not.toHaveBeenCalled()
     })
 
@@ -92,7 +94,7 @@ describe('withWallet', () => {
       delete process.env.KMS_KEY_REGION
       mockCommand.flags = { withKms: true }
 
-      await expect(withWallet(mockCommand as any, mockNext)).rejects.toThrow(
+      await expect(withWallet(mockCommand as Parameters<typeof withWallet>[0], mockNext)).rejects.toThrow(
         'Missing KMS_KEY_REGION environment variable',
       )
       expect(mockCreate).not.toHaveBeenCalled()
