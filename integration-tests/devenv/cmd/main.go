@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -47,7 +48,71 @@ var downCmd = &cobra.Command{
 	},
 }
 
+var obsCmd = &cobra.Command{
+	Use:   "obs",
+	Short: "Manage the observability stack",
+	Long:  "Spin up or down the observability stack with subcommands 'up' and 'down'",
+}
+
+var obsUpCmd = &cobra.Command{
+	Use:     "up",
+	Aliases: []string{"u"},
+	Short:   "Spin up the observability stack",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		full, _ := cmd.Flags().GetBool("full")
+		var err error
+		if full {
+			err = framework.ObservabilityUpFull()
+		} else {
+			err = framework.ObservabilityUp()
+		}
+		if err != nil {
+			return fmt.Errorf("observability up failed: %w", err)
+		}
+		return nil
+	},
+}
+
+var obsDownCmd = &cobra.Command{
+	Use:     "down",
+	Aliases: []string{"d"},
+	Short:   "Spin down the observability stack",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return framework.ObservabilityDown()
+	},
+}
+
+var obsRestartCmd = &cobra.Command{
+	Use:     "restart",
+	Aliases: []string{"r"},
+	Short:   "Restart the observability stack (data wipe)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := framework.ObservabilityDown(); err != nil {
+			return fmt.Errorf("observability down failed: %w", err)
+		}
+		full, _ := cmd.Flags().GetBool("full")
+		var err error
+		if full {
+			err = framework.ObservabilityUpFull()
+		} else {
+			err = framework.ObservabilityUp()
+		}
+		if err != nil {
+			return fmt.Errorf("observability up failed: %w", err)
+		}
+		return nil
+	},
+}
+
 func init() {
+	// observability
+	obsCmd.PersistentFlags().BoolP("full", "f", false, "Enable full observability stack with additional components")
+	obsCmd.AddCommand(obsRestartCmd)
+	obsCmd.AddCommand(obsUpCmd)
+	obsCmd.AddCommand(obsDownCmd)
+	rootCmd.AddCommand(obsCmd)
+
+	// main env commands
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(downCmd)
 }

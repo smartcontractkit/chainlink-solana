@@ -56,6 +56,7 @@ jobs:
       id-token: write
       contents: read
     runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
+    timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
@@ -126,7 +127,7 @@ jobs:
         working-directory: integration-tests/devenv
         env:
           CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/${{ github.event.inputs.cl_image_ecr }}:${{ github.event.inputs.cl_image_tag }}
-        run: go run ./cmd u ${{ matrix.configs }}
+        run: go run ./cmd u ${{ matrix.configs }} && go run ./cmd obs up -f
 
       - name: Run Soak Test
         working-directory: integration-tests/tests
