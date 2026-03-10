@@ -160,7 +160,7 @@ jobs:
         working-directory: integration-tests/devenv
         run: |
           go run ./fakes/cmd &
-          for i in {1..20}; do
+          for _ in {1..20}; do
             if curl -fsS -X POST "http://127.0.0.1:9111/mockserver-bridge" > /dev/null; then
               echo "Fakes server is ready"
               exit 0
