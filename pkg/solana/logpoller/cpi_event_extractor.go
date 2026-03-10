@@ -2,9 +2,9 @@ package logpoller
 
 import (
 	"encoding/base64"
-	"sync"
-
 	bin "encoding/binary"
+	"fmt"
+	"sync"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -55,6 +55,13 @@ func (e *CPIEventExtractor) AddFilter(filter types.Filter) {
 	defer e.mu.Unlock()
 
 	e.registered[key] = struct{}{}
+	e.lggr.Infow("[DEBUG] CPI filter added",
+		"filterName", filter.Name,
+		"sourceProgram", filter.Address.ToSolana().String(),
+		"destProgram", filter.ExtraFilterConfig.DestProgram.ToSolana().String(),
+		"methodSig", fmt.Sprintf("%x", filter.ExtraFilterConfig.MethodSignature),
+		"totalRegistered", len(e.registered),
+	)
 }
 
 func (e *CPIEventExtractor) RemoveFilter(filter types.Filter) {
@@ -87,16 +94,27 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 	logIdxOffset uint,
 ) []types.ProgramEvent {
 	if meta == nil || len(meta.InnerInstructions) == 0 {
+		e.lggr.Debugw("[DEBUG] ExtractCPIEvents: no inner instructions",
+			"slot", detail.slotNumber, "metaNil", meta == nil)
 		return nil
 	}
 
 	allAccountKeys := getAllAccountKeys(tx, meta)
 	if len(allAccountKeys) == 0 {
+		e.lggr.Debugw("[DEBUG] ExtractCPIEvents: no account keys", "slot", detail.slotNumber)
 		return nil
 	}
 
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
+	e.lggr.Infow("[DEBUG] ExtractCPIEvents: processing transaction",
+		"slot", detail.slotNumber,
+		"txSig", detail.trxSig.String(),
+		"innerInstructionSets", len(meta.InnerInstructions),
+		"registeredFilters", len(e.registered),
+		"accountKeys", len(allAccountKeys),
+	)
 
 	var events []types.ProgramEvent
 	logIdx := logIdxOffset
@@ -118,7 +136,14 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			1: outerProgram,
 		}
 
-		for _, ix := range inner.Instructions {
+		e.lggr.Infow("[DEBUG] ExtractCPIEvents: processing inner instruction set",
+			"slot", detail.slotNumber,
+			"outerIndex", inner.Index,
+			"outerProgram", outerProgram.ToSolana().String(),
+			"innerIxCount", len(inner.Instructions),
+		)
+
+		for ixIdx, ix := range inner.Instructions {
 			if int(ix.ProgramIDIndex) >= len(allAccountKeys) {
 				e.lggr.Warnf("program ID index out of range: %d, len(allAccountKeys): %d", ix.ProgramIDIndex, len(allAccountKeys))
 				continue
@@ -129,11 +154,29 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 				programAtStackHeight[ix.StackHeight] = destProgram
 			}
 
+			e.lggr.Infow("[DEBUG] ExtractCPIEvents: inner ix",
+				"slot", detail.slotNumber,
+				"ixIdx", ixIdx,
+				"destProgram", destProgram.ToSolana().String(),
+				"stackHeight", ix.StackHeight,
+				"dataLen", len(ix.Data),
+			)
+
 			if len(ix.Data) <= MethodDiscriminatorLen {
+				e.lggr.Debugw("[DEBUG] ExtractCPIEvents: data too short for method disc",
+					"slot", detail.slotNumber, "dataLen", len(ix.Data))
 				continue
 			}
 
 			methodSig := types.EventSignature(ix.Data[:MethodDiscriminatorLen])
+			anchorDisc := types.AnchorCPIEventDiscriminator()
+
+			e.lggr.Infow("[DEBUG] ExtractCPIEvents: method discriminator check",
+				"slot", detail.slotNumber,
+				"methodSigHex", fmt.Sprintf("%x", methodSig),
+				"anchorDiscHex", fmt.Sprintf("%x", anchorDisc),
+				"isAnchor", methodSig == anchorDisc,
+			)
 
 			var eventData []byte
 			var ok bool
@@ -143,6 +186,8 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 				eventData, ok = extractVecCPIEventData(ix.Data)
 			}
 			if !ok || len(eventData) == 0 {
+				e.lggr.Debugw("[DEBUG] ExtractCPIEvents: event data extraction failed or empty",
+					"slot", detail.slotNumber, "ok", ok, "eventDataLen", len(eventData))
 				continue
 			}
 
@@ -166,7 +211,28 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 				methodSig:     methodSig,
 			}
 
+			e.lggr.Infow("[DEBUG] ExtractCPIEvents: filter key lookup",
+				"slot", detail.slotNumber,
+				"sourceProgram", sourceProgram.ToSolana().String(),
+				"destProgram", destProgram.ToSolana().String(),
+				"methodSigHex", fmt.Sprintf("%x", methodSig),
+				"eventDataLen", len(eventData),
+			)
+
 			if _, ok := e.registered[key]; !ok {
+				e.lggr.Warnw("[DEBUG] ExtractCPIEvents: NO matching registered filter",
+					"slot", detail.slotNumber,
+					"sourceProgram", sourceProgram.ToSolana().String(),
+					"destProgram", destProgram.ToSolana().String(),
+					"methodSigHex", fmt.Sprintf("%x", methodSig),
+				)
+				for rk := range e.registered {
+					e.lggr.Infow("[DEBUG] ExtractCPIEvents: registered key dump",
+						"regSource", rk.sourceProgram.ToSolana().String(),
+						"regDest", rk.destProgram.ToSolana().String(),
+						"regMethodHex", fmt.Sprintf("%x", rk.methodSig),
+					)
+				}
 				continue
 			}
 

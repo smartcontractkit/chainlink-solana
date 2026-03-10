@@ -163,10 +163,26 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
 
+	fl.lggr.Infow("[DEBUG] RegisterFilter called",
+		"filterName", filter.Name,
+		"isCPI", filter.IsCPIFilter(),
+		"address", filter.Address.ToSolana().String(),
+		"eventName", filter.EventName,
+	)
+
 	filter.IsBackfilled = false
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
 		existingFilter := fl.filtersByID[existingFilterID]
 		if !existingFilter.MatchSameLogs(filter) {
+			fl.lggr.Errorw("[DEBUG] RegisterFilter: ErrFilterNameConflict",
+				"filterName", filter.Name,
+				"existingIdlLen", len(existingFilter.ContractIdl),
+				"newIdlLen", len(filter.ContractIdl),
+				"idlMatch", existingFilter.ContractIdl == filter.ContractIdl,
+				"addressMatch", existingFilter.Address == filter.Address,
+				"eventSigMatch", existingFilter.EventSig == filter.EventSig,
+				"eventNameMatch", existingFilter.EventName == filter.EventName,
+			)
 			return ErrFilterNameConflict
 		}
 		if existingFilter.IsBackfilled {
@@ -206,6 +222,12 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 
 	filter.ID = filterID
 	fl.addToIndices(filter, decoder)
+
+	fl.lggr.Infow("[DEBUG] RegisterFilter succeeded",
+		"filterName", filter.Name,
+		"filterID", filterID,
+		"isCPI", filter.IsCPIFilter(),
+	)
 
 	return nil
 }
