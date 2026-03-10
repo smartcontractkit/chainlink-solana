@@ -174,7 +174,8 @@ jobs:
       - name: Start fakes server
         working-directory: integration-tests/devenv
         run: |
-          go run ./fakes/cmd &
+          go build -o /tmp/fakes-server ./fakes/cmd
+          /tmp/fakes-server &
           for _ in {1..20}; do
             if curl -fsS -X POST "http://127.0.0.1:9111/mockserver-bridge" > /dev/null; then
               echo "Fakes server is ready"
