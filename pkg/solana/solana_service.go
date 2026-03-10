@@ -125,6 +125,20 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 }
 
 func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
+	// Diagnostic: log what we received over the wire (after gRPC + FromProto)
+	hasCPI := req.CPIFilterConfig != nil
+	ss.logger.Infow("[DEBUG] RegisterLogTracking received",
+		"filterName", req.Name,
+		"hasCPIFilterConfig", hasCPI,
+	)
+	if hasCPI {
+		ss.logger.Infow("[DEBUG] RegisterLogTracking CPI config",
+			"filterName", req.Name,
+			"destAddressLen", len(req.CPIFilterConfig.DestAddress),
+			"methodName", req.CPIFilterConfig.MethodName,
+		)
+	}
+
 	lp := ss.chain.LogPoller()
 	if lp.HasFilter(ctx, req.Name) {
 		return nil
