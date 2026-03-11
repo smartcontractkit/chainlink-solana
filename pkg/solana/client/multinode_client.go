@@ -328,6 +328,10 @@ func (m *MultiNodeClient) GetInterceptedChainInfo() (latest, highestUserObservat
 	return m.latestChainInfo, m.highestUserObservations
 }
 
+func (m *MultiNodeClient) CheckFinalizedStateAvailability(ctx context.Context) error {
+	return nil
+}
+
 func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transaction) (solana.Signature, mn.SendTxReturnCode, error) {
 	sig, err := m.SendTx(ctx, tx)
 	return sig, ClassifySendError(tx, err), err
