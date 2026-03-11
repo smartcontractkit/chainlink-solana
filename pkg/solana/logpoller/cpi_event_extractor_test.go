@@ -729,25 +729,43 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 }
 
 func TestExtractAnchorCPIEventData(t *testing.T) {
+	lggr := logger.Sugared(logger.Test(t))
+
 	t.Run("returns event data after discriminator", func(t *testing.T) {
 		disc := types.AnchorCPIEventDiscriminator()
 		payload := []byte{0x01, 0x02, 0x03, 0x04}
 		data := append(disc[:], payload...)
 
-		result, ok := extractAnchorCPIEventData(data)
+		result, ok := extractAnchorCPIEventData(lggr, data)
 		require.True(t, ok)
 		require.Equal(t, payload, result)
 	})
 
 	t.Run("rejects data too short", func(t *testing.T) {
 		data := make([]byte, MethodDiscriminatorLen)
-		result, ok := extractAnchorCPIEventData(data)
+		result, ok := extractAnchorCPIEventData(lggr, data)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
 }
 
 func TestExtractVecCPIEventData(t *testing.T) {
+	lggr := logger.Sugared(logger.Test(t))
+
+	sourceProgram := newRandomPublicKey(t)
+	destProgram := newRandomPublicKey(t)
+	allAccountKeys := []solana.PublicKey{
+		solana.PublicKey(sourceProgram),
+		solana.PublicKey(destProgram),
+	}
+	programAtStackHeight := map[uint16]types.PublicKey{
+		1: sourceProgram,
+	}
+	ix := rpc.CompiledInstruction{
+		ProgramIDIndex: 1,
+		StackHeight:    2,
+	}
+
 	t.Run("returns event data with valid vec prefix", func(t *testing.T) {
 		disc := make([]byte, MethodDiscriminatorLen)
 		payload := []byte{0xAA, 0xBB, 0xCC, 0xDD}
@@ -755,7 +773,7 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload))) //nolint:gosec
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(data)
+		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight)
 		require.True(t, ok)
 		require.Equal(t, payload, result)
 	})
@@ -767,7 +785,7 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload)+10)) //nolint:gosec
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(data)
+		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
@@ -778,14 +796,14 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		vecLen := []byte{0x00, 0x00, 0x00, 0x00}
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(data)
+		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
 
 	t.Run("rejects data shorter than legacy offset", func(t *testing.T) {
 		data := make([]byte, CPIEventDataOffsetLegacy-1)
-		result, ok := extractVecCPIEventData(data)
+		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
