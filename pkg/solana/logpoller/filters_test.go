@@ -678,3 +678,155 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 		})
 	}
 }
+
+func TestFilters_GetFilters(t *testing.T) {
+	lggr := logger.Sugared(logger.Test(t))
+
+	t.Run("returns error when load fails", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+		orm.On("SelectFilters", mock.Anything).Return(nil, errors.New("db error")).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.Error(t, err)
+		require.Nil(t, result)
+	})
+
+	t.Run("returns empty map when no filters exist", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Empty(t, result)
+	})
+
+	t.Run("returns all filters keyed by name", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+
+		filter1 := types.Filter{
+			ID:        1,
+			Name:      "filter1",
+			EventName: "event1",
+			EventSig:  types.NewEventSignatureFromName("event1"),
+		}
+		filter2 := types.Filter{
+			ID:        2,
+			Name:      "filter2",
+			EventName: "event2",
+			EventSig:  types.NewEventSignatureFromName("event2"),
+		}
+
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		require.Equal(t, filter1, result["filter1"])
+		require.Equal(t, filter2, result["filter2"])
+	})
+
+	t.Run("excludes deleted filters", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+
+		activeFilter := types.Filter{
+			ID:        1,
+			Name:      "activeFilter",
+			EventName: "event1",
+			EventSig:  types.NewEventSignatureFromName("event1"),
+		}
+		deletedFilter := types.Filter{
+			ID:        2,
+			Name:      "deletedFilter",
+			IsDeleted: true,
+		}
+
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{activeFilter, deletedFilter}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.Equal(t, activeFilter, result["activeFilter"])
+		require.NotContains(t, result, "deletedFilter")
+	})
+
+	t.Run("returns a copy that does not affect internal state", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+
+		filter1 := types.Filter{
+			ID:            1,
+			Name:          "filter1",
+			EventName:     "event1",
+			EventSig:      types.NewEventSignatureFromName("event1"),
+			StartingBlock: 100,
+		}
+
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+
+		result, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+
+		// Modify the returned filter
+		modifiedFilter := result["filter1"]
+		modifiedFilter.StartingBlock = 9999
+		result["filter1"] = modifiedFilter
+
+		// Add a new entry to the returned map
+		result["newFilter"] = types.Filter{Name: "newFilter"}
+
+		// Get filters again and verify internal state was not affected
+		result2, err := fs.GetFilters(t.Context())
+		require.NoError(t, err)
+		require.Len(t, result2, 1)
+		require.Equal(t, int64(100), result2["filter1"].StartingBlock)
+		require.NotContains(t, result2, "newFilter")
+	})
+
+	t.Run("concurrent access is safe", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+
+		filter1 := types.Filter{
+			ID:        1,
+			Name:      "filter1",
+			EventName: "event1",
+			EventSig:  types.NewEventSignatureFromName("event1"),
+		}
+
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1}, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
+
+		err := fs.LoadFilters(t.Context())
+		require.NoError(t, err)
+
+		const numGoroutines = 50
+		const readsPerGoroutine = 100
+
+		var wg sync.WaitGroup
+		wg.Add(numGoroutines)
+
+		for range numGoroutines {
+			go func() {
+				defer wg.Done()
+				for range readsPerGoroutine {
+					result, err := fs.GetFilters(t.Context())
+					assert.NoError(t, err)
+					assert.Len(t, result, 1)
+					assert.Equal(t, filter1, result["filter1"])
+				}
+			}()
+		}
+
+		wg.Wait()
+	})
+}

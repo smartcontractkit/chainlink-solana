@@ -13,8 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 )
 
 var (
@@ -32,17 +32,17 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	parsed := &solcommoncodec.ParsedTypes{
 		EncoderDefs: make(map[string]solcommoncodec.Entry),
 	}
-	idlDef, err := codec.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, idl.Accounts[0].Name, idl)
+	idlDef, err := codecv1.FindDefinitionFromIDL(solcommoncodec.ChainConfigTypeAccountDef, idl.Accounts[0].Name, idl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find definition: %w", err)
 	}
 
-	accountIDLDef, ok := idlDef.(codec.IdlTypeDef)
+	accountIDLDef, ok := idlDef.(codecv1.IdlTypeDef)
 	if !ok {
 		return nil, errors.New("invalid cast")
 	}
 
-	cEntry, err := codec.CreateCodecEntry(accountIDLDef, idl.Accounts[0].Name, idl, nil)
+	cEntry, err := codecv1.CreateCodecEntry(accountIDLDef, idl.Accounts[0].Name, idl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create codec entry: %w", err)
 	}
@@ -57,8 +57,8 @@ func NewEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	return &capEncoder{codec: c, itemType: itemType}, err
 }
 
-func getIDLFromConfig(config *values.Map) (codec.IDL, error) {
-	var idl codec.IDL
+func getIDLFromConfig(config *values.Map) (codecv1.IDL, error) {
+	var idl codecv1.IDL
 	inputSchema, ok := config.Underlying[reportSchemaKey]
 	if !ok {
 		return idl, errors.New("missing field report_schema")

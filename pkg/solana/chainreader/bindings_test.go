@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
 
@@ -76,8 +76,8 @@ func (_m *mockBinding) GetReadDefinition() config.ReadDefinition {
 	return config.ReadDefinition{}
 }
 
-func (_m *mockBinding) GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef) {
-	return codec.IDL{}, codec.IdlTypeDef{}, codec.IdlTypeDef{}
+func (_m *mockBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
+	return codecv1.IDL{}, codecv1.IdlTypeDef{}, codecv1.IdlTypeDef{}
 }
 
 func (_m *mockBinding) GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig {

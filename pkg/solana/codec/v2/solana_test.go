@@ -9,8 +9,8 @@ import (
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codecv2"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 )
 
 func TestCreateCodecEntry(t *testing.T) {

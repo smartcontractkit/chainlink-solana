@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -39,12 +39,12 @@ func TestLogPollerFilters(t *testing.T) {
 				StartingBlock: 1,
 				SubkeyPaths:   types.SubKeyPaths([][]string{{"a", "b"}, {"c"}}),
 				EventIdl: types.EventIdl{
-					Event: codec.IdlEvent{
+					Event: codecv1.IdlEvent{
 						Name:   "MyEvent",
-						Fields: []codec.IdlEventField{{Name: "MyField", Type: codec.NewIdlStringType(codec.IdlTypeDuration), Index: true}},
+						Fields: []codecv1.IdlEventField{{Name: "MyField", Type: codecv1.NewIdlStringType(codecv1.IdlTypeDuration), Index: true}},
 					},
-					Types: codec.IdlTypeDefSlice{
-						{Name: "NilType", Type: codec.IdlTypeDefTy{Kind: codec.IdlTypeDefTyKindStruct, Fields: &codec.IdlTypeDefStruct{}}},
+					Types: codecv1.IdlTypeDefSlice{
+						{Name: "NilType", Type: codecv1.IdlTypeDefTy{Kind: codecv1.IdlTypeDefTyKindStruct, Fields: &codecv1.IdlTypeDefStruct{}}},
 					},
 				},
 				Retention:   1000,

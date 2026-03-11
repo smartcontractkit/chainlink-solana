@@ -1,4 +1,4 @@
-package codec_test
+package codecv1_test
 
 import (
 	"encoding/json"
@@ -14,9 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/interfacetests"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/testutils"
-	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/commoncodec"
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1/testutils"
 )
 
 func TestNewIDLAccountCodec(t *testing.T) {
@@ -95,7 +95,7 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 	renameMod, err := modConfig.ToModifier(solcommoncodec.DecoderHooks...)
 	require.NoError(t, err)
 
-	idlCodecWithMods, err := codec.NewNamedModifierCodec(idlCodec, testutils.TestStructWithNestedStruct, renameMod)
+	idlCodecWithMods, err := codecv1.NewNamedModifierCodec(idlCodec, testutils.TestStructWithNestedStruct, renameMod)
 	require.NoError(t, err)
 
 	type modifiedTestStruct struct {
@@ -155,13 +155,13 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	t.Parallel()
 
-	var idl codec.IDL
+	var idl codecv1.IDL
 	if err := json.Unmarshal([]byte(testutils.CircularDepIDL), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
 	}
 
-	_, err := codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+	_, err := codecv1.NewIDLAccountCodec(idl, binary.LittleEndian())
 
 	assert.ErrorIs(t, err, types.ErrInvalidConfig)
 }
@@ -175,7 +175,7 @@ const (
 	eventIDLType        idlType = "event"
 )
 
-func newTestIDLAndCodec(t *testing.T, idlTP idlType) (string, codec.IDL, types.RemoteCodec) {
+func newTestIDLAndCodec(t *testing.T, idlTP idlType) (string, codecv1.IDL, types.RemoteCodec) {
 	t.Helper()
 
 	var idlDef string
@@ -189,7 +189,7 @@ func newTestIDLAndCodec(t *testing.T, idlTP idlType) (string, codec.IDL, types.R
 		idlDef = defs.IDL
 	}
 
-	var idl codec.IDL
+	var idl codecv1.IDL
 	if err := json.Unmarshal([]byte(idlDef), &idl); err != nil {
 		t.Logf("failed to unmarshal test IDL: %s", err.Error())
 		t.FailNow()
@@ -203,9 +203,9 @@ func newTestIDLAndCodec(t *testing.T, idlTP idlType) (string, codec.IDL, types.R
 	//nolint:exhaustive
 	switch idlTP {
 	case accountIDLType:
-		entry, err = codec.NewIDLAccountCodec(idl, binary.LittleEndian())
+		entry, err = codecv1.NewIDLAccountCodec(idl, binary.LittleEndian())
 	case definedTypesIDLType:
-		entry, err = codec.NewIDLDefinedTypesCodec(idl, binary.LittleEndian())
+		entry, err = codecv1.NewIDLDefinedTypesCodec(idl, binary.LittleEndian())
 	}
 
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -29,7 +29,7 @@ type readBinding interface {
 	GetAddress(context.Context, any) (solana.PublicKey, error)
 	GetGenericName() string
 	GetReadDefinition() config.ReadDefinition
-	GetIDLInfo() (idl codec.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codec.IdlTypeDef)
+	GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef)
 	GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig
 	SetCodec(types.RemoteCodec)
 	SetModifier(commoncodec.Modifier)
