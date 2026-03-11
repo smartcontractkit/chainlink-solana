@@ -154,30 +154,8 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		events = append(events, txEvents...)
 
 		// Look for events corresponding to CPI filters
-		hasCPIExtractor := j.cpiEventExtractor != nil
-		hasCPIFilters := hasCPIExtractor && j.cpiEventExtractor.HasCPIFilters()
-		innerIxCount := 0
-		if txWithMeta.Meta != nil {
-			innerIxCount = len(txWithMeta.Meta.InnerInstructions)
-		}
-
-		j.lggr.Infow("[DEBUG] getBlock: CPI extraction check",
-			"slot", j.slotNumber,
-			"txIdx", idx,
-			"txSig", tx.Signatures[0].String(),
-			"hasCPIExtractor", hasCPIExtractor,
-			"hasCPIFilters", hasCPIFilters,
-			"innerInstructionSets", innerIxCount,
-			"logEvents", len(txEvents),
-		)
-
-		if hasCPIFilters {
+		if j.cpiEventExtractor != nil && j.cpiEventExtractor.HasCPIFilters() {
 			cpiEvents := j.cpiEventExtractor.ExtractCPIEvents(tx, txWithMeta.Meta, detail, uint(len(txEvents)))
-			j.lggr.Infow("[DEBUG] getBlock: CPI extraction result",
-				"slot", j.slotNumber,
-				"txIdx", idx,
-				"cpiEventsFound", len(cpiEvents),
-			)
 			events = append(events, cpiEvents...)
 		}
 	}
