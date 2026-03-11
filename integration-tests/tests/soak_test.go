@@ -35,7 +35,7 @@ func TestSolanaOCRV2Soak(t *testing.T) {
 		End:             time.Now(),
 		WarmUpDuration:  30 * time.Minute,
 		CPUThreshold:    25.0,
-		MemoryThreshold: 350.0,
+		MemoryThreshold: 210.0,
 	})
 	require.NoError(t, errs)
 }
