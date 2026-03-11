@@ -3,7 +3,7 @@ name = "ocr2_solana"
 instances = 1
 
 [[nodesets]]
-name = "sol-ocr"
+name = "don"
 nodes = 6
 override_mode = "each"
 http_port_range_start = 20000
