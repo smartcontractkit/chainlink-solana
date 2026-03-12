@@ -24,6 +24,11 @@ var promSolLp = struct {
 	txsLogParsingError: newOutcomeDependantProm(txsLogParsingErrorName, "Number of transactions that %s onchain but had log parsing errors"),
 }
 
+var promLpLastProcessedSlot = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "solana_log_poller_last_processed_slot",
+	Help: "Last processed slot by log poller",
+}, []string{"chainID"})
+
 type solLpMetrics struct {
 	metrics.Labeler
 	chainID string
@@ -31,6 +36,7 @@ type solLpMetrics struct {
 	// transactions
 	txsTruncated       outcomeDependantMetric
 	txsLogParsingError outcomeDependantMetric
+	lastProcessedSlot  metric.Int64Gauge
 }
 
 func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
@@ -46,12 +52,18 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		return nil, err
 	}
 
+	lastProcessedSlot, err := meter.Int64Gauge("solana_log_poller_last_processed_slot")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register solana_log_poller_last_processed_slot: %w", err)
+	}
+
 	return &solLpMetrics{
 		chainID: chainID,
 		Labeler: metrics.NewLabeler().With("chainID", chainID),
 
 		txsTruncated:       *truncatedTxs,
 		txsLogParsingError: *txLogParsingError,
+		lastProcessedSlot:  lastProcessedSlot,
 	}, nil
 }
 
@@ -65,6 +77,11 @@ func (m *solLpMetrics) IncrementTruncatedTxs(ctx context.Context, txOutcome txOu
 
 func (m *solLpMetrics) IncrementTxsLogParsingError(ctx context.Context, txOutcome txOutcome) {
 	m.incrementForOutcome(ctx, promSolLp.txsLogParsingError, m.txsLogParsingError, txOutcome)
+}
+
+func (m *solLpMetrics) SetLatestProcessedSlot(ctx context.Context, slot int64) {
+	promLpLastProcessedSlot.WithLabelValues(m.chainID).Set(float64(slot))
+	m.lastProcessedSlot.Record(ctx, slot, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {

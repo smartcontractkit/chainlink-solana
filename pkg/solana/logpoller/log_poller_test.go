@@ -53,7 +53,9 @@ func newMockedLPwithConfig(t *testing.T, cfg config.Config, chainID string) mock
 }
 
 func newMockedLP(t *testing.T) mockedLP {
-	return newMockedLPwithConfig(t, config.NewDefault(), chainID)
+	cfg := config.NewDefault()
+	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](100)
+	return newMockedLPwithConfig(t, cfg, chainID)
 }
 
 func TestLogPoller_run(t *testing.T) {
@@ -71,7 +73,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{{StartingBlock: 16}}).Once()
 
 		expectedErr := errors.New("loaderFailed")
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(115)).Return(nil, nil, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
@@ -87,7 +89,8 @@ func TestLogPoller_run(t *testing.T) {
 		done := func() {}
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128)).Return(blocks, done, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(111)).Return(blocks, done, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(112), uint64(128)).Return(blocks, done, nil).Once()
 		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, filterID int64) error {
 			switch filterID {
 			case 1:
@@ -152,7 +155,7 @@ func TestLogPoller_run(t *testing.T) {
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
 		err := lp.LogPoller.run(t.Context())
-		require.ErrorContains(t, err, "failed processing block range [129, 130]: error backfilling filters: failed to start backfill")
+		require.ErrorContains(t, err, "failed processing block range [129, 130]: failed processing batch [129, 130]: error backfilling filters: failed to start backfill")
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		lp := newMockedLP(t)

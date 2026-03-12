@@ -90,6 +90,7 @@ type Service struct {
 	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
+	slotsBatchSize    int64
 	metrics           *solLpMetrics
 }
 
@@ -126,6 +127,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
+	lp.slotsBatchSize = cfg.LogPollerSlotsBatchSize()
 
 	return lp, nil
 }
@@ -389,7 +391,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 	}
 
 	if minSlot < to {
-		err := lp.processBlocksRange(ctx, addresses, minSlot, to)
+		err := lp.processBlocksRangeInBatches(ctx, addresses, minSlot, to)
 		if err != nil {
 			return err
 		}
@@ -414,8 +416,25 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 	return err
 }
 
+func (lp *Service) processBlocksRangeInBatches(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
+	lp.lggr.Infow("Processing block range in batches", "from", from, "to", to, "batchSize", lp.slotsBatchSize)
+	for batchStart := from; batchStart <= to; batchStart += lp.slotsBatchSize {
+		batchEnd := min(batchStart+lp.slotsBatchSize-1, to)
+		err := lp.processBlocksRange(ctx, addresses, batchStart, batchEnd)
+		if err != nil {
+			return fmt.Errorf("failed processing batch [%d, %d]: %w", batchStart, batchEnd, err)
+		}
+	}
+
+	return nil
+}
+
 func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
+	start := time.Now()
 	lp.lggr.Infow("Processing block range", "from", from, "to", to)
+	defer func() {
+		lp.lggr.Infow("Finished processing block range", "from", from, "to", to, "duration", time.Since(start))
+	}()
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
 	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
@@ -447,6 +466,7 @@ consumedAllBlocks:
 			highestInBatch := int64(batch[len(batch)-1].SlotNumber)
 			if highestInBatch > lp.lastProcessedSlot {
 				lp.lastProcessedSlot = highestInBatch
+				lp.metrics.SetLatestProcessedSlot(ctx, lp.lastProcessedSlot)
 			}
 		}
 	}
@@ -515,7 +535,7 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	}
 
 	lp.lggr.Debugw("Got new slot range to process", "from", lastProcessedSlot+1, "to", highestSlot)
-	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, highestSlot)
+	err = lp.processBlocksRangeInBatches(ctx, addresses, lastProcessedSlot+1, highestSlot)
 	if err != nil {
 		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
 	}
