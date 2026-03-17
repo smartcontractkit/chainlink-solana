@@ -434,11 +434,11 @@ func (c *chain) FinalizedHead(ctx context.Context) (types.Head, error) {
 	}
 
 	if block.BlockHeight == nil {
-		return types.Head{}, fmt.Errorf("client returned nil finalized block height")
+		return types.Head{}, errors.New("client returned nil finalized block height")
 	}
 
 	if block.BlockTime == nil {
-		return types.Head{}, fmt.Errorf("client returned nil finalized block time")
+		return types.Head{}, errors.New("client returned nil finalized block time")
 	}
 
 	hashBytes, err := block.Blockhash.MarshalText()
