@@ -118,6 +118,10 @@ func (r *Relayer) LatestHead(ctx context.Context) (relaytypes.Head, error) {
 	return r.chain.LatestHead(ctx)
 }
 
+func (r *Relayer) FinalizedHead(ctx context.Context) (relaytypes.Head, error) {
+	return r.chain.FinalizedHead(ctx)
+}
+
 func (r *Relayer) GetChainStatus(ctx context.Context) (relaytypes.ChainStatus, error) {
 	return r.chain.GetChainStatus(ctx)
 }
