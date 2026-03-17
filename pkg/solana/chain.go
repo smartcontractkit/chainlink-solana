@@ -121,6 +121,7 @@ func NewChain(cfg *config.TOMLConfig, opts ChainOpts) (Chain, error) {
 var _ Chain = (*chain)(nil)
 
 type chain struct {
+	types.UnimplementedChainService
 	services.StateMachine
 	stopCh         services.StopChan
 	id             string
