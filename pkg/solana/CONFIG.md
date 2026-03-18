@@ -241,6 +241,7 @@ NoNewFinalizedHeadsThreshold = '20s' # Default
 FinalityDepth = 0 # Default
 FinalityTagEnabled = true # Default
 FinalizedBlockOffset = 50 # Default
+FinalizedStateCheckFailureThreshold = 0 # Default
 ```
 
 
@@ -345,6 +346,12 @@ FinalityTagEnabled enables the use of finality tags.
 FinalizedBlockOffset = 50 # Default
 ```
 FinalizedBlockOffset is the offset from the finalized block to use for finality tags.
+
+### FinalizedStateCheckFailureThreshold
+```toml
+FinalizedStateCheckFailureThreshold = 0 # Default
+```
+FinalizedStateCheckFailureThreshold defines the number of consecutive finalized state check failures before declaring a node unhealthy. 0 means disabled.
 
 ## Workflow
 ```toml
