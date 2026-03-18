@@ -83,9 +83,10 @@ var fullConfig = TOMLConfig{
 			VerifyChainID:                ptr(true),
 			NodeNoNewHeadsThreshold:      config.MustNewDuration(3 * time.Minute),
 			NoNewFinalizedHeadsThreshold: config.MustNewDuration(time.Hour),
-			FinalityDepth:                ptr[uint32](0),
-			FinalityTagEnabled:           ptr(true),
-			FinalizedBlockOffset:         ptr[uint32](0),
+			FinalityDepth:                           ptr[uint32](0),
+			FinalityTagEnabled:                      ptr(true),
+			FinalizedBlockOffset:                    ptr[uint32](0),
+			FinalizedStateCheckFailureThreshold:     ptr[uint32](0),
 		},
 	},
 	Nodes: Nodes{
