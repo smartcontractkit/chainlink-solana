@@ -24,7 +24,7 @@ var promSolLp = struct {
 	txsLogParsingError: newOutcomeDependantProm(txsLogParsingErrorName, "Number of transactions that %s onchain but had log parsing errors"),
 }
 
-type solLpMetrics struct {
+type SolLpMetrics struct {
 	metrics.Labeler
 	chainID string
 
@@ -33,7 +33,7 @@ type solLpMetrics struct {
 	txsLogParsingError outcomeDependantMetric
 }
 
-func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
+func NewSolLpMetrics(chainID string) (*SolLpMetrics, error) {
 	meter := beholder.GetMeter()
 
 	truncatedTxs, err := newOutcomeDependantMetric(meter, txsTruncatedName)
@@ -46,7 +46,7 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		return nil, err
 	}
 
-	return &solLpMetrics{
+	return &SolLpMetrics{
 		chainID: chainID,
 		Labeler: metrics.NewLabeler().With("chainID", chainID),
 
@@ -55,19 +55,19 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 	}, nil
 }
 
-func (m *solLpMetrics) GetOtelAttributes() []attribute.KeyValue {
+func (m *SolLpMetrics) GetOtelAttributes() []attribute.KeyValue {
 	return beholder.OtelAttributes(m.Labels).AsStringAttributes()
 }
 
-func (m *solLpMetrics) IncrementTruncatedTxs(ctx context.Context, txOutcome txOutcome) {
+func (m *SolLpMetrics) IncrementTruncatedTxs(ctx context.Context, txOutcome txOutcome) {
 	m.incrementForOutcome(ctx, promSolLp.txsTruncated, m.txsTruncated, txOutcome)
 }
 
-func (m *solLpMetrics) IncrementTxsLogParsingError(ctx context.Context, txOutcome txOutcome) {
+func (m *SolLpMetrics) IncrementTxsLogParsingError(ctx context.Context, txOutcome txOutcome) {
 	m.incrementForOutcome(ctx, promSolLp.txsLogParsingError, m.txsLogParsingError, txOutcome)
 }
 
-func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {
+func (m *SolLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {
 	switch outcome {
 	case txSucceeded:
 		m.increment(ctx, prom.succeeded, me.succeeded)
@@ -76,7 +76,7 @@ func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDepe
 	}
 }
 
-func (m *solLpMetrics) increment(ctx context.Context, prom *prometheus.CounterVec, me metric.Int64Counter) {
+func (m *SolLpMetrics) increment(ctx context.Context, prom *prometheus.CounterVec, me metric.Int64Counter) {
 	prom.WithLabelValues(m.chainID).Add(1)
 	me.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }

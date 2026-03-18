@@ -90,7 +90,7 @@ type Service struct {
 	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
-	metrics           *solLpMetrics
+	metrics           *SolLpMetrics
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, chainID string) (*Service, error) {

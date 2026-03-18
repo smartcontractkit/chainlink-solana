@@ -25,11 +25,11 @@ type getBlockJob struct {
 	parseProgramLogs  func(logs []string) ([]types.ProgramOutput, error)
 	cpiEventExtractor *CPIEventExtractor
 	lggr              logger.SugaredLogger
-	metrics           *solLpMetrics
+	metrics           *SolLpMetrics
 	aborted           bool
 }
 
-func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *getBlockJob {
+func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64, metrics *SolLpMetrics, cpiEventExtractor *CPIEventExtractor) *getBlockJob {
 	return &getBlockJob{
 		client:            client,
 		blocks:            blocks,

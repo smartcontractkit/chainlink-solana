@@ -37,10 +37,10 @@ type EncodedLogCollector struct {
 	cpiEventExtractor *CPIEventExtractor
 
 	workers *worker.Group
-	metrics *solLpMetrics
+	metrics *SolLpMetrics
 }
 
-func NewEncodedLogCollector(client RPCClient, lggr logger.Logger, chainID string, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *EncodedLogCollector {
+func NewEncodedLogCollector(client RPCClient, lggr logger.Logger, chainID string, metrics *SolLpMetrics, cpiEventExtractor *CPIEventExtractor) *EncodedLogCollector {
 	c := &EncodedLogCollector{
 		client:            client,
 		metrics:           metrics,
