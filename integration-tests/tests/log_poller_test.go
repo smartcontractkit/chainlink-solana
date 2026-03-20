@@ -1,4 +1,4 @@
-package smoke
+package tests
 
 import (
 	"bytes"
