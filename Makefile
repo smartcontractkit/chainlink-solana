@@ -70,7 +70,12 @@ build_js:
 	cd gauntlet && yarn install --frozen-lockfile && yarn bundle
 
 build_contracts:
-	docker run --rm -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
+	docker run --rm -v $(shell pwd):/workdir \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		-e CARGO_HOME=/workdir/.cargo-home \
+		-e CARGO_TARGET_DIR=/workdir/contracts/target \
+		-e TMPDIR=/workdir/.build-tmp \
+		${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
 
 build_contracts_local:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-local.sh
