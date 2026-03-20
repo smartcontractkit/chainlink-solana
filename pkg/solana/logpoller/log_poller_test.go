@@ -163,13 +163,16 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
-		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(230, nil).Once()
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(228)).Return(blocks, func() {}, nil).Run(func(_ context.Context, _ []types.PublicKey, _, _ uint64) {
+			// ensure that batches are processed in the correct order by configuring second call after the first one is done
+			lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(229), uint64(230)).Return(blocks, func() {}, nil).Once()
+		}).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
-		require.Equal(t, int64(130), lp.LogPoller.lastProcessedSlot)
+		require.Equal(t, int64(230), lp.LogPoller.lastProcessedSlot)
 	})
 	// These two sub-tests demonstrate the difference between single-batch and multi-batch
 	// failure scenarios, showing how the batch-level cursor update prevents redundant RPC calls.
