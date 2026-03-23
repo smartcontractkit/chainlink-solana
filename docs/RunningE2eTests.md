@@ -3,55 +3,71 @@
 ## Installation
 `make build && make install`
 
-
 ## Configuration
-The main test config logic resides in the `integration-tests/testconfig/` directory. Everything is configured using TOML. The minimum OCR2 required values can be located at `integration-tests/testconfig/default.toml`, these values default to running the tests locally in docker using devnet.
+Environment setup and test configuration live under `integration-tests/devenv`. Configs are composed from:
 
-### Combinations
-There are a few possibile combinations to run tests that we support.
+- `integration-tests/devenv/env.toml` for base environment settings
+- `integration-tests/devenv/products/solana/basic.toml` for the embedded OCR2 setup
+- `integration-tests/devenv/products/solana/plugins.toml` to run with plugin binaries
+- `integration-tests/devenv/products/solana/soak.toml` to extend the smoke config for soak
 
-**Devnet** 
-Devnet requires previously deployed programs that are owned by the person running the tests. The program ID's are required for testnet, but ignored in localnet.
+Important: environment startup is decoupled from test logic. Tests no longer start the environment. You must run the environment setup (`go run ./cmd u ...`) before running any tests. This generates `integration-tests/devenv/env-out.toml`, which the tests read.
 
-- `Common.network` needs to be set to `devnet` which will instruct the tests to run against devnet
-- `ocr2_program_id`, `access_controller_program_id`, `store_program_id`, `link_token_address`, `vault_address` need to be set so the tests know what programs to use so we avoid deploying each time.
-- `E2E_TEST_COMMON_RPC_URL` and `E2E_TEST_COMMON_WS_URL` need to be set
+## Run tests locally
 
-**Localnet**
-Setting localnet will instruct the tests to run in localnet, the program ID's are not taken from the TOML in this scenario, but rather defined in the `integration-tests/config/config.go`.
+### Smoke (embedded)
+```
+cd integration-tests/devenv
+go run ./cmd u env.toml,products/solana/basic.toml
+cd ../tests
+go test -v -timeout 30m -run TestSolanaOCRV2Smoke
+```
 
-**K8s**
+### Smoke (plugins)
+```
+cd integration-tests/devenv
+go run ./cmd u env.toml,products/solana/basic.toml,products/solana/plugins.toml
+cd ../tests
+go test -v -timeout 30m -run TestSolanaOCRV2Smoke
+```
 
-Running in Kubernetes will require aws auth.
+### Soak (embedded)
+```
+cd integration-tests/devenv
+go run ./cmd u env.toml,products/solana/basic.toml,products/solana/soak.toml
+go run ./cmd obs up -f
+cd ../tests
+go test -v -timeout 4h -run TestSolanaOCRV2Soak
+```
 
-- `Common.inside_k8` needs to be set to true if you want to run the tests in k8
+### Soak (plugins)
+```
+cd integration-tests/devenv
+go run ./cmd u env.toml,products/solana/basic.toml,products/solana/soak.toml,products/solana/plugins.toml
+go run ./cmd obs up -f
+cd ../tests
+go test -v -timeout 4h -run TestSolanaOCRV2Soak
+```
 
-### Overrides
+## GitHub workflows
 
-By default all values are pulled either from `default.toml` or if we create an `overrides.toml` where we want to set new values or override existing values. Both `default.toml` and `overrides.toml` will end up being merged where values that are set in both files will be taken based on the value in `overrides.toml`.
+### `e2e_custom_cl.yml` (PR + manual)
+Workflow runs on PRs and `workflow_dispatch` with input `cl_branch_ref` (Chainlink repo branch to integrate).
 
-## Run tests
+What it does:
+- Builds current contract artifacts.
+- Builds a custom Chainlink image (or reuses an existing one if available).
+- Runs smoke tests as a matrix:
+  - `embedded`: `env.toml,products/solana/basic.toml`
+  - `plugins`: `env.toml,products/solana/basic.toml,products/solana/plugins.toml`
+- Runs program upgrade tests only when:
+  - Contracts have changed, and
+  - Current artifacts differ from the pinned previous release artifacts
 
-`cd integration-tests/smoke && go test -timeout 30m -count=1 -run TestSolanaOCRV2Smoke;`
+### `soak.yml` (on-demand soak)
+Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/actions/workflows/soak.yml). Inputs are:
 
-### On demand soak test
+- `cl_image_tag` (required): Chainlink image tag
+- `cl_image_ecr` (optional): ECR repo name (default `chainlink`)
 
-Navigate to the [workflow](https://github.com/smartcontractkit/chainlink-solana/actions/workflows/soak.yml). The workflow takes in 3 parameters:
-
-- Base64 string of the .toml configuration
-- Core image tag which defaults to develop
-- Test runner tag, only tag needs to be supplied
-    - In order to create the test image a label needs to be added to the PR `build-test-image` which will start building it on every push.
-
-Create an `overrides.toml` file in `integration-tests/testconfig` and run `cat overrides.toml | base64`. `inside_k8` needs to be set to true in the .toml in order to run the tests in kubernetes.
-
-#### Local
-
-If you want to kick off the test from local:
-
-- `export TEST_SUITE: soak`
-- `export DETACH_RUNNER: true`
-- `export ENV_JOB_IMAGE: <internal_repo>/chainlink-solana-tests:<tag>`
-- Base64 the .toml config
-- Run `export BASE64_CONFIG_OVERRIDE="<config>"`
-- cd integration-tests/soak && go test -timeout 30m -count=1 -run TestSolanaOCRV2Soak;
+The workflow builds contract artifacts, starts the environment via `integration-tests/devenv`, then runs soak tests with the same embedded/plugins matrix.

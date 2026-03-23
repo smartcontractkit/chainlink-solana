@@ -7,25 +7,17 @@ on:
         required: true
         default: develop
         type: string
-      test_secrets_override_key:
-        description: 'Key to run tests with custom test secrets like ws url, rpc url, private key, etc.'
-        required: false
-        type: string
-      team:
-        description: Team to run the tests for (e.g. BIX, CCIP)
-        required: true
-        type: string
+
   schedule:
     - cron: '0 6 * * *'
 # Only run 1 of this workflow at a time per PR
 env:
-  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
   MOD_CACHE_VERSION: 1
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
-  group: integration-tests-solana-${{ github.ref }}
+  group: integration-tests-solana-daily-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,7 +54,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
@@ -81,93 +73,137 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Check if image exists
-        id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+      - name: Check if image exists in ECR
+        id: check-image-exists
+        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
         with:
-          repository: chainlink
+          repository: "chainlink"
           tag: solana.${{ github.sha }}
-          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-      - name: Build Image
-        if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+
+      - name: Checkout Chainlink repo
+        if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
+        uses: actions/checkout@v4
         with:
-          should_checkout: true
-          cl_repo: smartcontractkit/chainlink
-          cl_ref: ${{ github.event.inputs.cl_branch_ref }}
-          dep_solana_sha: ${{ github.event.pull_request.head.sha }}
-          push_tag: ${{ env.CL_ECR }}:solana.${{ github.sha }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          repository: smartcontractkit/chainlink
+          ref: ${{ github.event.inputs.cl_branch_ref }}
+
+      - name: Build Image
+        if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
+        uses: smartcontractkit/.github/actions/ctf-build-image@ctf-build-image/v1
+        env:
+          # otherwise image building will fail, because pipeline doesn't have access to private repositories (could be fixed with GATI)
+          CL_INSTALL_PRIVATE_PLUGINS: "false"
+        with:
+          dockerfile: core/chainlink.Dockerfile
+          image-tag: solana.${{ github.sha }}
+          go-get-overrides: |
+            chainlink-solana=${{ github.event.pull_request.head.sha }}
+          # registry inputs
+          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          aws-account-number: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          docker-registry-url: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
+          docker-repository-name: chainlink
+          # GATI inputs
+          gati-role-arn: ${{ secrets.AWS_ROLE_ARN_GATI_READONLY }}
+          gati-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL}}
 
   e2e_custom_run_smoke_tests:
-    name: E2E Custom Run Smoke Tests
+    name: E2E Smoke Tests (${{ matrix.variant }})
     environment: integration
     permissions:
-      checks: write
-      pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-16cores-64GB
-
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: embedded
+            configs: env-testnet.toml,products/solana/basic.toml
+          - variant: plugins
+            configs: env-testnet.toml,products/solana/basic.toml,products/solana/plugins.toml
     needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
     env:
-      TEST_SUITE: smoke
-      TEST_ARGS: -test.timeout 30m
-      TEST_LOG_LEVEL: debug
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
+      SOLANA_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          role-duration-seconds: 1800
+          mask-aws-account-id: true
+
+      - name: Authenticate to ECR
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+        env:
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+
+      - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
+
       - name: Install gauntlet
         uses: ./.github/actions/build-gauntlet
-      - name: Generate config overrides
-        run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
-          cat << EOF > config.toml
-          [ChainlinkImage]
-          version="solana.${{ github.sha }}"
-          [Common]
-          user="${{ github.actor }}"
-          network="devnet"
-          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
-          EOF
 
-          # shellcheck disable=SC2002
-          BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
-          # shellcheck disable=SC2086
-          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
-          # shellcheck disable=SC2086
-          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
-      - name: Run Tests
-        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2Smoke/embedded $(args) ./smoke 2>&1 | tee /tmp/gotest.log
-          test_download_vendor_packages_command: cd ./integration-tests && go mod download
-          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          go_mod_path: ./integration-tests/go.mod
-          cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-          artifacts_name: smoke-test-logs
-          artifacts_location: ./integration-tests/smoke/logs/
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          enable-gap: false
-          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
-          cache_restore_only: "false"
-          default_e2e_test_chainlink_image: ${{ env.CL_ECR }}
-        env:
-          E2E_TEST_COMMON_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }} # default private key
-          E2E_TEST_COMMON_RPC_URL: https://api.devnet.solana.com # default url
-          E2E_TEST_COMMON_WS_URL: https://api.devnet.solana.com # default url
-          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
-          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
+          go-version-file: integration-tests/go.mod
+          cache: true
+          cache-dependency-path: integration-tests/go.sum
+
+      - name: Download Go dependencies
+        working-directory: integration-tests
+        run: go mod download
+
+      - name: Download contract artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+
+      - name: Start fakes server
+        working-directory: integration-tests/devenv
+        run: |
+          go build -o /tmp/fakes-server ./fakes/cmd
+          /tmp/fakes-server &
+          for _ in {1..20}; do
+            if curl -fsS -X POST "http://127.0.0.1:9111/mockserver-bridge" > /dev/null; then
+              echo "Fakes server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Fakes server failed to start"
+          exit 1
+
+      - name: Setup Environment
+        working-directory: integration-tests/devenv
+        run: go run ./cmd u ${{ matrix.configs }}
+
+      - name: Run Smoke Test
+        working-directory: integration-tests/tests
+        run: go test -v -timeout 30m -run TestSolanaOCRV2Smoke
+
+      - name: Show Docker containers status
+        if: failure()
+        run: docker ps -a
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs-${{ matrix.variant }}
+          path: |
+            integration-tests/devenv/logs/
+            integration-tests/tests/logs/
+          retention-days: 1

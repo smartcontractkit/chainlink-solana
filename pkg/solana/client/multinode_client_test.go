@@ -40,14 +40,14 @@ func TestMultiNodeClient_LatestBlock(t *testing.T) {
 	t.Run("LatestBlock", func(t *testing.T) {
 		head, err := c.LatestBlock(t.Context())
 		require.NoError(t, err)
-		require.Equal(t, true, head.IsValid())
+		require.True(t, head.IsValid())
 		require.NotEqual(t, solana.Hash{}, head.BlockHash)
 	})
 
 	t.Run("LatestFinalizedBlock", func(t *testing.T) {
 		finalizedHead, err := c.LatestFinalizedBlock(t.Context())
 		require.NoError(t, err)
-		require.Equal(t, true, finalizedHead.IsValid())
+		require.True(t, finalizedHead.IsValid())
 		require.NotEqual(t, solana.Hash{}, finalizedHead.BlockHash)
 	})
 }
