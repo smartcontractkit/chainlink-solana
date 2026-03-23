@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 )
 
 type OCR2Config struct {
@@ -12,7 +12,7 @@ type OCR2Config struct {
 	OffChainConfig       *OCROffChainConfig
 	PayeeConfig          *PayeeConfig
 	ProposalAcceptConfig *ProposalAcceptConfig
-	NodeKeys             []client.NodeKeysBundle
+	NodeKeys             []clclient.NodeKeysBundle
 	VaultAddress         string
 	Secret               string
 	ProposalID           string
@@ -101,10 +101,10 @@ type StoreWriterConfig struct {
 	Transmissions string `json:"transmissions"`
 }
 
-func NewOCR2Config(nodeKeys []client.NodeKeysBundle, proposalID string, vaultAddress string, secret string) *OCR2Config {
+func NewOCR2Config(nodeKeys []clclient.NodeKeysBundle, proposalID string, vaultAddress string, secret string) *OCR2Config {
 	var oracles []Operator
 
-	nodeKeysSorted := make([]client.NodeKeysBundle, len(nodeKeys))
+	nodeKeysSorted := make([]clclient.NodeKeysBundle, len(nodeKeys))
 	copy(nodeKeysSorted, nodeKeys)
 
 	// We have to sort by on_chain_pub_key for the config digest

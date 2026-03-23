@@ -1,0 +1,9 @@
+[solana]
+image = "anzaxyz/agave:v2.1.21"
+chain_id = "localnet"
+secret = "thisisatestingonlysecret"
+
+[solana.Out]
+internal_http_url = "https://api.devnet.solana.com"
+external_http_url = "https://api.devnet.solana.com"
+external_ws_url = "wss://api.devnet.solana.com"

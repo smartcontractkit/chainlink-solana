@@ -13,13 +13,12 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
+	tc "github.com/testcontainers/testcontainers-go"
 	"golang.org/x/sync/errgroup"
 
 	access_controller2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/access_controller"
 	ocr_2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/ocr_2"
 	store2 "github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
-	test_env_sol "github.com/smartcontractkit/chainlink-solana/integration-tests/docker/testenv"
 )
 
 // All account sizes are calculated from Rust structures, ex. programs/access-controller/src/lib.rs:L80
@@ -346,34 +345,19 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 	}, nil
 }
 
-func (c *ContractDeployer) DeployProgramRemote(programName string, env *environment.Environment) error {
-	log.Debug().Str("Program", programName).Msg("Deploying program")
-	programPath := filepath.Join("programs", programName)
-	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
-	programKeyFilePath := filepath.Join("programs", programKeyFileName)
-	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programKeyFilePath, programPath)
-	pl, err := env.Client.ListPods(env.Cfg.Namespace, "app=sol")
-	if err != nil {
-		return err
-	}
-	stdOutBytes, stdErrBytes, _ := env.Client.ExecuteInPod(env.Cfg.Namespace, pl.Items[0].Name, "sol-val", strings.Split(cmd, " "))
-	log.Debug().Str("STDOUT", string(stdOutBytes)).Str("STDERR", string(stdErrBytes)).Str("CMD", cmd).Send()
-	return nil
-}
-
 func BuildProgramIDKeypairPath(programName string) string {
 	programKeyFileName := strings.Replace(programName, ".so", keypairSuffix, -1)
 	return filepath.Join("programs", programKeyFileName)
 }
 
 // DeployProgramRemoteLocal takes in a programIDBuilder which allows for building the program keypair path from the name or passing the deployed program address
-func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
+func (c *ContractDeployer) DeployProgramRemoteLocal(programName string, container tc.Container, programIDBuilder func(string) string) error {
 	log.Info().Str("Program", programName).Msg("Deploying program")
 	programPath := filepath.Join("programs", programName)
 
 	cmd := fmt.Sprintf("solana program deploy --program-id %s %s", programIDBuilder(programName), programPath)
 	log.Info().Str("Cmd", cmd).Msg("Deploying " + programName)
-	_, res, err := sol.Container.Exec(context.Background(), strings.Split(cmd, " "))
+	_, res, err := container.Exec(context.Background(), strings.Split(cmd, " "))
 	if err != nil {
 		return err
 	}
@@ -495,24 +479,7 @@ func (c *ContractDeployer) LoadPrograms(contractsDir string) error {
 	return nil
 }
 
-func (c *ContractDeployer) DeployAnchorProgramsRemote(contractsDir string, env *environment.Environment) error {
-	contractBinaries, err := c.Client.ListDirFilenamesByExt(contractsDir, ".so")
-	if err != nil {
-		return err
-	}
-	log.Debug().Interface("Binaries", contractBinaries).Msg("Program binaries")
-	g := errgroup.Group{}
-
-	for idx := range contractBinaries {
-		g.Go(func() error {
-			return c.DeployProgramRemote(contractBinaries[idx], env)
-		})
-	}
-
-	return g.Wait()
-}
-
-func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, sol *test_env_sol.Solana, programIDBuilder func(string) string) error {
+func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir string, container tc.Container, programIDBuilder func(string) string) error {
 	contractBinaries, err := c.Client.ListDirFilenamesByExt(filepath.Join(baseDir, subDir), ".so")
 	if err != nil {
 		return err
@@ -522,7 +489,7 @@ func (c *ContractDeployer) DeployAnchorProgramsRemoteDocker(baseDir, subDir stri
 
 	for idx := range contractBinaries {
 		g.Go(func() error {
-			return c.DeployProgramRemoteLocal(filepath.Join(subDir, contractBinaries[idx]), sol, programIDBuilder)
+			return c.DeployProgramRemoteLocal(filepath.Join(subDir, contractBinaries[idx]), container, programIDBuilder)
 		})
 	}
 
