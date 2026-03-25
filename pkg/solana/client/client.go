@@ -27,6 +27,19 @@ const (
 // If the requested block contains a transaction with a higher version, an error will be returned.
 const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
 
+// HeadMetadataGetBlockOpts returns options for getBlock that omit transaction bodies and rewards,
+// leaving only metadata (e.g. blockhash, block height, block time) for head reporting.
+func HeadMetadataGetBlockOpts(commitment rpc.CommitmentType) *rpc.GetBlockOpts {
+	rewards := false
+	v := MaxSupportTransactionVersion
+	return &rpc.GetBlockOpts{
+		Commitment:                     commitment,
+		TransactionDetails:             rpc.TransactionDetailsNone,
+		Rewards:                        &rewards,
+		MaxSupportedTransactionVersion: &v,
+	}
+}
+
 type ReaderWriter interface {
 	Writer
 	Reader
