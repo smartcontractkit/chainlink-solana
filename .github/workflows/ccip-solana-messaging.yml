@@ -1,0 +1,138 @@
+name: CCIP Solana Messaging Tests
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/solana/**'
+  workflow_dispatch:
+    inputs:
+      cl_branch_ref:
+        description: Chainlink repo branch to test against
+        required: true
+        default: develop
+        type: string
+
+concurrency:
+  group: ccip-solana-messaging-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  get-core-ref:
+    name: Get Core Ref
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      core-ref: ${{ steps.get-core-ref.outputs.core-ref || github.event.inputs.cl_branch_ref || 'develop' }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+
+      - name: Get core ref
+        id: get-core-ref
+        uses: ./.github/actions/get-core-ref
+
+  ccip-messaging-tests:
+    name: CCIP Messaging (${{ matrix.test.name }})
+    needs: get-core-ref
+    runs-on: ubuntu-latest-8cores-32GB
+    permissions:
+      contents: read
+      actions: write # upload-artifact
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - name: EVM2Solana
+            slug: evm2solana
+            run: Test_CCIPMessaging_EVM2Solana
+            loopp: false
+          - name: EVM2Solana LOOPP
+            slug: evm2solana-loopp
+            run: Test_CCIPMessaging_EVM2Solana
+            loopp: true
+          - name: Solana2EVM
+            slug: solana2evm
+            run: Test_CCIPMessaging_Solana2EVM
+            loopp: false
+          - name: Solana2EVM LOOPP
+            slug: solana2evm-loopp
+            run: Test_CCIPMessaging_Solana2EVM
+            loopp: true
+          - name: Revert EVM2Solana LOOPP
+            slug: revert-evm2solana-loopp
+            run: Test_CCIPMessaging_Revert_EVM2Solana
+            loopp: true
+          - name: MultiExecReports EVM2Solana
+            slug: multiexec-evm2solana
+            run: Test_CCIPMessaging_MultiExecReports_EVM2Solana
+            loopp: false
+    steps:
+      - name: Checkout chainlink-solana
+        uses: actions/checkout@v4
+        with:
+          path: chainlink-solana
+
+      - name: Checkout chainlink
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink
+          ref: ${{ needs.get-core-ref.outputs.core-ref }}
+          path: chainlink
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: chainlink/go.mod
+          check-latest: true
+
+      - name: Override chainlink-solana dependency
+        run: |
+          SOLANA_PATH="${{ github.workspace }}/chainlink-solana"
+          for dir in . deployment integration-tests; do
+            pushd "chainlink/$dir"
+            go mod edit -replace "github.com/smartcontractkit/chainlink-solana=${SOLANA_PATH}"
+            go mod edit -replace "github.com/smartcontractkit/chainlink-solana/contracts=${SOLANA_PATH}/contracts"
+            go mod tidy
+            popd
+          done
+
+      - name: Build LOOPP plugin binary
+        if: matrix.test.loopp
+        working-directory: chainlink-solana
+        run: go build -o "$GOPATH/bin/chainlink-solana" ./pkg/solana/cmd/chainlink-solana
+
+      - name: Run CCIP Messaging Test
+        working-directory: chainlink/integration-tests
+        env:
+          CL_SOLANA_CMD: ${{ matrix.test.loopp && 'chainlink-solana' || '' }}
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/ccip-test-artifacts"
+          cd smoke/ccip
+          set -o pipefail
+          go test -run "${{ matrix.test.run }}" -timeout 18m -test.parallel=4 -count=1 -json 2>&1 | tee "${GITHUB_WORKSPACE}/ccip-test-artifacts/gotest.json"
+
+      - name: Show Docker containers status
+        if: failure()
+        run: docker ps -a
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccip-messaging-${{ matrix.test.slug }}-${{ github.run_id }}
+          path: ccip-test-artifacts/
+          retention-days: 7
+          if-no-files-found: warn
+
+  check-results:
+    name: CCIP Solana Messaging Tests
+    if: always()
+    runs-on: ubuntu-latest
+    needs: ccip-messaging-tests
+    steps:
+      - name: Fail if tests were not successful
+        if: needs.ccip-messaging-tests.result == 'failure'
+        run: exit 1
