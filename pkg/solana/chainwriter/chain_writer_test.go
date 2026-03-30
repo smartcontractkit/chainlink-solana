@@ -1410,50 +1410,51 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, encodedPayloadv1)
 
-	// Anchor 0.3x IDL parsing results in snake_case field names. Create structs to match these field names.
+	// Anchor 0.3x IDLs use snake_case in JSON, but codecv2 maps fields to Go names via snakeToPascal (e.g. oracle_id → OracleId).
+	// Test structs must use those PascalCase names so codec.Convert can populate the encoder’s pointer-wrapped fields.
 	type InnerDynamicV2 struct {
-		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
-		S       string
+		IntVal int64
+		S      string
 	}
 	type InnerStaticV2 struct {
-		Int_val int64 //nolint:revive // snake_case required to match Anchor IDL
-		A       solana.PublicKey
+		IntVal int64
+		A      solana.PublicKey
 	}
 	type AccountStructV2 struct {
-		Account     solana.PublicKey
-		Account_str solana.PublicKey //nolint:revive // snake_case required to match Anchor IDL
+		Account    solana.PublicKey
+		AccountStr solana.PublicKey
 	}
 	type NestedDynamicV2 struct {
-		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
-		Inner       InnerDynamicV2
+		FixedBytes [2]uint8
+		Inner      InnerDynamicV2
 	}
 	type NestedStaticV2 struct {
-		Fixed_bytes [2]uint8 //nolint:revive // snake_case required to match Anchor IDL
-		Inner       InnerStaticV2
+		FixedBytes [2]uint8
+		Inner      InnerStaticV2
 	}
 	type TestItemV2 struct {
 		Field                 int32
-		Oracle_id             uint8           //nolint:revive // snake_case required to match Anchor IDL
-		Oracle_ids            [32]uint8       //nolint:revive // snake_case required to match Anchor IDL
-		Account_struct        AccountStructV2 //nolint:revive // snake_case required to match Anchor IDL
+		OracleId              uint8
+		OracleIds             [32]uint8
+		AccountStruct         AccountStructV2
 		Accounts              []solana.PublicKey
-		Different_field       string           //nolint:revive // snake_case required to match Anchor IDL
-		Big_field             ag_binary.Int128 //nolint:revive // snake_case required to match Anchor IDL
-		Nested_dynamic_struct NestedDynamicV2  //nolint:revive // snake_case required to match Anchor IDL
-		Nested_static_struct  NestedStaticV2   //nolint:revive // snake_case required to match Anchor IDL
+		DifferentField        string
+		BigField              ag_binary.Int128
+		NestedDynamicStruct   NestedDynamicV2
+		NestedStaticStruct    NestedStaticV2
 	}
 
-	// Test v2 encoding with matching struct (same data, different field names)
+	// Test v2 encoding with matching struct (same data as v1; IDL source differs but codec field names align)
 	testArrayV2 := [1]TestItemV2{{
 		Field:                 1,
-		Oracle_id:             2,
-		Oracle_ids:            [32]uint8{3},
-		Account_struct:        AccountStructV2{},
+		OracleId:              2,
+		OracleIds:             [32]uint8{3},
+		AccountStruct:         AccountStructV2{},
 		Accounts:              []solana.PublicKey{},
-		Different_field:       "test",
-		Big_field:             ag_binary.Int128{Lo: 5},
-		Nested_dynamic_struct: NestedDynamicV2{Fixed_bytes: [2]uint8{6, 7}, Inner: InnerDynamicV2{Int_val: 8, S: "inner"}},
-		Nested_static_struct:  NestedStaticV2{Fixed_bytes: [2]uint8{9, 10}, Inner: InnerStaticV2{Int_val: 11}},
+		DifferentField:        "test",
+		BigField:              ag_binary.Int128{Lo: 5},
+		NestedDynamicStruct:   NestedDynamicV2{FixedBytes: [2]uint8{6, 7}, Inner: InnerDynamicV2{IntVal: 8, S: "inner"}},
+		NestedStaticStruct:    NestedStaticV2{FixedBytes: [2]uint8{9, 10}, Inner: InnerStaticV2{IntVal: 11}},
 	}}
 
 	encodedPayloadv2, err := cw.EncodePayload(ctx, testArrayV2, chainwriter.MethodConfig{
