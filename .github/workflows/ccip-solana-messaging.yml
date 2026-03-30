@@ -91,6 +91,23 @@ jobs:
           go-version-file: chainlink/go.mod
           check-latest: true
 
+      - name: Setup Postgres
+        id: setup-postgres
+        uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+        with:
+          image-tag: "16-alpine"
+          tmpfs: "true"
+
+      - name: Prepare Test Schema
+        working-directory: chainlink
+        env:
+          CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}
+        run: |
+          unset GRAFANA_INTERNAL_TENANT_ID
+          unset GRAFANA_INTERNAL_BASIC_AUTH
+          unset GRAFANA_INTERNAL_HOST
+          go run ./core/store/cmd/preparetest
+
       - name: Override chainlink-solana dependency
         run: |
           SOLANA_PATH="${{ github.workspace }}/chainlink-solana"
@@ -114,6 +131,7 @@ jobs:
       - name: Run CCIP Messaging Test
         working-directory: chainlink/integration-tests
         env:
+          CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}
           CL_SOLANA_CMD: ${{ matrix.test.loopp && 'chainlink-solana' || '' }}
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/ccip-test-artifacts"
