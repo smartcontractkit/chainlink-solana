@@ -31,7 +31,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Get core ref
         id: get-core-ref
@@ -74,12 +74,12 @@ jobs:
             loopp: false
     steps:
       - name: Checkout chainlink-solana
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: chainlink-solana
 
       - name: Checkout chainlink
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ needs.get-core-ref.outputs.core-ref }}
