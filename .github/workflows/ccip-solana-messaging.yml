@@ -105,7 +105,11 @@ jobs:
       - name: Build LOOPP plugin binary
         if: matrix.test.loopp
         working-directory: chainlink-solana
-        run: go build -o "$GOPATH/bin/chainlink-solana" ./pkg/solana/cmd/chainlink-solana
+        run: |
+          PLUGIN_BIN="$(go env GOPATH)/bin"
+          mkdir -p "$PLUGIN_BIN"
+          go build -o "$PLUGIN_BIN/chainlink-solana" ./pkg/solana/cmd/chainlink-solana
+          echo "$PLUGIN_BIN" >> "$GITHUB_PATH"
 
       - name: Run CCIP Messaging Test
         working-directory: chainlink/integration-tests
