@@ -478,6 +478,9 @@ func (lp *Service) run(ctx context.Context) (err error) {
 		return fmt.Errorf("error loading filters: %w", err)
 	}
 
+	// TODO: remove random log line after confirming CI test runs
+	lp.lggr.Debugw("we in the log poller and we running")
+
 	lastProcessedSlot, err := lp.getLastProcessedSlot(ctx)
 	if err != nil {
 		return fmt.Errorf("failed getting last processed slot: %w", err)
