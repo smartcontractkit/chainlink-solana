@@ -41,6 +41,7 @@ ComputeUnitLimitDefault = 200_000 # Default
 EstimateComputeUnitLimit = false # Default
 LogPollerStartingLookback = '24h' # Default
 LogPollerCPIEventsEnabled = true # Default
+LogPollerSlotsBatchSize = 1000 # Default
 ```
 
 
@@ -213,6 +214,12 @@ LogPollerCPIEventsEnabled = true # Default
 ```
 LogPollerCPIEventsEnabled - Flag for LogPoller listening to CPI Events.
 CPI events require LOOPP mode to function correctly.
+
+### LogPollerSlotsBatchSize
+```toml
+LogPollerSlotsBatchSize = 1000 # Default
+```
+LogPollerSlotsBatchSize is the number of slots to process in a batch when polling for logs. Setting this value too high may increase memory usage, while setting it too low may increase the number of RPC calls and decrease performance.
 
 ## MultiNode
 ```toml
