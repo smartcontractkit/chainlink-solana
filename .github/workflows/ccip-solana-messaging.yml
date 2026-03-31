@@ -86,14 +86,14 @@ jobs:
           path: chainlink
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: chainlink/go.mod
           check-latest: true
 
       - name: Setup Postgres
         id: setup-postgres
-        uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+        uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/v1
         with:
           image-tag: "16-alpine"
           tmpfs: "true"
@@ -145,7 +145,7 @@ jobs:
 
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ccip-messaging-${{ matrix.test.slug }}-${{ github.run_id }}
           path: ccip-test-artifacts/
