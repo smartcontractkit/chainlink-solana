@@ -1,7 +1,7 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey, TransactionInstruction, SystemProgram } from '@solana/web3.js'
-import { getOrCreateAssociatedTokenAccount } from '@solana/spl-token'
+import { getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { utils } from '@coral-xyz/anchor'
 import { logger, BN, prompt } from '@chainlink/gauntlet-core/dist/utils'
@@ -64,15 +64,14 @@ export default class Initialize extends SolanaCommand {
     const maxAnswer = new BN(input.maxAnswer)
     const transmissions = new PublicKey(input.transmissions)
 
-    const tokenVault = (
-      await getOrCreateAssociatedTokenAccount(
-        this.provider.connection,
-        this.wallet.payer,
-        linkPublicKey,
-        vaultAuthority,
-        true,
-      )
-    ).address
+    const tokenVault = await getAssociatedTokenAddress(linkPublicKey, vaultAuthority, true)
+
+    const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+      signer,
+      tokenVault,
+      vaultAuthority,
+      linkPublicKey,
+    )
 
     const tx = await program.methods
       .initialize(minAnswer, maxAnswer)
@@ -105,7 +104,7 @@ export default class Initialize extends SolanaCommand {
       programId: program.programId,
     })
 
-    return [feedCreationInstruction, tx]
+    return [createAtaIx, feedCreationInstruction, tx]
   }
 
   execute = async () => {

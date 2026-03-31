@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, BN } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { PublicKey } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 
@@ -58,12 +58,10 @@ export default class SetValidatorConfig extends SolanaCommand {
 
   execute = async () => {
     const contract = getContract(CONTRACT_LIST.STORE, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = utils.makeTx(rawTx)
-    logger.debug(tx)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     logger.info(`Setting validator config on ${this.flags.feed.toString()}...`)
     logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, contract.idl)(rawTx)
     logger.success(`Validator config on tx ${txhash}`)
 
     return {

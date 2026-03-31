@@ -1,7 +1,15 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt, BN } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
-import { createAssociatedTokenAccount, createMint, mintTo } from '@solana/spl-token'
+import {
+  createInitializeMintInstruction,
+  createAssociatedTokenAccountInstruction,
+  createMintToInstruction,
+  getAssociatedTokenAddress,
+  MINT_SIZE,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token'
+import { Keypair, SystemProgram } from '@solana/web3.js'
 import { TOKEN_DECIMALS } from '../../../lib/constants'
 import { CONTRACT_LIST } from '../../../lib/contracts'
 
@@ -15,44 +23,53 @@ export default class DeployToken extends SolanaCommand {
   }
 
   execute = async () => {
-    const mintAuthority = this.wallet.payer
+    const mintAuthority = this.wallet.publicKey
 
     logger.loading('Creating token...')
 
     const decimals = this.flags.decimals || TOKEN_DECIMALS
-    const token = await createMint(
-      this.provider.connection,
-      this.wallet.payer,
-      mintAuthority.publicKey,
-      this.wallet.payer.publicKey, // Freeze authority
-      decimals,
+    const mint = Keypair.generate()
+    const lamports = await this.provider.connection.getMinimumBalanceForRentExemption(MINT_SIZE)
+
+    const createMintIxs = [
+      SystemProgram.createAccount({
+        fromPubkey: this.wallet.publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: MINT_SIZE,
+        lamports,
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      createInitializeMintInstruction(mint.publicKey, decimals, mintAuthority, mintAuthority),
+    ]
+
+    const tokenVault = await getAssociatedTokenAddress(mint.publicKey, this.wallet.publicKey)
+    const createAtaIx = createAssociatedTokenAccountInstruction(
+      this.wallet.publicKey,
+      tokenVault,
+      this.wallet.publicKey,
+      mint.publicKey,
     )
 
+    await this.signAndSendRawTx([...createMintIxs, createAtaIx], [mint])
+
     const billion = BigInt(Math.pow(10, 9))
-    const tokenVault = await createAssociatedTokenAccount(
-      this.provider.connection,
-      this.wallet.payer,
-      token,
-      this.wallet.payer.publicKey,
-    )
     const mintAmount = billion * BigInt(Math.pow(10, decimals))
 
     await prompt(
       `Minting ${billion.toString()} token units, with ${decimals} decimals. Total ${mintAmount.toString()}. Continue?`,
     )
 
-    await mintTo(this.provider.connection, this.wallet.payer, token, tokenVault, mintAuthority, mintAmount)
-
-    // To disable minting https://github.com/solana-labs/solana-program-library/blob/36e886392b8c6619b275f6681aed6d8aae6e70f9/token/js/client/token.js#L985
+    const mintToIx = createMintToInstruction(mint.publicKey, tokenVault, mintAuthority, mintAmount)
+    await this.signAndSendRawTx([mintToIx])
 
     logger.info(`
       TOKEN:
-        - Address: ${token}
+        - Address: ${mint.publicKey}
       VAULT:
         - address: ${tokenVault.toString()}
       STATE ACCOUNTS:
-        - Mint Authority: ${mintAuthority.publicKey}
-        - Freeze Authority: ${this.wallet.payer.publicKey}
+        - Mint Authority: ${mintAuthority}
+        - Freeze Authority: ${mintAuthority}
     `)
 
     return {
@@ -61,8 +78,8 @@ export default class DeployToken extends SolanaCommand {
       },
       responses: [
         {
-          tx: { ...this.wrapResponse('', token.toString()), wait: async () => ({ success: true }) },
-          contract: token.toString(),
+          tx: { ...this.wrapResponse('', mint.publicKey.toString()), wait: async () => ({ success: true }) },
+          contract: mint.publicKey.toString(),
         },
       ],
     } as Result<TransactionResponse>

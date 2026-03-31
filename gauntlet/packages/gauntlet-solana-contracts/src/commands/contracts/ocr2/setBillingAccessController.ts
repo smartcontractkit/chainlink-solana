@@ -38,20 +38,22 @@ export default class SetBillingAccessController extends SolanaCommand {
     this.require(oldAC.toString() !== ac.toString(), 'New access controller is the same as existing access controller')
     await prompt(`Continue setting billing access controller?`)
 
-    const tx = await program.rpc.setBillingAccessController({
-      accounts: {
+    const ix = await program.methods
+      .setBillingAccessController()
+      .accounts({
         state: state,
-        authority: this.wallet.payer.publicKey,
+        authority: this.wallet.publicKey,
         accessController: ac,
-      },
-      signers: [this.wallet.payer],
-    })
+      })
+      .instruction()
 
-    logger.success(`Billing access controller set on tx ${tx}`)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, ocr2.idl)([ix])
+
+    logger.success(`Billing access controller set on tx ${txhash}`)
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
+          tx: this.wrapResponse(txhash, state.toString()),
           contract: state.toString(),
         },
       ],
