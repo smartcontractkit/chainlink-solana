@@ -6,7 +6,7 @@ on:
       - 'pkg/solana/**'
   push:
     branches:
-      - main
+      - develop
     paths:
       - 'pkg/solana/**'
   workflow_dispatch:
