@@ -36,7 +36,10 @@ jobs:
 
   get_projectserum_version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -65,7 +68,10 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -84,12 +90,15 @@ jobs:
 
   e2e_custom_build_previous_artifacts:
     name: E2E Build Previous Release Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
-    needs: [contract-changes,get_projectserum_version]
+    needs: [contract-changes, get_projectserum_version]
     if: needs.contract-changes.outputs.changed == 'true'
     steps:
       - name: Checkout previous release
@@ -126,7 +135,12 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    needs: [contract-changes,e2e_custom_build_artifacts,e2e_custom_build_previous_artifacts]
+    needs:
+      [
+        contract-changes,
+        e2e_custom_build_artifacts,
+        e2e_custom_build_previous_artifacts,
+      ]
     if: needs.contract-changes.outputs.changed == 'true'
     outputs:
       changed: ${{ steps.check.outputs.continue }}
@@ -185,10 +199,13 @@ jobs:
         uses: ./.github/actions/get-core-ref
 
   e2e_custom_build_custom_chainlink_image:
-    needs: [ get-core-ref ]
+    needs: [get-core-ref]
     name: E2E Custom Build Custom CL Image
     runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -228,7 +245,10 @@ jobs:
 
   e2e_custom_run_smoke_tests_matrix:
     name: E2E Smoke Tests (${{ matrix.variant }})
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -241,7 +261,12 @@ jobs:
             configs: env.toml,products/solana/basic.toml
           - variant: plugins
             configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    needs:
+      [
+        e2e_custom_build_artifacts,
+        e2e_custom_build_custom_chainlink_image,
+        check_test_compilation,
+      ]
     env:
       CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
@@ -344,7 +369,10 @@ jobs:
 
   e2e_program_upgrade_tests:
     name: E2E Program Upgrade Tests (${{ matrix.variant }})
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -355,7 +383,13 @@ jobs:
         include:
           - variant: plugins
             configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
-    needs: [contract-changes,e2e_program_upgrade_generate_artifacts,e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    needs:
+      [
+        contract-changes,
+        e2e_program_upgrade_generate_artifacts,
+        e2e_custom_build_custom_chainlink_image,
+        check_test_compilation,
+      ]
     if: needs.contract-changes.outputs.changed == 'true' && needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
     env:
       CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
@@ -445,4 +479,3 @@ jobs:
             integration-tests/devenv/logs/
             integration-tests/tests/logs/
           retention-days: 1
-

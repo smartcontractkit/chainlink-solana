@@ -14,7 +14,10 @@ env:
 jobs:
   get-projectserum-version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -27,7 +30,10 @@ jobs:
 
   e2e-custom-build-artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -44,7 +50,10 @@ jobs:
           image-version: ${{ needs.get-projectserum-version.outputs.projectserum_version }}
 
   publish-integration-test-image:
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read

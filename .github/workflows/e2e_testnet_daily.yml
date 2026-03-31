@@ -9,7 +9,7 @@ on:
         type: string
 
   schedule:
-    - cron: '0 6 * * *'
+    - cron: "0 6 * * *"
 # Only run 1 of this workflow at a time per PR
 env:
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
@@ -37,7 +37,10 @@ jobs:
 
   get_projectserum_version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -50,7 +53,10 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -69,7 +75,10 @@ jobs:
   e2e_custom_build_custom_chainlink_image:
     name: E2E Custom Build Custom CL Image
     runs-on: ubuntu-latest
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -112,7 +121,10 @@ jobs:
 
   e2e_custom_run_smoke_tests:
     name: E2E Smoke Tests (${{ matrix.variant }})
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -125,7 +137,12 @@ jobs:
             configs: env-testnet.toml,products/solana/basic.toml
           - variant: plugins
             configs: env-testnet.toml,products/solana/basic.toml,products/solana/plugins.toml
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    needs:
+      [
+        e2e_custom_build_artifacts,
+        e2e_custom_build_custom_chainlink_image,
+        check_test_compilation,
+      ]
     env:
       CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
       SOLANA_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}

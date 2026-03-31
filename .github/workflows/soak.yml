@@ -20,7 +20,10 @@ env:
 jobs:
   get_projectserum_version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -33,7 +36,10 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -51,7 +57,10 @@ jobs:
 
   e2e_soak_test:
     name: E2E Soak Test (${{ matrix.variant }})
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
