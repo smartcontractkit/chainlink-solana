@@ -388,28 +388,34 @@ func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
 		return types.Head{}, err
 	}
 
-	latestBlock, err := sc.GetLatestBlock(ctx)
+	commitment := c.cfg.Commitment()
+	slot, err := sc.SlotHeightWithCommitment(ctx, commitment)
 	if err != nil {
 		return types.Head{}, nil
 	}
 
-	if latestBlock.BlockHeight == nil {
+	block, err := sc.GetBlockWithOpts(ctx, slot, client.HeadMetadataGetBlockOpts(commitment))
+	if err != nil {
+		return types.Head{}, nil
+	}
+
+	if block.BlockHeight == nil {
 		return types.Head{}, fmt.Errorf("client returned nil latest block height")
 	}
 
-	if latestBlock.BlockTime == nil {
+	if block.BlockTime == nil {
 		return types.Head{}, fmt.Errorf("client returned nil block time")
 	}
 
-	hashBytes, err := latestBlock.Blockhash.MarshalText()
+	hashBytes, err := block.Blockhash.MarshalText()
 	if err != nil {
 		return types.Head{}, err
 	}
 
 	return types.Head{
-		Height:    strconv.FormatUint(*latestBlock.BlockHeight, 10),
+		Height:    strconv.FormatUint(*block.BlockHeight, 10),
 		Hash:      hashBytes,
-		Timestamp: uint64(latestBlock.BlockTime.Time().Unix()), //nolint:gosec // blocktime will never be negative (pre 1970)
+		Timestamp: uint64(block.BlockTime.Time().Unix()), //nolint:gosec // blocktime will never be negative (pre 1970)
 	}, nil
 }
 
@@ -424,11 +430,7 @@ func (c *chain) FinalizedHead(ctx context.Context) (types.Head, error) {
 		return types.Head{}, fmt.Errorf("FinalizedHead.SlotHeight: %w", err)
 	}
 
-	version := client.MaxSupportTransactionVersion
-	block, err := sc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
-		Commitment:                     rpc.CommitmentFinalized,
-		MaxSupportedTransactionVersion: &version,
-	})
+	block, err := sc.GetBlockWithOpts(ctx, slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentFinalized))
 	if err != nil {
 		return types.Head{}, fmt.Errorf("FinalizedHead.GetBlock: %w", err)
 	}
