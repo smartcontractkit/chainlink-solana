@@ -1,4 +1,5 @@
 import { Result } from '@chainlink/gauntlet-core'
+import { logger } from '@chainlink/gauntlet-core/dist/utils'
 import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import BN from 'bn.js'
@@ -27,23 +28,25 @@ export default class Initialize extends SolanaCommand {
     const accessController = new PublicKey(this.flags.accessController)
     const owner = this.wallet.publicKey
 
-    console.log(`Initializing store contract with State at ${state.publicKey}...`)
-    const txHash = await program.rpc.initialize({
-      accounts: {
+    logger.loading(`Initializing store contract with State at ${state.publicKey}...`)
+
+    const createStateIx = await program.account.store.createInstruction(state)
+    const initIx = await program.methods
+      .initialize()
+      .accounts({
         store: state.publicKey,
         owner: owner,
         loweringAccessController: accessController,
-      },
-      signers: [state],
-      instructions: [await program.account.store.createInstruction(state)],
-    })
+      })
+      .instruction()
 
-    console.log('TX', txHash)
+    const txHash = await this.sendTxWithIDL(this.signAndSendRawTx, store.idl)([createStateIx, initIx], [state])
 
-    console.log(`
+    logger.success(`TX ${txHash}`)
+
+    logger.info(`
     STATE ACCOUNTS:
       - State: ${state.publicKey}
-      - Payer: ${this.provider.wallet.publicKey}
       - Owner: ${owner}
     `)
 

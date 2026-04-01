@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import {
   AccountMeta,
   PublicKey,
@@ -70,10 +70,10 @@ export const makeUpgradeProgramCommand = (contractId: CONTRACT_LIST): SolanaCons
     }
 
     execute = async () => {
-      const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
+      const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
       await prompt(`Continue upgrading the ${contractId} program?`)
       logger.loading('Upgrading program...')
-      const txhash = await this.provider.sendAndConfirm(utils.makeTx(rawTx), [this.wallet.payer])
+      const txhash = await this.signAndSendRawTx(rawTx)
       logger.success(`Program upgraded on tx ${txhash}`)
       return {
         responses: [
