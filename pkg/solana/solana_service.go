@@ -336,10 +336,6 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("failed getting transaction status. %w", err)
 	}
 
-	if txStatus == commonsol.TxFatal {
-		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
-	}
-
 	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
 }
 
