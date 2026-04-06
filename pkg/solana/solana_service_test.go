@@ -37,18 +37,6 @@ func pk(i byte) solanago.PublicKey {
 
 func cpk(i byte) commonsol.PublicKey { return commonsol.PublicKey(pk(i)) }
 
-func sig(i byte) solanago.Signature {
-	var s solanago.Signature
-	for j := range s {
-		s[j] = i
-	}
-	return s
-}
-
-func csig(i byte) commonsol.Signature { return commonsol.Signature(sig(i)) }
-
-func uint64Ptr(v uint64) *uint64 { return &v }
-
 // stubChain implements the Chain interface with only the methods needed by
 // SubmitTransaction, avoiding the import cycle that mocks/chain.go causes.
 type stubChain struct {
@@ -141,7 +129,7 @@ func TestConvertAccountResult(t *testing.T) {
 		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		assert.Equal(t, uint64(42), got.RPCContext.Slot)
+		assert.Equal(t, uint64(42), got.Slot)
 		assert.Nil(t, got.Value)
 	})
 
@@ -160,7 +148,7 @@ func TestConvertAccountResult(t *testing.T) {
 		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		assert.Equal(t, uint64(100), got.RPCContext.Slot)
+		assert.Equal(t, uint64(100), got.Slot)
 		require.NotNil(t, got.Value)
 		assert.Equal(t, uint64(999), got.Value.Lamports)
 		assert.Equal(t, cpk(5), got.Value.Owner)
