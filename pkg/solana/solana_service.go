@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -274,6 +275,8 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 	return &commonsol.GetSlotHeightReply{Height: slot}, nil
 }
 
+const minimumConfirmationTime = 2 * time.Second
+
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
 	if err != nil {
@@ -302,6 +305,9 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		if req.Cfg.ComputeLimit != nil {
 			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
 		}
+		if req.Cfg.ComputeMaxPrice != nil {
+			cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
+		}
 	}
 
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
@@ -310,13 +316,16 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
 
-	maximumWaitTimeForConfirmation := ss.chain.Config().WF().AcceptanceTimeout()
+	maximumWaitTimeForConfirmation := max(ss.chain.Config().WF().AcceptanceTimeout(), minimumConfirmationTime)
+
 	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
 	defer cancel()
 
+	var lastStatusErr error
 	txStatus, err := retry.Do(retryContext, ss.logger, func(ctx context.Context) (commonsol.TransactionStatus, error) {
 		txStatus, txStatusErr := ss.chain.TxManager().GetTransactionStatus(ctx, transactionID)
 		if txStatusErr != nil {
+			lastStatusErr = txStatusErr
 			return commonsol.TxFatal, txStatusErr
 		}
 
@@ -326,14 +335,19 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		case commontypes.Unconfirmed, commontypes.Finalized:
 			return commonsol.TxSuccess, nil
 		case commontypes.Pending, commontypes.Unknown:
-			return commonsol.TxFatal, fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
+			lastStatusErr = fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
+			return commonsol.TxFatal, lastStatusErr
 		default:
-			return commonsol.TxFatal, fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
+			lastStatusErr = fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
+			return commonsol.TxFatal, lastStatusErr
 		}
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed getting transaction status. %w", err)
+		if lastStatusErr != nil {
+			return nil, fmt.Errorf("failed getting transaction status for tx %s: %w: %w", transactionID, lastStatusErr, err)
+		}
+		return nil, fmt.Errorf("failed getting transaction status for tx %s: %w", transactionID, err)
 	}
 
 	if txStatus == commonsol.TxFatal {
@@ -694,11 +708,11 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 	}
 
 	var a *commonsol.Account
-	data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
-	if err != nil {
-		return nil, err
-	}
 	if acc.Value != nil {
+		data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
+		if err != nil {
+			return nil, err
+		}
 		a = &commonsol.Account{
 			Lamports:   acc.Value.Lamports,
 			Executable: acc.Value.Executable,
