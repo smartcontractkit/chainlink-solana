@@ -1,13 +1,19 @@
 package solana
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	solana "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
 func Test_Converters(t *testing.T) {
@@ -288,3 +294,108 @@ func sig(i byte) solana.Signature {
 func csig(i byte) commonsol.Signature { return commonsol.Signature(sig(i)) }
 
 func uint64Ptr(v uint64) *uint64 { return &v }
+
+// mockLogPoller is a minimal LogPoller implementation for testing readiness guards.
+type mockLogPoller struct {
+	ready error
+}
+
+func (m *mockLogPoller) Start(context.Context) error                      { return nil }
+func (m *mockLogPoller) Ready() error                                     { return m.ready }
+func (m *mockLogPoller) Close() error                                     { return nil }
+func (m *mockLogPoller) HasFilter(context.Context, string) bool           { return false }
+func (m *mockLogPoller) RegisterFilter(context.Context, logpollertypes.Filter) error {
+	return nil
+}
+func (m *mockLogPoller) UnregisterFilter(context.Context, string) error { return nil }
+func (m *mockLogPoller) GetFilters(context.Context) (map[string]logpollertypes.Filter, error) {
+	return nil, nil
+}
+func (m *mockLogPoller) GetLatestBlock(context.Context) (int64, error) { return 0, nil }
+func (m *mockLogPoller) FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error) {
+	return nil, nil
+}
+func (m *mockLogPoller) Replay(int64)           {}
+func (m *mockLogPoller) CPIEventsEnabled() bool { return false }
+
+// stubChain is a minimal Chain stub that only provides a LogPoller.
+// It embeds the Chain interface so unimplemented methods panic if called.
+type stubChain struct {
+	Chain
+	lp LogPoller
+}
+
+func (s *stubChain) LogPoller() LogPoller { return s.lp }
+
+func newSolanaService(t *testing.T, lpReady error) *solanaService {
+	t.Helper()
+	return &solanaService{
+		chain:  &stubChain{lp: &mockLogPoller{ready: lpReady}},
+		logger: logger.Test(t),
+	}
+}
+
+func TestLogPollerReadinessGuard(t *testing.T) {
+	ctx := context.Background()
+	errNotStarted := errors.New("not started")
+
+	t.Run("RegisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		err := ss.RegisterLogTracking(ctx, commonsol.LPFilterQuery{Name: "test"})
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("RegisterLogTracking succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		err := ss.RegisterLogTracking(ctx, commonsol.LPFilterQuery{
+			Name:            "test",
+			ContractIdlJSON: []byte(`{}`),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("UnregisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		err := ss.UnregisterLogTracking(ctx, "test")
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("UnregisterLogTracking succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		err := ss.UnregisterLogTracking(ctx, "test")
+		require.NoError(t, err)
+	})
+
+	t.Run("QueryTrackedLogs returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.QueryTrackedLogs(ctx, nil, query.LimitAndSort{})
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetLatestLPBlock returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.GetLatestLPBlock(ctx)
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetLatestLPBlock succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		block, err := ss.GetLatestLPBlock(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, block)
+		require.Equal(t, uint64(0), block.Slot)
+	})
+
+	t.Run("GetFiltersNames returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.GetFiltersNames(ctx)
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetFiltersNames succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		names, err := ss.GetFiltersNames(ctx)
+		require.NoError(t, err)
+		require.Empty(t, names)
+	})
+}

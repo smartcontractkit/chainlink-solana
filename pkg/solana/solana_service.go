@@ -21,10 +21,20 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+var ErrLogPollerNotStarted = errors.New("log poller is not started; register/unregister/query operations require a running log poller")
+
 type solanaService struct {
 	commontypes.UnimplementedSolanaService
 	chain  Chain
 	logger logger.Logger
+}
+
+func (ss *solanaService) requireLogPoller() (LogPoller, error) {
+	lp := ss.chain.LogPoller()
+	if err := lp.Ready(); err != nil {
+		return nil, ErrLogPollerNotStarted
+	}
+	return lp, nil
 }
 
 func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockRequest) (*commonsol.GetBlockReply, error) {
@@ -44,7 +54,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 }
 
 func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlock, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	n, err := lp.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest lp block: %w", err)
@@ -125,7 +139,11 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 }
 
 func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if lp.HasFilter(ctx, req.Name) {
 		return nil
 	}
@@ -144,7 +162,11 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 }
 
 func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName string) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if !lp.HasFilter(ctx, filterName) {
 		return nil
 	}
@@ -154,7 +176,11 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
 	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	queryName, err := deriveNameFromFilterQuery(filterQuery)
 	if err != nil {
 		return nil, err
@@ -186,7 +212,12 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 }
 
 func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) {
-	filters, err := ss.chain.LogPoller().GetFilters(ctx)
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
+	filters, err := lp.GetFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
