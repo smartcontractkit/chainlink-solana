@@ -731,6 +731,15 @@ func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountI
 	}
 }
 
+const maxDiagPayloadLen = 1024
+
+func truncateDiag(s string) string {
+	if len(s) <= maxDiagPayloadLen {
+		return s
+	}
+	return s[:maxDiagPayloadLen] + "...(truncated)"
+}
+
 func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingType) (*commonsol.DataBytesOrJSON, error) {
 	if obj == nil {
 		return nil, nil
@@ -759,16 +768,16 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		// Fallback: decode ["<base64>", "base64"] manually
 		var arr []string
 		if err := json.Unmarshal(txJSON, &arr); err != nil {
-			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, string(txJSON))
+			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, truncateDiag(string(txJSON)))
 		}
 		if len(arr) != 2 {
-			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), string(txJSON))
+			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), truncateDiag(string(txJSON)))
 		}
 
 		s := arr[0]
 		enc := arr[1]
 		if enc != "base64" {
-			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, string(txJSON))
+			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, truncateDiag(string(txJSON)))
 		}
 
 		b, err := base64.StdEncoding.DecodeString(s)
@@ -793,7 +802,7 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 	default:
 		// Treat unknown as base64 preference
 		if len(txBytes) == 0 {
-			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", string(txJSON))
+			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", truncateDiag(string(txJSON)))
 		}
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
