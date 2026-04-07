@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	relaytypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/ccip/provider"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/chainreader"
@@ -53,20 +52,18 @@ var _ relaytypes.SolanaService = &Relayer{}
 type Relayer struct {
 	relaytypes.UnimplementedRelayer
 	services.StateMachine
-	lggr                 logger.Logger
-	chain                Chain
-	stopCh               services.StopChan
-	capabilitiesRegistry core.CapabilitiesRegistry
+	lggr   logger.Logger
+	chain  Chain
+	stopCh services.StopChan
 	solanaService
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain, capReg core.CapabilitiesRegistry) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
 	return &Relayer{
-		lggr:                 logger.Named(lggr, "Relayer"),
-		chain:                chain,
-		stopCh:               make(services.StopChan),
-		capabilitiesRegistry: capReg,
+		lggr:   logger.Named(lggr, "Relayer"),
+		chain:  chain,
+		stopCh: make(services.StopChan),
 		solanaService: solanaService{
 			chain:  chain,
 			logger: lggr,
