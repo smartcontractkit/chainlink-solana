@@ -186,6 +186,9 @@ func (m *Configurator) ConfigureJobsAndContracts(
 	if err := sg.DeployLinkToken(); err != nil {
 		return fmt.Errorf("failed to deploy link token: %w", err)
 	}
+	if sg.LinkAddress == "" || sg.VaultAddress == "" {
+		return fmt.Errorf("deploy link token returned empty addresses: link=%q vault=%q", sg.LinkAddress, sg.VaultAddress)
+	}
 
 	if err := sg.G.WriteNetworkConfigVar(sg.NetworkFilePath, "PROGRAM_ID_OCR2", cfg.ProgramAddresses.OCR2); err != nil {
 		return fmt.Errorf("failed to write PROGRAM_ID_OCR2: %w", err)
