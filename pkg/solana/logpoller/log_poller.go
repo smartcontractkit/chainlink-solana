@@ -116,7 +116,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 		Start: lp.start,
 		NewSubServices: func(lggr logger.Logger) []services.Service {
 			lp.filters = newFilters(lggr, orm, lp.cpiEventExtractor)
-			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor)
+			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor, cfg.LogPollerSlotsBatchSize())
 			lp.loader = loader
 			return []services.Service{loader}
 		},
