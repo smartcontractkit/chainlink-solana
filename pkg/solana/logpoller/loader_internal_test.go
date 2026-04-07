@@ -77,7 +77,7 @@ func TestScheduleBlocksFetching_HappyPath(t *testing.T) {
 	prev := uint64(0)
 	for block := range ch {
 		if prev != 0 {
-			require.Equal(t, block.SlotNumber-prev, uint64(1), "expected blocks to be received in consecutive order since batch size is 1")
+			require.Equal(t, uint64(1), block.SlotNumber-prev, "expected blocks to be received in consecutive order since batch size is 1")
 		}
 		require.Contains(t, expectedSlots, block.SlotNumber, "received block for unexpected slot")
 		delete(expectedSlots, block.SlotNumber)
