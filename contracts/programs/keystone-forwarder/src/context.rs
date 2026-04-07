@@ -99,7 +99,6 @@ pub struct Report<'info> {
     pub state: Account<'info, ForwarderState>,
 
     #[account(
-        mut,
         constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
         seeds = [b"config", state.key().as_ref(), &extract_config_id(extract_raw_report(&data))],
         bump
