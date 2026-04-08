@@ -1,0 +1,42 @@
+[[products]]
+name = "ocr2_solana"
+instances = 1
+
+[[nodesets]]
+name = "don"
+nodes = 6
+override_mode = "each"
+http_port_range_start = 20000
+p2p_port_range_start = 22000
+
+[nodesets.db]
+image = "postgres:15"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+        image = "public.ecr.aws/chainlink/chainlink:2.36.0"
+
+[[ocr2_solana]]
+node_count = 6
+number_of_rounds = 10
+gauntlet_network = "solana-devenv"

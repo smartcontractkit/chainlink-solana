@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -430,42 +428,6 @@ func (c *Client) WaitForEvents() error {
 }
 
 func (c *Client) GetChainID() *big.Int {
-	panic("implement me")
-}
-
-func (c *Client) GetClients() []blockchain.EVMClient {
-	panic("implement me")
-}
-
-func (c *Client) GetDefaultWallet() *blockchain.EthereumWallet {
-	panic("implement me")
-}
-
-func (c *Client) GetWallets() []*blockchain.EthereumWallet {
-	panic("implement me")
-}
-
-func (c *Client) SetID(id int) {
-	panic("implement me")
-}
-
-func (c *Client) SetDefaultWallet(num int) error {
-	panic("implement me")
-}
-
-func (c *Client) SetWallets(wallets []*blockchain.EthereumWallet) {
-	panic("implement me")
-}
-
-func (c *Client) LatestBlockNumber(ctx context.Context) (uint64, error) {
-	panic("implement me")
-}
-
-func (c *Client) GasStats() *blockchain.GasStats {
-	panic("implement me")
-}
-
-func (c *Client) AddHeaderEventSubscription(key string, subscriber blockchain.HeaderEventSubscription) {
 	panic("implement me")
 }
 

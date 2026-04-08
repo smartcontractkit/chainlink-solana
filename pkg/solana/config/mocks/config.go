@@ -699,6 +699,51 @@ func (_c *Config_LogPollerCPIEventsEnabled_Call) RunAndReturn(run func() bool) *
 	return _c
 }
 
+// LogPollerSlotsBatchSize provides a mock function with no fields
+func (_m *Config) LogPollerSlotsBatchSize() int64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogPollerSlotsBatchSize")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// Config_LogPollerSlotsBatchSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogPollerSlotsBatchSize'
+type Config_LogPollerSlotsBatchSize_Call struct {
+	*mock.Call
+}
+
+// LogPollerSlotsBatchSize is a helper method to define mock.On call
+func (_e *Config_Expecter) LogPollerSlotsBatchSize() *Config_LogPollerSlotsBatchSize_Call {
+	return &Config_LogPollerSlotsBatchSize_Call{Call: _e.mock.On("LogPollerSlotsBatchSize")}
+}
+
+func (_c *Config_LogPollerSlotsBatchSize_Call) Run(run func()) *Config_LogPollerSlotsBatchSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Config_LogPollerSlotsBatchSize_Call) Return(_a0 int64) *Config_LogPollerSlotsBatchSize_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Config_LogPollerSlotsBatchSize_Call) RunAndReturn(run func() int64) *Config_LogPollerSlotsBatchSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogPollerStartingLookback provides a mock function with no fields
 func (_m *Config) LogPollerStartingLookback() time.Duration {
 	ret := _m.Called()

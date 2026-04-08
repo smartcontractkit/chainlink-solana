@@ -8,13 +8,8 @@ on:
         required: true
         default: develop
         type: string
-      team:
-        description: Team to run the tests for (e.g. BIX, CCIP)
-        required: true
-        type: string
 
 env:
-  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
   MOD_CACHE_VERSION: 1
 
@@ -30,6 +25,7 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
       - name: Setup go
         uses: actions/setup-go@v5
         with:
@@ -47,6 +43,7 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
+
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -66,37 +63,18 @@ jobs:
             contracts:
               - 'contracts/**'
 
-  solana-test-image-exists:
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    name: Check If Solana Test Image Exists
-    runs-on: ubuntu-latest
-    outputs:
-      exists: ${{ steps.check-image-exists.outputs.exists }}
-    steps:
-      - name: Check if image exists in ECR
-        id: check-image-exists
-        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
-        with:
-          repository: chainlink-solana-tests
-          tag: ${{ github.sha }}
-          aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
     environment: integration
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [get_projectserum_version]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
+
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -110,7 +88,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-32cores-128GB
+    runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
     needs: [contract-changes,get_projectserum_version]
     if: needs.contract-changes.outputs.changed == 'true'
     steps:
@@ -209,7 +187,7 @@ jobs:
   e2e_custom_build_custom_chainlink_image:
     needs: [ get-core-ref ]
     name: E2E Custom Build Custom CL Image
-    runs-on: ubuntu-latest-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
     environment: integration
     permissions:
       id-token: write
@@ -248,157 +226,223 @@ jobs:
           gati-role-arn: ${{ secrets.AWS_ROLE_ARN_GATI_READONLY }}
           gati-lambda-url: ${{ secrets.AWS_RELENG_TEAM_GATI_LAMBDA_URL}}
 
-  build_test_image:
+  e2e_custom_run_smoke_tests_matrix:
+    name: E2E Smoke Tests (${{ matrix.variant }})
     environment: integration
-    if: contains(join(github.event.pull_request.labels.*.name, ' '), 'build-test-image')
     permissions:
       id-token: write
       contents: read
-    name: Build Test Image
-    runs-on: ubuntu-latest
-    needs: [e2e_custom_build_artifacts]
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: embedded
+            configs: env.toml,products/solana/basic.toml
+          - variant: plugins
+            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
+    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
+    env:
+      CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Build Image
-        uses: ./.github/actions/build-test-image
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
         with:
-          artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          role-duration-seconds: 1800
+          mask-aws-account-id: true
+
+      - name: Authenticate to ECR
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+        env:
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+
+      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+        run: ./scripts/install-solana-ci.sh
+
+      - name: Install gauntlet
+        uses: ./.github/actions/build-gauntlet
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: integration-tests/go.mod
+          cache: true
+          cache-dependency-path: integration-tests/go.sum
+
+      - name: Download Go dependencies
+        working-directory: integration-tests
+        run: go mod download
+
+      - name: Download contract artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+
+      - name: Start fakes server
+        working-directory: integration-tests/devenv
+        run: |
+          go build -o /tmp/fakes-server ./fakes/cmd
+          /tmp/fakes-server &
+          for _ in {1..20}; do
+            if curl -fsS -X POST "http://127.0.0.1:9111/mockserver-bridge" > /dev/null; then
+              echo "Fakes server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Fakes server failed to start"
+          exit 1
+
+      - name: Setup Environment
+        working-directory: integration-tests/devenv
+        env:
+          CONFIGS: ${{ matrix.configs }}
+        run: go run ./cmd u "$CONFIGS"
+
+      - name: Run Smoke Test
+        working-directory: integration-tests/tests
+        run: go test -v -timeout 30m -run TestSolanaOCRV2Smoke
+
+      - name: Show Docker containers status
+        if: failure()
+        run: docker ps -a
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs-${{ matrix.variant }}
+          path: |
+            integration-tests/devenv/logs/
+            integration-tests/tests/logs/
+          retention-days: 1
 
   e2e_custom_run_smoke_tests:
     name: E2E Custom Run Smoke Tests
-    environment: integration
-    permissions:
-      checks: write
-      pull-requests: write
-      id-token: write
-      contents: read
-    runs-on: ubuntu-latest-16cores-64GB
-
-    needs: [e2e_custom_build_artifacts, e2e_custom_build_custom_chainlink_image, check_test_compilation]
-    env:
-      TEST_SUITE: smoke
-      TEST_ARGS: -test.timeout 30m
-      TEST_LOG_LEVEL: debug
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    needs: [e2e_custom_run_smoke_tests_matrix]
+    if: always()
     steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v4
-
-      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
-        run: ./scripts/install-solana-ci.sh
-
-      - name: Install gauntlet
-        uses: ./.github/actions/build-gauntlet
-
-      - name: Generate config overrides
-        run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
-          cat << EOF > config.toml
-          [ChainlinkImage]
-          version="solana.${{ github.sha }}"
-          [Common]
-          user="${{ github.actor }}"
-          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
-          EOF
-
-          # shellcheck disable=SC2002
-          BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
-          # shellcheck disable=SC2086
-          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
-          # shellcheck disable=SC2086
-          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
-
-      - name: Run Tests
-        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
-        with:
-          test_command_to_run: cd ./integration-tests && go test -v -count=1 -run TestSolanaOCRV2Smoke $(args) ./smoke 2>&1 | tee /tmp/gotest.log
-          test_download_vendor_packages_command: cd ./integration-tests && go mod download
-          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          go_mod_path: ./integration-tests/go.mod
-          cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-          artifacts_name: smoke-test-logs
-          artifacts_location: ./integration-tests/smoke/logs/
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          enable-gap: false
-          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
-          cache_restore_only: "false"
+      - name: Check results
         env:
-          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
-          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
-          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
+          MATRIX_RESULT: ${{ needs.e2e_custom_run_smoke_tests_matrix.result }}
+        run: |
+          if [[ "${MATRIX_RESULT}" == "success" ]]; then
+            echo "All smoke tests passed."
+          else
+            echo "Smoke tests failed: ${MATRIX_RESULT}"
+            exit 1
+          fi
 
   e2e_program_upgrade_tests:
-    name: E2E Program Upgrade Tests
+    name: E2E Program Upgrade Tests (${{ matrix.variant }})
     environment: integration
     permissions:
-      checks: write
-      pull-requests: write
       id-token: write
       contents: read
-    runs-on: ubuntu-latest-16cores-64GB
+    runs-on: ubuntu-latest-16cores-64GB # ghv-ignore!
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: plugins
+            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
     needs: [contract-changes,e2e_program_upgrade_generate_artifacts,e2e_custom_build_custom_chainlink_image, check_test_compilation]
     if: needs.contract-changes.outputs.changed == 'true' && needs.e2e_program_upgrade_generate_artifacts.outputs.changed == 'true'
     env:
-      TEST_SUITE: smoke
-      TEST_ARGS: -test.timeout 30m
-      TEST_LOG_LEVEL: debug
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CHAINLINK_IMAGE: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink:solana.{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
-      - name: Install Solana CLI # required for ensuring the local test validator is configured correctly
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+          role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          role-duration-seconds: 3600
+          mask-aws-account-id: true
+
+      - name: Authenticate to ECR
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
+        env:
+          AWS_REGION: ${{ secrets.QA_AWS_REGION }}
+
+      - name: Install Solana CLI
         run: ./scripts/install-solana-ci.sh
+
       - name: Install gauntlet
         uses: ./.github/actions/build-gauntlet
-      - name: Generate config overrides
-        run: | # https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md
-          cat << EOF > config.toml
-          [ChainlinkImage]
-          image="${{ env.CL_ECR }}"
-          version="solana.${{ github.sha }}"
-          [Common]
-          user="${{ github.actor }}"
-          internal_docker_repo = "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com"
-          EOF
 
-          # shellcheck disable=SC2002
-          BASE64_CONFIG_OVERRIDE=$(cat config.toml | base64 -w 0)
-          # shellcheck disable=SC2086
-          echo ::add-mask::$BASE64_CONFIG_OVERRIDE
-          # shellcheck disable=SC2086
-          echo "BASE64_CONFIG_OVERRIDE=$BASE64_CONFIG_OVERRIDE" >> $GITHUB_ENV
-      - name: Run Upgrade Test
-        uses: smartcontractkit/.github/actions/ctf-run-tests@91995e4dd053581696702eec503ce2d2c8b8e753 # 0.6.1
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          test_command_to_run: cd ./integration-tests && go test -count=1 -run TestSolanaOCRV2UpgradeSmoke $(args) ./smoke 2>&1 | tee /tmp/gotest.log
-          test_download_vendor_packages_command: cd ./integration-tests && go mod download
-          test_config_override_base64: ${{ env.BASE64_CONFIG_OVERRIDE }}
-          download_contract_artifacts_path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
-          go_mod_path: ./integration-tests/go.mod
-          cl_repo: ${{ env.CL_ECR }}
-          cl_image_tag: solana.${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
-          artifacts_name: smoke-test-logs
-          artifacts_location: ./integration-tests/smoke/logs/
-          QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
-          QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          enable-gap: false
-          cache_key_id: solana-e2e-${{ env.MOD_CACHE_VERSION }}
-          cache_restore_only: "false"
+          go-version-file: integration-tests/go.mod
+          cache: true
+          cache-dependency-path: integration-tests/go.sum
+
+      - name: Download Go dependencies
+        working-directory: integration-tests
+        run: go mod download
+
+      - name: Download previous contract artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-previous
+          path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
+
+      - name: Download current contract artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: contracts/target/deploy-upgrade
+
+      - name: Start fakes server
+        working-directory: integration-tests/devenv
+        run: |
+          go build -o /tmp/fakes-server ./fakes/cmd
+          /tmp/fakes-server &
+          for _ in {1..20}; do
+            if curl -fsS -X POST "http://127.0.0.1:9111/mockserver-bridge" > /dev/null; then
+              echo "Fakes server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Fakes server failed to start"
+          exit 1
+
+      - name: Setup Environment
+        working-directory: integration-tests/devenv
+        run: go run ./cmd u ${{ matrix.configs }}
+
+      - name: Run Upgrade Test
+        working-directory: integration-tests/tests
         env:
-          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CL_ECR }}
-          E2E_TEST_SOLANA_SECRET: thisisatestingonlysecret
-          CHAINLINK_USER_TEAM: ${{ github.event.inputs.team || 'BIX' }}
+          UPGRADE_CONTRACTS_DIR: ${{ github.workspace }}/contracts/target/deploy-upgrade
+        run: go test -v -timeout 30m -run TestSolanaOCRV2UpgradeSmoke
+
+      - name: Show Docker containers status
+        if: failure()
+        run: docker ps -a
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgrade-test-logs-${{ matrix.variant }}
+          path: |
+            integration-tests/devenv/logs/
+            integration-tests/tests/logs/
+          retention-days: 1
 

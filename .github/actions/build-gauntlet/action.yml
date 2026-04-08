@@ -4,9 +4,6 @@ description: A GitHub Action to get tool versions and build Gauntlet
 runs:
   using: 'composite'
   steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
     - name: Get Tool Versions
       uses: smartcontractkit/tool-versions-to-env-action@v1.0.8
       id: tool-versions

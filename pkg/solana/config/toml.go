@@ -238,6 +238,10 @@ func (c *Chain) SetFrom(f *Chain) {
 	if f.LogPollerCPIEventsEnabled != nil {
 		c.LogPollerCPIEventsEnabled = f.LogPollerCPIEventsEnabled
 	}
+
+	if f.LogPollerSlotsBatchSize != nil {
+		c.LogPollerSlotsBatchSize = f.LogPollerSlotsBatchSize
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() (err error) {
@@ -253,6 +257,10 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 
 	if c.BlockTime() <= 0 {
 		err = errors.Join(err, config.ErrInvalid{Name: "BlockTime", Msg: "must be greater than 0"})
+	}
+
+	if c.LogPollerSlotsBatchSize() <= 0 {
+		err = errors.Join(err, config.ErrInvalid{Name: "LogPollerSlotsBatchSize", Msg: "must be greater than 0"})
 	}
 
 	return
@@ -438,6 +446,10 @@ func (c *TOMLConfig) EstimateComputeUnitLimit() bool {
 
 func (c *TOMLConfig) LogPollerStartingLookback() time.Duration {
 	return c.Chain.LogPollerStartingLookback.Duration()
+}
+
+func (c *TOMLConfig) LogPollerSlotsBatchSize() int64 {
+	return *c.Chain.LogPollerSlotsBatchSize
 }
 
 func (c *TOMLConfig) LogPollerCPIEventsEnabled() bool {

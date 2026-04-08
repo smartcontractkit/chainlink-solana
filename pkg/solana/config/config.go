@@ -44,6 +44,7 @@ type Config interface {
 	// log poller
 	LogPollerStartingLookback() time.Duration
 	LogPollerCPIEventsEnabled() bool
+	LogPollerSlotsBatchSize() int64
 
 	// workflow
 	WF() Workflow
@@ -131,6 +132,7 @@ type Chain struct {
 	EstimateComputeUnitLimit  *bool
 	LogPollerStartingLookback *config.Duration
 	LogPollerCPIEventsEnabled *bool
+	LogPollerSlotsBatchSize   *int64
 }
 
 type Node struct {
