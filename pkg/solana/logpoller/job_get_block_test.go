@@ -27,6 +27,7 @@ type solLpPromTest struct {
 	id                 string
 	txsTruncated       outcomeDependantTestMetric
 	txsLogParsingError outcomeDependantTestMetric
+	blockSkipped       float64
 }
 
 func (p solLpPromTest) assertEqual(t *testing.T) {
@@ -34,6 +35,7 @@ func (p solLpPromTest) assertEqual(t *testing.T) {
 	assert.InDelta(t, p.txsTruncated.reverted, testutil.ToFloat64(promSolLp.txsTruncated.reverted.WithLabelValues(p.id)), 0.0001, "mismatch: truncated reverted")
 	assert.InDelta(t, p.txsLogParsingError.succeeded, testutil.ToFloat64(promSolLp.txsLogParsingError.succeeded.WithLabelValues(p.id)), 0.0001, "mismatch: log parsing error succeeded")
 	assert.InDelta(t, p.txsLogParsingError.reverted, testutil.ToFloat64(promSolLp.txsLogParsingError.reverted.WithLabelValues(p.id)), 0.0001, "mismatch: log parsing error reverted")
+	assert.InDelta(t, p.blockSkipped, testutil.ToFloat64(promLpBlockSkipped.WithLabelValues(p.id)), 0.0001, "mismatch: block skipped")
 }
 
 // resetPromMetricsForLabel clears the prometheus counters for the given label
@@ -43,6 +45,7 @@ func resetPromMetricsForLabel(label string) {
 	promSolLp.txsTruncated.reverted.DeleteLabelValues(label)
 	promSolLp.txsLogParsingError.succeeded.DeleteLabelValues(label)
 	promSolLp.txsLogParsingError.reverted.DeleteLabelValues(label)
+	promLpBlockSkipped.DeleteLabelValues(label)
 }
 
 func TestGetBlockJob(t *testing.T) {
@@ -184,6 +187,32 @@ func TestGetBlockJob(t *testing.T) {
 		case <-job.Done():
 			require.Fail(t, "expected done channel to be open as job was aborted")
 		default:
+		}
+	})
+	t.Run("Abort emits block skipped metric", func(t *testing.T) {
+		resetPromMetricsForLabel(t.Name())
+		lggr := logger.Sugared(logger.Test(t))
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		blocks := make(chan types.Block, 1)
+		job := newGetBlockJob(nil, nil, blocks, lggr, slotNumber, metrics, nil)
+		err = job.Abort(t.Context())
+		require.NoError(t, err)
+
+		result := <-blocks
+		assert.True(t, result.Aborted)
+		assert.Equal(t, slotNumber, result.SlotNumber)
+
+		expectedMetrics := solLpPromTest{
+			id:           t.Name(),
+			blockSkipped: float64(slotNumber),
+		}
+		expectedMetrics.assertEqual(t)
+
+		select {
+		case <-job.Done():
+		default:
+			t.Fatal("expected job to be done")
 		}
 	})
 	t.Run("Happy path", func(t *testing.T) {

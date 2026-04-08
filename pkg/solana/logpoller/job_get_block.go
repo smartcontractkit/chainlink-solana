@@ -53,6 +53,7 @@ func (j *getBlockJob) Done() <-chan struct{} {
 
 func (j *getBlockJob) Abort(ctx context.Context) error {
 	j.aborted = true
+	j.metrics.SetBlockSkipped(ctx, int64(j.slotNumber)) // nolint:gosec // G115: integer overflow conversion uint64 -> int64
 	var abort types.Block
 	abort.Aborted = true
 	abort.SlotNumber = j.slotNumber
