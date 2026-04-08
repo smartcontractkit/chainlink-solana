@@ -302,10 +302,10 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
-		if req.Cfg.ComputeLimit != nil {
+		if req.Cfg.ComputeLimit != nil && *req.Cfg.ComputeLimit != 0 {
 			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
 		}
-		if req.Cfg.ComputeMaxPrice != nil {
+		if req.Cfg.ComputeMaxPrice != nil && *req.Cfg.ComputeMaxPrice != 0 {
 			cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
 		}
 	}
