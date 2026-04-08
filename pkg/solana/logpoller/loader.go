@@ -120,16 +120,12 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	}
 
 	c.engine.GoCtx(ctx, func(ctx context.Context) {
-		ctx, cancel := context.WithCancel(ctx)
 		startTime := time.Now()
-		defer cancel()
 		for batchStart := 0; batchStart < len(slots); {
 			batchEnd := min(batchStart+c.slotsBatchSize, len(slots))
 			jobs, err := c.scheduleBlocks(ctx, slots[batchStart:batchEnd], blocks)
 			if err != nil {
 				c.lggr.Errorw("Failed to schedule block fetching jobs for batch.", "err", err)
-				// do not close blocks channel here to avoid signalling end of stream to the consumer - instead, just stop all the jobs and return
-				cancel()
 				return
 			}
 
@@ -145,6 +141,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 		}
 
 		c.lggr.Infow("Finished fetching all blocks.", "from", slots[0], "to", slots[len(slots)-1], "duration", time.Since(startTime))
+		// only close the channel after all jobs are done. Do not close on failures to avoid signaling successful completion to the upstream
 		close(blocks)
 	})
 	return blocks, nil
