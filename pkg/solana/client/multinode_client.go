@@ -332,3 +332,5 @@ func (m *MultiNodeClient) SendTransaction(ctx context.Context, tx *solana.Transa
 	sig, err := m.SendTx(ctx, tx)
 	return sig, ClassifySendError(tx, err), err
 }
+
+func (m *MultiNodeClient) CheckFinalizedStateAvailability(ctx context.Context) error { return nil } // no-op
