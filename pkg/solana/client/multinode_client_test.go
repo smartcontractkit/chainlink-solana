@@ -12,6 +12,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -58,18 +59,29 @@ type jsonRPCResponse struct {
 func newMockJSONRPCServer(t *testing.T, handle jsonRPCHandler) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
+		if !assert.Equal(t, http.MethodPost, r.Method) {
+			http.Error(w, "only POST supported", http.StatusMethodNotAllowed)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			http.Error(w, "failed to read body", http.StatusInternalServerError)
+			return
+		}
 		var req jsonRPCRequest
-		require.NoError(t, json.Unmarshal(body, &req))
+		if !assert.NoError(t, json.Unmarshal(body, &req)) {
+			http.Error(w, "invalid JSON-RPC request", http.StatusBadRequest)
+			return
+		}
 		outcome := handle(req.Method, req.Params, req.ID)
 		w.Header().Set("Content-Type", "application/json")
 		resp := jsonRPCResponse{Result: outcome.Result, Error: outcome.RPCError, ID: req.ID}
 		out, err := json.Marshal(resp)
-		require.NoError(t, err)
-		_, err = w.Write(out)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			http.Error(w, "failed to marshal response", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(out)
 	}))
 	t.Cleanup(server.Close)
 	return server
