@@ -344,6 +344,53 @@ func TestLogPoller_run(t *testing.T) {
 		assert.Equal(t, int64(100), backfillRanges[1][0])
 		assert.Equal(t, dbHead, backfillRanges[1][1])
 	})
+	t.Run("Newly inserted filter is properly backfilled", func(t *testing.T) {
+		lp := newMockedLP(t)
+
+		addr1 := types.PublicKey{1, 2, 3}
+		addr2 := types.PublicKey{4, 5, 6}
+		ctx := t.Context()
+
+		// DB latest block 1000 via ORM only (do not set lastProcessedSlot on the service).
+		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(int64(1000), nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(1001), nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+
+		// Run 1: filter needs backfill from 100; loader only yields a block at 600 (due to sparse events).
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+			{ID: 1, StartingBlock: 100, Address: addr1},
+		}).Once()
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block, 1)
+				blocks <- types.Block{SlotNumber: 600}
+				close(blocks)
+				return blocks, func() {}, nil
+			})
+		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(1)).Return(nil).Once()
+
+		err := lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+
+		// Run 2: new filter inserted at 900 — must backfill [900, 1000] using DB watermark, not stop at in-memory 600.
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+			{ID: 2, StartingBlock: 900, Address: addr2},
+		}).Once()
+		// The new filter's backfill should use the DB latest block (1000) as the upper bound
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block)
+				close(blocks)
+				return blocks, func() {}, nil
+			}).Once()
+		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(2)).Return(nil).Once()
+
+		err = lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test_GetLastProcessedSlot(t *testing.T) {
