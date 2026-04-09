@@ -164,7 +164,7 @@ func TestMultiNodeClient_LatestBlock_MockRPC(t *testing.T) {
 }
 
 func TestMultiNodeClient_FinalizedBlock_MockRPC(t *testing.T) {
-	runGetBlockTest(t, rpc.CommitmentConfirmed, (*MultiNodeClient).LatestFinalizedBlock)
+	runGetBlockTest(t, rpc.CommitmentFinalized, (*MultiNodeClient).LatestFinalizedBlock)
 }
 
 func runGetBlockTest(t *testing.T, expectedCommitment rpc.CommitmentType, getBlock func(m *MultiNodeClient, ctx context.Context) (*Head, error)) {
