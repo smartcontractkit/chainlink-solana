@@ -418,8 +418,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 	}
 
 	if minSlot < to {
-		var err error
-		err = lp.processBlocksRange(ctx, addresses, minSlot, to, saveBackfillProgress)
+		err := lp.processBlocksRange(ctx, addresses, minSlot, to, saveBackfillProgress)
 		if err != nil {
 			return err
 		}
