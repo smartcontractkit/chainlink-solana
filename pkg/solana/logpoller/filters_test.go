@@ -513,12 +513,20 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	// all filters are now in the queue due to global starting block update
 	ensureInQueue(110, 98, notBackfilled, backfilledFilter, newFilter)
 	// partial backfill update doesn't remove filters from the queue
-	for _, filter := range []*types.Filter{&notBackfilled, &backfilledFilter, &newFilter} {
-		err = filters.UpdateBackfillProgress(t.Context(), *filter, 109, false)
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 109, false)
 		require.NoError(t, err)
 	}
 	require.NoError(t, err)
 	ensureInQueue(110, 109, notBackfilled, backfilledFilter, newFilter)
+	// full backfill update removes filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		orm.EXPECT().MarkFilterBackfilled(mock.Anything, filter.ID).Return(nil).Once()
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	filtersToBackfill, _ = filters.GetFiltersToBackfill(110)
+	require.Empty(t, filtersToBackfill)
 }
 
 func TestFilters_ExtractField(t *testing.T) {
