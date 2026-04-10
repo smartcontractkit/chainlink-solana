@@ -395,7 +395,8 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 
 		isComplete := lastProcessed >= to
 		// avoid updating progress too frequently to reduce db load, but still update at least every 100 blocks or once backfill is complete
-		needUpdate := isComplete || lastProcessed-prevCheckpoint >= 100
+		const saveCheckpointInterval = 100
+		needUpdate := isComplete || lastProcessed-prevCheckpoint >= saveCheckpointInterval
 		if !needUpdate {
 			return nil
 		}

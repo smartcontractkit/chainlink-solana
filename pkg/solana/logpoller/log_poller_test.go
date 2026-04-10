@@ -366,27 +366,33 @@ func TestLogPoller_run(t *testing.T) {
 
 		// Run 1: filter needs backfill from 100; loader only yields a block at 600 (due to sparse events).
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+		lp.Filters.EXPECT().GetFiltersToBackfill(int64(1000)).Return([]types.Filter{
 			{ID: 1, StartingBlock: 100, Address: addr1},
-		}).Once()
+		}, 100).Once()
 
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000)).
 			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
-				blocks := make(chan types.Block, 1)
-				blocks <- types.Block{SlotNumber: 600}
+				blocks := make(chan types.Block, 4)
+				blocks <- types.Block{SlotNumber: 101}
+				blocks <- types.Block{SlotNumber: 102}
+				blocks <- types.Block{SlotNumber: 103} // simulate blocks that do not trigger checkpoint update
+				blocks <- types.Block{SlotNumber: 600} // simulate a block that triggers checkpoint update, but is still behind the DB head
 				close(blocks)
 				return blocks, func() {}, nil
 			})
-		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(1)).Return(nil).Once()
+		// Only 600 block triggers checkpoint update
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 1, StartingBlock: 100, Address: addr1}, int64(600), false).Return(nil).Once()
+		// Once full range was processed filter must be marked as fully backfilled, even if we have not received block equal to DB head (e.g. due to sparse events)
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 1, StartingBlock: 100, Address: addr1}, int64(1000), true).Return(nil).Once()
 
 		err := lp.LogPoller.run(ctx)
 		require.NoError(t, err)
 
 		// Run 2: new filter inserted at 900 — must backfill [900, 1000] using DB watermark, not stop at in-memory 600.
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+		lp.Filters.EXPECT().GetFiltersToBackfill(int64(1000)).Return([]types.Filter{
 			{ID: 2, StartingBlock: 900, Address: addr2},
-		}).Once()
+		}, 900).Once()
 		// The new filter's backfill should use the DB latest block (1000) as the upper bound
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000)).
 			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
@@ -394,7 +400,7 @@ func TestLogPoller_run(t *testing.T) {
 				close(blocks)
 				return blocks, func() {}, nil
 			}).Once()
-		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(2)).Return(nil).Once()
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 2, StartingBlock: 900, Address: addr2}, int64(1000), true).Return(nil).Once()
 
 		err = lp.LogPoller.run(ctx)
 		require.NoError(t, err)
