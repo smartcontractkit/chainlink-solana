@@ -11,7 +11,7 @@ require (
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260224214816-cb23ec38649f
 	github.com/smartcontractkit/chainlink-deployments-framework v0.75.0
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20260317184729-81a8971f77f6
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20260410115711-24885e0d13eb
 	github.com/stretchr/testify v1.11.1
 )
 
