@@ -55,6 +55,7 @@ NoNewFinalizedHeadsThreshold = '1h0m0s'
 FinalityDepth = 0
 FinalityTagEnabled = true
 FinalizedBlockOffset = 0
+FinalizedStateCheckFailureThreshold = 0
 
 [[Nodes]]
 Name = 'primary'
