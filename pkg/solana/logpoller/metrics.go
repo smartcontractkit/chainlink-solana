@@ -29,9 +29,9 @@ var promLpLastProcessedSlot = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Help: "Last processed slot by log poller",
 }, []string{"chainID"})
 
-var promLpBlockSkipped = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name: "solana_log_poller_block_skipped",
-	Help: "Slot number of the most recently skipped block due to max retry exhaustion",
+var promLpBlocksSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "solana_log_poller_blocks_skipped",
+	Help: "Number of blocks skipped due to max retry exhaustion",
 }, []string{"chainID"})
 
 type solLpMetrics struct {
@@ -42,7 +42,7 @@ type solLpMetrics struct {
 	txsTruncated       outcomeDependantMetric
 	txsLogParsingError outcomeDependantMetric
 	lastProcessedSlot  metric.Int64Gauge
-	blockSkipped       metric.Int64Gauge
+	blocksSkipped      metric.Int64Counter
 }
 
 func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
@@ -63,9 +63,9 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		return nil, fmt.Errorf("failed to register solana_log_poller_last_processed_slot: %w", err)
 	}
 
-	blockSkipped, err := meter.Int64Gauge("solana_log_poller_block_skipped")
+	blocksSkipped, err := meter.Int64Counter("solana_log_poller_blocks_skipped")
 	if err != nil {
-		return nil, fmt.Errorf("failed to register solana_log_poller_block_skipped: %w", err)
+		return nil, fmt.Errorf("failed to register solana_log_poller_blocks_skipped: %w", err)
 	}
 
 	return &solLpMetrics{
@@ -75,7 +75,7 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		txsTruncated:       *truncatedTxs,
 		txsLogParsingError: *txLogParsingError,
 		lastProcessedSlot:  lastProcessedSlot,
-		blockSkipped:       blockSkipped,
+		blocksSkipped:      blocksSkipped,
 	}, nil
 }
 
@@ -96,9 +96,9 @@ func (m *solLpMetrics) SetLatestProcessedSlot(ctx context.Context, slot int64) {
 	m.lastProcessedSlot.Record(ctx, slot, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
-func (m *solLpMetrics) SetBlockSkipped(ctx context.Context, slotNumber int64) {
-	promLpBlockSkipped.WithLabelValues(m.chainID).Set(float64(slotNumber))
-	m.blockSkipped.Record(ctx, slotNumber, metric.WithAttributes(m.GetOtelAttributes()...))
+func (m *solLpMetrics) IncrementBlocksSkipped(ctx context.Context) {
+	promLpBlocksSkipped.WithLabelValues(m.chainID).Inc()
+	m.blocksSkipped.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {
