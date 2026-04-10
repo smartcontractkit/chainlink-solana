@@ -53,6 +53,7 @@ func (j *getBlockJob) Done() <-chan struct{} {
 
 func (j *getBlockJob) Abort(ctx context.Context) error {
 	j.aborted = true
+	j.metrics.IncrementBlocksSkipped(ctx)
 	var abort types.Block
 	abort.Aborted = true
 	abort.SlotNumber = j.slotNumber
