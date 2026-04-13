@@ -298,52 +298,6 @@ func (_c *MockFilters_HasFilter_Call) RunAndReturn(run func(context.Context, str
 	return _c
 }
 
-// IncrementSeqNum provides a mock function with given fields: filterID
-func (_m *MockFilters) IncrementSeqNum(filterID int64) int64 {
-	ret := _m.Called(filterID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IncrementSeqNum")
-	}
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func(int64) int64); ok {
-		r0 = rf(filterID)
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	return r0
-}
-
-// MockFilters_IncrementSeqNum_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncrementSeqNum'
-type MockFilters_IncrementSeqNum_Call struct {
-	*mock.Call
-}
-
-// IncrementSeqNum is a helper method to define mock.On call
-//   - filterID int64
-func (_e *MockFilters_Expecter) IncrementSeqNum(filterID interface{}) *MockFilters_IncrementSeqNum_Call {
-	return &MockFilters_IncrementSeqNum_Call{Call: _e.mock.On("IncrementSeqNum", filterID)}
-}
-
-func (_c *MockFilters_IncrementSeqNum_Call) Run(run func(filterID int64)) *MockFilters_IncrementSeqNum_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(int64))
-	})
-	return _c
-}
-
-func (_c *MockFilters_IncrementSeqNum_Call) Return(_a0 int64) *MockFilters_IncrementSeqNum_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockFilters_IncrementSeqNum_Call) RunAndReturn(run func(int64) int64) *MockFilters_IncrementSeqNum_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // LoadFilters provides a mock function with given fields: ctx
 func (_m *MockFilters) LoadFilters(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -437,50 +391,49 @@ func (_c *MockFilters_MarkFilterBackfilled_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// MatchingFiltersForEncodedEvent provides a mock function with given fields: event
-func (_m *MockFilters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter] {
-	ret := _m.Called(event)
+// ProcessMatchingFiltersForEncodedEvent provides a mock function with given fields: event, process
+func (_m *MockFilters) ProcessMatchingFiltersForEncodedEvent(event types.ProgramEvent, process func(iter.Seq[types.Filter]) error) error {
+	ret := _m.Called(event, process)
 
 	if len(ret) == 0 {
-		panic("no return value specified for MatchingFiltersForEncodedEvent")
+		panic("no return value specified for ProcessMatchingFiltersForEncodedEvent")
 	}
 
-	var r0 iter.Seq[types.Filter]
-	if rf, ok := ret.Get(0).(func(types.ProgramEvent) iter.Seq[types.Filter]); ok {
-		r0 = rf(event)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(types.ProgramEvent, func(iter.Seq[types.Filter]) error) error); ok {
+		r0 = rf(event, process)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(iter.Seq[types.Filter])
-		}
+		r0 = ret.Error(0)
 	}
 
 	return r0
 }
 
-// MockFilters_MatchingFiltersForEncodedEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MatchingFiltersForEncodedEvent'
-type MockFilters_MatchingFiltersForEncodedEvent_Call struct {
+// MockFilters_ProcessMatchingFiltersForEncodedEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ProcessMatchingFiltersForEncodedEvent'
+type MockFilters_ProcessMatchingFiltersForEncodedEvent_Call struct {
 	*mock.Call
 }
 
-// MatchingFiltersForEncodedEvent is a helper method to define mock.On call
+// ProcessMatchingFiltersForEncodedEvent is a helper method to define mock.On call
 //   - event types.ProgramEvent
-func (_e *MockFilters_Expecter) MatchingFiltersForEncodedEvent(event interface{}) *MockFilters_MatchingFiltersForEncodedEvent_Call {
-	return &MockFilters_MatchingFiltersForEncodedEvent_Call{Call: _e.mock.On("MatchingFiltersForEncodedEvent", event)}
+//   - process func(iter.Seq[types.Filter]) error
+func (_e *MockFilters_Expecter) ProcessMatchingFiltersForEncodedEvent(event interface{}, process interface{}) *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call {
+	return &MockFilters_ProcessMatchingFiltersForEncodedEvent_Call{Call: _e.mock.On("ProcessMatchingFiltersForEncodedEvent", event, process)}
 }
 
-func (_c *MockFilters_MatchingFiltersForEncodedEvent_Call) Run(run func(event types.ProgramEvent)) *MockFilters_MatchingFiltersForEncodedEvent_Call {
+func (_c *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call) Run(run func(event types.ProgramEvent, process func(iter.Seq[types.Filter]) error)) *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.ProgramEvent))
+		run(args[0].(types.ProgramEvent), args[1].(func(iter.Seq[types.Filter]) error))
 	})
 	return _c
 }
 
-func (_c *MockFilters_MatchingFiltersForEncodedEvent_Call) Return(_a0 iter.Seq[types.Filter]) *MockFilters_MatchingFiltersForEncodedEvent_Call {
+func (_c *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call) Return(_a0 error) *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockFilters_MatchingFiltersForEncodedEvent_Call) RunAndReturn(run func(types.ProgramEvent) iter.Seq[types.Filter]) *MockFilters_MatchingFiltersForEncodedEvent_Call {
+func (_c *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call) RunAndReturn(run func(types.ProgramEvent, func(iter.Seq[types.Filter]) error) error) *MockFilters_ProcessMatchingFiltersForEncodedEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -624,6 +577,52 @@ func (_c *MockFilters_RegisterFilter_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// ReloadSeqNums provides a mock function with given fields: ctx
+func (_m *MockFilters) ReloadSeqNums(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReloadSeqNums")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockFilters_ReloadSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReloadSeqNums'
+type MockFilters_ReloadSeqNums_Call struct {
+	*mock.Call
+}
+
+// ReloadSeqNums is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockFilters_Expecter) ReloadSeqNums(ctx interface{}) *MockFilters_ReloadSeqNums_Call {
+	return &MockFilters_ReloadSeqNums_Call{Call: _e.mock.On("ReloadSeqNums", ctx)}
+}
+
+func (_c *MockFilters_ReloadSeqNums_Call) Run(run func(ctx context.Context)) *MockFilters_ReloadSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockFilters_ReloadSeqNums_Call) Return(_a0 error) *MockFilters_ReloadSeqNums_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFilters_ReloadSeqNums_Call) RunAndReturn(run func(context.Context) error) *MockFilters_ReloadSeqNums_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UnregisterFilter provides a mock function with given fields: ctx, name
 func (_m *MockFilters) UnregisterFilter(ctx context.Context, name string) error {
 	ret := _m.Called(ctx, name)
@@ -667,6 +666,52 @@ func (_c *MockFilters_UnregisterFilter_Call) Return(_a0 error) *MockFilters_Unre
 }
 
 func (_c *MockFilters_UnregisterFilter_Call) RunAndReturn(run func(context.Context, string) error) *MockFilters_UnregisterFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UnsafeIncrementSeqNum provides a mock function with given fields: filterID
+func (_m *MockFilters) UnsafeIncrementSeqNum(filterID int64) int64 {
+	ret := _m.Called(filterID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnsafeIncrementSeqNum")
+	}
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func(int64) int64); ok {
+		r0 = rf(filterID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	return r0
+}
+
+// MockFilters_UnsafeIncrementSeqNum_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UnsafeIncrementSeqNum'
+type MockFilters_UnsafeIncrementSeqNum_Call struct {
+	*mock.Call
+}
+
+// UnsafeIncrementSeqNum is a helper method to define mock.On call
+//   - filterID int64
+func (_e *MockFilters_Expecter) UnsafeIncrementSeqNum(filterID interface{}) *MockFilters_UnsafeIncrementSeqNum_Call {
+	return &MockFilters_UnsafeIncrementSeqNum_Call{Call: _e.mock.On("UnsafeIncrementSeqNum", filterID)}
+}
+
+func (_c *MockFilters_UnsafeIncrementSeqNum_Call) Run(run func(filterID int64)) *MockFilters_UnsafeIncrementSeqNum_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int64))
+	})
+	return _c
+}
+
+func (_c *MockFilters_UnsafeIncrementSeqNum_Call) Return(_a0 int64) *MockFilters_UnsafeIncrementSeqNum_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFilters_UnsafeIncrementSeqNum_Call) RunAndReturn(run func(int64) int64) *MockFilters_UnsafeIncrementSeqNum_Call {
 	_c.Call.Return(run)
 	return _c
 }

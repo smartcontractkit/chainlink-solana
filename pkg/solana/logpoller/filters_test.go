@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -539,72 +540,6 @@ func TestFilters_ExtractField(t *testing.T) {
 	}
 }
 
-func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
-	orm := mocks.NewMockORM(t)
-	lggr := logger.Sugared(logger.Test(t))
-	fs := newFilters(lggr, orm, nil)
-
-	filter1 := types.Filter{ID: 1, Name: "filter1", EventName: "event1", EventSig: types.NewEventSignatureFromName("event1")}
-	filter2 := types.Filter{ID: 2, Name: "filter2", EventName: "event2", EventSig: types.NewEventSignatureFromName("event2")}
-	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
-	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
-
-	err := fs.LoadFilters(t.Context())
-	require.NoError(t, err)
-
-	const numGoroutines = 50
-	const incrementsPerGoroutine = 100
-
-	seqNumsFilter1 := make(chan int64, numGoroutines*incrementsPerGoroutine)
-	seqNumsFilter2 := make(chan int64, numGoroutines*incrementsPerGoroutine)
-
-	var wg sync.WaitGroup
-	wg.Add(numGoroutines * 2)
-
-	for range numGoroutines {
-		go func() {
-			defer wg.Done()
-			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter1.ID)
-				seqNumsFilter1 <- seqNum
-			}
-		}()
-	}
-
-	for range numGoroutines {
-		go func() {
-			defer wg.Done()
-			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter2.ID)
-				seqNumsFilter2 <- seqNum
-			}
-		}()
-	}
-
-	wg.Wait()
-	close(seqNumsFilter1)
-	close(seqNumsFilter2)
-
-	seenFilter1 := make(map[int64]struct{})
-	for seqNum := range seqNumsFilter1 {
-		_, exists := seenFilter1[seqNum]
-		require.False(t, exists, "duplicate sequence number %d found for filter1", seqNum)
-		seenFilter1[seqNum] = struct{}{}
-	}
-	require.Len(t, seenFilter1, numGoroutines*incrementsPerGoroutine, "expected %d unique sequence numbers for filter1", numGoroutines*incrementsPerGoroutine)
-
-	seenFilter2 := make(map[int64]struct{})
-	for seqNum := range seqNumsFilter2 {
-		_, exists := seenFilter2[seqNum]
-		require.False(t, exists, "duplicate sequence number %d found for filter2", seqNum)
-		seenFilter2[seqNum] = struct{}{}
-	}
-	require.Len(t, seenFilter2, numGoroutines*incrementsPerGoroutine, "expected %d unique sequence numbers for filter2", numGoroutines*incrementsPerGoroutine)
-
-	require.Equal(t, int64(numGoroutines*incrementsPerGoroutine), fs.seqNums[filter1.ID])
-	require.Equal(t, int64(numGoroutines*incrementsPerGoroutine), fs.seqNums[filter2.ID])
-}
-
 func TestFilters_UpdateStartingBlocks(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
@@ -829,4 +764,59 @@ func TestFilters_GetFilters(t *testing.T) {
 
 		wg.Wait()
 	})
+}
+
+func TestRegisterFilter_preservesSequenceNumberWithRealDB(t *testing.T) {
+	sqltest.SkipInMemory(t)
+
+	// assertFilterSeqNumsMatchDB checks that in-memory seqNums for filterID equals MAX(sequence_num)
+	// from solana.logs for that filter (same source as RegisterFilter/LoadFilters use via SelectSeqNums).
+	assertFilterSeqNumsMatchDB := func(t *testing.T, orm *DSORM, fs *filters, filterID int64) {
+		t.Helper()
+		dbSeq, err := orm.SelectSeqNums(t.Context())
+		require.NoError(t, err)
+		require.Contains(t, dbSeq, filterID)
+		require.Equal(t, dbSeq[filterID], fs.seqNums[filterID],
+			"in-memory seqNums must stay aligned with DB MAX(sequence_num) for filter_id=%d", filterID)
+	}
+
+	lggr := logger.Test(t)
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+	orm := NewORM(chainID, dbx, lggr)
+	fs := newFilters(lggr, orm, nil)
+
+	filter := newRandomFilter(t)
+	require.NoError(t, fs.RegisterFilter(t.Context(), filter))
+
+	filtersMap, err := fs.GetFilters(t.Context())
+	require.NoError(t, err)
+	filterID := filtersMap[filter.Name].ID
+	require.NotZero(t, filterID)
+
+	log := newRandomLog(t, filterID, chainID, filter.EventName)
+	log.Address = filter.Address
+	log.EventSig = filter.EventSig
+	log.SequenceNum = fs.UnsafeIncrementSeqNum(filterID)
+	require.NoError(t, orm.InsertLogs(t.Context(), []types.Log{log}))
+
+	assertFilterSeqNumsMatchDB(t, orm, fs, filterID)
+
+	// update filter and reregister, simulating a user changing config but keeping the same filter ID and expecting seqNums to continue from the DB, not reset to 0.
+	filter.MaxLogsKept = 99
+	require.NoError(t, fs.RegisterFilter(t.Context(), filter))
+
+	// After reregister, seqNums must still match what SelectSeqNums reads from the database (no reset to 0).
+	assertFilterSeqNumsMatchDB(t, orm, fs, filterID)
+
+	require.NoError(t, fs.ReloadSeqNums(t.Context()))
+
+	// after an explicit ReloadSeqNums, in-memory seqNums must still match the DB (no change expected since they should already match).
+	assertFilterSeqNumsMatchDB(t, orm, fs, filterID)
+
+	// Independently confirm a fresh LoadFilters on a new instance sees the same max as this instance's seqNums.
+	fs2 := newFilters(lggr, orm, nil)
+	require.NoError(t, fs2.LoadFilters(t.Context()))
+	assertFilterSeqNumsMatchDB(t, orm, fs2, filterID)
+	require.Equal(t, fs.seqNums[filterID], fs2.seqNums[filterID],
+		"reregistered filter's seq counter should match a cold load from DB")
 }

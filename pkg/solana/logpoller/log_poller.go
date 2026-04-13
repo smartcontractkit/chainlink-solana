@@ -58,9 +58,13 @@ type filtersI interface {
 	GetFiltersToBackfill() []types.Filter
 	MarkFilterBackfilled(ctx context.Context, filterID int64) error
 	UpdateStartingBlocks(startingBlocks int64)
-	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
+	ProcessMatchingFiltersForEncodedEvent(event types.ProgramEvent, process func(filters iter.Seq[types.Filter]) error) error
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
-	IncrementSeqNum(filterID int64) int64
+	// UnsafeIncrementSeqNum - increments the sequence number for a filter and returns the new value.
+	//This should only be used in the thread safe context of the filters.ProcessMatchingFiltersForEncodedEvent function.
+	UnsafeIncrementSeqNum(filterID int64) int64
+	// ReloadSeqNum - reloads sequence numbers from the database.
+	ReloadSeqNums(ctx context.Context) error
 }
 
 type ReplayInfo struct {
@@ -79,19 +83,20 @@ type Service struct {
 	services.Service
 	eng *services.Engine
 
-	lggr              logger.SugaredLogger
-	orm               ORM
-	lastProcessedSlot int64
-	replay            ReplayInfo
-	client            RPCClient
-	loader            logsLoader
-	filters           filtersI
-	cpiEventExtractor *CPIEventExtractor
-	processBlocks     func(ctx context.Context, blocks []types.Block) error
-	blockTime         time.Duration
-	startingLookback  time.Duration
-	slotsBatchSize    int64
-	metrics           *solLpMetrics
+	lggr                    logger.SugaredLogger
+	orm                     ORM
+	lastProcessedSlot       int64
+	replay                  ReplayInfo
+	client                  RPCClient
+	loader                  logsLoader
+	filters                 filtersI
+	cpiEventExtractor       *CPIEventExtractor
+	processBlocks           func(ctx context.Context, blocks []types.Block) error
+	blockTime               time.Duration
+	startingLookback        time.Duration
+	slotsBatchSize          int64
+	metrics                 *solLpMetrics
+	seqNumbersRequireReload bool
 }
 
 func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, chainID string) (*Service, error) {
@@ -174,94 +179,112 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return err
 	}
 
+	if lp.seqNumbersRequireReload {
+		err := lp.filters.ReloadSeqNums(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to reload sequence numbers: %w", err)
+		}
+
+		lp.seqNumbersRequireReload = false
+	}
+
+	defer func() {
+		// if error occurs during processing, we no longer know the correct sequence numbers for filters, so we should reload them from the database on the next event.
+		if err != nil {
+			lp.seqNumbersRequireReload = true
+		}
+	}()
+
 	blockData := programEvent.BlockData
 
-	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
-	if matchingFilters == nil {
-		return nil
-	}
-
-	var logs []types.Log
-	for filter := range matchingFilters {
-		var revertErr *string
-		if blockData.Error != nil {
-			if !filter.IncludeReverted {
-				continue
-			}
-			revertErr = new(string)
-			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
-				*revertErr = fmt.Sprintf("%v", blockData.Error)
-				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
-			} else {
-				*revertErr = string(j)
-			}
+	return lp.filters.ProcessMatchingFiltersForEncodedEvent(programEvent, func(matchingFilters iter.Seq[types.Filter]) error {
+		if matchingFilters == nil {
+			return nil
 		}
 
-		var logIndex int64
-		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
-		if err != nil {
-			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
-			return err
-		}
-		if blockData.SlotNumber > math.MaxInt64 {
-			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
-			lp.lggr.Critical(err.Error())
-			return err
-		}
-
-		log := types.Log{
-			FilterID:       filter.ID,
-			ChainID:        lp.orm.ChainID(),
-			LogIndex:       logIndex,
-			BlockHash:      types.Hash(blockData.BlockHash),
-			BlockNumber:    int64(blockData.SlotNumber),
-			BlockTimestamp: blockData.BlockTime.Time().UTC(),
-			Address:        filter.Address,
-			EventSig:       filter.EventSig,
-			TxHash:         types.Signature(blockData.TransactionHash),
-			Error:          revertErr,
-		}
-
-		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
-		if err != nil {
-			return err
-		}
-
-		log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
-		for idx, path := range filter.SubkeyPaths {
-			if len(path) == 0 {
-				continue
+		var logs []types.Log
+		for filter := range matchingFilters {
+			var revertErr *string
+			if blockData.Error != nil {
+				if !filter.IncludeReverted {
+					continue
+				}
+				revertErr = new(string)
+				if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+					*revertErr = fmt.Sprintf("%v", blockData.Error)
+					lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+				} else {
+					*revertErr = string(j)
+				}
 			}
 
-			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
-			if decodeSubKeyErr != nil {
-				return decodeSubKeyErr
+			var logIndex int64
+			logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
+			if err != nil {
+				lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
+				return err
+			}
+			if blockData.SlotNumber > math.MaxInt64 {
+				err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
+				lp.lggr.Critical(err.Error())
+				return err
 			}
 
-			indexedVal, newIndexedValErr := types.NewIndexedValue(subKeyVal)
-			if newIndexedValErr != nil {
-				return newIndexedValErr
+			log := types.Log{
+				FilterID:       filter.ID,
+				ChainID:        lp.orm.ChainID(),
+				LogIndex:       logIndex,
+				BlockHash:      types.Hash(blockData.BlockHash),
+				BlockNumber:    int64(blockData.SlotNumber),
+				BlockTimestamp: blockData.BlockTime.Time().UTC(),
+				Address:        filter.Address,
+				EventSig:       filter.EventSig,
+				TxHash:         types.Signature(blockData.TransactionHash),
+				Error:          revertErr,
 			}
 
-			log.SubkeyValues[idx] = indexedVal
+			log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
+			if err != nil {
+				return err
+			}
+
+			log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
+			for idx, path := range filter.SubkeyPaths {
+				if len(path) == 0 {
+					continue
+				}
+
+				subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
+				if decodeSubKeyErr != nil {
+					return decodeSubKeyErr
+				}
+
+				indexedVal, newIndexedValErr := types.NewIndexedValue(subKeyVal)
+				if newIndexedValErr != nil {
+					return newIndexedValErr
+				}
+
+				log.SubkeyValues[idx] = indexedVal
+			}
+
+			log.SequenceNum = lp.filters.UnsafeIncrementSeqNum(filter.ID)
+
+			if filter.Retention > 0 {
+				expiresAt := time.Now().Add(filter.Retention).UTC()
+				log.ExpiresAt = &expiresAt
+			}
+
+			lp.lggr.Infow("found matching event", "log", log, "eventName", filter.EventName)
+
+			logs = append(logs, log)
+		}
+		if len(logs) == 0 {
+			return nil
 		}
 
-		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
-
-		if filter.Retention > 0 {
-			expiresAt := time.Now().Add(filter.Retention).UTC()
-			log.ExpiresAt = &expiresAt
-		}
-
-		lp.lggr.Infow("found matching event", "log", log, "eventName", filter.EventName)
-
-		logs = append(logs, log)
-	}
-	if len(logs) == 0 {
-		return nil
-	}
-
-	return lp.orm.InsertLogs(ctx, logs)
+		// InsertLogs must be called in the thread safe context of the filters to ensure that sequence numbers are consistent with the database state.
+		return lp.orm.InsertLogs(ctx, logs)
+	})
 }
 
 func (lp *Service) HasFilter(ctx context.Context, name string) bool {

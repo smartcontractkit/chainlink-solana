@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -52,11 +53,10 @@ func newFilters(lggr logger.Logger, orm ORM, cpiEventExtractor *CPIEventExtracto
 	}
 }
 
-// IncrementSeqNum increments the sequence number for a filterID and returns the new
+// UnsafeIncrementSeqNum increments the sequence number for a filterID and returns the new
 // number. This means the sequence number assigned to the first log matched after registration will be 1.
-func (fl *filters) IncrementSeqNum(filterID int64) int64 {
-	fl.seqNumsMutex.Lock()
-	defer fl.seqNumsMutex.Unlock()
+// This is not thread safe and must only be called within a context of ProcessMatchingFiltersForEncodedEvent.
+func (fl *filters) UnsafeIncrementSeqNum(filterID int64) int64 {
 	fl.seqNums[filterID]++
 	return fl.seqNums[filterID]
 }
@@ -164,6 +164,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	defer fl.filtersMutex.Unlock()
 
 	filter.IsBackfilled = false
+	var oldSequence int64
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
 		existingFilter := fl.filtersByID[existingFilterID]
 		if !existingFilter.MatchSameLogs(filter) {
@@ -179,6 +180,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 			}
 		}
 
+		oldSequence = fl.seqNums[existingFilter.ID]
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
@@ -206,6 +208,9 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 
 	filter.ID = filterID
 	fl.addToIndices(filter, decoder)
+	// InsertFilter acts as upsert, so if we updated an existing filter, we want to keep the same sequence number to avoid missing logs or processing logs out of order.
+	// If it's a new filter, seqNums[filter.ID] will be 0, which is what we want.
+	fl.seqNums[filter.ID] = oldSequence
 
 	return nil
 }
@@ -304,9 +309,7 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
-	fl.seqNumsMutex.Lock()
 	delete(fl.seqNums, filter.ID)
-	fl.seqNumsMutex.Unlock()
 	delete(fl.decoders, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
@@ -381,16 +384,14 @@ func (fl *filters) GetDistinctAddresses(ctx context.Context) ([]types.PublicKey,
 	return result, nil
 }
 
-// MatchingFilters - returns iterator to go through all matching filters.
-// Requires LoadFilters to be called at least once.
+// MatchingFilters - returns iterator to go through all matching filters. Iterator is not thread safe, so filtersMutex should be held while consuming it.
+//Filters returned by the iterator should not be modified. Requires LoadFilters to be called at least once.
 func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.EventSignature, isCPI bool) iter.Seq[types.Filter] {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to matchingFilters")
 		return nil
 	}
 	return func(yield func(types.Filter) bool) {
-		fl.filtersMutex.RLock()
-		defer fl.filtersMutex.RUnlock()
 		filters, ok := fl.filtersByAddress[addr]
 		if !ok {
 			return
@@ -412,10 +413,10 @@ func (fl *filters) matchingFilters(addr types.PublicKey, eventSignature types.Ev
 	}
 }
 
-// MatchingFiltersForEncodedEvent - similar to MatchingFilters but accepts a raw encoded event. Under normal operation,
-// this will be called on every new event that happens on the blockchain, so it's important it returns immediately if it
+// ProcessMatchingFiltersForEncodedEvent - calls `process` in a thread safe context with filters that are matching event.
+// Under normal operation, this will be called on every new event that happens on the blockchain, so it's important it returns immediately if it
 // doesn't match any registered filters.
-func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter] {
+func (fl *filters) ProcessMatchingFiltersForEncodedEvent(event types.ProgramEvent, process func(filters iter.Seq[types.Filter]) error) error {
 	// If this log message corresponds to an anchor event, then it must begin with an 8 byte discriminator,
 	// which will appear as the first 11 bytes of base64-encoded data. Standard base64 encoding RFC requires
 	// that any base64-encoded string must be padding with the = char to make its length a multiple of 4, so
@@ -451,7 +452,10 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter
 		return nil
 	}
 
-	return fl.matchingFilters(types.PublicKey(addr), discriminator, event.IsCPI)
+	matchingFilters := fl.matchingFilters(types.PublicKey(addr), discriminator, event.IsCPI)
+	fl.filtersMutex.Lock()
+	defer fl.filtersMutex.Unlock()
+	return process(matchingFilters)
 }
 
 // GetFiltersToBackfill - returns copy of backfill queue
@@ -575,15 +579,28 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 
 		fl.addToIndices(filter, decoder)
 	}
-	fl.seqNumsMutex.Lock()
 	fl.seqNums, err = fl.orm.SelectSeqNums(ctx)
-	fl.seqNumsMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to select sequence numbers from db: %w", err)
 	}
 
+	if fl.seqNums == nil {
+		fl.seqNums = make(map[int64]int64)
+	}
+
 	fl.loadedFilters.Store(true)
 
+	return nil
+}
+
+func (fl *filters) ReloadSeqNums(ctx context.Context) error {
+	fl.filtersMutex.Lock()
+	defer fl.filtersMutex.Unlock()
+	seqNums, err := fl.orm.SelectSeqNums(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to select sequence numbers from db: %w", err)
+	}
+	fl.seqNums = seqNums
 	return nil
 }
 
