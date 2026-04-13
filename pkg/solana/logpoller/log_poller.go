@@ -386,7 +386,6 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 		}
 	}
 
-	prevCheckpoint := minSlot
 	var markedCompleted bool
 	saveBackfillProgress := func(ctx context.Context, lastProcessed int64) error {
 		if markedCompleted {
@@ -394,13 +393,6 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 		}
 
 		isComplete := lastProcessed >= to
-		// avoid updating progress too frequently to reduce db load, but still update at least every 100 blocks or once backfill is complete
-		const saveCheckpointInterval = 100
-		needUpdate := isComplete || lastProcessed-prevCheckpoint >= saveCheckpointInterval
-		if !needUpdate {
-			return nil
-		}
-
 		var err error
 		for _, filter := range filters {
 			filterErr := lp.filters.UpdateBackfillProgress(ctx, filter, lastProcessed, isComplete)
@@ -413,7 +405,6 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 			return err
 		}
 
-		prevCheckpoint = lastProcessed
 		markedCompleted = isComplete
 		return nil
 	}
