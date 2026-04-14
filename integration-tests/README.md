@@ -14,47 +14,35 @@ This workflow adds additional steps to the base [e2e_custom_cl workflow](https:/
 
 ```mermaid
 flowchart TD
-    
-    classDef base stroke:#00f
-    testimage[Check Test Image Existence]
-    buildver[Build Container Version]
-    smoketest[Execute Smoke Tests]
-    currentartifacts[Build Current Artifacts]
-    buildtestimage[Build & Push Test Image]
-    compcheck[Test Compilation Check]
-    climage[Build Custom CL Image]
-    class compcheck,buildver,climage,testimage,currentartifacts,smoketest,buildtestimage base
+    compcheck[Check Test Compilation]
+    buildArtifacts[Build Current Artifacts]
+    buildCLImage[Build Custom CL Image]
+    smokeMatrix[Run Smoke Tests Matrix]
 
-    compcheck --> smoketest
-    buildver --> currentartifacts
-    currentartifacts --> smoketest
-    climage --> smoketest
-    currentartifacts .->|is labeled?| buildtestimage
+    contractChanges[Detect Contract Changes]
+    buildPrevArtifacts[Build Previous Artifacts]
+    combineArtifacts[Combine Artifacts]
+    artifactsDiff{ArtifactsDifferent?}
+    upgradeTests[Run Upgrade Tests]
 
-    classDef upgrade stroke:#0f0
-    changecheck[Check Contract Changes]
-    prevartifacts[Build Previous Artifacts]
-    combineartifacts[Combine Artifacts For Test]
-    upgradetest[Execute Upgrade Test]
-    class changecheck,prevartifacts,combineartifacts,upgradetest upgrade
+    compcheck --> smokeMatrix
+    buildArtifacts --> smokeMatrix
+    buildCLImage --> smokeMatrix
 
-    changecheck .->|changed?| prevartifacts
-    changecheck .->|changed?| combineartifacts
-    changecheck .->|changed?| upgradetest
-    buildver --> prevartifacts
-    prevartifacts --> combineartifacts
-    currentartifacts --> combineartifacts
-    combineartifacts .->|artifacts different?| upgradetest
-    climage --> upgradetest
-    compcheck --> upgradetest
+    contractChanges --> buildPrevArtifacts
+    contractChanges --> combineArtifacts
+    buildArtifacts --> combineArtifacts
+    buildPrevArtifacts --> combineArtifacts
+    combineArtifacts --> artifactsDiff
+    artifactsDiff -->|yes| upgradeTests
+    buildCLImage --> upgradeTests
+    compcheck --> upgradeTests
 ```
 
-- 🟦 **BLUE**: represents the base smoke test jobs
-- 🟩 **GREEN**: represents the program upgrade test jobs
-- the program upgrade test is only run when two conditions are true:
-  - files within `./contract` are changed: this prevents running an integration test unless needed
-  - generated program artifacts differ from the *pinned* version in the workflow: this prevents running an integration test unless actual program changes were made, not just trivial changes
-    - note: the pinned version needs to be manually updated to track with the deployed production version
+- The program upgrade test runs only when two conditions are true:
+  - Files within `./contracts` are changed.
+  - Generated program artifacts differ from the pinned version in the workflow.
+    - The pinned version should be updated to track the deployed production version.
 
 ### Workflow Runs for Upgrade Testing
 

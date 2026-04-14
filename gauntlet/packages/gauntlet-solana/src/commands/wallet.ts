@@ -7,6 +7,7 @@ import { logger } from '@chainlink/gauntlet-core/dist/utils'
 export enum WalletTypes {
   LOCAL = 'local',
   LEDGER = 'ledger',
+  KMS = 'kms',
 }
 
 export abstract class SolanaWallet {

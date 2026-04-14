@@ -1,6 +1,6 @@
 import { Result } from '@chainlink/gauntlet-core'
 import { logger, prompt } from '@chainlink/gauntlet-core/dist/utils'
-import { SolanaCommand, TransactionResponse, utils } from '@chainlink/gauntlet-solana'
+import { SolanaCommand, TransactionResponse } from '@chainlink/gauntlet-solana'
 import { AccountMeta, PublicKey, TransactionInstruction } from '@solana/web3.js'
 import { CONTRACT_LIST, getContract } from '../../../lib/contracts'
 import { makeRawUpgradeTransaction } from '../../abstract/upgrade'
@@ -53,9 +53,7 @@ export default class Migrate extends SolanaCommand {
 
   execute = async () => {
     const contract = getContract(CONTRACT_LIST.STORE, '')
-    const rawTx = await this.makeRawTransaction(this.wallet.payer.publicKey)
-    const tx = utils.makeTx(rawTx)
-    logger.debug(tx)
+    const rawTx = await this.makeRawTransaction(this.wallet.publicKey)
     logger.info(
       `Migrating Store program (${contract.programId.toString()})
     - store account: ${this.flags.state}
@@ -67,7 +65,7 @@ export default class Migrate extends SolanaCommand {
     await prompt(`Continue migrating?`)
 
     logger.loading('Sending tx...')
-    const txhash = await this.sendTx(tx, [this.wallet.payer], contract.idl)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, contract.idl)(rawTx)
     logger.success(`Migrated on tx hash: ${txhash}`)
 
     return {

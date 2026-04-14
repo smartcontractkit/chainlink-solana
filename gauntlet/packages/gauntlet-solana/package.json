@@ -25,6 +25,7 @@
     "bundle": "yarn build && pkg ."
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.540.0",
     "@chainlink/gauntlet-core": "0.1.2",
     "@ledgerhq/hw-app-solana": "^6.20.0",
     "@ledgerhq/hw-transport-node-hid": "^6.20.0",
