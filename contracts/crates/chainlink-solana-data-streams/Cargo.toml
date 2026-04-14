@@ -13,7 +13,7 @@ name = "chainlink_solana_data_streams"
 default = []
 
 [dependencies]
-borsh = "0.10.3"
+borsh = "0.10.4"
 
 [target.'cfg(target_os = "solana")'.dependencies]
 solana-program = "1.17"

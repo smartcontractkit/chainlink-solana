@@ -18,7 +18,7 @@ default = []
 anchor-spl = "0.29.0"
 anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 solana-program = "1.17.25"
-borsh = "0.9.1"
+borsh = "1.6.1"
 borsh-derive = "0.9.1"
 data-feeds-cache = { path = "../../programs/data-feeds-cache", features = ["cpi"] }
 
