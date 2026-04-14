@@ -38,20 +38,22 @@ export default class SetLoweringAccessController extends SolanaCommand {
     this.require(oldAC.toString() !== ac.toString(), 'New access controller is the same as existing access controller')
     await prompt(`Continue setting lowering access controller?`)
 
-    const tx = await program.rpc.setLoweringAccessController({
-      accounts: {
+    const ix = await program.methods
+      .setLoweringAccessController()
+      .accounts({
         store: state,
-        authority: this.wallet.payer.publicKey,
+        authority: this.wallet.publicKey,
         accessController: ac,
-      },
-      signers: [this.wallet.payer],
-    })
+      })
+      .instruction()
 
-    logger.success(`Access controller set on tx ${tx}`)
+    const txhash = await this.sendTxWithIDL(this.signAndSendRawTx, store.idl)([ix])
+
+    logger.success(`Access controller set on tx ${txhash}`)
     return {
       responses: [
         {
-          tx: this.wrapResponse(tx, state.toString()),
+          tx: this.wrapResponse(txhash, state.toString()),
           contract: state.toString(),
         },
       ],

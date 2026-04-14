@@ -6,6 +6,7 @@ import { Connection, Keypair } from '@solana/web3.js'
 import { DEFAULT_DERIVATION_PATH } from '../lib/constants'
 import SolanaCommand from './internal/solana'
 import { LedgerWallet, LocalWallet } from './wallet'
+import { KMSWallet } from './kmsWallet'
 
 const isValidURL = (url: string) => {
   const pattern = new RegExp('^(https?|wss?):/')
@@ -33,6 +34,17 @@ export const withWallet: Middleware = async (c: SolanaCommand, next: Next) => {
     logger.info('Loading Ledger wallet')
     const path = c.flags.ledgerPath || DEFAULT_DERIVATION_PATH
     c.wallet = await LedgerWallet.create(path)
+    console.info(`Operator address is ${c.wallet.publicKey}`)
+    return next()
+  }
+
+  if (c.flags.withKms || boolean(process.env.WITH_KMS)) {
+    logger.info('Loading KMS wallet')
+    const keyId = process.env.KMS_KEY_ID
+    const keyRegion = process.env.KMS_KEY_REGION
+    assertions.assert(!!keyId, 'Missing KMS_KEY_ID environment variable')
+    assertions.assert(!!keyRegion, 'Missing KMS_KEY_REGION environment variable')
+    c.wallet = await KMSWallet.create(keyId, keyRegion)
     console.info(`Operator address is ${c.wallet.publicKey}`)
     return next()
   }
