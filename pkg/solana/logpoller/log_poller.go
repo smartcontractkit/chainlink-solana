@@ -90,7 +90,6 @@ type Service struct {
 	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
-	slotsBatchSize    int64
 	metrics           *solLpMetrics
 }
 
@@ -117,7 +116,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 		Start: lp.start,
 		NewSubServices: func(lggr logger.Logger) []services.Service {
 			lp.filters = newFilters(lggr, orm, lp.cpiEventExtractor)
-			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor)
+			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor, cfg.LogPollerSlotsBatchSize())
 			lp.loader = loader
 			return []services.Service{loader}
 		},
@@ -127,7 +126,6 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
-	lp.slotsBatchSize = cfg.LogPollerSlotsBatchSize()
 
 	return lp, nil
 }
@@ -351,10 +349,12 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 	}
 	if lookbackSlot > lastProcessed {
 		lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		lp.lastProcessedSlot = lookbackSlot
 		return lookbackSlot, nil
 	}
 	lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
+	lp.lastProcessedSlot = lastProcessed
 	return lastProcessed, nil
 }
 
@@ -391,7 +391,7 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 	}
 
 	if minSlot < to {
-		err := lp.processBlocksRangeInBatches(ctx, addresses, minSlot, to)
+		err := lp.processBlocksRange(ctx, addresses, minSlot, to)
 		if err != nil {
 			return err
 		}
@@ -414,19 +414,6 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 	}
 
 	return err
-}
-
-func (lp *Service) processBlocksRangeInBatches(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
-	lp.lggr.Infow("Processing block range in batches", "from", from, "to", to, "batchSize", lp.slotsBatchSize)
-	for batchStart := from; batchStart <= to; batchStart += lp.slotsBatchSize {
-		batchEnd := min(batchStart+lp.slotsBatchSize-1, to)
-		err := lp.processBlocksRange(ctx, addresses, batchStart, batchEnd)
-		if err != nil {
-			return fmt.Errorf("failed processing batch [%d, %d]: %w", batchStart, batchEnd, err)
-		}
-	}
-
-	return nil
 }
 
 func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
@@ -535,7 +522,7 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	}
 
 	lp.lggr.Debugw("Got new slot range to process", "from", lastProcessedSlot+1, "to", highestSlot)
-	err = lp.processBlocksRangeInBatches(ctx, addresses, lastProcessedSlot+1, highestSlot)
+	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, highestSlot)
 	if err != nil {
 		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
 	}
