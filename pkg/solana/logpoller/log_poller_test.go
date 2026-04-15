@@ -434,7 +434,7 @@ func TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests(t *testin
 	slots := []uint64{105, 104, 103, 102, 101}
 
 	lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-	lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+	lp.Filters.EXPECT().GetFiltersToBackfill(mock.Anything).Return(nil, 0).Once()
 	lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{addr}, nil).Once()
 
 	lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil).Once()
