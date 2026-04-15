@@ -146,9 +146,9 @@ pub fn sorted_insert<T: Ord>(vec: &mut Vec<T>, value: T) {
 }
 
 pub fn validate_feed_config_inputs(
-    data_ids: &Vec<[u8; 16]>,
-    descriptions: &Vec<[u8; 32]>,
-    workflow_metadatas: &Vec<WorkflowMetadata>,
+    data_ids: &[[u8; 16]],
+    descriptions: &[[u8; 32]],
+    workflow_metadatas: &[WorkflowMetadata],
 ) -> Result<()> {
     require_gte!(
         MAX_WORKFLOW_METADATAS,

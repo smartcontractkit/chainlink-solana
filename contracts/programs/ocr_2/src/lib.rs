@@ -1078,9 +1078,12 @@ pub mod query {
 
     // https://github.com/coral-xyz/anchor/pull/2770
     macro_rules! try_from {
-        ($ty: ty, $acc: expr) => {
-            <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
-        };
+        ($ty: ty, $acc: expr) => {{
+            let acc_ref = $acc.as_ref();
+            <$ty>::try_from(unsafe {
+                core::mem::transmute::<&AccountInfo<'_>, &AccountInfo<'_>>(acc_ref)
+            })
+        }};
     }
 
     pub fn latest_config_details(account: &AccountInfo) -> Result<LatestConfig> {
