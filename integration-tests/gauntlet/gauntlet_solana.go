@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	ocr2_config "github.com/smartcontractkit/chainlink-solana/integration-tests/config"
 
@@ -143,6 +144,26 @@ func (sg *SolanaGauntlet) exec(args []string, options gauntlet.ExecCommandOption
 	return out, err
 }
 
+func (sg *SolanaGauntlet) execWithRetries(args []string, options gauntlet.ExecCommandOptions) (string, error) {
+	updatedArgs := []string{"--cwd", sg.Dir, sg.G.Command, args[0], sg.G.Flag("network", sg.G.Network)}
+	if len(args) > 1 {
+		updatedArgs = append(updatedArgs, args[1:]...)
+	}
+
+	if options.RetryCount == 0 {
+		options.RetryCount = 4
+	}
+	if options.RetryDelay == 0 {
+		options.RetryDelay = 2 * time.Second
+	}
+
+	out, err := sg.G.ExecCommandWithRetries(updatedArgs, options)
+	if err != nil {
+		err = fmt.Errorf("%w\ngauntlet command: %s\nstdout: %s", err, updatedArgs, out)
+	}
+	return out, err
+}
+
 func (sg *SolanaGauntlet) InitializeAccessController() (string, error) {
 	_, err := sg.exec([]string{"access_controller:initialize"}, *sg.options)
 	if err != nil {
@@ -156,7 +177,11 @@ func (sg *SolanaGauntlet) InitializeAccessController() (string, error) {
 }
 
 func (sg *SolanaGauntlet) DeployLinkToken() error {
-	_, err := sg.exec([]string{"token:deploy"}, *sg.options)
+	opts := *sg.options
+	opts.RetryCount = 4
+	opts.RetryDelay = 2 * time.Second
+
+	_, err := sg.execWithRetries([]string{"token:deploy"}, opts)
 	if err != nil {
 		return err
 	}
@@ -164,6 +189,14 @@ func (sg *SolanaGauntlet) DeployLinkToken() error {
 	if err != nil {
 		return err
 	}
+
+	if sg.gr.Data.Vault == nil || *sg.gr.Data.Vault == "" {
+		return fmt.Errorf("token:deploy succeeded but vault address missing in report.json")
+	}
+	if len(sg.gr.Responses) == 0 || sg.gr.Responses[0].Contract == "" {
+		return fmt.Errorf("token:deploy succeeded but link token address missing in report.json")
+	}
+
 	sg.VaultAddress = *sg.gr.Data.Vault
 	sg.LinkAddress = sg.gr.Responses[0].Contract
 
