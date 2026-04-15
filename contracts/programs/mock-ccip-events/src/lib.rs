@@ -49,7 +49,6 @@ pub struct Initialize {}
 
 /// Events and structs copied from the CCIP contracts
 /// https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs
-
 /// --------------------- CCIPMessageSent --------------------- ///
 #[event]
 pub struct CCIPMessageSent {
