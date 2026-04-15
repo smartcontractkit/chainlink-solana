@@ -282,6 +282,115 @@ func TestLogPoller_run(t *testing.T) {
 		assert.Equal(t, uint64(103), backfillFromSlots[1],
 			"run 2: starts from 103 — blocks 101,102 are NOT re-fetched")
 	})
+	t.Run("Gracefully handles failure during backfill", func(t *testing.T) {
+		// Ensure that failure to backfill a batch does not cause false advancement of the cursor for filters that require backfill.
+		lp := newMockedLP(t)
+
+		const dbHead int64 = 1000
+		addr := types.PublicKey{1}
+		filter := types.Filter{ID: 7, StartingBlock: 100, Address: addr}
+
+		// First run only: lastProcessedSlot is 0, so we consult the DB and lookback RPCs.
+		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(dbHead, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(1500), nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Twice()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{filter}).Twice()
+
+		var backfillRanges [][2]int64
+		var processBlocksFailed bool
+		lp.LogPoller.processBlocks = func(_ context.Context, batch []types.Block) error {
+			for _, b := range batch {
+				if b.SlotNumber > 200 && !processBlocksFailed {
+					processBlocksFailed = true
+					return errors.New("simulated failure after slot 200")
+				}
+			}
+			return nil
+		}
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, to uint64) (<-chan types.Block, func(), error) {
+				// nolint:gosec
+				// G115: from and to are always within int64
+				backfillRanges = append(backfillRanges, [2]int64{int64(from), int64(to)})
+				// nolint:gosec
+				// G115: to-from is always within int
+				ch := make(chan types.Block, int(to-from)+2)
+				go func() {
+					defer close(ch)
+					for s := from; s <= to; s++ {
+						ch <- types.Block{SlotNumber: s}
+					}
+				}()
+				return ch, func() {}, nil
+			}).Twice()
+
+		// Run 1: full intended range [100, dbHead]; fails once a batch contains a slot > 200.
+		err := lp.LogPoller.run(t.Context())
+		require.Error(t, err)
+
+		require.Len(t, backfillRanges, 1)
+		assert.Equal(t, int64(100), backfillRanges[0][0], "first attempt should start at filter StartingBlock")
+		assert.Equal(t, dbHead, backfillRanges[0][1], "first attempt should use persisted head as upper bound")
+
+		// Run 2: should re-attempt the full range again. Since this run is successful it should mark the filter backfilled
+		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, filter.ID).Return(nil).Once()
+		err = lp.LogPoller.run(t.Context())
+		require.NoError(t, err)
+
+		require.Len(t, backfillRanges, 2)
+		assert.Equal(t, int64(100), backfillRanges[1][0])
+		assert.Equal(t, dbHead, backfillRanges[1][1])
+	})
+	t.Run("Newly inserted filter is properly backfilled", func(t *testing.T) {
+		lp := newMockedLP(t)
+
+		addr1 := types.PublicKey{1, 2, 3}
+		addr2 := types.PublicKey{4, 5, 6}
+		ctx := t.Context()
+
+		// DB latest block 1000 via ORM only (do not set lastProcessedSlot on the service).
+		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(int64(1000), nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(1001), nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+
+		// Run 1: filter needs backfill from 100; loader only yields a block at 600 (due to sparse events).
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+			{ID: 1, StartingBlock: 100, Address: addr1},
+		}).Once()
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block, 1)
+				blocks <- types.Block{SlotNumber: 600}
+				close(blocks)
+				return blocks, func() {}, nil
+			})
+		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(1)).Return(nil).Once()
+
+		err := lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+
+		// Run 2: new filter inserted at 900 — must backfill [900, 1000] using DB watermark, not stop at in-memory 600.
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+			{ID: 2, StartingBlock: 900, Address: addr2},
+		}).Once()
+		// The new filter's backfill should use the DB latest block (1000) as the upper bound
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block)
+				close(blocks)
+				return blocks, func() {}, nil
+			}).Once()
+		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, int64(2)).Return(nil).Once()
+
+		err = lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+	})
 }
 
 // TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests asserts that when LogPollerSlotsBatchSize is

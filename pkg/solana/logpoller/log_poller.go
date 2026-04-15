@@ -349,10 +349,12 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 	}
 	if lookbackSlot > lastProcessed {
 		lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		lp.lastProcessedSlot = lookbackSlot
 		return lookbackSlot, nil
 	}
 	lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
+	lp.lastProcessedSlot = lastProcessed
 	return lastProcessed, nil
 }
 
