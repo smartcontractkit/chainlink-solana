@@ -115,6 +115,10 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 		}
 
 		f.storeSlot(sig.Slot)
+
+		if sig.Slot == f.from {
+			return true, nil
+		}
 	}
 
 	oldestSig := sigs[len(sigs)-1]

@@ -54,16 +54,13 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	address, err := solana.PublicKeyFromBase58("J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4")
 	require.NoError(t, err)
 	slots := []uint64{44, 43, 42, 41}
-	var txSigsResponse []*rpc.TransactionSignature
-	for _, slot := range slots {
-		txSigsResponse = append(txSigsResponse, &rpc.TransactionSignature{Slot: slot})
-	}
 	client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, key solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
 		switch *opts.MinContextSlot {
 		case 44:
-			return txSigsResponse, nil
-		case 41:
-			return nil, nil
+			return []*rpc.TransactionSignature{{Slot: 44}, {Slot: 43}, {Slot: 42, Signature: solana.Signature{1, 2, 3}}}, nil
+		case 42:
+			require.Equal(t, solana.Signature{1, 2, 3}, opts.Before)
+			return []*rpc.TransactionSignature{{Slot: 42}, {Slot: 41}}, nil
 		default:
 			panic("unexpected call")
 		}
@@ -215,7 +212,7 @@ func TestEncodedLogCollector_Backfill_DoesNotBlockOnRPCError(t *testing.T) {
 			default:
 				panic("unexpected call")
 			}
-		}).Twice()
+		}).Once()
 
 	// Make one slot fail.
 	const failingSlot uint64 = 43
