@@ -407,6 +407,68 @@ func TestLogPoller_run(t *testing.T) {
 	})
 }
 
+// TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests asserts that when LogPollerSlotsBatchSize is
+// smaller than the number of slots in the backfill range, block fetching runs in multiple batches but
+// GetSignaturesForAddress (getSlotsForAddressJob) is not invoked twice for the same RPC cursor (MinContextSlot + Before).
+func TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests(t *testing.T) {
+	t.Parallel()
+
+	const slotsBatchSize = 2
+	cfg := config.NewDefault()
+	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](slotsBatchSize)
+
+	lp := newMockedLPwithConfig(t, cfg, chainID)
+	loader := NewEncodedLogCollector(lp.Client, logger.Test(t), t.Name(), nil, nil, slotsBatchSize)
+	require.NoError(t, loader.Start(t.Context()))
+	t.Cleanup(func() { require.NoError(t, loader.Close()) })
+	lp.LogPoller.loader = loader
+	lp.LogPoller.lastProcessedSlot = 100
+
+	ctx := t.Context()
+
+	address, err := solana.PublicKeyFromBase58("J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4")
+	require.NoError(t, err)
+	addr := types.PublicKey(address)
+
+	// Five slots 101..105 — strictly larger than slotsBatchSize so scheduleBlocksFetching uses multiple batches.
+	slots := []uint64{105, 104, 103, 102, 101}
+
+	lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+	lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+	lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{addr}, nil).Once()
+
+	lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil).Once()
+
+	lp.Client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+			txSigsResponse := make([]*rpc.TransactionSignature, 0, len(slots))
+			for _, slot := range slots {
+				tx := &rpc.TransactionSignature{Slot: slot}
+				txSigsResponse = append(txSigsResponse, tx)
+			}
+			// add an extra signature with lower slot to signal that there the block range is fully processed
+			txSigsResponse = append(txSigsResponse, &rpc.TransactionSignature{Slot: slots[len(slots)-1] - 1})
+			return txSigsResponse, nil
+		}).Once() // GetSignaturesForAddress should be called only once for the whole range, not once per batch.
+
+	blockTime := solana.UnixTimeSeconds(128)
+	lp.Client.EXPECT().
+		GetBlockWithOpts(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, slot uint64, _ *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+			println(slot)
+			require.Contains(t, slots, slot)
+			return &rpc.GetBlockResult{
+				Blockhash:   solana.Hash{1, 2, 3},
+				BlockHeight: &slot,
+				BlockTime:   &blockTime,
+			}, nil
+		}).Times(len(slots))
+
+	err = lp.LogPoller.run(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(105), lp.LogPoller.lastProcessedSlot)
+}
+
 func Test_GetLastProcessedSlot(t *testing.T) {
 	ctx := t.Context()
 
