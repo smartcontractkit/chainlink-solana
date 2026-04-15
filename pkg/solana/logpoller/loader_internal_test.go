@@ -81,6 +81,7 @@ func TestScheduleBlocksFetching_HappyPath(t *testing.T) {
 		}
 		require.Contains(t, expectedSlots, block.SlotNumber, "received block for unexpected slot")
 		delete(expectedSlots, block.SlotNumber)
+		prev = block.SlotNumber
 	}
 	require.Empty(t, expectedSlots)
 }
