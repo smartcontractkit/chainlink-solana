@@ -458,6 +458,8 @@ consumedAllBlocks:
 		}
 	}
 
+	lp.metrics.SetLatestProcessedSlot(ctx, to)
+
 	return nil
 }
 
