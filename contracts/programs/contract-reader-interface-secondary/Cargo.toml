@@ -19,3 +19,7 @@ idl-build = ["anchor-lang/idl-build"]
 [dependencies]
 anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
 bytemuck = "1.7"
+
+[lints]
+workspace = true
+

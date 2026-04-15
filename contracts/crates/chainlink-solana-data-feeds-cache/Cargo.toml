@@ -22,3 +22,6 @@ borsh = "0.9.1"
 borsh-derive = "0.9.1"
 data-feeds-cache = { path = "../../programs/data-feeds-cache", features = ["cpi"] }
 
+[lints]
+workspace = true
+

@@ -25,3 +25,7 @@ store = { version = "1.0.1", path = "../store", default-features = false, featur
 arrayref = "0.3.6"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 bytemuck = "1.7"
+
+[lints]
+workspace = true
+

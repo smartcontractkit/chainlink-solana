@@ -25,3 +25,7 @@ arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 blake3 = "1.8.2"
 # Pin indexmap to 2.11.x; 2.12+ requires rustc 1.82, Solana tools ship 1.79
 indexmap = "2.11"
+
+[lints]
+workspace = true
+
