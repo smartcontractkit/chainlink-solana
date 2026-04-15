@@ -190,14 +190,14 @@ func setupMockCCIPEventsProgram(t *testing.T, accessor *chainaccessor.SolanaAcce
 	// Wait one LogPoller loop to ensure filters are registered
 	time.Sleep(2 * cfg.BlockTime())
 
-	mock_ccip_events.SetProgramID(mockCCIPEventsProgram)
+	mock_ccip_events.ProgramID = mockCCIPEventsProgram
 
 	sentEvent := buildMockCCIPSentEvent(t, 1, sender, receiver, feeToken)
 	commitEvent := buildMockCommitEvent(t, mockCCIPEventsProgram)
 	executeEvent := buildMockExecuteEvent(t)
 	cctpEvent := buildMockCCTPEvent(t)
 
-	ix, err := mock_ccip_events.NewInitializeInstruction(sentEvent, commitEvent, executeEvent, cctpEvent).ValidateAndBuild()
+	ix, err := mock_ccip_events.NewInitializeInstruction(sentEvent, commitEvent, executeEvent, cctpEvent)
 	require.NoError(t, err)
 
 	res, err := client.LatestBlockhash(t.Context())
@@ -236,13 +236,13 @@ func setupMockCCIPEventsProgram(t *testing.T, accessor *chainaccessor.SolanaAcce
 	time.Sleep(2 * cfg.BlockTime())
 }
 
-func buildMockCCIPSentEvent(t *testing.T, seqNum uint64, sender, receiver, feeToken solana.PublicKey) mock_ccip_events.CCIPMessageSentObj {
+func buildMockCCIPSentEvent(t *testing.T, seqNum uint64, sender, receiver, feeToken solana.PublicKey) mock_ccip_events.CcipMessageSentObj {
 	t.Helper()
 
-	return mock_ccip_events.CCIPMessageSentObj{
+	return mock_ccip_events.CcipMessageSentObj{
 		DestChainSelector: chainsel.TEST_33333333333333333333333333333333333333333333.Selector,
 		SequenceNumber:    seqNum,
-		Message: mock_ccip_events.SVM2AnyRampMessage{
+		Message: mock_ccip_events.Svm2AnyRampMessage{
 			Header: mock_ccip_events.RampMessageHeader{
 				Nonce:               0,
 				MessageId:           [32]byte{1}, // message id cannot be empty
@@ -288,7 +288,7 @@ func buildMockExecuteEvent(t *testing.T) mock_ccip_events.ExecutionStateChangedO
 		SequenceNumber:      1,
 		MessageId:           [32]byte{1}, // message id cannot be empty
 		MessageHash:         [32]byte{1}, // message hash cannot be empty
-		State:               mock_ccip_events.Success_MessageExecutionState,
+		State:               mock_ccip_events.MessageExecutionState_Success,
 	}
 }
 
