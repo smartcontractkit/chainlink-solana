@@ -103,7 +103,7 @@ where
     Ok(f(&mut store))
 }
 
-impl<'a> Feed<'a> {
+impl Feed<'_> {
     pub fn insert(&mut self, round: Transmission) {
         self.header.latest_round_id += 1;
 
