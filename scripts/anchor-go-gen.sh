@@ -13,5 +13,6 @@ do
   
   IFS='/' read -r -a idl_path <<< "${idl_path_str}"
   IFS='.' read -r -a idl_name <<< "${idl_path[3]}"
+  rm -rf ./contracts/generated/"${idl_name}"
   anchor-go -idl "${idl_path_str}" -output ./contracts/generated/"${idl_name}"  -no-go-mod
 done
