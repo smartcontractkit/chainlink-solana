@@ -40,7 +40,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	metrics, err := logpoller.NewSolLpMetrics("test-chain-id")
 	require.NoError(t, err)
 
-	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t), "test-chain-id", metrics, nil)
+	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t), "test-chain-id", metrics, nil, 10)
 
 	require.NoError(t, collector.Start(ctx))
 	t.Cleanup(func() {
@@ -184,7 +184,7 @@ func TestEncodedLogCollector_Backfill_DoesNotBlockOnRPCError(t *testing.T) {
 	metrics, err := logpoller.NewSolLpMetrics("test-chain-id")
 	require.NoError(t, err)
 
-	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t), "test-chain-id", metrics, nil).WithMaxGroupRetryCount(2)
+	collector := logpoller.NewEncodedLogCollector(client, logger.Test(t), "test-chain-id", metrics, nil, 10).WithMaxGroupRetryCount(2)
 
 	ctx := t.Context()
 	require.NoError(t, collector.Start(ctx))

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -35,16 +36,19 @@ type EncodedLogCollector struct {
 	client            RPCClient
 	lggr              logger.SugaredLogger
 	cpiEventExtractor *CPIEventExtractor
+	slotsBatchSize    int
 
 	workers *worker.Group
 	metrics *solLpMetrics
 }
 
-func NewEncodedLogCollector(client RPCClient, lggr logger.Logger, chainID string, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *EncodedLogCollector {
+func NewEncodedLogCollector(client RPCClient, lggr logger.Logger, chainID string, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor, slotsBatchSize int64) *EncodedLogCollector {
 	c := &EncodedLogCollector{
 		client:            client,
 		metrics:           metrics,
 		cpiEventExtractor: cpiEventExtractor,
+		// nolint:gosec
+		slotsBatchSize: int(slotsBatchSize), // G115: integer overflow conversion int64 -&gt; int
 	}
 
 	c.Service, c.engine = services.Config{
@@ -110,29 +114,53 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []t
 
 func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan types.Block, error) {
 	blocks := make(chan types.Block)
-	getBlockJobs := make([]*getBlockJob, len(slots))
-	for i, slot := range slots {
-		getBlockJobs[i] = newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot, c.metrics, c.cpiEventExtractor)
-		err := c.workers.Do(ctx, getBlockJobs[i])
-		if err != nil {
-			return nil, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
-		}
+	if len(slots) == 0 {
+		close(blocks)
+		return blocks, nil
 	}
 
-	go func() {
-		for _, job := range getBlockJobs {
-			select {
-			case <-ctx.Done():
+	c.engine.GoCtx(ctx, func(ctx context.Context) {
+		startTime := time.Now()
+		for batchStart := 0; batchStart < len(slots); {
+			batchEnd := min(batchStart+c.slotsBatchSize, len(slots))
+			jobs, err := c.scheduleBlocks(ctx, slots[batchStart:batchEnd], blocks)
+			if err != nil {
+				c.lggr.Errorw("Failed to schedule block fetching jobs for batch.", "err", err)
 				return
-			case <-job.Done():
-				continue
+			}
+
+			batchStart = batchEnd
+			for _, job := range jobs {
+				select {
+				case <-ctx.Done():
+					c.lggr.Infow("Context cancelled while waiting for block fetching jobs to finish.")
+					return
+				case <-job.Done():
+				}
 			}
 		}
 
+		c.lggr.Infow("Finished fetching all blocks.", "from", slots[0], "to", slots[len(slots)-1], "duration", time.Since(startTime))
+		// only close the channel after all jobs are done. Do not close on failures to avoid signaling successful completion to the upstream
 		close(blocks)
-	}()
-
+	})
 	return blocks, nil
+}
+
+func (c *EncodedLogCollector) scheduleBlocks(ctx context.Context, slots []uint64, blocks chan types.Block) ([]*getBlockJob, error) {
+	getBlockJobs := make([]*getBlockJob, 0, len(slots))
+	for i, slot := range slots {
+		if ctx.Err() != nil {
+			return getBlockJobs, ctx.Err()
+		}
+		getBlockJobs = append(getBlockJobs, newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot, c.metrics, c.cpiEventExtractor))
+		err := c.workers.Do(ctx, getBlockJobs[i])
+		if err != nil {
+			return getBlockJobs, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
+		}
+	}
+
+	return getBlockJobs, nil
 }
 
 func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan types.Block, cleanUp func(), err error) {
