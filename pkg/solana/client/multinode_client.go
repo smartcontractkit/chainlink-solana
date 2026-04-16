@@ -159,11 +159,20 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 	ctx, cancel, chStopInFlight, rawRPC := m.acquireQueryCtx(ctx, m.contextDuration)
 	defer cancel()
 
-	head, err := m.getLatestHead(ctx, rawRPC, rpc.CommitmentConfirmed)
+	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, err
 	}
 
+	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
+	if err != nil {
+		return nil, err
+	}
+
+	head := &Head{
+		SlotNumber: &slot,
+		BlockHash:  &result.Value.Blockhash,
+	}
 	if !head.IsValid() {
 		return nil, errors.New("invalid head")
 	}
@@ -172,47 +181,23 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 	return head, nil
 }
 
-func (m *MultiNodeClient) getLatestHead(ctx context.Context, rpc *rpc.Client, commitment rpc.CommitmentType) (*Head, error) {
-	slot, err := rpc.GetSlot(ctx, commitment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest slot: %w", err)
-	}
-
-	// find latest non empty slot
-	const maxLookBack = 10
-	var minSlot uint64
-	if slot > maxLookBack {
-		minSlot = slot - maxLookBack
-	}
-	maxSlot := slot
-	nonEmptySlots, err := rpc.GetBlocks(ctx, minSlot, &maxSlot, commitment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blocks for latest head: %w", err)
-	}
-
-	if len(nonEmptySlots) == 0 {
-		return nil, fmt.Errorf("failed to find non-empty block in last %d slots. Slot range [%d, %d]", maxLookBack, minSlot, maxSlot)
-	}
-
-	latestNonEmptySlot := nonEmptySlots[len(nonEmptySlots)-1]
-	block, err := rpc.GetBlockWithOpts(ctx, latestNonEmptySlot, HeadMetadataGetBlockOpts(commitment))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block for latest head: %w", err)
-	}
-
-	return &Head{
-		SlotNumber: &latestNonEmptySlot,
-		BlockHash:  &block.Blockhash,
-	}, nil
-}
-
 func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, error) {
 	ctx, cancel, chStopInFlight, rawRPC := m.acquireQueryCtx(ctx, m.contextDuration)
 	defer cancel()
 
-	head, err := m.getLatestHead(ctx, rawRPC, rpc.CommitmentFinalized)
+	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
+	}
+
+	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+
+	head := &Head{
+		SlotNumber: &slot,
+		BlockHash:  &result.Value.Blockhash,
 	}
 	if !head.IsValid() {
 		return nil, errors.New("invalid head")

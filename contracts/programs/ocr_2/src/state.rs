@@ -6,12 +6,12 @@ use arrayvec::arrayvec;
 // NOTE: ALL types in this file have to be verified to contain no padding via `cargo rustc -- -Zprint-type-sizes`!
 
 // 19 is what we can achieve with Solana's resource constraints
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path for IDL build.
 pub const MAX_ORACLES: usize = 19;
 // OCR2 is designed for a maximum of 31 oracles, and there are various assumptions made around this value.
 const_assert!(MAX_ORACLES <= 31);
 
-#[constant]
+// Not #[constant]: usize has no IdlBuild get_full_path for IDL build.
 pub const DIGEST_SIZE: usize = 32;
 
 pub const ONCHAIN_CONFIG_VERSION: u8 = 1;
@@ -122,8 +122,8 @@ pub struct Config {
     /// Access controller program managing access to billing.
     pub billing_access_controller: Pubkey,
 
-    pub min_answer: i128,
-    pub max_answer: i128,
+    pub min_answer: [u8; 16],
+    pub max_answer: [u8; 16],
 
     pub f: u8,
     pub round: u8,
@@ -150,23 +150,24 @@ impl Config {
         // calculate onchain_config from stored config
         let mut onchain_config = vec![ONCHAIN_CONFIG_VERSION]; // version
 
-        // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
-        if self.min_answer.is_negative() {
-            onchain_config.extend_from_slice(&[0xFF; 8]);
-        } else {
-            // 0 or positive
-            onchain_config.extend_from_slice(&[0x00; 8]);
-        }
-        onchain_config.extend_from_slice(&self.min_answer.to_be_bytes());
+        let min_answer = i128::from_le_bytes(self.min_answer);
+        let max_answer = i128::from_le_bytes(self.max_answer);
 
         // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
-        if self.max_answer.is_negative() {
+        if min_answer.is_negative() {
             onchain_config.extend_from_slice(&[0xFF; 8]);
         } else {
-            // 0 or positive
             onchain_config.extend_from_slice(&[0x00; 8]);
         }
-        onchain_config.extend_from_slice(&self.max_answer.to_be_bytes());
+        onchain_config.extend_from_slice(&min_answer.to_be_bytes());
+
+        // the ocr plugin expects i192 encoded values, so we need to sign extend to make the digest match
+        if max_answer.is_negative() {
+            onchain_config.extend_from_slice(&[0xFF; 8]);
+        } else {
+            onchain_config.extend_from_slice(&[0x00; 8]);
+        }
+        onchain_config.extend_from_slice(&max_answer.to_be_bytes());
 
         // NOTE: keccak256 is also available, but SHA256 is faster
         use anchor_lang::solana_program::hash;

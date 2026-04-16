@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	MethodDiscriminatorLen = 8
-	VecLengthPrefixLen     = 4
-	CPIEventDataOffset     = MethodDiscriminatorLen + VecLengthPrefixLen
+	MethodDiscriminatorLen    = 8
+	VecLengthPrefixLen        = 4
+	CPIEventDataOffsetLegacy  = MethodDiscriminatorLen + VecLengthPrefixLen
+	CPIEventDataOffsetCurrent = MethodDiscriminatorLen
 )
 
 type cpiFilterKey struct {
@@ -112,8 +113,9 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			continue
 		}
 
+		outerProgram := types.PublicKey(allAccountKeys[outerInstruction.ProgramIDIndex])
 		programAtStackHeight := map[uint16]types.PublicKey{
-			1: types.PublicKey(allAccountKeys[outerInstruction.ProgramIDIndex]),
+			1: outerProgram,
 		}
 
 		for _, ix := range inner.Instructions {
@@ -123,43 +125,38 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			}
 
 			destProgram := types.PublicKey(allAccountKeys[ix.ProgramIDIndex])
-			programAtStackHeight[ix.StackHeight] = destProgram
-			if len(ix.Data) < CPIEventDataOffset {
-				e.lggr.Warnw("data shorter than cpiEventDataOffset", "dataLen", len(ix.Data), "required", CPIEventDataOffset)
-				continue
+			if ix.StackHeight > 0 {
+				programAtStackHeight[ix.StackHeight] = destProgram
 			}
 
-			declaredLen := bin.LittleEndian.Uint32(ix.Data[MethodDiscriminatorLen:CPIEventDataOffset])
-			if declaredLen == 0 {
-				e.lggr.Warnw("cpi event vec length is zero",
-					"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
-					"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
-				)
-				continue
-			}
-
-			remaining := len(ix.Data) - CPIEventDataOffset
-			if int(declaredLen) > remaining {
-				e.lggr.Warnw("cpi event vec length exceeds remaining bytes",
-					"declaredLen", declaredLen, "remaining", remaining,
-					"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
-					"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
-				)
-				continue
-			}
-
-			if int(declaredLen) != remaining {
-				e.lggr.Warnw("cpi event vec length does not match remaining bytes",
-					"declaredLen", declaredLen, "remaining", remaining,
-					"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
-					"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
-				)
+			if len(ix.Data) <= MethodDiscriminatorLen {
 				continue
 			}
 
 			methodSig := types.EventSignature(ix.Data[:MethodDiscriminatorLen])
 
-			if ix.StackHeight <= 1 {
+			var eventData []byte
+			var ok bool
+			if methodSig == types.AnchorCPIEventDiscriminator() {
+				eventData, ok = extractAnchorCPIEventData(e.lggr, ix.Data)
+			} else {
+				eventData, ok = extractVecCPIEventData(e.lggr, ix.Data, allAccountKeys, ix, programAtStackHeight)
+			}
+			if !ok || len(eventData) == 0 {
+				continue
+			}
+
+			// Determine the source program: use StackHeight tracking when available,
+			// fall back to the outer instruction's program when StackHeight is missing (0).
+			var sourceProgram types.PublicKey
+			if ix.StackHeight > 1 {
+				sp, ok := programAtStackHeight[ix.StackHeight-1]
+				if !ok {
+					e.lggr.Warnw("could not find caller for instruction", "stackHeight", ix.StackHeight)
+					continue
+				}
+				sourceProgram = sp
+			} else if ix.StackHeight == 1 {
 				e.lggr.Warnw("unexpected stack height for inner instruction",
 					"ix", ix,
 					"destProgram", destProgram.ToSolana(),
@@ -167,12 +164,8 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 					"innerIndex", inner.Index,
 				)
 				continue
-			}
-
-			sourceProgram, ok := programAtStackHeight[ix.StackHeight-1]
-			if !ok {
-				e.lggr.Warnw("could not find caller for instruction", "stackHeight", ix.StackHeight)
-				continue
+			} else {
+				sourceProgram = outerProgram
 			}
 
 			key := cpiFilterKey{
@@ -185,7 +178,6 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 				continue
 			}
 
-			eventData := ix.Data[CPIEventDataOffset : CPIEventDataOffset+int(declaredLen)]
 			encodedData := base64.StdEncoding.EncodeToString(eventData)
 
 			e.lggr.Infow("Found CPI event",
@@ -217,6 +209,63 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 	}
 
 	return events
+}
+
+// extractAnchorCPIEventData handles Anchor 0.31+ emit_cpi! format: [method_disc(8)][event_data(N)].
+// Event data directly follows the 8-byte method discriminator with no vec prefix.
+func extractAnchorCPIEventData(lggr logger.SugaredLogger, data []byte) ([]byte, bool) {
+	if len(data) <= CPIEventDataOffsetCurrent {
+		lggr.Warnw("anchor CPI event data shorter than method discriminator", "dataLen", len(data), "required", CPIEventDataOffsetCurrent+1)
+		return nil, false
+	}
+	return data[CPIEventDataOffsetCurrent:], true
+}
+
+// extractVecCPIEventData handles the Borsh Vec<u8> format used by CCIP's cpi_event and
+// Anchor <=0.29: [method_disc(8)][vec_len(4)][event_data(N)].
+// Validation is strict: declaredLen must be >0 and must exactly equal the remaining bytes.
+// Returns (nil, false) on any mismatch -- no fallback.
+func extractVecCPIEventData(
+	lggr logger.SugaredLogger,
+	data []byte,
+	allAccountKeys []solana.PublicKey,
+	ix rpc.CompiledInstruction,
+	programAtStackHeight map[uint16]types.PublicKey,
+) ([]byte, bool) {
+	if len(data) < CPIEventDataOffsetLegacy {
+		lggr.Warnw("data shorter than cpiEventDataOffset", "dataLen", len(data), "required", CPIEventDataOffsetLegacy)
+		return nil, false
+	}
+
+	declaredLen := bin.LittleEndian.Uint32(data[MethodDiscriminatorLen:CPIEventDataOffsetLegacy])
+	if declaredLen == 0 {
+		lggr.Warnw("cpi event vec length is zero",
+			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
+		)
+		return nil, false
+	}
+
+	remaining := len(data) - CPIEventDataOffsetLegacy
+	if int(declaredLen) > remaining {
+		lggr.Warnw("cpi event vec length exceeds remaining bytes",
+			"declaredLen", declaredLen, "remaining", remaining,
+			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
+		)
+		return nil, false
+	}
+
+	if int(declaredLen) != remaining {
+		lggr.Warnw("cpi event vec length does not match remaining bytes",
+			"declaredLen", declaredLen, "remaining", remaining,
+			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
+		)
+		return nil, false
+	}
+
+	return data[CPIEventDataOffsetLegacy:], true
 }
 
 func getAllAccountKeys(tx *solana.Transaction, meta *rpc.TransactionMeta) []solana.PublicKey {

@@ -34,7 +34,7 @@ jobs:
           runner-os: ${{ runner.os }}
 
   rust_run_anchor_tests:
-    timeout-minutes: 15
+    timeout-minutes: 30
     name: Rust Run Anchor Tests
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]

@@ -5,7 +5,7 @@
 
 pub(crate) mod data_feeds_store_v1 {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use solana_program::pubkey::Pubkey;
+    use anchor_lang::solana_program::pubkey::Pubkey;
 
     solana_program::declare_id!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
 
@@ -227,7 +227,7 @@ mod tests {
     use super::data_feeds_store_v1::{Transmission, Transmissions, HEADER_SIZE, ID};
     use super::v2::read_feed_v2;
     use anchor_lang::prelude::{AccountInfo, Pubkey as AnchorPubkey};
-    use solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
+    use anchor_lang::solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
 
     fn mock_account_info<'a>(
         key: &'a AnchorPubkey,

@@ -56,7 +56,7 @@ pub fn handler<'info>(
             )?;
 
             let mut dst = curr_report_account_info.try_borrow_mut_data()?;
-            dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(&DecimalReport::discriminator());
+            dst[..ANCHOR_DISCRIMINATOR].copy_from_slice(DecimalReport::DISCRIMINATOR);
 
             emit!(DecimalReportInitialized {
                 state: ctx.accounts.state.key(),

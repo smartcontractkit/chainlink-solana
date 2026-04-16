@@ -35,16 +35,18 @@ func (m *OCRv2) ProgramAddress() string {
 
 func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
 	payer := m.Client.DefaultWallet
+	writeInstr, err := ocr_2.NewWriteOffchainConfigInstruction(
+		ocConfigBytes,
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	return m.Client.TXSync(
 		"Write OffChain config chunk",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewWriteOffchainConfigInstruction(
-				ocConfigBytes,
-				m.Proposal.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{writeInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -64,22 +66,24 @@ func (m *OCRv2) writeOffChainConfig(ocConfigBytes []byte) error {
 func (m *OCRv2) acceptProposal(digest []byte) error {
 	payer := m.Client.DefaultWallet
 	va := m.ContractDeployer.Accounts.Authorities["vault"]
+	acceptInstr, err := ocr_2.NewAcceptProposalInstruction(
+		digest,
+		m.State.PublicKey(),
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey(),
+		m.OCRVaultAssociatedPubKey,
+		m.Owner.PublicKey(),
+		m.OCRVaultAssociatedPubKey,
+		va.PublicKey,
+		solana.TokenProgramID,
+	)
+	if err != nil {
+		return err
+	}
 	return m.Client.TXSync(
 		"Accept OffChain config proposal",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewAcceptProposalInstruction(
-				digest,
-				m.State.PublicKey(),
-				m.Proposal.PublicKey(),
-				m.Owner.PublicKey(),
-				m.OCRVaultAssociatedPubKey,
-				m.Owner.PublicKey(),
-				m.OCRVaultAssociatedPubKey,
-				va.PublicKey,
-				solana.TokenProgramID,
-			).Build(),
-		},
+		[]solana.Instruction{acceptInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -104,22 +108,24 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 		return nil
 	}
 	va := m.ContractDeployer.Accounts.Authorities["vault"]
+	billingInstr, err := ocr_2.NewSetBillingInstruction(
+		observationPayment,
+		transmissionPayment,
+		m.State.PublicKey(),
+		m.Owner.PublicKey(),
+		billingACPubKey,
+		m.Owner.PublicKey(),
+		m.OCRVaultAssociatedPubKey,
+		va.PublicKey,
+		solana.TokenProgramID,
+	)
+	if err != nil {
+		return err
+	}
 	err = m.Client.TXSync(
 		"Set billing",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewSetBillingInstruction(
-				observationPayment,
-				transmissionPayment,
-				m.State.PublicKey(),
-				m.Owner.PublicKey(),
-				m.Owner.PublicKey(),
-				billingACPubKey,
-				m.OCRVaultAssociatedPubKey, // token vault
-				va.PublicKey,               // vault authority
-				solana.TokenProgramID,      // token program
-			).Build(),
-		},
+		[]solana.Instruction{billingInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -139,15 +145,17 @@ func (m *OCRv2) SetBilling(observationPayment uint32, transmissionPayment uint32
 
 func (m *OCRv2) finalizeOffChainConfig() error {
 	payer := m.Client.DefaultWallet
+	finalizeInstr, err := ocr_2.NewFinalizeProposalInstruction(
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	return m.Client.TXSync(
 		"Finalize OffChain config",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewFinalizeProposalInstruction(
-				m.Proposal.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{finalizeInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -214,17 +222,18 @@ func (m *OCRv2) createProposal(version uint64) error {
 	if err != nil {
 		return err
 	}
+	createProposalInstr, err := ocr_2.NewCreateProposalInstruction(
+		version,
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	return m.Client.TXSync(
 		"Create proposal",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			proposalAccInstruction,
-			ocr_2.NewCreateProposalInstruction(
-				version,
-				m.Proposal.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{proposalAccInstruction, createProposalInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -328,17 +337,19 @@ func (m *OCRv2) proposeConfig(ocConfig OffChainAggregatorV2Config) error {
 			Transmitter: transmitter,
 		})
 	}
-	err := m.Client.TXSync(
+	proposeConfigInstr, err := ocr_2.NewProposeConfigInstruction(
+		oracles,
+		uint8(ocConfig.F), //nolint:gosec // F cannot exceed max oracles (255)
+		m.Proposal.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
+	err = m.Client.TXSync(
 		"Propose new config",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			ocr_2.NewProposeConfigInstruction(
-				oracles,
-				uint8(ocConfig.F), //nolint:gosec // F cannot exceed max oracles (255)
-				m.Proposal.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{proposeConfigInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -367,15 +378,19 @@ func (m *OCRv2) proposeConfig(ocConfig OffChainAggregatorV2Config) error {
 	for i := 0; i < len(oracles); i++ {
 		payees = append(payees, payee.PublicKey())
 	}
-	proposeInstr := ocr_2.NewProposePayeesInstruction(
+	proposeInstr, err := ocr_2.NewProposePayeesInstruction(
 		m.Mint.PublicKey(),
 		m.Proposal.PublicKey(),
-		m.Owner.PublicKey())
-	// Add payees as remaining accounts
-	for i := 0; i < len(payees); i++ {
-		proposeInstr.Append(solana.Meta(payees[i]))
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
 	}
-	instr = append(instr, proposeInstr.Build())
+	gi := proposeInstr.(*solana.GenericInstruction)
+	for i := 0; i < len(payees); i++ {
+		gi.AccountValues = append(gi.AccountValues, solana.Meta(payees[i]))
+	}
+	instr = append(instr, proposeInstr)
 	return m.Client.TXSync(
 		"Set payees",
 		rpc.CommitmentConfirmed,

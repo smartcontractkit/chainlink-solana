@@ -61,7 +61,7 @@ LogPollerStartingLookback = '24h' # Default
 # CPI events require LOOPP mode to function correctly.
 LogPollerCPIEventsEnabled = true # Default
 # LogPollerSlotsBatchSize is the number of slots to process in a batch when polling for logs. Setting this value too high may increase memory usage, while setting it too low may increase the number of RPC calls and decrease performance.
-LogPollerSlotsBatchSize = 100 # Default
+LogPollerSlotsBatchSize = 1000 # Default
 
 [MultiNode]
 # Enabled enables the multinode feature.

@@ -13,14 +13,19 @@ no-entrypoint = []
 no-idl = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-solana-program = "1.17.25" # pin solana to 1.17
-anchor-lang = { version = "0.29.0", features = [] }
-anchor-spl = "0.29.0"
+anchor-lang = { version = "0.31.0", features = [] }
+anchor-spl = "0.31.0"
+zeroize = "1.7"
 static_assertions = "1.1.0"
 access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
 store = { version = "1.0.1", path = "../store", default-features = false, features = ["cpi"] }
 arrayref = "0.3.6"
 arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
 bytemuck = "1.7"
+
+[lints]
+workspace = true
+
