@@ -1434,8 +1434,8 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	}
 	type TestItemV2 struct {
 		Field                 int32
-		OracleId              uint8
-		OracleIds             [32]uint8
+		OracleId              uint8     //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
+		OracleIds             [32]uint8 //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
 		AccountStruct         AccountStructV2
 		Accounts              []solana.PublicKey
 		DifferentField        string

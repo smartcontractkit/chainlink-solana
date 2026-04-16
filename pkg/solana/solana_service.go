@@ -667,7 +667,7 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 		}
 		var destProgram logpollertypes.PublicKey
 		copy(destProgram[:], f.CPIFilterConfig.DestAddress[:])
-		methodSig := logpollertypes.EventSignature{}
+		var methodSig logpollertypes.EventSignature
 		if f.CPIFilterConfig.MethodName == logpollertypes.AnchorCPIMethodName {
 			methodSig = logpollertypes.AnchorCPIEventDiscriminator()
 		} else {

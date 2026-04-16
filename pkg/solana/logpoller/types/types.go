@@ -141,9 +141,8 @@ func NewMethodSignatureFromName(methodName string) EventSignature {
 func AnchorCPIEventDiscriminator() EventSignature {
 	sum := sha256.Sum256([]byte(AnchorCPIMethodName))
 	var sig EventSignature
-	for i := range EventSignatureLength {
-		sig[i] = sum[EventSignatureLength-1-i]
-	}
+	copy(sig[:], sum[:EventSignatureLength])
+	slices.Reverse(sig[:])
 	return sig
 }
 
