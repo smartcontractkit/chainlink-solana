@@ -55,7 +55,7 @@ func TestGetBlockJob(t *testing.T) {
 		lggr := logger.Sugared(logger.Test(t))
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, nil, nil, lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, nil, nil, lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		require.Equal(t, "getBlock for slotNumber: 42", job.String())
 	})
 	t.Run("Error if fails to get block", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(0, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
@@ -78,7 +78,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(slotNumber+1, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.NoError(t, err)
 		result := <-job.blocks
@@ -100,7 +100,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block number")
 	})
@@ -112,7 +112,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "block at slot 42 returned from rpc is missing block time")
 	})
@@ -123,7 +123,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42: missing transaction field")
 	})
@@ -134,7 +134,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "failed to parse transaction 0 in slot 42")
 	})
@@ -148,7 +148,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected all transactions to have at least one signature 0 in slot 42")
 	})
@@ -162,7 +162,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(t.Context())
 		require.ErrorContains(t, err, "expected transaction to have meta. signature: 2AnZxg8HN2sGa7GC7iWGDgpXbEasqXQNEumCjvHUFDcBnfRKAdaN3SvKLhbQwheN15xDkL5D5mdX21A5gH1MdYB; slot: 42; idx: 0")
 	})
@@ -180,7 +180,7 @@ func TestGetBlockJob(t *testing.T) {
 		}).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(ctx.Done(), client, make(chan types.Block), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(ctx.Done(), client, make(chan types.Block), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Run(ctx)
 		require.ErrorIs(t, err, context.Canceled)
 		select {
@@ -195,7 +195,7 @@ func TestGetBlockJob(t *testing.T) {
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
 		blocks := make(chan types.Block, 1)
-		job := newGetBlockJob(nil, nil, blocks, lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, nil, blocks, lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		err = job.Abort(t.Context())
 		require.NoError(t, err)
 
@@ -237,7 +237,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		job.parseProgramLogs = func(logs []string) ([]types.ProgramOutput, error) {
 			result := types.ProgramOutput{
 				Program: "myProgram",
@@ -347,7 +347,7 @@ func TestGetBlockJob(t *testing.T) {
 		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
 		metrics, err := NewSolLpMetrics(t.Name())
 		require.NoError(t, err)
-		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil, rpc.CommitmentFinalized)
 		job.parseProgramLogs = func(logs []string) ([]types.ProgramOutput, error) {
 			return nil, errors.New("unexpected test parsing error")
 		}
@@ -374,6 +374,25 @@ func TestGetBlockJob(t *testing.T) {
 		default:
 			t.Fatal("expected job to be done")
 		}
+	})
+	t.Run("Forwards configured commitment into RPC opts", func(t *testing.T) {
+		resetPromMetricsForLabel(t.Name())
+		client := mocks.NewRPCClient(t)
+		lggr := logger.Sugared(logger.Test(t))
+		height := uint64(41)
+		blockTime := solana.UnixTimeSeconds(128)
+		block := rpc.GetBlockResult{BlockHeight: &height, BlockTime: ptr(blockTime), Blockhash: solana.Hash{1, 2, 3}}
+		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).RunAndReturn(
+			func(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+				require.NotNil(t, opts)
+				require.Equal(t, rpc.CommitmentConfirmed, opts.Commitment)
+				return &block, nil
+			}).Once()
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil, rpc.CommitmentConfirmed)
+		err = job.Run(t.Context())
+		require.NoError(t, err)
 	})
 }
 

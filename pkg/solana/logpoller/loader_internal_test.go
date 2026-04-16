@@ -26,7 +26,7 @@ func TestScheduleBlocksFetching_EmptySlots(t *testing.T) {
 	require.NoError(t, collector.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, collector.Close()) })
 
-	ch, err := collector.scheduleBlocksFetching(ctx, nil)
+	ch, err := collector.scheduleBlocksFetching(ctx, nil, rpc.CommitmentFinalized)
 	require.NoError(t, err)
 
 	_, ok := <-ch
@@ -67,7 +67,7 @@ func TestScheduleBlocksFetching_HappyPath(t *testing.T) {
 		}).
 		Times(len(slots))
 
-	ch, err := collector.scheduleBlocksFetching(ctx, slots)
+	ch, err := collector.scheduleBlocksFetching(ctx, slots, rpc.CommitmentFinalized)
 	require.NoError(t, err)
 	expectedSlots := make(map[uint64]struct{})
 	for _, slot := range slots {

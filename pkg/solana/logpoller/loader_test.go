@@ -109,7 +109,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 			}, nil
 		})
 
-	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), []types.PublicKey{types.PublicKey(address)}, 41, 44)
+	results, cleanUp, err := collector.BackfillForAddresses(t.Context(), []types.PublicKey{types.PublicKey(address)}, 41, 44, rpc.CommitmentFinalized)
 	require.NoError(t, err)
 	defer cleanUp()
 	var events []types.ProgramEvent
@@ -266,6 +266,7 @@ func TestEncodedLogCollector_Backfill_DoesNotBlockOnRPCError(t *testing.T) {
 		testCtx,
 		[]types.PublicKey{types.PublicKey(address)},
 		41, 44,
+		rpc.CommitmentFinalized,
 	)
 	require.NoError(t, err)
 	defer cleanUp()

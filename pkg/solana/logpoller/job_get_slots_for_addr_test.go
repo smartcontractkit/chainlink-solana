@@ -44,7 +44,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 				require.Equal(t, to, *opts.MinContextSlot)
 				return nil, expectedError
 			}).Once()
-		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, nil, address, from, to)
+		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, nil, address, from, to, rpc.CommitmentFinalized)
 		err := job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 	})
@@ -61,7 +61,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 				return nil, expectedError
 			}).Once()
 		lggr, observed := logger.TestObservedSugared(t, zapcore.DPanicLevel)
-		job := newGetSlotsForAddress(lggr, client, nil, nil, address, from, to)
+		job := newGetSlotsForAddress(lggr, client, nil, nil, address, from, to, rpc.CommitmentFinalized)
 		err := job.Run(t.Context())
 		require.ErrorIs(t, err, expectedError)
 		tests.RequireLogMessage(t, observed, "RPC signaled that transaction history is not available. "+
@@ -78,7 +78,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 	t.Run("Completes successfully if there is no signatures", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)
 		client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).Return([]*rpc.TransactionSignature{}, nil).Once()
-		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, nil, address, from, to)
+		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, nil, address, from, to, rpc.CommitmentFinalized)
 		err := job.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
@@ -101,7 +101,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		var actualSlots []uint64
 		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, func(s uint64) {
 			actualSlots = append(actualSlots, s)
-		}, address, from, to)
+		}, address, from, to, rpc.CommitmentFinalized)
 		err := job.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
@@ -126,7 +126,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		var actualSlots []uint64
 		firstJob := newGetSlotsForAddress(logger.TestSugared(t), client, workers, func(s uint64) {
 			actualSlots = append(actualSlots, s)
-		}, address, from, to)
+		}, address, from, to, rpc.CommitmentFinalized)
 		err := firstJob.Run(t.Context())
 		require.NoError(t, err)
 		select {
@@ -141,5 +141,17 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		requireJobIsDone(t, firstJob.Done(), "expected fist job to be done")
 		requireJobIsDone(t, secondJob.Done(), "expected second job to be done")
 		require.Equal(t, []uint64{19, 18}, actualSlots)
+	})
+	t.Run("Forwards configured commitment into RPC opts", func(t *testing.T) {
+		client := mocks.NewRPCClient(t)
+		client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+			func(ctx context.Context, key solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+				require.NotNil(t, opts)
+				require.Equal(t, rpc.CommitmentConfirmed, opts.Commitment)
+				return []*rpc.TransactionSignature{}, nil
+			}).Once()
+		job := newGetSlotsForAddress(logger.TestSugared(t), client, nil, nil, address, from, to, rpc.CommitmentConfirmed)
+		err := job.Run(t.Context())
+		require.NoError(t, err)
 	})
 }

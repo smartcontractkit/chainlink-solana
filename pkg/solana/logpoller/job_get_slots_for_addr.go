@@ -20,9 +20,10 @@ var _ worker.Job = (*getSlotsForAddressJob)(nil)
 // calls storeSlot for each. If single request was not sufficient to identify all slots - schedules a new job. Channel
 // returned by Done() will be closed only when all jobs are done.
 type getSlotsForAddressJob struct {
-	address   types.PublicKey
-	beforeSig solana.Signature
-	from, to  uint64
+	address    types.PublicKey
+	beforeSig  solana.Signature
+	from, to   uint64
+	commitment rpc.CommitmentType
 
 	client RPCClient
 	lggr   logger.SugaredLogger
@@ -33,16 +34,17 @@ type getSlotsForAddressJob struct {
 	workers   WorkerGroup
 }
 
-func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address types.PublicKey, from, to uint64) *getSlotsForAddressJob {
+func newGetSlotsForAddress(lggr logger.SugaredLogger, client RPCClient, workers WorkerGroup, storeSlot func(uint64), address types.PublicKey, from, to uint64, commitment rpc.CommitmentType) *getSlotsForAddressJob {
 	return &getSlotsForAddressJob{
-		address:   address,
-		client:    client,
-		lggr:      lggr,
-		from:      from,
-		to:        to,
-		storeSlot: storeSlot,
-		workers:   workers,
-		done:      make(chan struct{}),
+		address:    address,
+		client:     client,
+		lggr:       lggr,
+		from:       from,
+		to:         to,
+		commitment: commitment,
+		storeSlot:  storeSlot,
+		workers:    workers,
+		done:       make(chan struct{}),
 	}
 }
 
@@ -77,7 +79,7 @@ const historyErrorMsg = "history is not available from this node"
 // run - returns true, nil - if job was fully done, and we have not created a child job
 func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 	opts := rpc.GetSignaturesForAddressOpts{
-		Commitment:     rpc.CommitmentFinalized,
+		Commitment:     f.commitment,
 		MinContextSlot: &f.to, // MinContextSlot is not filter. It defines min slot that RPC is expected to observe to handle the request
 	}
 
@@ -124,14 +126,15 @@ func (f *getSlotsForAddressJob) run(ctx context.Context) (bool, error) {
 	oldestSig := sigs[len(sigs)-1]
 	// to ensure we do not overload RPC perform next call as a separate job
 	err = f.workers.Do(ctx, &getSlotsForAddressJob{
-		address:   f.address,
-		beforeSig: oldestSig.Signature,
-		from:      f.from,
-		to:        oldestSig.Slot,
-		client:    f.client,
-		storeSlot: f.storeSlot,
-		done:      f.done,
-		workers:   f.workers,
+		address:    f.address,
+		beforeSig:  oldestSig.Signature,
+		from:       f.from,
+		to:         oldestSig.Slot,
+		commitment: f.commitment,
+		client:     f.client,
+		storeSlot:  f.storeSlot,
+		done:       f.done,
+		workers:    f.workers,
 	})
 	return false, err
 }

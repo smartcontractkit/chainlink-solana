@@ -43,7 +43,7 @@ type ORM interface {
 }
 
 type logsLoader interface {
-	BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan types.Block, cleanUp func(), err error)
+	BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64, commitment rpc.CommitmentType) (orderedBlocks <-chan types.Block, cleanUp func(), err error)
 }
 
 type filtersI interface {
@@ -424,7 +424,7 @@ func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.Pub
 	}()
 	// nolint:gosec
 	// G115: integer overflow conversion uint64 -&gt; int64
-	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to))
+	blocks, cleanup, err := lp.loader.BackfillForAddresses(ctx, addresses, uint64(from), uint64(to), rpc.CommitmentFinalized)
 	if err != nil {
 		return fmt.Errorf("error backfilling filters: %w", err)
 	}

@@ -27,6 +27,7 @@ type RPCClient interface {
 type WorkerGroup interface {
 	Do(ctx context.Context, job worker.Job) error
 }
+
 type EncodedLogCollector struct {
 	// service state management
 	services.Service
@@ -76,7 +77,7 @@ func (c *EncodedLogCollector) WithMaxGroupRetryCount(cc uint8) *EncodedLogCollec
 	return c
 }
 
-func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) ([]uint64, error) {
+func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64, commitment rpc.CommitmentType) ([]uint64, error) {
 	// identify slots to fetch
 	slotsForAddressJobs := make([]*getSlotsForAddressJob, len(addresses))
 	slotsToFetch := make(map[uint64]struct{}, toSlot-fromSlot)
@@ -87,7 +88,7 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []t
 		slotsToFetchMu.Unlock()
 	}
 	for i, address := range addresses {
-		slotsForAddressJobs[i] = newGetSlotsForAddress(c.lggr, c.client, c.workers, storeSlot, address, fromSlot, toSlot)
+		slotsForAddressJobs[i] = newGetSlotsForAddress(c.lggr, c.client, c.workers, storeSlot, address, fromSlot, toSlot, commitment)
 		err := c.workers.Do(ctx, slotsForAddressJobs[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not schedule job to fetch slots for address: %w", err)
@@ -112,7 +113,7 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []t
 	return result, nil
 }
 
-func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan types.Block, error) {
+func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64, commitment rpc.CommitmentType) (<-chan types.Block, error) {
 	blocks := make(chan types.Block)
 	if len(slots) == 0 {
 		close(blocks)
@@ -123,7 +124,7 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 		startTime := time.Now()
 		for batchStart := 0; batchStart < len(slots); {
 			batchEnd := min(batchStart+c.slotsBatchSize, len(slots))
-			jobs, err := c.scheduleBlocks(ctx, slots[batchStart:batchEnd], blocks)
+			jobs, err := c.scheduleBlocks(ctx, slots[batchStart:batchEnd], blocks, commitment)
 			if err != nil {
 				c.lggr.Errorw("Failed to schedule block fetching jobs for batch.", "err", err)
 				return
@@ -147,13 +148,13 @@ func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots 
 	return blocks, nil
 }
 
-func (c *EncodedLogCollector) scheduleBlocks(ctx context.Context, slots []uint64, blocks chan types.Block) ([]*getBlockJob, error) {
+func (c *EncodedLogCollector) scheduleBlocks(ctx context.Context, slots []uint64, blocks chan types.Block, commitment rpc.CommitmentType) ([]*getBlockJob, error) {
 	getBlockJobs := make([]*getBlockJob, 0, len(slots))
 	for i, slot := range slots {
 		if ctx.Err() != nil {
 			return getBlockJobs, ctx.Err()
 		}
-		getBlockJobs = append(getBlockJobs, newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot, c.metrics, c.cpiEventExtractor))
+		getBlockJobs = append(getBlockJobs, newGetBlockJob(ctx.Done(), c.client, blocks, c.lggr, slot, c.metrics, c.cpiEventExtractor, commitment))
 		err := c.workers.Do(ctx, getBlockJobs[i])
 		if err != nil {
 			return getBlockJobs, fmt.Errorf("could not schedule job to fetch blocks for slot: %w", err)
@@ -163,8 +164,8 @@ func (c *EncodedLogCollector) scheduleBlocks(ctx context.Context, slots []uint64
 	return getBlockJobs, nil
 }
 
-func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64) (orderedBlocks <-chan types.Block, cleanUp func(), err error) {
-	slotsToFetch, err := c.getSlotsToFetch(ctx, addresses, fromSlot, toSlot)
+func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot, toSlot uint64, commitment rpc.CommitmentType) (orderedBlocks <-chan types.Block, cleanUp func(), err error) {
+	slotsToFetch, err := c.getSlotsToFetch(ctx, addresses, fromSlot, toSlot, commitment)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("failed to identify slots to fetch: %w", err)
 	}
@@ -178,7 +179,7 @@ func (c *EncodedLogCollector) BackfillForAddresses(ctx context.Context, addresse
 			cancelJobs()
 		}
 	}()
-	unorderedBlocks, err := c.scheduleBlocksFetching(ctx, slotsToFetch)
+	unorderedBlocks, err := c.scheduleBlocksFetching(ctx, slotsToFetch, commitment)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("failed to schedule blocks to fetch: %w", err)
 	}

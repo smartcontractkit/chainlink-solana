@@ -7,6 +7,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	rpc "github.com/gagliardetto/solana-go/rpc"
+
 	types "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -23,9 +25,9 @@ func (_m *MockLogsLoader) EXPECT() *MockLogsLoader_Expecter {
 	return &MockLogsLoader_Expecter{mock: &_m.Mock}
 }
 
-// BackfillForAddresses provides a mock function with given fields: ctx, addresses, fromSlot, toSlot
-func (_m *MockLogsLoader) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot uint64, toSlot uint64) (<-chan types.Block, func(), error) {
-	ret := _m.Called(ctx, addresses, fromSlot, toSlot)
+// BackfillForAddresses provides a mock function with given fields: ctx, addresses, fromSlot, toSlot, commitment
+func (_m *MockLogsLoader) BackfillForAddresses(ctx context.Context, addresses []types.PublicKey, fromSlot uint64, toSlot uint64, commitment rpc.CommitmentType) (<-chan types.Block, func(), error) {
+	ret := _m.Called(ctx, addresses, fromSlot, toSlot, commitment)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BackfillForAddresses")
@@ -34,27 +36,27 @@ func (_m *MockLogsLoader) BackfillForAddresses(ctx context.Context, addresses []
 	var r0 <-chan types.Block
 	var r1 func()
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.PublicKey, uint64, uint64) (<-chan types.Block, func(), error)); ok {
-		return rf(ctx, addresses, fromSlot, toSlot)
+	if rf, ok := ret.Get(0).(func(context.Context, []types.PublicKey, uint64, uint64, rpc.CommitmentType) (<-chan types.Block, func(), error)); ok {
+		return rf(ctx, addresses, fromSlot, toSlot, commitment)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []types.PublicKey, uint64, uint64) <-chan types.Block); ok {
-		r0 = rf(ctx, addresses, fromSlot, toSlot)
+	if rf, ok := ret.Get(0).(func(context.Context, []types.PublicKey, uint64, uint64, rpc.CommitmentType) <-chan types.Block); ok {
+		r0 = rf(ctx, addresses, fromSlot, toSlot, commitment)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan types.Block)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []types.PublicKey, uint64, uint64) func()); ok {
-		r1 = rf(ctx, addresses, fromSlot, toSlot)
+	if rf, ok := ret.Get(1).(func(context.Context, []types.PublicKey, uint64, uint64, rpc.CommitmentType) func()); ok {
+		r1 = rf(ctx, addresses, fromSlot, toSlot, commitment)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(func())
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, []types.PublicKey, uint64, uint64) error); ok {
-		r2 = rf(ctx, addresses, fromSlot, toSlot)
+	if rf, ok := ret.Get(2).(func(context.Context, []types.PublicKey, uint64, uint64, rpc.CommitmentType) error); ok {
+		r2 = rf(ctx, addresses, fromSlot, toSlot, commitment)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -72,13 +74,14 @@ type MockLogsLoader_BackfillForAddresses_Call struct {
 //   - addresses []types.PublicKey
 //   - fromSlot uint64
 //   - toSlot uint64
-func (_e *MockLogsLoader_Expecter) BackfillForAddresses(ctx interface{}, addresses interface{}, fromSlot interface{}, toSlot interface{}) *MockLogsLoader_BackfillForAddresses_Call {
-	return &MockLogsLoader_BackfillForAddresses_Call{Call: _e.mock.On("BackfillForAddresses", ctx, addresses, fromSlot, toSlot)}
+//   - commitment rpc.CommitmentType
+func (_e *MockLogsLoader_Expecter) BackfillForAddresses(ctx interface{}, addresses interface{}, fromSlot interface{}, toSlot interface{}, commitment interface{}) *MockLogsLoader_BackfillForAddresses_Call {
+	return &MockLogsLoader_BackfillForAddresses_Call{Call: _e.mock.On("BackfillForAddresses", ctx, addresses, fromSlot, toSlot, commitment)}
 }
 
-func (_c *MockLogsLoader_BackfillForAddresses_Call) Run(run func(ctx context.Context, addresses []types.PublicKey, fromSlot uint64, toSlot uint64)) *MockLogsLoader_BackfillForAddresses_Call {
+func (_c *MockLogsLoader_BackfillForAddresses_Call) Run(run func(ctx context.Context, addresses []types.PublicKey, fromSlot uint64, toSlot uint64, commitment rpc.CommitmentType)) *MockLogsLoader_BackfillForAddresses_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]types.PublicKey), args[2].(uint64), args[3].(uint64))
+		run(args[0].(context.Context), args[1].([]types.PublicKey), args[2].(uint64), args[3].(uint64), args[4].(rpc.CommitmentType))
 	})
 	return _c
 }
@@ -88,7 +91,7 @@ func (_c *MockLogsLoader_BackfillForAddresses_Call) Return(orderedBlocks <-chan 
 	return _c
 }
 
-func (_c *MockLogsLoader_BackfillForAddresses_Call) RunAndReturn(run func(context.Context, []types.PublicKey, uint64, uint64) (<-chan types.Block, func(), error)) *MockLogsLoader_BackfillForAddresses_Call {
+func (_c *MockLogsLoader_BackfillForAddresses_Call) RunAndReturn(run func(context.Context, []types.PublicKey, uint64, uint64, rpc.CommitmentType) (<-chan types.Block, func(), error)) *MockLogsLoader_BackfillForAddresses_Call {
 	_c.Call.Return(run)
 	return _c
 }

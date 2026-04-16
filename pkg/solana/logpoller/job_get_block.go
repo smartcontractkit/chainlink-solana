@@ -26,10 +26,11 @@ type getBlockJob struct {
 	cpiEventExtractor *CPIEventExtractor
 	lggr              logger.SugaredLogger
 	metrics           *solLpMetrics
+	commitment        rpc.CommitmentType
 	aborted           bool
 }
 
-func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor) *getBlockJob {
+func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan types.Block, lggr logger.SugaredLogger, slotNumber uint64, metrics *solLpMetrics, cpiEventExtractor *CPIEventExtractor, commitment rpc.CommitmentType) *getBlockJob {
 	return &getBlockJob{
 		client:            client,
 		blocks:            blocks,
@@ -40,6 +41,7 @@ func newGetBlockJob(stopCh services.StopRChan, client RPCClient, blocks chan typ
 		lggr:              lggr,
 		stopCh:            stopCh,
 		metrics:           metrics,
+		commitment:        commitment,
 	}
 }
 
@@ -81,7 +83,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		// NOTE: any change to the filtering arguments may affect calculation of txIndex, which could lead to events duplication.
 		&rpc.GetBlockOpts{
 			Encoding:   solana.EncodingBase64,
-			Commitment: rpc.CommitmentFinalized,
+			Commitment: j.commitment,
 			// get the full transaction details
 			TransactionDetails:             rpc.TransactionDetailsFull,
 			MaxSupportedTransactionVersion: &version,

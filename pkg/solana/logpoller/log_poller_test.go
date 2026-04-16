@@ -72,7 +72,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{{StartingBlock: 16}}).Once()
 
 		expectedErr := errors.New("loaderFailed")
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128), rpc.CommitmentFinalized).Return(nil, nil, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
@@ -88,7 +88,7 @@ func TestLogPoller_run(t *testing.T) {
 		done := func() {}
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128)).Return(blocks, done, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128), rpc.CommitmentFinalized).Return(blocks, done, nil).Once()
 		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, filterID int64) error {
 			switch filterID {
 			case 1:
@@ -151,7 +151,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130), rpc.CommitmentFinalized).Return(nil, nil, expectedError).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorContains(t, err, "failed processing block range [129, 130]: error backfilling filters: failed to start backfill")
 	})
@@ -164,7 +164,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(blocks, func() {}, nil).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130), rpc.CommitmentFinalized).Return(blocks, func() {}, nil).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, int64(130), lp.LogPoller.lastProcessedSlot)
@@ -193,8 +193,8 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(addresses, nil)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil)
 
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, addresses, mock.AnythingOfType("uint64"), uint64(105)).
-			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, _ uint64) (<-chan types.Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, addresses, mock.AnythingOfType("uint64"), uint64(105), rpc.CommitmentFinalized).
+			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, _ uint64, _ rpc.CommitmentType) (<-chan types.Block, func(), error) {
 				backfillFromSlots = append(backfillFromSlots, from)
 				ch := make(chan types.Block, 3)
 				ch <- types.Block{SlotNumber: 101}
@@ -252,8 +252,8 @@ func TestLogPoller_run(t *testing.T) {
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(addresses, nil)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil)
 
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, addresses, mock.AnythingOfType("uint64"), uint64(105)).
-			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, _ uint64) (<-chan types.Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, addresses, mock.AnythingOfType("uint64"), uint64(105), rpc.CommitmentFinalized).
+			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, _ uint64, _ rpc.CommitmentType) (<-chan types.Block, func(), error) {
 				backfillFromSlots = append(backfillFromSlots, from)
 				if from == 101 {
 					return blocks1, func() {}, nil
@@ -310,8 +310,8 @@ func TestLogPoller_run(t *testing.T) {
 			return nil
 		}
 
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, mock.Anything, mock.Anything).
-			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, to uint64) (<-chan types.Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, mock.Anything, mock.Anything, rpc.CommitmentFinalized).
+			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, to uint64, _ rpc.CommitmentType) (<-chan types.Block, func(), error) {
 				// nolint:gosec
 				// G115: from and to are always within int64
 				backfillRanges = append(backfillRanges, [2]int64{int64(from), int64(to)})
@@ -362,8 +362,8 @@ func TestLogPoller_run(t *testing.T) {
 			{ID: 1, StartingBlock: 100, Address: addr1},
 		}).Once()
 
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000)).
-			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000), rpc.CommitmentFinalized).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64, _ rpc.CommitmentType) (<-chan types.Block, func(), error) {
 				blocks := make(chan types.Block, 1)
 				blocks <- types.Block{SlotNumber: 600}
 				close(blocks)
@@ -380,8 +380,8 @@ func TestLogPoller_run(t *testing.T) {
 			{ID: 2, StartingBlock: 900, Address: addr2},
 		}).Once()
 		// The new filter's backfill should use the DB latest block (1000) as the upper bound
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000)).
-			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000), rpc.CommitmentFinalized).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64, _ rpc.CommitmentType) (<-chan types.Block, func(), error) {
 				blocks := make(chan types.Block)
 				close(blocks)
 				return blocks, func() {}, nil
