@@ -65,6 +65,9 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
 	}
 
+	// force-retain prior behavior in multinode's unreachableLoop
+	cfg.Solana.MultiNode.MultiNode.PollSuccessThreshold = new(uint32)
+
 	rawNodes := make([]map[string]string, 0, len(cfg.Solana.Nodes))
 	for _, n := range cfg.Solana.Nodes {
 		if n == nil || n.URL == nil {
