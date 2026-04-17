@@ -1,3 +1,9 @@
+[toolchain]
+anchor_version = "0.31.0"
+
+[features]
+resolution = false
+
 [programs.localnet]
 hello_world = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
 

@@ -24,7 +24,8 @@ describe("hello-world", () => {
     let storeIdl = JSON.parse(
       fs.readFileSync("../../target/idl/store.json", "utf-8")
     );
-    const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
+    storeIdl.address = CHAINLINK_PROGRAM_ID;
+    const storeProgram = new Program(storeIdl, provider);
 
     // Create a feed
     const description = "FOO/BAR";
