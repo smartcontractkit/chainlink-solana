@@ -1225,7 +1225,7 @@ describe("data feeds cache", function () {
 
       const submissionEvent = waitForEvent(
         mockLegacyStoreProgram,
-        "Submit",
+        "submit",
         (event: any, slot) => {
           assert.strictEqual(
             event.feeds.length,
@@ -1346,13 +1346,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1457,13 +1455,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1526,13 +1522,11 @@ describe("data feeds cache", function () {
       assert.isTrue(report.answer.eq(new BN(321)), "answers match");
       assert.isTrue(report.timestamp == 123, "answers match");
 
-      const staleReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const staleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const staleLenPrefix = Buffer.alloc(4);
       staleLenPrefix.writeUInt32LE(1, 0);
@@ -1542,7 +1536,7 @@ describe("data feeds cache", function () {
 
       const staleReportEvent = waitForEvent(
         cacheProgram,
-        "StaleDecimalReport",
+        "staleDecimalReport",
         (event: any, slot) => {
           assert.isTrue(
             Buffer.from(event.dataId).equals(feedA.dataId),
@@ -1612,13 +1606,11 @@ describe("data feeds cache", function () {
         unauthorizedWorkflow[0].allowedWorkflowName
       );
 
-      const singleReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1637,7 +1629,7 @@ describe("data feeds cache", function () {
 
       const invalidUpdatePermissionEvent = waitForEvent(
         cacheProgram,
-        "InvalidUpdatePermission",
+        "invalidUpdatePermission",
         (event: any, slot) => {
           assert.isTrue(
             Buffer.from(event.dataId).equals(feedA.dataId),
@@ -1720,13 +1712,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1789,13 +1779,11 @@ describe("data feeds cache", function () {
       assert.isTrue(report.answer.eq(new BN(321)), "answers match");
       assert.isTrue(report.timestamp == 123, "answers match");
 
-      const newReport = encodeReceivedDecimalReport(
-        {
-          timestamp: new BN(323),
-          answer: new BN(721),
-          dataId: feedA.dataId,
-        }
-      );
+      const newReport = encodeReceivedDecimalReport({
+        timestamp: new BN(323),
+        answer: new BN(721),
+        dataId: feedA.dataId,
+      });
 
       const newLenPrefix = Buffer.alloc(4);
       newLenPrefix.writeUInt32LE(1, 0);

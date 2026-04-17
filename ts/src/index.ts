@@ -43,7 +43,7 @@ export class OCR2Feed {
     return this.provider.connection.onLogs(feed, (event, ctx) => {
 
       for (const log of this._parser.parseLogs(event.logs)) {
-        if (log.name != "NewTransmission") {
+        if (log.name != "newTransmission") {
           return;
         }
         let parsed = OCR2Feed.parseLog(log);
