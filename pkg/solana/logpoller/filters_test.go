@@ -511,40 +511,92 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	err := filters.LoadFilters(t.Context())
 	require.NoError(t, err)
 	// filters that were not backfilled are properly identified on load
-	ensureInQueue := func(expectedFilters ...types.Filter) {
-		filtersToBackfill := filters.GetFiltersToBackfill()
+	ensureInQueue := func(targetBlock int64, expectedStartingBlock int64, expectedFilters ...types.Filter) {
+		filtersToBackfill, actualStartingBlock := filters.GetFiltersToBackfill(targetBlock)
 		require.Len(t, filtersToBackfill, len(expectedFilters))
+		require.Equal(t, expectedStartingBlock, actualStartingBlock)
 		for _, expectedFilter := range expectedFilters {
 			require.Contains(t, filtersToBackfill, expectedFilter)
 		}
 	}
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter remains in queue if failed to mark as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(errors.New("db call failed")).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.Error(t, err)
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter is removed from queue, if marked as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(nil).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.NoError(t, err)
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue := func() {
+		filterToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+		require.Empty(t, filterToBackfill)
+		require.Equal(t, int64(110), startingBlock)
+	}
+	requireEmptyBackfillQueue()
 	// re adding identical filter won't trigger backfill
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(backfilledFilter.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), backfilledFilter))
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue()
 	// older StartingBlock trigger backfill
 	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 100, notBackfilled)
 	// new filter is always added to the queue
 	newFilter := types.Filter{Name: "new filter"}
-	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
+	const newFilterID = int64(3)
+	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilterID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), newFilter))
-	ensureInQueue(notBackfilled, types.Filter{ID: 3, Name: "new filter"})
+	ensureInQueue(110, 100, notBackfilled, types.Filter{ID: newFilterID, Name: "new filter"})
+	newFilter.ID = newFilterID
+	// update of the starting block via RegisterFilter between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 2)
+	require.Equal(t, int64(100), startingBlock)
+	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
+	orm.EXPECT().InsertFilter(mock.Anything, notBackfilled).Return(notBackfilled.ID, nil).Once()
+	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
+	orm.EXPECT().MarkFilterBackfilled(mock.Anything, newFilterID).Return(nil).Once()
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	ensureInQueue(110, 99, notBackfilled)
+	// replay between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock = filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 1)
+	require.Equal(t, int64(99), startingBlock)
+	filters.UpdateStartingBlocks(98)
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	// reflect new starting block and backfill status caused by UpdateStartingBlocks
+	for _, filter := range []*types.Filter{&notBackfilled, &backfilledFilter, &newFilter} {
+		filter.StartingBlock = 98
+		filter.IsBackfilled = false
+	}
+	// all filters are now in the queue due to global starting block update
+	ensureInQueue(110, 98, notBackfilled, backfilledFilter, newFilter)
+	// partial backfill update doesn't remove filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 109, false)
+		require.NoError(t, err)
+	}
+	require.NoError(t, err)
+	ensureInQueue(110, 109, notBackfilled, backfilledFilter, newFilter)
+	// full backfill update removes filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		orm.EXPECT().MarkFilterBackfilled(mock.Anything, filter.ID).Return(nil).Once()
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	filtersToBackfill, _ = filters.GetFiltersToBackfill(110)
+	require.Empty(t, filtersToBackfill)
 }
 
 func TestFilters_ExtractField(t *testing.T) {
@@ -735,7 +787,7 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			copy(newFilters, origFilters)
 			filters.filtersByID[ids[0]] = &newFilters[0]
 			filters.filtersByID[ids[1]] = &newFilters[1]
-			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
+			filters.filtersToBackfill = map[int64]int64{ids[0]: 0}
 			filters.UpdateStartingBlocks(tt.replayBlock)
 			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
 
