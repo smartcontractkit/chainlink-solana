@@ -3,11 +3,15 @@
 #![allow(rustdoc::missing_doc_code_examples)]
 #![deny(missing_docs)]
 
+/// Canonical Chainlink store program id on public clusters (see explorer / ops config).
+/// Local `anchor test` uses the workspace id from `contracts/Anchor.toml`; pass that id to
+/// [`v2::read_feed_v2`](crate::v2::read_feed_v2) as `store_program_id`.
+pub const CHAINLINK_STORE_MAINNET: solana_program::pubkey::Pubkey =
+    solana_program::pubkey!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
+
 pub(crate) mod data_feeds_store_v1 {
     use borsh::{BorshDeserialize, BorshSerialize};
-    use anchor_lang::solana_program::pubkey::Pubkey;
-
-    solana_program::declare_id!("HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny");
+    use solana_program::pubkey::Pubkey;
 
     pub(crate) const TRANSMISSIONS_DISCRIMINATOR: [u8; 8] = [96, 179, 69, 66, 128, 129, 73, 117];
 
@@ -69,8 +73,9 @@ pub mod v2 {
     use std::{cell::Ref, convert::TryInto, mem::size_of};
 
     use super::data_feeds_store_v1::{
-        Transmission, Transmissions, HEADER_SIZE, ID, TRANSMISSIONS_DISCRIMINATOR,
+        Transmission, Transmissions, HEADER_SIZE, TRANSMISSIONS_DISCRIMINATOR,
     };
+    use solana_program::pubkey::Pubkey;
     /// Represents a single oracle round.
     #[derive(BorshSerialize, BorshDeserialize)]
     pub struct Round {
@@ -164,26 +169,32 @@ pub mod v2 {
     ///
     /// Example:
     /// ```ignore
-    /// read_feed_v2(account_info.try_borrow_data()?, account_info.owner.to_bytes());
+    /// read_feed_v2(
+    ///     account_info.try_borrow_data()?,
+    ///     account_info.owner.to_bytes(),
+    ///     chainlink_store_program.key,
+    /// );
     /// ```
     ///
     /// The caller is responsible for providing both:
     /// - the account’s **data** (via `AccountInfo::try_borrow_data()`), and  
-    /// - the account’s **owner** (via `AccountInfo::owner.to_bytes()`).
+    /// - the feed account’s **owner** bytes (via `AccountInfo::owner.to_bytes()`), and  
+    /// - the **store program id** that must own the feed (same as `chainlink_store_program.key`).
     ///
-    /// Ensure these values come from the same feed account.
+    /// Ensure feed data and owner come from the same feed account.
     ///
     // DEV: Method does not expose `AccountInfo` to avoid
     // dependency from `anchor-lang` or `solana-program` version
     pub fn read_feed_v2(
         data: Ref<&mut [u8]>,
-        owner: [u8; 32],
+        feed_owner: [u8; 32],
+        store_program_id: &Pubkey,
     ) -> std::result::Result<Feed, ReadError> {
         if !data.starts_with(&TRANSMISSIONS_DISCRIMINATOR) {
             return Err(ReadError::InvalidDiscriminator);
         }
 
-        if owner != ID.to_bytes() {
+        if &feed_owner != store_program_id.as_ref() {
             return Err(ReadError::InvalidOwner);
         }
 
@@ -224,7 +235,7 @@ mod tests {
     use std::convert::TryInto;
     use std::mem::size_of;
 
-    use super::data_feeds_store_v1::{Transmission, Transmissions, HEADER_SIZE, ID};
+    use super::data_feeds_store_v1::{Transmission, Transmissions, HEADER_SIZE};
     use super::v2::read_feed_v2;
     use anchor_lang::prelude::{AccountInfo, Pubkey as AnchorPubkey};
     use anchor_lang::solana_program::{hash, pubkey::Pubkey as SolanaPubkey};
@@ -313,14 +324,18 @@ mod tests {
         // We pass in the owner program ID this way for testing purposes only.
         // For ordinary usage in production applications you must pass in owner (as bytes)
         // from the AccountInfo struct. See `read_feed_v2` comments for more detail.
-        let feed = read_feed_v2(account.try_borrow_data()?, ID.to_bytes())?;
+        let feed = read_feed_v2(account.try_borrow_data()?, account.owner.to_bytes(), account.owner)?;
 
         let round = feed.latest_round_data().unwrap();
         assert_eq!(round.answer, 12);
 
         // test aligned data
         let other_account = mock_account_info(&key, true, true, &mut lamports, &mut buffer, &owner);
-        let other_feed = read_feed_v2(other_account.try_borrow_data()?, ID.to_bytes())?;
+        let other_feed = read_feed_v2(
+            other_account.try_borrow_data()?,
+            other_account.owner.to_bytes(),
+            other_account.owner,
+        )?;
 
         let other_round = other_feed.latest_round_data().unwrap();
         assert_eq!(other_round.answer, 12);

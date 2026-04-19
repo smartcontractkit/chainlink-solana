@@ -5,6 +5,7 @@ import { PublicKey } from "@solana/web3.js";
 export const CHAINLINK_AGGREGATOR_PROGRAM_ID = new PublicKey(
   "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
 );
+/** Mainnet / typical public deployment. Local `anchor test` loads `store.so` at the id in `contracts/Anchor.toml`. */
 export const CHAINLINK_STORE_PROGRAM_ID = new PublicKey(
   "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
 );
