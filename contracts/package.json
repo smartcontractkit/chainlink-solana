@@ -7,7 +7,7 @@
     "@types/chai": "^4.2.22",
     "@types/mocha": "^10.0.0",
     "@types/node": "^14.14.37",
-    "bn.js": "^5.2.0",
+    "bn.js": "^5.2.3",
     "borsh": "^0.7.0",
     "chai": "^4.3.4",
     "ethereum-cryptography": "^3.2.0",
