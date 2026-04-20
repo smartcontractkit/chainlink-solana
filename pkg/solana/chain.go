@@ -391,12 +391,12 @@ func (c *chain) LatestHead(ctx context.Context) (types.Head, error) {
 	commitment := c.cfg.Commitment()
 	slot, err := sc.SlotHeightWithCommitment(ctx, commitment)
 	if err != nil {
-		return types.Head{}, nil
+		return types.Head{}, fmt.Errorf("failed to get slot height: %w", err)
 	}
 
 	block, err := sc.GetBlockWithOpts(ctx, slot, client.HeadMetadataGetBlockOpts(commitment))
 	if err != nil {
-		return types.Head{}, nil
+		return types.Head{}, fmt.Errorf("failed to get block: %w", err)
 	}
 
 	if block.BlockHeight == nil {
