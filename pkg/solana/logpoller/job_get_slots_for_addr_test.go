@@ -105,7 +105,7 @@ func TestGetSlotsForAddressJob(t *testing.T) {
 		err := job.Run(t.Context())
 		require.NoError(t, err)
 		requireJobIsDone(t, job.Done(), "expected job to be done")
-		require.Equal(t, []uint64{19, 20, 11, 10}, actualSlots)
+		require.Equal(t, []uint64{19, 20, 11, 10, 10}, actualSlots)
 	})
 	t.Run("If slot range may have more signatures, schedules a new job", func(t *testing.T) {
 		client := mocks.NewRPCClient(t)

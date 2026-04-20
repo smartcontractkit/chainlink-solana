@@ -90,6 +90,7 @@ type Service struct {
 	processBlocks     func(ctx context.Context, blocks []types.Block) error
 	blockTime         time.Duration
 	startingLookback  time.Duration
+	slotsBatchSize    int64
 	metrics           *solLpMetrics
 }
 
@@ -116,7 +117,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 		Start: lp.start,
 		NewSubServices: func(lggr logger.Logger) []services.Service {
 			lp.filters = newFilters(lggr, orm, lp.cpiEventExtractor)
-			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor, cfg.LogPollerSlotsBatchSize())
+			loader := NewEncodedLogCollector(cl, lggr, chainID, lp.metrics, lp.cpiEventExtractor)
 			lp.loader = loader
 			return []services.Service{loader}
 		},
@@ -126,6 +127,7 @@ func New(lggr logger.SugaredLogger, orm ORM, cl RPCClient, cfg config.Config, ch
 
 	lp.startingLookback = cfg.LogPollerStartingLookback()
 	lp.blockTime = cfg.BlockTime()
+	lp.slotsBatchSize = cfg.LogPollerSlotsBatchSize()
 
 	return lp, nil
 }

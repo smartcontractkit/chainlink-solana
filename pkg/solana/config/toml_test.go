@@ -55,7 +55,7 @@ var fullConfig = TOMLConfig{
 		EstimateComputeUnitLimit:  ptr(false),
 		LogPollerStartingLookback: config.MustNewDuration(24 * time.Hour),
 		LogPollerCPIEventsEnabled: ptr(true),
-		LogPollerSlotsBatchSize:   ptr[int64](100),
+		LogPollerSlotsBatchSize:   ptr[int64](1000),
 	},
 	Workflow: WorkflowConfig{
 		AcceptanceTimeout: config.MustNewDuration(42 * time.Second),

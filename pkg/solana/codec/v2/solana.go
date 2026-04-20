@@ -3,6 +3,7 @@ package codecv2
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	"github.com/gagliardetto/anchor-go/idl/idltype"
@@ -20,6 +21,19 @@ const (
 	DefaultHashBitLength = 32
 	unknownIDLFormat     = "%w: unknown IDL type def %q"
 )
+
+// snakeToPascal converts a snake_case string to PascalCase.
+// e.g. "transmission_id" -> "TransmissionId", "don_id" -> "DonId"
+func snakeToPascal(s string) string {
+	caser := cases.Title(language.English, cases.NoLower)
+	parts := strings.Split(s, "_")
+	for i, part := range parts {
+		if len(part) > 0 {
+			parts[i] = caser.String(part)
+		}
+	}
+	return strings.Join(parts, "")
+}
 
 func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl anchoridl.Idl, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
@@ -149,7 +163,7 @@ func asStruct(
 				return name, nil, err
 			}
 
-			named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+			named[idx] = commonencodings.NamedTypeCodec{Name: snakeToPascal(fieldName), Codec: typedCodec}
 		}
 		structCodec, err := commonencodings.NewStructCodec(named)
 		if err != nil {
@@ -175,7 +189,7 @@ func asStructForInstructionArgs(
 		if err != nil {
 			return nil, err
 		}
-		named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+		named[idx] = commonencodings.NamedTypeCodec{Name: snakeToPascal(fieldName), Codec: typedCodec}
 	}
 
 	var isVecOrArray bool
