@@ -8,7 +8,7 @@ replace github.com/smartcontractkit/chainlink-solana/contracts => ../contracts
 
 require (
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/docker/docker v28.5.2+incompatible
+	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.14.0
@@ -30,7 +30,7 @@ require (
 	github.com/smartcontractkit/libocr v0.0.0-20260403184524-b6409238958d
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	github.com/testcontainers/testcontainers-go v0.41.0
+	github.com/testcontainers/testcontainers-go v0.40.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/sync v0.20.0
