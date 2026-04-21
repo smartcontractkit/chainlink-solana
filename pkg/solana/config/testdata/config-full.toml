@@ -25,7 +25,7 @@ ComputeUnitLimitDefault = 100000
 EstimateComputeUnitLimit = false
 LogPollerStartingLookback = '24h0m0s'
 LogPollerCPIEventsEnabled = true
-LogPollerSlotsBatchSize = 100
+LogPollerSlotsBatchSize = 1000
 
 [Workflow]
 AcceptanceTimeout = '42s'

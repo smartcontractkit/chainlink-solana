@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@chainlink/solana-sdk": "link:../ts",
-    "@coral-xyz/anchor": "^0.29.0",
+    "@coral-xyz/anchor": "^0.31.0",
     "@solana/spl-token": "^0.3.5",
     "@solana/web3.js": "^1.50.1 <=1.92.3",
     "@types/chai": "^4.2.22",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "@types/chai-as-promised": "^8.0.2",
     "chai-as-promised": "^8.0.1",
-    "@coral-xyz/borsh": "^0.29.0"
+    "@coral-xyz/borsh": "^0.31.1"
   },
   "pnpm": {
     "overrides": {

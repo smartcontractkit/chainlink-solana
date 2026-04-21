@@ -152,6 +152,6 @@ pub fn deserialize_from_buffer_account(
 
 fn div_ceil<T: Into<u32>>(a: T, b: T) -> u32 {
     let (a, b) = (a.into(), b.into());
-    assert!(a + b - 1 > 0);
-    (a + b - 1) / b
+    assert!(b > 0);
+    a.div_ceil(b)
 }

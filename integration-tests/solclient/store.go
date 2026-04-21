@@ -34,16 +34,18 @@ func (m *Store) TransmissionsAddress() string {
 
 func (m *Store) SetValidatorConfig(flaggingThreshold uint32) error {
 	payer := m.Client.DefaultWallet
-	err := m.Client.TXAsync(
+	validatorInstr, err := store.NewSetValidatorConfigInstruction(
+		flaggingThreshold,
+		m.Feed.PublicKey(),
+		m.Owner.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
+	err = m.Client.TXAsync(
 		"Set validator config",
-		[]solana.Instruction{
-			store.NewSetValidatorConfigInstruction(
-				flaggingThreshold,
-				m.Feed.PublicKey(),
-				m.Owner.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{validatorInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey
@@ -67,16 +69,18 @@ func (m *Store) SetWriter(writerAuthority string) error {
 	if err != nil {
 		return nil
 	}
+	setWriterInstr, err := store.NewSetWriterInstruction(
+		writerAuthPubKey,
+		m.Feed.PublicKey(),
+		m.Owner.PublicKey(),
+		m.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	err = m.Client.TXAsync(
 		"Set writer",
-		[]solana.Instruction{
-			store.NewSetWriterInstruction(
-				writerAuthPubKey,
-				m.Feed.PublicKey(),
-				m.Owner.PublicKey(),
-				m.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{setWriterInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(m.Owner.PublicKey()) {
 				return &m.Owner.PrivateKey

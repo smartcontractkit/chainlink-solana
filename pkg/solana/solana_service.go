@@ -648,24 +648,38 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 }
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
-	var idl logpollertypes.EventIdl
-	err := json.Unmarshal(f.ContractIdlJSON, &idl)
-	if err != nil {
-		return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
-	}
-
-	return logpollertypes.Filter{
+	filter := logpollertypes.Filter{
 		Name:            f.Name,
 		Address:         logpollertypes.PublicKey(f.Address),
 		EventName:       f.EventName,
 		EventSig:        logpollertypes.EventSignature(f.EventSig),
 		StartingBlock:   f.StartingBlock,
-		EventIdl:        idl,
+		ContractIdl:     string(f.ContractIdlJSON),
 		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
 		Retention:       f.Retention,
 		MaxLogsKept:     f.MaxLogsKept,
 		IncludeReverted: f.IncludeReverted,
-	}, nil
+	}
+
+	if f.CPIFilterConfig != nil {
+		if len(f.CPIFilterConfig.DestAddress) != solana.PublicKeyLength {
+			return logpollertypes.Filter{}, fmt.Errorf("invalid CPI filter dest address length: expected %d, got %d", solana.PublicKeyLength, len(f.CPIFilterConfig.DestAddress))
+		}
+		var destProgram logpollertypes.PublicKey
+		copy(destProgram[:], f.CPIFilterConfig.DestAddress[:])
+		var methodSig logpollertypes.EventSignature
+		if f.CPIFilterConfig.MethodName == logpollertypes.AnchorCPIMethodName {
+			methodSig = logpollertypes.AnchorCPIEventDiscriminator()
+		} else {
+			methodSig = logpollertypes.NewMethodSignatureFromName(f.CPIFilterConfig.MethodName)
+		}
+		filter.ExtraFilterConfig = logpollertypes.ExtraFilterConfig{
+			DestProgram:     destProgram,
+			MethodSignature: methodSig,
+		}
+	}
+
+	return filter, nil
 }
 
 func convertAccounts(accs []*rpc.Account) ([]*commonsol.Account, error) {
