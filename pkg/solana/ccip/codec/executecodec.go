@@ -264,7 +264,7 @@ func ParseExtraDataMap(input map[string]any) (ExtraData, error) {
 			default:
 				return out, fmt.Errorf("invalid type for IsWritableBitmap, expected uint64, got %T", fieldValue)
 			}
-		case "Accounts":
+		case "accounts":
 			switch v := fieldValue.(type) {
 			case [][32]byte:
 				a := make([]solana.PublicKey, len(v))
