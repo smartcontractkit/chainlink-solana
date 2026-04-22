@@ -42,6 +42,6 @@ func (a addressCodec) OracleIDAsAddressBytes(oracleID uint8) ([]byte, error) {
 }
 
 func (a addressCodec) TransmitterBytesToString(addr []byte) (string, error) {
-	// Transmitter accounts are addresses
+	// Transmitter Accounts are addresses
 	return a.AddressBytesToString(addr)
 }

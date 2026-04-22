@@ -27,9 +27,9 @@ type ExecutePluginCodecV1 struct {
 
 // ExtraData is a struct for holding the decoded extra args data used for encoding the execute report.
 type ExtraData struct {
-	extraArgs     ccip_offramp.Any2SVMRampExtraArgs
-	accounts      []solana.PublicKey
-	tokenReceiver solana.PublicKey
+	ExtraArgs     ccip_offramp.Any2SVMRampExtraArgs
+	Accounts      []solana.PublicKey
+	TokenReceiver solana.PublicKey
 }
 
 func NewExecutePluginCodecV1(extraDataCodec ccipocr3.ExtraDataCodecBundle) *ExecutePluginCodecV1 {
@@ -117,9 +117,9 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 			},
 			Sender:        msg.Sender,
 			Data:          msg.Data,
-			TokenReceiver: ed.tokenReceiver,
+			TokenReceiver: ed.TokenReceiver,
 			TokenAmounts:  tokenAmounts,
-			ExtraArgs:     ed.extraArgs,
+			ExtraArgs:     ed.ExtraArgs,
 		}
 
 		// should only have an offchain token data if there are tokens as part of the message
@@ -264,7 +264,7 @@ func ParseExtraDataMap(input map[string]any) (ExtraData, error) {
 			default:
 				return out, fmt.Errorf("invalid type for IsWritableBitmap, expected uint64, got %T", fieldValue)
 			}
-		case "accounts":
+		case "Accounts":
 			switch v := fieldValue.(type) {
 			case [][32]byte:
 				a := make([]solana.PublicKey, len(v))
@@ -314,9 +314,9 @@ func ParseExtraDataMap(input map[string]any) (ExtraData, error) {
 		}
 	}
 
-	out.extraArgs = extraArgs
-	out.accounts = accounts
-	out.tokenReceiver = tokenReceiver
+	out.ExtraArgs = extraArgs
+	out.Accounts = accounts
+	out.TokenReceiver = tokenReceiver
 	return out, nil
 }
 

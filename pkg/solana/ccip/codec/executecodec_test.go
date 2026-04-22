@@ -327,12 +327,12 @@ func TestParseExtraDataMap_NativeTypes(t *testing.T) {
 
 	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
-	assert.Equal(t, uint32(2000000), ed.extraArgs.ComputeUnits)
-	assert.Equal(t, uint64(6), ed.extraArgs.IsWritableBitmap)
-	assert.Equal(t, solanago.PublicKeyFromBytes(receiver[:]), ed.tokenReceiver)
-	require.Len(t, ed.accounts, 2)
-	assert.Equal(t, solanago.PublicKeyFromBytes(account1[:]), ed.accounts[0])
-	assert.Equal(t, solanago.PublicKeyFromBytes(account2[:]), ed.accounts[1])
+	assert.Equal(t, uint32(2000000), ed.ExtraArgs.ComputeUnits)
+	assert.Equal(t, uint64(6), ed.ExtraArgs.IsWritableBitmap)
+	assert.Equal(t, solanago.PublicKeyFromBytes(receiver[:]), ed.TokenReceiver)
+	require.Len(t, ed.Accounts, 2)
+	assert.Equal(t, solanago.PublicKeyFromBytes(account1[:]), ed.Accounts[0])
+	assert.Equal(t, solanago.PublicKeyFromBytes(account2[:]), ed.Accounts[1])
 }
 
 func TestParseExtraDataMap_LOOPConvertedTypes(t *testing.T) {
@@ -358,12 +358,12 @@ func TestParseExtraDataMap_LOOPConvertedTypes(t *testing.T) {
 
 	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
-	assert.Equal(t, uint32(2000000), ed.extraArgs.ComputeUnits)
-	assert.Equal(t, uint64(6), ed.extraArgs.IsWritableBitmap)
-	assert.Equal(t, solanago.PublicKeyFromBytes(receiver), ed.tokenReceiver)
-	require.Len(t, ed.accounts, 2)
-	assert.Equal(t, solanago.PublicKeyFromBytes(account1), ed.accounts[0])
-	assert.Equal(t, solanago.PublicKeyFromBytes(account2), ed.accounts[1])
+	assert.Equal(t, uint32(2000000), ed.ExtraArgs.ComputeUnits)
+	assert.Equal(t, uint64(6), ed.ExtraArgs.IsWritableBitmap)
+	assert.Equal(t, solanago.PublicKeyFromBytes(receiver), ed.TokenReceiver)
+	require.Len(t, ed.Accounts, 2)
+	assert.Equal(t, solanago.PublicKeyFromBytes(account1), ed.Accounts[0])
+	assert.Equal(t, solanago.PublicKeyFromBytes(account2), ed.Accounts[1])
 }
 
 func TestParseExtraDataMap_LOOPAccountsAsByteSlice(t *testing.T) {
@@ -380,8 +380,8 @@ func TestParseExtraDataMap_LOOPAccountsAsByteSlice(t *testing.T) {
 
 	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
-	require.Len(t, ed.accounts, 1)
-	assert.Equal(t, solanago.PublicKeyFromBytes(account1), ed.accounts[0])
+	require.Len(t, ed.Accounts, 1)
+	assert.Equal(t, solanago.PublicKeyFromBytes(account1), ed.Accounts[0])
 }
 
 func TestParseExtraDataMap_InvalidTypes(t *testing.T) {

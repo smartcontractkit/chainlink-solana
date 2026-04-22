@@ -41,7 +41,7 @@ func NewExtraDataDecoder() ExtraDataDecoder {
 // DecodeExtraArgsToMap is a helper function for converting Borsh encoded extra args bytes into map[string]any
 func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs ccipocr3.Bytes) (map[string]any, error) {
 	if len(extraArgs) < 4 {
-		return nil, fmt.Errorf("extra args too short: %d, should be at least 4 (i.e the extraArgs tag)", len(extraArgs))
+		return nil, fmt.Errorf("extra args too short: %d, should be at least 4 (i.e the ExtraArgs tag)", len(extraArgs))
 	}
 
 	var decodedEvmTag, decodedSvmTag []byte

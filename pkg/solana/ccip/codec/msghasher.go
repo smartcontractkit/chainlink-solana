@@ -81,10 +81,10 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg ccipocr3.Message) (ccipocr
 		return [32]byte{}, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 	}
 
-	anyToSolanaMessage.TokenReceiver = ed.tokenReceiver
-	anyToSolanaMessage.ExtraArgs = ed.extraArgs
-	accounts := ed.accounts
-	// if logical receiver is empty, don't prepend it to the accounts list
+	anyToSolanaMessage.TokenReceiver = ed.TokenReceiver
+	anyToSolanaMessage.ExtraArgs = ed.ExtraArgs
+	accounts := ed.Accounts
+	// if logical receiver is empty, don't prepend it to the Accounts list
 	if !msg.Receiver.IsZeroOrEmpty() {
 		accounts = append([]solana.PublicKey{solana.PublicKeyFromBytes(msg.Receiver)}, accounts...)
 	}
