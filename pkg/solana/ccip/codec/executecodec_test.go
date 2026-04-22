@@ -325,7 +325,7 @@ func TestParseExtraDataMap_NativeTypes(t *testing.T) {
 		"Accounts":                 [][32]byte{account1, account2},
 	}
 
-	ed, err := parseExtraDataMap(input)
+	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
 	assert.Equal(t, uint32(2000000), ed.extraArgs.ComputeUnits)
 	assert.Equal(t, uint64(6), ed.extraArgs.IsWritableBitmap)
@@ -356,7 +356,7 @@ func TestParseExtraDataMap_LOOPConvertedTypes(t *testing.T) {
 		},
 	}
 
-	ed, err := parseExtraDataMap(input)
+	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
 	assert.Equal(t, uint32(2000000), ed.extraArgs.ComputeUnits)
 	assert.Equal(t, uint64(6), ed.extraArgs.IsWritableBitmap)
@@ -378,7 +378,7 @@ func TestParseExtraDataMap_LOOPAccountsAsByteSlice(t *testing.T) {
 		"Accounts":                [][]byte{account1},
 	}
 
-	ed, err := parseExtraDataMap(input)
+	ed, err := ParseExtraDataMap(input)
 	require.NoError(t, err)
 	require.Len(t, ed.accounts, 1)
 	assert.Equal(t, solanago.PublicKeyFromBytes(account1), ed.accounts[0])
@@ -389,7 +389,7 @@ func TestParseExtraDataMap_InvalidTypes(t *testing.T) {
 		input := map[string]any{
 			"ComputeUnits": int64(5000000000), // exceeds uint32 max
 		}
-		_, err := parseExtraDataMap(input)
+		_, err := ParseExtraDataMap(input)
 		require.ErrorContains(t, err, "ComputeUnits out of uint32 range")
 	})
 
@@ -397,7 +397,7 @@ func TestParseExtraDataMap_InvalidTypes(t *testing.T) {
 		input := map[string]any{
 			"TokenReceiver": []byte{0x01, 0x02}, // not 32 bytes
 		}
-		_, err := parseExtraDataMap(input)
+		_, err := ParseExtraDataMap(input)
 		require.ErrorContains(t, err, "invalid length for TokenReceiver")
 	})
 
@@ -407,7 +407,7 @@ func TestParseExtraDataMap_InvalidTypes(t *testing.T) {
 				[]byte{0x01, 0x02}, // not 32 bytes
 			},
 		}
-		_, err := parseExtraDataMap(input)
+		_, err := ParseExtraDataMap(input)
 		require.ErrorContains(t, err, "invalid length for Accounts[0]")
 	})
 
@@ -417,7 +417,7 @@ func TestParseExtraDataMap_InvalidTypes(t *testing.T) {
 				"not bytes",
 			},
 		}
-		_, err := parseExtraDataMap(input)
+		_, err := ParseExtraDataMap(input)
 		require.ErrorContains(t, err, "invalid type for Accounts[0]")
 	})
 }

@@ -25,7 +25,8 @@ type ExecutePluginCodecV1 struct {
 	extraDataCodec ccipocr3.ExtraDataCodecBundle
 }
 
-type extraData struct {
+// ExtraData is a struct for holding the decoded extra args data used for encoding the execute report.
+type ExtraData struct {
 	extraArgs     ccip_offramp.Any2SVMRampExtraArgs
 	accounts      []solana.PublicKey
 	tokenReceiver solana.PublicKey
@@ -97,7 +98,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 			return nil, fmt.Errorf("failed to decode extra args: %w", err)
 		}
 
-		ed, err := parseExtraDataMap(extraDataDecodedMap)
+		ed, err := ParseExtraDataMap(extraDataDecodedMap)
 		if err != nil {
 			return nil, fmt.Errorf("invalid extra args map: %w", err)
 		}
@@ -223,9 +224,10 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	return report, nil
 }
 
-func parseExtraDataMap(input map[string]any) (extraData, error) {
+// ParseExtraDataMap parses the decoded extra args map into the extraData struct used for encoding the execute report.
+func ParseExtraDataMap(input map[string]any) (ExtraData, error) {
 	// Parse input map into SolanaExtraArgs
-	var out extraData
+	var out ExtraData
 	var extraArgs ccip_offramp.Any2SVMRampExtraArgs
 	var accounts []solana.PublicKey
 	var tokenReceiver solana.PublicKey

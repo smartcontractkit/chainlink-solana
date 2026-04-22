@@ -76,7 +76,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg ccipocr3.Message) (ccipocr
 		return [32]byte{}, fmt.Errorf("failed to decode extra args: %w", err)
 	}
 
-	ed, err := parseExtraDataMap(extraDataDecodedMap)
+	ed, err := ParseExtraDataMap(extraDataDecodedMap)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 	}
