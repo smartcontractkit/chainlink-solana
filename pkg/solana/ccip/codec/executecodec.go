@@ -79,7 +79,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 				return nil, fmt.Errorf("failed to decode dest exec data: %w", err)
 			}
 
-			destGasAmount, err := extractDestGasAmountFromMap(destExecDataDecodedMap)
+			destGasAmount, err := ExtractDestGasAmountFromMap(destExecDataDecodedMap)
 			if err != nil {
 				return nil, err
 			}
@@ -320,7 +320,8 @@ func ParseExtraDataMap(input map[string]any) (ExtraData, error) {
 	return out, nil
 }
 
-func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
+// ExtractDestGasAmountFromMap searches for the dest gas amount in the decoded DestExecData map and returns it as a uint32.
+func ExtractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 	// Search for the gas fields
 	for fieldName, fieldValue := range input {
 		lowercase := strings.ToLower(fieldName)

@@ -54,7 +54,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg ccipocr3.Message) (ccipocr
 			return [32]byte{}, fmt.Errorf("failed to decode dest exec data: %w", err)
 		}
 
-		destGasAmount, err := extractDestGasAmountFromMap(destExecDataDecodedMap)
+		destGasAmount, err := ExtractDestGasAmountFromMap(destExecDataDecodedMap)
 		if err != nil {
 			return [32]byte{}, err
 		}
