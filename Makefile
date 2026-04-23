@@ -2,10 +2,10 @@ BIN_DIR = bin
 
 export GOPATH ?= $(shell go env GOPATH)
 export GO111MODULE ?= on
-export PROJECT_SERUM_VERSION ?=v0.29.0
+export PROJECT_SERUM_VERSION ?=v0.31.0
 export PROJECT_SERUM_IMAGE ?= backpackapp/build:$(PROJECT_SERUM_VERSION)
 
-export ANCHOR_VERSION ?=v0.29.0
+export ANCHOR_VERSION ?=v0.31.0
 TARGET_DIR ?= $(PWD)/contracts/target
 
 LINUX=LINUX
@@ -70,7 +70,12 @@ build_js:
 	cd gauntlet && yarn install --frozen-lockfile && yarn bundle
 
 build_contracts:
-	docker run --rm -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
+	docker run --rm -v $(shell pwd):/workdir \
+		-e CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse \
+		-e CARGO_HOME=/workdir/.cargo-home \
+		-e CARGO_TARGET_DIR=/workdir/contracts/target \
+		-e TMPDIR=/workdir/.build-tmp \
+		${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/anchor-build.sh
 
 build_contracts_local:
 	docker run --rm -it -v $(shell pwd):/workdir ${PROJECT_SERUM_IMAGE} /bin/bash ./scripts/setup-local.sh

@@ -13,9 +13,16 @@
         { "name": "Accounts", "type": { "vec": "publicKey" } },
         { "name": "DifferentField", "type": "string" },
         { "name": "BigField", "type": "i128" },
-        { "name": "NestedDynamicStruct", "type": { "defined": "NestedDynamic" } },
+        {
+          "name": "NestedDynamicStruct",
+          "type": { "defined": "NestedDynamic" }
+        },
         { "name": "NestedStaticStruct", "type": { "defined": "NestedStatic" } }
       ]
+    },
+    {
+      "name": "TestEvent",
+      "fields": [{ "name": "Field1", "type": "i64" }]
     }
   ],
   "types": [

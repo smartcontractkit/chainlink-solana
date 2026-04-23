@@ -4,8 +4,10 @@ use arrayvec::arrayvec;
 use static_assertions::const_assert;
 use std::mem;
 
+// No AnchorSerialize/AnchorDeserialize: both zero_copy and those derives implement IdlBuild (conflict).
+// Zero_copy account data is used via load()/load_mut(); no separate serialize needed.
 #[zero_copy]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct SignerAddressList {
     pub xs: [[u8; 20]; MAX_ACCTS], // Fixed array of 32 addresses (20 bytes each)
     pub len: u64,
@@ -20,7 +22,7 @@ const_assert!(
 
 /// Account which represent a set of oracles expected to sign a forwarder report.
 #[account(zero_copy)]
-#[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace)]
 pub struct OraclesConfig {
     pub config_id: u64,                      // 8 bytes
     pub f: u8,                               // 1 byte

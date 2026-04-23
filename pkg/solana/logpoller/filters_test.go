@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -239,6 +244,71 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		// all indices contain filter
 		requireIndexed(t, fs, filter)
 	})
+	t.Run("Happy path versioned", func(t *testing.T) {
+		// 1. Create decoder codecs for the same event using two different IDL formats
+		// 2. Create encoded event data
+		// 3. Decode subkey from event data using both codecs and verify the results are the same
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+		eventName := "TestEvent"
+
+		// Test with codec v1 (CodecEventIdl)
+		codecV1Filter := types.Filter{
+			Name:        "codecV1Filter",
+			ContractIdl: codecv1.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV1FilterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV1FilterID, nil).Once()
+		err := fs.RegisterFilter(t.Context(), codecV1Filter)
+		require.NoError(t, err)
+
+		// Test with codec v2 (Codecv2EventIdl)
+		codecV2Filter := types.Filter{
+			Name:        "codecV2Filter",
+			ContractIdl: codecv2.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV2FilterID = int64(2)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV2FilterID, nil).Once()
+		err = fs.RegisterFilter(t.Context(), codecV2Filter)
+		require.NoError(t, err)
+
+		// Verify both filters are registered
+		require.Len(t, fs.filtersToBackfill, 2)
+		require.Contains(t, fs.filtersToBackfill, codecV1FilterID)
+		require.Contains(t, fs.filtersToBackfill, codecV2FilterID)
+
+		// Test DecodeSubKey for both codec versions
+		// Define test event structs matching the IDL field names
+		type TestEvent struct {
+			Field1 int64
+		}
+
+		// Create test data
+		testValue := int64(12345)
+
+		// Borsh encode for event data
+		// Events use sha256("event:<EventName>")[:8] as discriminator
+		discriminator := solcommoncodec.NewDiscriminatorHashPrefix(eventName, false)
+		eventData := TestEvent{Field1: testValue}
+		buf := new(bytes.Buffer)
+		buf.Write(discriminator)
+		require.NoError(t, binary.NewBorshEncoder(buf).Encode(eventData))
+		encodedBytes := buf.Bytes()
+
+		// Test DecodeSubKey for v1
+		v1Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV1FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v1Result)
+
+		// Test DecodeSubKey for v2
+		v2Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV2FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v2Result)
+	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
@@ -441,40 +511,92 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	err := filters.LoadFilters(t.Context())
 	require.NoError(t, err)
 	// filters that were not backfilled are properly identified on load
-	ensureInQueue := func(expectedFilters ...types.Filter) {
-		filtersToBackfill := filters.GetFiltersToBackfill()
+	ensureInQueue := func(targetBlock int64, expectedStartingBlock int64, expectedFilters ...types.Filter) {
+		filtersToBackfill, actualStartingBlock := filters.GetFiltersToBackfill(targetBlock)
 		require.Len(t, filtersToBackfill, len(expectedFilters))
+		require.Equal(t, expectedStartingBlock, actualStartingBlock)
 		for _, expectedFilter := range expectedFilters {
 			require.Contains(t, filtersToBackfill, expectedFilter)
 		}
 	}
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter remains in queue if failed to mark as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(errors.New("db call failed")).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.Error(t, err)
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter is removed from queue, if marked as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(nil).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.NoError(t, err)
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue := func() {
+		filterToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+		require.Empty(t, filterToBackfill)
+		require.Equal(t, int64(110), startingBlock)
+	}
+	requireEmptyBackfillQueue()
 	// re adding identical filter won't trigger backfill
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(backfilledFilter.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), backfilledFilter))
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue()
 	// older StartingBlock trigger backfill
 	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 100, notBackfilled)
 	// new filter is always added to the queue
 	newFilter := types.Filter{Name: "new filter"}
-	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
+	const newFilterID = int64(3)
+	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilterID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), newFilter))
-	ensureInQueue(notBackfilled, types.Filter{ID: 3, Name: "new filter"})
+	ensureInQueue(110, 100, notBackfilled, types.Filter{ID: newFilterID, Name: "new filter"})
+	newFilter.ID = newFilterID
+	// update of the starting block via RegisterFilter between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 2)
+	require.Equal(t, int64(100), startingBlock)
+	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
+	orm.EXPECT().InsertFilter(mock.Anything, notBackfilled).Return(notBackfilled.ID, nil).Once()
+	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
+	orm.EXPECT().MarkFilterBackfilled(mock.Anything, newFilterID).Return(nil).Once()
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	ensureInQueue(110, 99, notBackfilled)
+	// replay between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock = filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 1)
+	require.Equal(t, int64(99), startingBlock)
+	filters.UpdateStartingBlocks(98)
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	// reflect new starting block and backfill status caused by UpdateStartingBlocks
+	for _, filter := range []*types.Filter{&notBackfilled, &backfilledFilter, &newFilter} {
+		filter.StartingBlock = 98
+		filter.IsBackfilled = false
+	}
+	// all filters are now in the queue due to global starting block update
+	ensureInQueue(110, 98, notBackfilled, backfilledFilter, newFilter)
+	// partial backfill update doesn't remove filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 109, false)
+		require.NoError(t, err)
+	}
+	require.NoError(t, err)
+	ensureInQueue(110, 109, notBackfilled, backfilledFilter, newFilter)
+	// full backfill update removes filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		orm.EXPECT().MarkFilterBackfilled(mock.Anything, filter.ID).Return(nil).Once()
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	filtersToBackfill, _ = filters.GetFiltersToBackfill(110)
+	require.Empty(t, filtersToBackfill)
 }
 
 func TestFilters_ExtractField(t *testing.T) {
@@ -665,7 +787,7 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			copy(newFilters, origFilters)
 			filters.filtersByID[ids[0]] = &newFilters[0]
 			filters.filtersByID[ids[1]] = &newFilters[1]
-			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
+			filters.filtersToBackfill = map[int64]int64{ids[0]: 0}
 			filters.UpdateStartingBlocks(tt.replayBlock)
 			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
 

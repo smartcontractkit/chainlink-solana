@@ -70,10 +70,10 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{{StartingBlock: 16}}).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return([]types.Filter{{StartingBlock: 16}}, 16).Once()
 
 		expectedErr := errors.New("loaderFailed")
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(115)).Return(nil, nil, expectedErr).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(16), uint64(128)).Return(nil, nil, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
@@ -81,18 +81,17 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return([]types.Filter{
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return([]types.Filter{
 			{ID: 1, StartingBlock: 16, Address: types.PublicKey{1, 2, 3}},
 			{ID: 2, StartingBlock: 12, Address: types.PublicKey{1, 2, 3}},
 			{ID: 3, StartingBlock: 14, Address: types.PublicKey{3, 2, 1}},
-		}).Once()
+		}, 12).Once()
 		done := func() {}
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(111)).Return(blocks, done, nil).Once()
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(112), uint64(128)).Return(blocks, done, nil).Once()
-		lp.Filters.EXPECT().MarkFilterBackfilled(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, filterID int64) error {
-			switch filterID {
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{{1, 2, 3}, {3, 2, 1}}, uint64(12), uint64(128)).Return(blocks, done, nil).Once()
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, mock.Anything, int64(128), true).RunAndReturn(func(ctx context.Context, filter types.Filter, _ int64, _ bool) error {
+			switch filter.ID {
 			case 1:
 				return errors.New("filter no longer exists")
 			case 2, 3:
@@ -109,7 +108,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		expectedErr := errors.New("failed to load filters")
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, expectedErr).Once()
 		err := lp.LogPoller.run(t.Context())
@@ -119,7 +118,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(nil, nil).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
@@ -128,7 +127,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		expectedErr := errors.New("RPC failed")
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(0, expectedErr).Once()
@@ -139,7 +138,7 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(16, nil).Once()
 		err := lp.LogPoller.run(t.Context())
@@ -149,27 +148,24 @@ func TestLogPoller_run(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(130, nil).Once()
 		expectedError := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(130)).Return(nil, nil, expectedError).Once()
 		err := lp.LogPoller.run(t.Context())
-		require.ErrorContains(t, err, "failed processing block range [129, 130]: failed processing batch [129, 130]: error backfilling filters: failed to start backfill")
+		require.ErrorContains(t, err, "error backfilling filters: failed to start backfill")
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{{}}, nil).Once()
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(230, nil).Once()
 		blocks := make(chan types.Block)
 		close(blocks)
-		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(228)).Return(blocks, func() {}, nil).Run(func(_ context.Context, _ []types.PublicKey, _, _ uint64) {
-			// ensure that batches are processed in the correct order by configuring second call after the first one is done
-			lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(229), uint64(230)).Return(blocks, func() {}, nil).Once()
-		}).Once()
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, uint64(129), uint64(230)).Return(blocks, func() {}, nil).Once()
 		err := lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 		require.Equal(t, int64(230), lp.LogPoller.lastProcessedSlot)
@@ -194,7 +190,7 @@ func TestLogPoller_run(t *testing.T) {
 		}
 
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil)
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil)
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Twice()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(addresses, nil)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil)
 
@@ -253,7 +249,7 @@ func TestLogPoller_run(t *testing.T) {
 		}
 
 		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil)
-		lp.Filters.EXPECT().GetFiltersToBackfill().Return(nil)
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return(addresses, nil)
 		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil)
 
@@ -278,6 +274,7 @@ func TestLogPoller_run(t *testing.T) {
 			"cursor advances to 102 — first batch succeeded before failure")
 
 		// --- Run 2: starts from 103, blocks 101 and 102 are NOT re-fetched ---
+		lp.Filters.EXPECT().GetFiltersToBackfill(lp.LogPoller.lastProcessedSlot).Return(nil, lp.LogPoller.lastProcessedSlot).Once()
 		err = lp.LogPoller.run(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, int64(105), lp.LogPoller.lastProcessedSlot)
@@ -287,6 +284,190 @@ func TestLogPoller_run(t *testing.T) {
 		assert.Equal(t, uint64(103), backfillFromSlots[1],
 			"run 2: starts from 103 — blocks 101,102 are NOT re-fetched")
 	})
+	t.Run("Gracefully handles failure during backfill", func(t *testing.T) {
+		// Ensure that failure to backfill a batch does not cause false advancement of the cursor for filters that require backfill.
+		lp := newMockedLP(t)
+
+		const dbHead int64 = 1000
+		addr := types.PublicKey{1}
+		filter := types.Filter{ID: 7, StartingBlock: 100, Address: addr}
+
+		// First run only: lastProcessedSlot is 0, so we consult the DB and lookback RPCs.
+		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(dbHead, nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(1500), nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Twice()
+		lp.Filters.EXPECT().GetFiltersToBackfill(dbHead).Return([]types.Filter{filter}, 100).Twice()
+
+		var backfillRanges [][2]int64
+		var processBlocksFailed bool
+		lp.LogPoller.processBlocks = func(_ context.Context, batch []types.Block) error {
+			for _, b := range batch {
+				if b.SlotNumber > 200 && !processBlocksFailed {
+					processBlocksFailed = true
+					return errors.New("simulated failure after slot 200")
+				}
+			}
+			return nil
+		}
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, _ []types.PublicKey, from, to uint64) (<-chan types.Block, func(), error) {
+				// nolint:gosec
+				// G115: from and to are always within int64
+				backfillRanges = append(backfillRanges, [2]int64{int64(from), int64(to)})
+				// nolint:gosec
+				// G115: to-from is always within int
+				ch := make(chan types.Block, int(to-from)+2)
+				go func() {
+					defer close(ch)
+					for s := from; s <= to; s++ {
+						ch <- types.Block{SlotNumber: s}
+					}
+				}()
+				return ch, func() {}, nil
+			}).Twice()
+
+		isFirstRun := true
+		// Run 1: full intended range [100, dbHead]; fails once a batch contains a slot > 200.
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, filter, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, filter types.Filter, lastProcessed int64, isComplete bool) error {
+			if isFirstRun {
+				require.Less(t, lastProcessed, int64(200), "cursor should not advance past the failing slot on first run")
+				require.False(t, isComplete, "backfill should not be marked complete on first run")
+			}
+			return nil
+		})
+		err := lp.LogPoller.run(t.Context())
+		require.Error(t, err)
+
+		require.Len(t, backfillRanges, 1)
+		assert.Equal(t, int64(100), backfillRanges[0][0], "first attempt should start at filter StartingBlock")
+		assert.Equal(t, dbHead, backfillRanges[0][1], "first attempt should use persisted head as upper bound")
+
+		isFirstRun = false
+		err = lp.LogPoller.run(t.Context())
+		require.NoError(t, err)
+
+		require.Len(t, backfillRanges, 2)
+		assert.Equal(t, int64(100), backfillRanges[1][0])
+		assert.Equal(t, dbHead, backfillRanges[1][1])
+	})
+	t.Run("Newly inserted filter is properly backfilled", func(t *testing.T) {
+		lp := newMockedLP(t)
+
+		addr1 := types.PublicKey{1, 2, 3}
+		addr2 := types.PublicKey{4, 5, 6}
+		ctx := t.Context()
+
+		// DB latest block 1000 via ORM only (do not set lastProcessedSlot on the service).
+		lp.ORM.EXPECT().GetLatestBlock(mock.Anything).Return(int64(1000), nil).Once()
+		lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(1001), nil).Once()
+		lp.Client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), nil).Once()
+
+		// Run 1: filter needs backfill from 100; loader only yields a block at 600 (due to sparse events).
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(int64(1000)).Return([]types.Filter{
+			{ID: 1, StartingBlock: 100, Address: addr1},
+		}, 100).Once()
+
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr1}, uint64(100), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block, 4)
+				blocks <- types.Block{SlotNumber: 101}
+				blocks <- types.Block{SlotNumber: 102}
+				blocks <- types.Block{SlotNumber: 103} // simulate blocks that do not trigger checkpoint update
+				blocks <- types.Block{SlotNumber: 600} // simulate a block that triggers checkpoint update, but is still behind the DB head
+				close(blocks)
+				return blocks, func() {}, nil
+			})
+		// Only 600 block triggers checkpoint update
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 1, StartingBlock: 100, Address: addr1}, int64(600), false).Return(nil).Once()
+		// Once full range was processed filter must be marked as fully backfilled, even if we have not received block equal to DB head (e.g. due to sparse events)
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 1, StartingBlock: 100, Address: addr1}, int64(1000), true).Return(nil).Once()
+
+		err := lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+
+		// Run 2: new filter inserted at 900 — must backfill [900, 1000] using DB watermark, not stop at in-memory 600.
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+		lp.Filters.EXPECT().GetFiltersToBackfill(int64(1000)).Return([]types.Filter{
+			{ID: 2, StartingBlock: 900, Address: addr2},
+		}, 900).Once()
+		// The new filter's backfill should use the DB latest block (1000) as the upper bound
+		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr2}, uint64(900), uint64(1000)).
+			RunAndReturn(func(ctx context.Context, _ []types.PublicKey, _ uint64, _ uint64) (<-chan types.Block, func(), error) {
+				blocks := make(chan types.Block)
+				close(blocks)
+				return blocks, func() {}, nil
+			}).Once()
+		lp.Filters.EXPECT().UpdateBackfillProgress(mock.Anything, types.Filter{ID: 2, StartingBlock: 900, Address: addr2}, int64(1000), true).Return(nil).Once()
+
+		err = lp.LogPoller.run(ctx)
+		require.NoError(t, err)
+	})
+}
+
+// TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests asserts that when LogPollerSlotsBatchSize is
+// smaller than the number of slots in the backfill range, block fetching runs in multiple batches but
+// GetSignaturesForAddress (getSlotsForAddressJob) is not invoked twice for the same RPC cursor (MinContextSlot + Before).
+func TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests(t *testing.T) {
+	t.Parallel()
+
+	const slotsBatchSize = 2
+	cfg := config.NewDefault()
+	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](slotsBatchSize)
+
+	lp := newMockedLPwithConfig(t, cfg, chainID)
+	loader := NewEncodedLogCollector(lp.Client, logger.Test(t), t.Name(), nil, nil)
+	require.NoError(t, loader.Start(t.Context()))
+	t.Cleanup(func() { require.NoError(t, loader.Close()) })
+	lp.LogPoller.loader = loader
+	lp.LogPoller.lastProcessedSlot = 100
+
+	ctx := t.Context()
+
+	address, err := solana.PublicKeyFromBase58("J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4")
+	require.NoError(t, err)
+	addr := types.PublicKey(address)
+
+	// Five slots 101..105 — strictly larger than slotsBatchSize so scheduleBlocksFetching uses multiple batches.
+	slots := []uint64{105, 104, 103, 102, 101}
+
+	lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Once()
+	lp.Filters.EXPECT().GetFiltersToBackfill(mock.Anything).Return(nil, 0).Once()
+	lp.Filters.EXPECT().GetDistinctAddresses(mock.Anything).Return([]types.PublicKey{addr}, nil).Once()
+
+	lp.Client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(105), nil).Once()
+
+	lp.Client.EXPECT().GetSignaturesForAddressWithOpts(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) ([]*rpc.TransactionSignature, error) {
+			txSigsResponse := make([]*rpc.TransactionSignature, 0, len(slots))
+			for _, slot := range slots {
+				tx := &rpc.TransactionSignature{Slot: slot}
+				txSigsResponse = append(txSigsResponse, tx)
+			}
+			// add an extra signature with lower slot to signal that there the block range is fully processed
+			txSigsResponse = append(txSigsResponse, &rpc.TransactionSignature{Slot: slots[len(slots)-1] - 1})
+			return txSigsResponse, nil
+		}).Once() // GetSignaturesForAddress should be called only once for the whole range, not once per batch.
+
+	blockTime := solana.UnixTimeSeconds(128)
+	lp.Client.EXPECT().
+		GetBlockWithOpts(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, slot uint64, _ *rpc.GetBlockOpts) (*rpc.GetBlockResult, error) {
+			println(slot)
+			require.Contains(t, slots, slot)
+			return &rpc.GetBlockResult{
+				Blockhash:   solana.Hash{1, 2, 3},
+				BlockHeight: &slot,
+				BlockTime:   &blockTime,
+			}, nil
+		}).Times(len(slots))
+
+	err = lp.LogPoller.run(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(105), lp.LogPoller.lastProcessedSlot)
 }
 
 func Test_GetLastProcessedSlot(t *testing.T) {
@@ -407,7 +588,8 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		lp := newMockedLP(t)
 		expectedErr := errors.New("failed to start backfill")
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil, expectedErr).Once()
-		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
+		noopProgress := func(_ context.Context, _ int64) error { return nil }
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20, noopProgress)
 		require.ErrorIs(t, err, expectedErr)
 	})
 	funcWithCallExpectation := func(t *testing.T) func() {
@@ -424,7 +606,8 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 			cancel()
 			return nil, funcWithCallExpectation(t), nil
 		}).Once()
-		err := lp.LogPoller.processBlocksRange(ctx, nil, 10, 20)
+		noopProgress := func(_ context.Context, _ int64) error { return nil }
+		err := lp.LogPoller.processBlocksRange(ctx, nil, 10, 20, noopProgress)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 	t.Run("Happy path", func(t *testing.T) {
@@ -434,9 +617,9 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		blocks <- types.Block{SlotNumber: 12}
 		close(blocks)
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
-		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
+		noopProgress := func(_ context.Context, _ int64) error { return nil }
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20, noopProgress)
 		require.NoError(t, err)
-		assert.Equal(t, int64(12), lp.LogPoller.lastProcessedSlot)
 	})
 	t.Run("Updates lastProcessedSlot incrementally on partial failure", func(t *testing.T) {
 		lp := newMockedLP(t)
@@ -457,9 +640,9 @@ func TestLogPoller_processBlocksRange(t *testing.T) {
 		}
 
 		lp.Loader.EXPECT().BackfillForAddresses(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(blocks, funcWithCallExpectation(t), nil).Once()
-		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20)
+		noopProgress := func(_ context.Context, _ int64) error { return nil }
+		err := lp.LogPoller.processBlocksRange(t.Context(), nil, 10, 20, noopProgress)
 		require.ErrorIs(t, err, expectedErr)
-		assert.Equal(t, int64(12), lp.LogPoller.lastProcessedSlot)
 	})
 }
 

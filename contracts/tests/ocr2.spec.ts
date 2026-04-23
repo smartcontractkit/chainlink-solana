@@ -665,8 +665,9 @@ describe("ocr2", () => {
 
     let account = await program.account.state.fetch(state.publicKey);
     let config = account.config;
-    assert.ok(config.minAnswer.toNumber() == minAnswer);
-    assert.ok(config.maxAnswer.toNumber() == maxAnswer);
+    // Anchor 0.31 decodes [u8; 16] as a byte array, not BN
+    assert.ok(new BN(config.minAnswer, 10, "le").toNumber() == minAnswer);
+    assert.ok(new BN(config.maxAnswer, 10, "le").toNumber() == maxAnswer);
     // assert.ok(config.decimals == 18);
 
     console.log(`Generating ${n} oracles...`);

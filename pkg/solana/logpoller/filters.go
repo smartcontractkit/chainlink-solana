@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/codec"
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
-	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
@@ -29,7 +30,7 @@ type filters struct {
 	filtersByID            map[int64]*types.Filter
 	filtersByName          map[string]int64
 	filtersByAddress       map[types.PublicKey]map[types.EventSignature]map[int64]struct{}
-	filtersToBackfill      map[int64]struct{}
+	filtersToBackfill      map[int64]int64
 	filtersToDelete        map[int64]types.Filter
 	filtersMutex           sync.RWMutex
 	loadedFilters          atomic.Bool
@@ -211,7 +212,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 }
 
 func newDecoder(filter types.Filter) (types.Decoder, error) {
-	cEntry, err := codecv1.NewEventArgsEntry(filter.EventName, codecv1.EventIDLTypes(filter.EventIdl), true, nil, binary.LittleEndian())
+	cEntry, err := codec.NewEventCodecEntry(filter, true, nil, binary.LittleEndian())
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +249,7 @@ func (fl *filters) addToIndices(filter types.Filter, decoder types.Decoder) {
 
 	filtersForEventSig[filter.ID] = struct{}{}
 	if !filter.IsBackfilled {
-		fl.filtersToBackfill[filter.ID] = struct{}{}
+		fl.filtersToBackfill[filter.ID] = filter.StartingBlock
 	}
 
 	if filter.IsCPIFilter() {
@@ -454,26 +455,30 @@ func (fl *filters) MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter
 	return fl.matchingFilters(types.PublicKey(addr), discriminator, event.IsCPI)
 }
 
-// GetFiltersToBackfill - returns copy of backfill queue
+// GetFiltersToBackfill - returns copy of backfill queue and starting block
 // Requires LoadFilters to be called at least once.
-func (fl *filters) GetFiltersToBackfill() []types.Filter {
+func (fl *filters) GetFiltersToBackfill(to int64) ([]types.Filter, int64) {
 	if !fl.loadedFilters.Load() {
 		fl.lggr.Critical("Invariant violation: expected filters to be loaded before call to MatchingFilters")
-		return nil
+		return nil, 0
 	}
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
+	startingBlock := to
 	result := make([]types.Filter, 0, len(fl.filtersToBackfill))
-	for filterID := range fl.filtersToBackfill {
+	for filterID, filterStartingBlock := range fl.filtersToBackfill {
 		filter, ok := fl.filtersByID[filterID]
 		if !ok {
 			fl.lggr.Errorw("expected filter to exist in filtersByID", "filterID", filterID)
 			continue
 		}
+		if filterStartingBlock != 0 && filterStartingBlock < startingBlock {
+			startingBlock = filterStartingBlock
+		}
 		result = append(result, *filter)
 	}
 
-	return result
+	return result, startingBlock
 }
 
 // GetFilters returns a copy of all currently registered filters, keyed by filter name.
@@ -492,19 +497,30 @@ func (fl *filters) GetFilters(ctx context.Context) (map[string]types.Filter, err
 	return result, nil
 }
 
-func (fl *filters) MarkFilterBackfilled(ctx context.Context, filterID int64) error {
+func (fl *filters) UpdateBackfillProgress(ctx context.Context, filter types.Filter, backfilledTo int64, isComplete bool) error {
 	fl.filtersMutex.Lock()
 	defer fl.filtersMutex.Unlock()
-	filter, ok := fl.filtersByID[filterID]
+	storedFilter, ok := fl.filtersByID[filter.ID]
 	if !ok {
-		return fmt.Errorf("filter %d not found", filterID)
+		return fmt.Errorf("filter %d not found", filter.ID)
 	}
-	err := fl.orm.MarkFilterBackfilled(ctx, filterID)
+	if storedFilter.StartingBlock < filter.StartingBlock {
+		// This can happen if a filter is updated with a lower starting block while it's being backfilled.
+		// In this case, we want to keep the filter in the backfill queue for the next iteration to pick it up.
+		return nil
+	}
+
+	if !isComplete {
+		// update starting block for next backfill iteration
+		fl.filtersToBackfill[filter.ID] = backfilledTo
+		return nil
+	}
+	err := fl.orm.MarkFilterBackfilled(ctx, filter.ID)
 	if err != nil {
 		return fmt.Errorf("failed to mark filter backfilled: %w", err)
 	}
 
-	filter.IsBackfilled = true
+	storedFilter.IsBackfilled = true
 	delete(fl.filtersToBackfill, filter.ID)
 	return nil
 }
@@ -530,7 +546,7 @@ func (fl *filters) UpdateStartingBlocks(startingBlock int64) {
 	for id, blk := range startingBlocks {
 		fl.filtersByID[id].IsBackfilled = false
 		fl.filtersByID[id].StartingBlock = blk
-		fl.filtersToBackfill[id] = struct{}{}
+		fl.filtersToBackfill[id] = blk
 	}
 }
 
@@ -550,7 +566,7 @@ func (fl *filters) LoadFilters(ctx context.Context) error {
 	fl.filtersByID = make(map[int64]*types.Filter)
 	fl.filtersByName = make(map[string]int64)
 	fl.filtersByAddress = make(map[types.PublicKey]map[types.EventSignature]map[int64]struct{})
-	fl.filtersToBackfill = make(map[int64]struct{})
+	fl.filtersToBackfill = make(map[int64]int64)
 	fl.filtersToDelete = make(map[int64]types.Filter)
 	fl.knownPrograms = make(map[string]uint)
 	fl.knownDiscriminators = make(map[types.EventSignature]uint)

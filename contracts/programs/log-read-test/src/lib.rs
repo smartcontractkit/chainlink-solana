@@ -1,3 +1,4 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 
 declare_id!("J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4");
@@ -28,10 +29,25 @@ pub mod log_read_test {
 
         Ok(())
     }
+
+    pub fn create_log_cpi(ctx: Context<CreateLogCpi>, value: u64) -> Result<()> {
+        emit_cpi!(event::TestEvent {
+            str_val: "Hello, CPI!".to_string(),
+            u64_value: value,
+        });
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
 pub struct Initialization<'info> {
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct CreateLogCpi<'info> {
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
