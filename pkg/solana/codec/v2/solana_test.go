@@ -158,40 +158,40 @@ func TestSnakeToPascal(t *testing.T) {
 	}
 }
 
-func TestSnakeToPascal_NoCollisions(t *testing.T) {
+// TestSnakeToPascal_KnownCollisions documents distinct snake_case inputs that map to the
+// same PascalCase name; callers that need uniqueness must validate at a higher layer.
+func TestSnakeToPascal_KnownCollisions(t *testing.T) {
 	t.Parallel()
 
 	collisionGroups := []struct {
-		name   string
-		inputs []string
+		name       string
+		inputs     []string
+		wantPascal string
 	}{
 		{
-			name:   "leading underscore vs plain",
-			inputs: []string{"reserved", "_reserved"},
+			name:       "leading underscore vs plain",
+			inputs:     []string{"reserved", "_reserved"},
+			wantPascal: "Reserved",
 		},
 		{
-			name:   "single vs double underscore",
-			inputs: []string{"a_b", "a__b"},
+			name:       "single vs double underscore",
+			inputs:     []string{"a_b", "a__b"},
+			wantPascal: "AB",
 		},
 		{
-			name:   "trailing underscore vs plain",
-			inputs: []string{"foo", "foo_"},
+			name:       "trailing underscore vs plain",
+			inputs:     []string{"foo", "foo_"},
+			wantPascal: "Foo",
 		},
 	}
 
 	for _, group := range collisionGroups {
 		t.Run(group.name, func(t *testing.T) {
 			t.Parallel()
-			var results []string
 			for _, input := range group.inputs {
-				result, err := snakeToPascal(input)
-				if err != nil {
-					continue
-				}
-				results = append(results, result)
-			}
-			if len(results) > 1 {
-				t.Logf("known collision risk: inputs %v all produce the same output %q", group.inputs, results[0])
+				got, err := snakeToPascal(input)
+				require.NoError(t, err, "input %q", input)
+				assert.Equal(t, group.wantPascal, got, "input %q", input)
 			}
 		})
 	}
