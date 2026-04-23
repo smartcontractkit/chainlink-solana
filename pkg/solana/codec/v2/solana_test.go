@@ -220,7 +220,7 @@ func TestValidateUniqueFieldNames(t *testing.T) {
 		}
 		err := validateUniqueFieldNames(named)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, commontypes.ErrInvalidConfig)
+		require.ErrorIs(t, err, commontypes.ErrInvalidConfig)
 		assert.Contains(t, err.Error(), "duplicate PascalCase field name")
 		assert.Contains(t, err.Error(), "Foo")
 	})
