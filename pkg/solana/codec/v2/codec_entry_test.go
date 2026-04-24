@@ -1,4 +1,4 @@
-package codecv2_test
+package codecv2
 
 import (
 	_ "embed"
@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
-	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 )
 
 //go:embed testutils/data_storage.json
@@ -41,7 +40,7 @@ func TestNewEventArgsEntry(t *testing.T) {
 			t.Fatalf("unexpected error: invalid IDL, error: %v", err)
 		}
 		for i, event := range idl.Events {
-			entry, err := codecv2.NewEventArgsEntry(fmt.Sprintf("test%d", i), codecv2.EventIDLTypes{
+			entry, err := NewEventArgsEntry(fmt.Sprintf("test%d", i), EventIDLTypes{
 				Event: event,
 				Types: idl.Types,
 			}, false, nil, binary.LittleEndian())
@@ -59,7 +58,7 @@ func TestNewInstructionArgsEntry(t *testing.T) {
 		}
 		for i, instruction := range idl.Instructions {
 			if len(instruction.Args) > 0 {
-				entry, err := codecv2.NewInstructionArgsEntry(fmt.Sprintf("test%d", i), codecv2.InstructionArgsIDLTypes{
+				entry, err := NewInstructionArgsEntry(fmt.Sprintf("test%d", i), InstructionArgsIDLTypes{
 					Instruction: instruction,
 					Types:       idl.Types,
 				}, nil, binary.LittleEndian())
