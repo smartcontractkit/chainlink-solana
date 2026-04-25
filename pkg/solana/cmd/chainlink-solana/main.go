@@ -63,6 +63,16 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
 	}
 
+	cfg.SetDefaults()
+	if err := cfg.ValidateConfig(); err != nil {
+		return nil, fmt.Errorf("config is invalid: %w", err)
+	}
+
+	cfgStr, err := cfg.TOMLString()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize config: %w", err)
+	}
+	c.Logger.Infow("Creating relayer", "config", cfgStr)
 	rawNodes := make([]map[string]string, 0, len(cfg.Nodes))
 	for _, n := range cfg.Nodes {
 		if n == nil || n.URL == nil {
