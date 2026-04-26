@@ -96,7 +96,6 @@ jobs:
           go-version-file: chainlink/go.mod
           check-latest: true
 
-
       - name: Setup Postgres
         id: setup-postgres
         uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/v1
