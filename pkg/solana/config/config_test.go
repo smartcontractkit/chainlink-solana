@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -65,9 +66,11 @@ func TestValidateConfig(t *testing.T) {
 func TestWorkflowConfigSetFrom(t *testing.T) {
 	var w WorkflowConfig
 	timeout := config.MustNewDuration(10 * time.Second)
-	other := WorkflowConfig{AcceptanceTimeout: timeout}
+	pk := solana.MustPublicKeyFromBase58("4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e")
+	other := WorkflowConfig{AcceptanceTimeout: timeout, FromAddress: &pk}
 	w.SetFrom(&other)
 	require.Equal(t, timeout, w.AcceptanceTimeout)
+	require.Equal(t, &pk, w.FromAddress)
 }
 
 func TestWorkflowConfigIsEnabled(t *testing.T) {
