@@ -72,7 +72,7 @@ func TestWorkflowConfigSetFrom(t *testing.T) {
 
 func TestWorkflowConfigIsEnabled(t *testing.T) {
 	t.Run("nil fields", func(t *testing.T) {
-		require.False(t, (WorkflowConfig{}).IsEnabled())
+		require.False(t, new(WorkflowConfig).IsEnabled())
 	})
 	t.Run("only acceptance timeout", func(t *testing.T) {
 		cfg := WorkflowConfig{

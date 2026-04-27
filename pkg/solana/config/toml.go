@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
