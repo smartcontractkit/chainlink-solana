@@ -61,12 +61,19 @@ type Workflow interface {
 
 type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
-	// ForwarderAddress, ForwarderState, and FromAddress are accepted for TOML compatibility;
-	// runtime uses capability config and does not read these from chain config.
+	// ForwarderAddress is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: configure the forwarder program address via capability config at runtime, not TOML.
 	ForwarderAddress *solana.PublicKey
-	ForwarderState   *solana.PublicKey
-	FromAddress      *solana.PublicKey
-	GasLimitDefault  *uint64
+	// ForwarderState is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: configure the forwarder state account via capability config at runtime, not TOML.
+	ForwarderState *solana.PublicKey
+	// FromAddress is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: use the workflow transmitter / capability-injected key material instead of TOML.
+	FromAddress       *solana.PublicKey
+	GasLimitDefault   *uint64
 	Local             *bool
 	PollPeriod        *config.Duration
 	TxAcceptanceState *commontypes.TransactionStatus
