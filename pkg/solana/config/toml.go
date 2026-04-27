@@ -298,10 +298,6 @@ func (c *TOMLConfig) ForwarderAddress() *solana.PublicKey {
 	return c.Workflow.ForwarderAddress
 }
 
-func (c *TOMLConfig) FromAddress() *solana.PublicKey {
-	return c.Workflow.FromAddress
-}
-
 func (c *TOMLConfig) ForwarderState() *solana.PublicKey {
 	return c.Workflow.ForwarderState
 }
@@ -329,9 +325,6 @@ func (wc *workflowConfig) PollPeriod() time.Duration {
 }
 func (wc *workflowConfig) ForwarderAddress() *solana.PublicKey {
 	return wc.conf.ForwarderAddress
-}
-func (wc *workflowConfig) FromAddress() *solana.PublicKey {
-	return wc.conf.FromAddress
 }
 func (wc *workflowConfig) ForwarderState() *solana.PublicKey {
 	return wc.conf.ForwarderState

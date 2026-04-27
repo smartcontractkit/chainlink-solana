@@ -17,14 +17,20 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+type AddressLister interface {
+	Accounts(ctx context.Context) (accounts []string, err error)
+}
+
 type solanaService struct {
 	commontypes.UnimplementedSolanaService
-	chain  Chain
-	logger logger.Logger
+	addressLister AddressLister
+	chain         Chain
+	logger        logger.Logger
 }
 
 func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockRequest) (*commonsol.GetBlockReply, error) {
@@ -285,11 +291,29 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 	// remove dummy signatures (were injected by tx.MarshalBinary)
 	tx.Signatures = tx.Signatures[:0]
-	forwarder := solana.PublicKey(req.Receiver)
+	if len(tx.Message.AccountKeys) == 0 {
+		return nil, errors.New("transaction has no account keys")
+	}
+	if ss.addressLister == nil {
+		return nil, errors.New("address lister is not initialized")
+	}
+	accountAddrs, err := ss.addressLister.Accounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	if len(accountAddrs) == 0 {
+		return nil, errors.New("no accounts available")
+	}
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
+	feePayer, err := ss.getPublicKeyWithHighestLamports(ctx, r, accountAddrs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine fee payer for SubmitTransaction: %w", err)
+	}
+	ss.logger.Debugw("Using fee payer", "publicKey", feePayer.String())
+	tx.Message.AccountKeys[0] = feePayer
 
 	blockhash, err := r.LatestBlockhash(ctx)
 	if err != nil {
@@ -305,7 +329,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
-	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
+	err = ss.chain.TxManager().Enqueue(ctx, feePayer.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
@@ -341,6 +365,59 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+}
+
+// getPublicKeyWithHighestLamports returns the account with the largest SOL (lamport) balance.
+// If all balance queries fail, it falls back to the first successfully parsed address (same idea as EVM relay).
+func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r client.Reader, accounts []string) (solana.PublicKey, error) {
+	if len(accounts) == 0 {
+		return solana.PublicKey{}, errors.New("no accounts provided")
+	}
+	if len(accounts) == 1 {
+		pk, err := solana.PublicKeyFromBase58(accounts[0])
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("invalid account address: %w", err)
+		}
+		ss.logger.Debugw("only one enabled account for chain", "account", accounts[0])
+		return pk, nil
+	}
+
+	var highestLamports uint64
+	var selected solana.PublicKey
+	var haveAnyBalance bool
+
+	for _, acct := range accounts {
+		pk, err := solana.PublicKeyFromBase58(acct)
+		if err != nil {
+			ss.logger.Warnw("skipping invalid account string", "account", acct, "err", err)
+			continue
+		}
+		balance, err := r.BalanceWithCommitment(ctx, pk, rpc.CommitmentConfirmed)
+		if err != nil {
+			ss.logger.Warnw("failed to get balance for account, skipping", "account", acct, "err", err)
+			continue
+		}
+		if !haveAnyBalance || balance > highestLamports {
+			highestLamports = balance
+			selected = pk
+			haveAnyBalance = true
+		}
+	}
+
+	if !haveAnyBalance {
+		pk, err := solana.PublicKeyFromBase58(accounts[0])
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("failed to parse any valid account: %w", err)
+		}
+		return pk, nil
+	}
+
+	ss.logger.Debugw("selected fee payer with highest lamport balance for chain",
+		"publicKey", selected.String(),
+		"lamports", highestLamports,
+		"totalAccounts", len(accounts))
+
+	return selected, nil
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {

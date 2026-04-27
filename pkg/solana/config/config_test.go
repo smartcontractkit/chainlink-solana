@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -62,6 +63,15 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestWorkflowConfigSetEnabled(t *testing.T) {
-	var cfg WorkflowConfig
-	require.False(t, cfg.IsEnabled())
+	t.Run("empty", func(t *testing.T) {
+		var cfg WorkflowConfig
+		require.False(t, cfg.IsEnabled())
+	})
+	t.Run("forwarder address only", func(t *testing.T) {
+		k, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		pk := k.PublicKey()
+		cfg := WorkflowConfig{ForwarderAddress: &pk}
+		require.True(t, cfg.IsEnabled())
+	})
 }

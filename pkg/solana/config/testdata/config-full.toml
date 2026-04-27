@@ -31,7 +31,6 @@ LogPollerSlotsBatchSize = 1000
 AcceptanceTimeout = '42s'
 ForwarderAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5'
 ForwarderState = '4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e'
-FromAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5'
 GasLimitDefault = 3000000
 Local = true
 PollPeriod = '9s'

@@ -55,7 +55,6 @@ type Workflow interface {
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
 	ForwarderAddress() *solana.PublicKey
-	FromAddress() *solana.PublicKey
 	ForwarderState() *solana.PublicKey
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
@@ -66,7 +65,6 @@ type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
 	ForwarderAddress  *solana.PublicKey
 	ForwarderState    *solana.PublicKey
-	FromAddress       *solana.PublicKey
 	GasLimitDefault   *uint64
 	Local             *bool
 	PollPeriod        *config.Duration
@@ -75,8 +73,7 @@ type WorkflowConfig struct {
 
 func (w *WorkflowConfig) IsEnabled() bool {
 	return (w.ForwarderAddress != nil && !w.ForwarderAddress.IsZero()) ||
-		(w.ForwarderState != nil && !w.ForwarderState.IsZero()) ||
-		(w.FromAddress != nil && !w.FromAddress.IsZero())
+		(w.ForwarderState != nil && !w.ForwarderState.IsZero())
 }
 
 func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
@@ -88,9 +85,6 @@ func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
 	}
 	if f.ForwarderState != nil {
 		w.ForwarderState = f.ForwarderState
-	}
-	if f.FromAddress != nil {
-		w.FromAddress = f.FromAddress
 	}
 	if f.GasLimitDefault != nil {
 		w.GasLimitDefault = f.GasLimitDefault
