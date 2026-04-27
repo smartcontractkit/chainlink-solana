@@ -179,23 +179,15 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm, nil)
 		addr := newRandomPublicKey(t)
 		const eventName = "TestEvent"
-		eventSig := types.NewEventSignatureFromName(eventName)
 
 		filter1 := decoderReadyTestFilter(t, 1, "existingFilter", eventName, addr)
 		filter1.IncludeReverted = false
 		filter1.IsBackfilled = true
 		orm.EXPECT().SelectFilters(mock.Anything).Return(
 			[]types.Filter{filter1}, nil).Once()
-		filter2 := types.Filter{
-			Name:            "new filter",
-			Address:         addr,
-			EventName:       eventName,
-			EventSig:        eventSig,
-			ContractIdl:     codecv1.FetchLogpollerTypeTestIDL(),
-			SubkeyPaths:     [][]string{{"Field1"}},
-			IncludeReverted: true,
-			IsBackfilled:    true,
-		}
+		filter2 := decoderReadyTestFilter(t, 0, "new filter", eventName, addr)
+		filter2.IncludeReverted = true
+		filter2.IsBackfilled = true
 		orm.EXPECT().SelectSeqNums(mock.Anything).Return(nil, nil).Once()
 		err := fs.RegisterFilter(t.Context(), filter2)
 		require.ErrorContains(t, err, "conflicts with IncludeReverted=true", "shouldn't allow more than one value for IncludeReverted for an event")
