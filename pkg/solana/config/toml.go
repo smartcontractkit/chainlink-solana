@@ -466,6 +466,27 @@ func NewDefault() *TOMLConfig {
 	return cfg
 }
 
+func NewDecodedTOMLConfig(rawConfig string) (*TOMLConfig, error) {
+	d := toml.NewDecoder(strings.NewReader(rawConfig))
+	d.DisallowUnknownFields()
+	var cfg TOMLConfig
+
+	if err := d.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, rawConfig)
+	}
+
+	cfg.SetDefaults()
+	if err := cfg.ValidateConfig(); err != nil {
+		return nil, fmt.Errorf("config is invalid: %w", err)
+	}
+
+	if !cfg.IsEnabled() {
+		return nil, fmt.Errorf("cannot create new chain with ID %s: config is disabled", *cfg.ChainID)
+	}
+
+	return &cfg, nil
+}
+
 func NewDefaultMultiNodeConfig() mnCfg.MultiNodeConfig {
 	return NewDefault().MultiNode
 }
