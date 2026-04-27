@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -54,9 +53,6 @@ type Workflow interface {
 	IsEnabled() bool
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-	ForwarderAddress() *solana.PublicKey
-	FromAddress() *solana.PublicKey
-	ForwarderState() *solana.PublicKey
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
 	Local() bool // shows if workflow is run against local network
@@ -64,33 +60,24 @@ type Workflow interface {
 
 type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
-	ForwarderAddress  *solana.PublicKey
-	ForwarderState    *solana.PublicKey
-	FromAddress       *solana.PublicKey
 	GasLimitDefault   *uint64
 	Local             *bool
 	PollPeriod        *config.Duration
 	TxAcceptanceState *commontypes.TransactionStatus
 }
 
+// IsEnabled reports whether workflow-style settings are configured: both AcceptanceTimeout and
+// PollPeriod must be present with positive durations. Used e.g. to start the log poller.
 func (w *WorkflowConfig) IsEnabled() bool {
-	return (w.ForwarderAddress != nil && !w.ForwarderAddress.IsZero()) ||
-		(w.ForwarderState != nil && !w.ForwarderState.IsZero()) ||
-		(w.FromAddress != nil && !w.FromAddress.IsZero())
+	if w.AcceptanceTimeout == nil || w.PollPeriod == nil {
+		return false
+	}
+	return w.AcceptanceTimeout.Duration() > 0 && w.PollPeriod.Duration() > 0
 }
 
 func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
 	if f.AcceptanceTimeout != nil {
 		w.AcceptanceTimeout = f.AcceptanceTimeout
-	}
-	if f.ForwarderAddress != nil {
-		w.ForwarderAddress = f.ForwarderAddress
-	}
-	if f.ForwarderState != nil {
-		w.ForwarderState = f.ForwarderState
-	}
-	if f.FromAddress != nil {
-		w.FromAddress = f.FromAddress
 	}
 	if f.GasLimitDefault != nil {
 		w.GasLimitDefault = f.GasLimitDefault

@@ -350,9 +350,6 @@ FinalizedBlockOffset is the offset from the finalized block to use for finality 
 ```toml
 [Workflow]
 AcceptanceTimeout = '45s' # Default
-ForwarderAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5' # Example
-ForwarderState = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5' # Example
-FromAddress = '4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e' # Example
 GasLimitDefault = 300_000 # Default
 Local = false # Default
 PollPeriod = '3s' # Default
@@ -365,24 +362,6 @@ TxAcceptanceState = 3 # Default
 AcceptanceTimeout = '45s' # Default
 ```
 AcceptanceTimeout is the default timeout for a tranmission to be accepted on chain
-
-### ForwarderAddress
-```toml
-ForwarderAddress = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5' # Example
-```
-ForwarderAddress is the keystone forwarder program address on chain.
-
-### ForwarderState
-```toml
-ForwarderState = '14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5' # Example
-```
-ForwarderState is the keystone forwarder program state account on chain.
-
-### FromAddress
-```toml
-FromAddress = '4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e' # Example
-```
-FromAddress is Address of the transmitter key to use for workflow writes.
 
 ### GasLimitDefault
 ```toml
