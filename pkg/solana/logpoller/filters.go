@@ -148,7 +148,7 @@ func (fl *filters) HasFilter(ctx context.Context, name string) bool {
 // that matches filter.EventSig signature will be captured starting from filter.StartingBlock.
 // The filter may be unregistered later by filter.Name.
 // In case of Filter.Name collision (within the chain scope) returns ErrFilterNameConflict if
-// one of the fields defining resulting logs (Address, EventSig, EventIDL, SubKeyPaths) does not match original filter.
+// one of the fields defining resulting logs (Address, EventSig, EventIDL, SubKeyPaths, EventName, ContractIDL) does not match original filter.
 // Otherwise, updates remaining fields and schedules backfill.
 // Warnings/debug information is keyed by filter name.
 func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) error {
