@@ -6,7 +6,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/codec"
 	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings"
-	"github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
+
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
@@ -95,7 +95,7 @@ func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDi
 		return nil, fmt.Errorf("failed to extract event IDL from codec: %w", err)
 	}
 
-	return NewEventArgsEntry(offChainName, EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}, true, nil, binary.LittleEndian())
+	return NewEventArgsEntry(offChainName, EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}, includeDiscriminator, mod, builder)
 }
 
 // NewEventArgsEntry accepts a struct containing event definition and types parsed from the contract IDL.
