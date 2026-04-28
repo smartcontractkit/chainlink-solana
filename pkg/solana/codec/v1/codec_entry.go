@@ -77,11 +77,17 @@ type EventIDLTypes struct {
 	Types IdlTypeDefSlice
 }
 
-// accepts contract idl string
+// NewEventArgsEntryWrapper accepts a contract IDL JSON string and builds a v1 event codec entry.
+// It rejects Anchor v2 (0.30+) IDLs, which lack a top-level "version" field, to prevent
+// silently producing an empty codec (v2 stores event fields externally in "types").
 func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	var codecIDL IDL
 	if err := json.Unmarshal([]byte(contractIdl), &codecIDL); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal contract IDL for %s, error: %w", offChainName, err)
+	}
+
+	if codecIDL.Version == "" {
+		return nil, fmt.Errorf("IDL for %s is not a legacy Anchor IDL (missing top-level \"version\" field); use the v2 codec for Anchor 0.30+ IDLs", offChainName)
 	}
 
 	eventIdl, err := ExtractEventIDL(offChainName, codecIDL)
@@ -92,8 +98,14 @@ func NewEventArgsEntryWrapper(offChainName string, contractIdl string, includeDi
 	return NewEventArgsEntry(offChainName, EventIDLTypes{Event: eventIdl, Types: codecIDL.Types}, includeDiscriminator, mod, builder)
 }
 
-// accepts struct containing event definition and types parsed from the contract idl
+// NewEventArgsEntry accepts a struct containing event definition and types parsed from the contract IDL.
+// It requires the event to have at least one field to prevent building an empty codec
+// that would silently discard decoded data.
 func NewEventArgsEntry(offChainName string, idlTypes EventIDLTypes, includeDiscriminator bool, mod codec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
+	if len(idlTypes.Event.Fields) == 0 {
+		return nil, fmt.Errorf("event %q has no fields; this may indicate an Anchor v2 IDL was parsed with the v1 codec", idlTypes.Event.Name)
+	}
+
 	_, eventCodec, err := asStruct(eventFieldsToFields(idlTypes.Event.Fields), createRefs(idlTypes.Types, builder), idlTypes.Event.Name, false, false)
 	if err != nil {
 		return nil, err
