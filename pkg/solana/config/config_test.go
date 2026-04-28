@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -65,9 +66,18 @@ func TestValidateConfig(t *testing.T) {
 func TestWorkflowConfigSetFrom(t *testing.T) {
 	var w WorkflowConfig
 	timeout := config.MustNewDuration(10 * time.Second)
-	other := WorkflowConfig{AcceptanceTimeout: timeout}
+	state := commontypes.Finalized
+	gasLimitDefault := uint64(400)
+	local := true
+	pollPeriod := config.MustNewDuration(1 * time.Second)
+	other := WorkflowConfig{AcceptanceTimeout: timeout, PollPeriod: pollPeriod, Local: &local, GasLimitDefault: &gasLimitDefault, TxAcceptanceState: &state}
 	w.SetFrom(&other)
 	require.Equal(t, timeout, w.AcceptanceTimeout)
+	require.Equal(t, pollPeriod, w.PollPeriod)
+	require.Equal(t, local, *w.Local)
+	require.Equal(t, gasLimitDefault, *w.GasLimitDefault)
+	require.Equal(t, state, *w.TxAcceptanceState)
+
 }
 
 func TestWorkflowConfigIsEnabled(t *testing.T) {

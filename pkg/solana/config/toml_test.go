@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -58,6 +59,9 @@ var fullConfig = TOMLConfig{
 	},
 	Workflow: WorkflowConfig{
 		AcceptanceTimeout: config.MustNewDuration(42 * time.Second),
+		ForwarderAddress:  ptr(solana.MustPublicKeyFromBase58("14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5")),
+		ForwarderState:    ptr(solana.MustPublicKeyFromBase58("14grJpemFaf88c8tiVb77W7TYg2W3ir6pfkKz3YjhhZ5")),
+		FromAddress:       ptr(solana.MustPublicKeyFromBase58("4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e")),
 		GasLimitDefault:   ptr[uint64](3_000_000),
 		Local:             ptr(true),
 		PollPeriod:        config.MustNewDuration(9 * time.Second),
