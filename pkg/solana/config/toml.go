@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/exp/slices"
@@ -294,18 +293,6 @@ func (c *TOMLConfig) PollPeriod() time.Duration {
 	return c.Workflow.PollPeriod.Duration()
 }
 
-func (c *TOMLConfig) ForwarderAddress() *solana.PublicKey {
-	return c.Workflow.ForwarderAddress
-}
-
-func (c *TOMLConfig) FromAddress() *solana.PublicKey {
-	return c.Workflow.FromAddress
-}
-
-func (c *TOMLConfig) ForwarderState() *solana.PublicKey {
-	return c.Workflow.ForwarderState
-}
-
 func (c *TOMLConfig) GasLimitDefault() *uint64 {
 	return c.Workflow.GasLimitDefault
 }
@@ -326,15 +313,6 @@ func (wc *workflowConfig) AcceptanceTimeout() time.Duration {
 }
 func (wc *workflowConfig) PollPeriod() time.Duration {
 	return wc.conf.PollPeriod.Duration()
-}
-func (wc *workflowConfig) ForwarderAddress() *solana.PublicKey {
-	return wc.conf.ForwarderAddress
-}
-func (wc *workflowConfig) FromAddress() *solana.PublicKey {
-	return wc.conf.FromAddress
-}
-func (wc *workflowConfig) ForwarderState() *solana.PublicKey {
-	return wc.conf.ForwarderState
 }
 func (wc *workflowConfig) GasLimitDefault() *uint64 {
 	return wc.conf.GasLimitDefault
@@ -464,6 +442,27 @@ func NewDefault() *TOMLConfig {
 	cfg := &TOMLConfig{}
 	cfg.SetDefaults()
 	return cfg
+}
+
+func NewDecodedTOMLConfig(rawConfig string) (*TOMLConfig, error) {
+	d := toml.NewDecoder(strings.NewReader(rawConfig))
+	d.DisallowUnknownFields()
+	var cfg TOMLConfig
+
+	if err := d.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, rawConfig)
+	}
+
+	cfg.SetDefaults()
+	if err := cfg.ValidateConfig(); err != nil {
+		return nil, fmt.Errorf("config is invalid: %w", err)
+	}
+
+	if !cfg.IsEnabled() {
+		return nil, fmt.Errorf("cannot create new chain with ID %s: config is disabled", *cfg.ChainID)
+	}
+
+	return &cfg, nil
 }
 
 func NewDefaultMultiNodeConfig() mnCfg.MultiNodeConfig {
