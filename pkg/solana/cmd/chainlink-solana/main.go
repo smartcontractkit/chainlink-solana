@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -54,27 +52,21 @@ type pluginRelayer struct {
 	ds sqlutil.DataSource
 }
 
-func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore core.Keystore, csaKeystore core.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
-	d := toml.NewDecoder(strings.NewReader(config))
-	d.DisallowUnknownFields()
-	var cfg struct {
-		Solana solcfg.TOMLConfig
+func (c *pluginRelayer) NewRelayer(ctx context.Context, rawConfig string, keystore core.Keystore, csaKeystore core.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
+	cfg, err := solcfg.NewDecodedTOMLConfig(rawConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read configs: %w", err)
 	}
-
-	if err := d.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
-	}
-
-	rawNodes := make([]map[string]string, 0, len(cfg.Solana.Nodes))
-	for _, n := range cfg.Solana.Nodes {
+	rawNodes := make([]map[string]string, 0, len(cfg.Nodes))
+	for _, n := range cfg.Nodes {
 		if n == nil || n.URL == nil {
 			continue
 		}
 		rawNodes = append(rawNodes, map[string]string{"URL": n.URL.String()})
 	}
 	chainID := ""
-	if cfg.Solana.ChainID != nil {
-		chainID = *cfg.Solana.ChainID
+	if cfg.ChainID != nil {
+		chainID = *cfg.ChainID
 	}
 	emitter := loop.NewPluginRelayerConfigEmitter(
 		c.Logger,
@@ -93,7 +85,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		DS:       c.ds,
 	}
 
-	chain, err := solana.NewChain(&cfg.Solana, opts)
+	chain, err := solana.NewChain(cfg, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain: %w", err)
 	}
