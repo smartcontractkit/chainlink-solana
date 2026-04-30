@@ -43,12 +43,8 @@ func (c ExtraFilterConfig) Equal(other ExtraFilterConfig) bool {
 
 func (f Filter) MatchSameLogs(other Filter) bool {
 	status := (f.Address == other.Address) && (f.EventSig == other.EventSig) && (f.EventName == other.EventName) && (f.SubkeyPaths.Equal(other.SubkeyPaths))
-	if (f.EventIdl.Event.Name != "") && (other.EventIdl.Event.Name != "") {
-		status = status && f.EventIdl.Equal(other.EventIdl)
-	}
-	if f.ContractIdl != "" && other.ContractIdl != "" {
-		status = status && f.ContractIdl == other.ContractIdl
-	}
+	status = status && f.EventIdl.Equal(other.EventIdl)
+	status = status && f.ContractIdl == other.ContractIdl
 	return status
 }
 

@@ -922,17 +922,18 @@ func TestBackgroundWorkerRun(t *testing.T) {
 	lp, err := New(lggr, orm, cl, config.NewDefault(), chainID)
 	require.NoError(t, err)
 
-	filter1 := types.Filter{ID: 1, Name: "Filter A"}
-	filter2 := types.Filter{ID: 2, Name: "Filter B"}
-	filter3 := types.Filter{ID: 3, Name: "Filter C"}
+	addr := newRandomPublicKey(t)
+	filter1 := decoderReadyTestFilter(t, 1, "Filter A", "TestEvent", addr)
+	filter2 := decoderReadyTestFilter(t, 2, "Filter B", "TestItem", addr)
+	filter3 := decoderReadyTestFilter(t, 3, "Filter C", "TestEvent", addr)
 
 	filters := []types.Filter{
 		filter1, filter2, filter3,
 	}
 
 	orm.EXPECT().SelectFilters(mock.Anything).Return(filters, nil).Once()
-	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil)
-	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(1), nil)
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().PruneLogsForFilter(mock.Anything, mock.Anything).Return(int64(1), nil).Times(3)
 
 	lp.backgroundWorkerRun(ctx)
 	orm.AssertNumberOfCalls(t, "PruneLogsForFilter", 3)

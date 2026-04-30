@@ -140,7 +140,7 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			if methodSig == types.AnchorCPIEventDiscriminator() {
 				eventData, ok = extractAnchorCPIEventData(e.lggr, ix.Data)
 			} else {
-				eventData, ok = extractVecCPIEventData(e.lggr, ix.Data, allAccountKeys, ix, programAtStackHeight)
+				eventData, ok = extractVecCPIEventData(e.lggr, ix.Data, allAccountKeys, ix, programAtStackHeight, outerProgram)
 			}
 			if !ok || len(eventData) == 0 {
 				continue
@@ -231,16 +231,19 @@ func extractVecCPIEventData(
 	allAccountKeys []solana.PublicKey,
 	ix rpc.CompiledInstruction,
 	programAtStackHeight map[uint16]types.PublicKey,
+	outerProgram types.PublicKey,
 ) ([]byte, bool) {
 	if len(data) < CPIEventDataOffsetLegacy {
 		lggr.Warnw("data shorter than cpiEventDataOffset", "dataLen", len(data), "required", CPIEventDataOffsetLegacy)
 		return nil, false
 	}
 
+	sourceForLog := resolveSourceForLog(ix.StackHeight, programAtStackHeight, outerProgram)
+
 	declaredLen := bin.LittleEndian.Uint32(data[MethodDiscriminatorLen:CPIEventDataOffsetLegacy])
 	if declaredLen == 0 {
 		lggr.Warnw("cpi event vec length is zero",
-			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"sourceProgram", sourceForLog,
 			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
 		)
 		return nil, false
@@ -250,7 +253,7 @@ func extractVecCPIEventData(
 	if int(declaredLen) > remaining {
 		lggr.Warnw("cpi event vec length exceeds remaining bytes",
 			"declaredLen", declaredLen, "remaining", remaining,
-			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"sourceProgram", sourceForLog,
 			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
 		)
 		return nil, false
@@ -259,13 +262,21 @@ func extractVecCPIEventData(
 	if int(declaredLen) != remaining {
 		lggr.Warnw("cpi event vec length does not match remaining bytes",
 			"declaredLen", declaredLen, "remaining", remaining,
-			"sourceProgram", programAtStackHeight[ix.StackHeight-1].ToSolana().String(),
+			"sourceProgram", sourceForLog,
 			"destProgram", allAccountKeys[ix.ProgramIDIndex].String(),
 		)
 		return nil, false
 	}
 
 	return data[CPIEventDataOffsetLegacy:], true
+}
+
+func resolveSourceForLog(stackHeight uint16, programAtStackHeight map[uint16]types.PublicKey, outerProgram types.PublicKey) string {
+	if stackHeight == 0 {
+		// Match ExtractCPIEvents: missing StackHeight uses outer instruction program as source.
+		return outerProgram.ToSolana().String()
+	}
+	return programAtStackHeight[stackHeight-1].ToSolana().String()
 }
 
 func getAllAccountKeys(tx *solana.Transaction, meta *rpc.TransactionMeta) []solana.PublicKey {

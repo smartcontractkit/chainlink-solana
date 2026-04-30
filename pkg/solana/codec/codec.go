@@ -18,14 +18,14 @@ import (
 func NewEventCodecEntry(filter types.Filter, includeDiscriminator bool, mod commoncodec.Modifier, builder encodings.Builder) (solcommoncodec.Entry, error) {
 	if filter.ContractIdl != "" {
 		// Try codecv2 first (Anchor 0.30+ IDL format)
-		entry, err := codecv2.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
-		if err == nil {
+		entry, v2Err := codecv2.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
+		if v2Err == nil {
 			return entry, nil
 		}
 		// Fall back to codec (legacy Anchor IDL format)
-		entry, err = codecv1.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create event codec entry: %w", err)
+		entry, v1Err := codecv1.NewEventArgsEntryWrapper(filter.EventName, filter.ContractIdl, includeDiscriminator, mod, builder)
+		if v1Err != nil {
+			return nil, fmt.Errorf("failed to create event codec entry: v2 err: %w, v1 err: %w", v2Err, v1Err)
 		}
 		return entry, nil
 	}
