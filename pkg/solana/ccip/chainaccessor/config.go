@@ -56,6 +56,10 @@ func (a *SolanaAccessor) getOffRampConfig(ctx context.Context) (ccipocr3.Offramp
 		MessageInterceptor:                      []byte{}, // expected to be empty for solana
 	}
 
+	if len(config.Ocr3) < 2 {
+		return ccipocr3.OfframpConfig{}, fmt.Errorf("offramp config OCR3 array has insufficient configs: expected 2, got %d", len(config.Ocr3))
+	}
+
 	commitConfig := config.Ocr3[0]
 	commitOCR3Config := ccipocr3.OCRConfigResponse{
 		OCRConfig: ccipocr3.OCRConfig{
