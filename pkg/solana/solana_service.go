@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -371,8 +372,130 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 
 const (
 	submitTransactionGetMultipleAccountsChunk = 100
-	submitTransactionSimLogLinesCap           = 64
+	submitTransactionSimLogHeadLines          = 28
+	submitTransactionSimLogTailLines          = 48
+	submitTransactionSimProgramFlowTailCap    = 36
 )
+
+// submitTransactionMissingAccount is structured preflight output so operators can map
+// pubkeys to message layout (signer / writable) and instruction usage without decoding on-chain data.
+type submitTransactionMissingAccount struct {
+	MessageAccountIndex            int      `json:"messageAccountIndex"`
+	PublicKey                      string   `json:"publicKey"`
+	Signer                         bool     `json:"signer"`
+	Writable                       bool     `json:"writable"`
+	Role                           string   `json:"role"`
+	ReferencedByInstructionIndexes []int    `json:"referencedByInstructionIndexes,omitempty"`
+	ProgramForInstructionIndexes   []int    `json:"programForInstructionIndexes,omitempty"`
+	WellKnownProgramOrSysvar       string   `json:"wellKnownProgramOrSysvar,omitempty"`
+	KeystoneForwarderReportSlots   []string `json:"keystoneForwarderReportSlots,omitempty"` // e.g. ix0:ExecutionState, ix0:OraclesConfigPDA (see preflight_keystone_forwarder.go)
+}
+
+func submitTransactionIxRefsForAccount(msg solana.Message, accountIndex int) (asAccount []int, asProgram []int) {
+	for ixIdx, ix := range msg.Instructions {
+		if int(ix.ProgramIDIndex) == accountIndex {
+			asProgram = append(asProgram, ixIdx)
+		}
+		for _, acctIX := range ix.Accounts {
+			if int(acctIX) == accountIndex {
+				asAccount = append(asAccount, ixIdx)
+				break
+			}
+		}
+	}
+	return asAccount, asProgram
+}
+
+func submitTransactionWellKnownAccount(pk solana.PublicKey) string {
+	switch {
+	case pk.Equals(solana.SystemProgramID):
+		return "SystemProgram"
+	case pk.Equals(solana.ComputeBudget):
+		return "ComputeBudget"
+	case pk.Equals(solana.TokenProgramID):
+		return "TokenProgram"
+	case pk.Equals(solana.Token2022ProgramID):
+		return "Token2022Program"
+	case pk.Equals(solana.SPLAssociatedTokenAccountProgramID):
+		return "AssociatedTokenAccountProgram"
+	case pk.Equals(solana.MemoProgramID):
+		return "MemoProgram"
+	case pk.Equals(solana.AddressLookupTableProgramID):
+		return "AddressLookupTableProgram"
+	case pk.Equals(solana.BPFLoaderUpgradeableProgramID):
+		return "BPFLoaderUpgradeable"
+	default:
+		return ""
+	}
+}
+
+func submitTransactionAccountRole(signer, writable bool) string {
+	switch {
+	case signer && writable:
+		return "writableSigner"
+	case signer && !writable:
+		return "readonlySigner"
+	case !signer && writable:
+		return "writableUnsigned"
+	default:
+		return "readonlyUnsigned"
+	}
+}
+
+func submitTransactionMarshalSimJSON(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
+}
+
+// submitTransactionSimulateLogsSandwich keeps the start and end of the RPC simulation log slice so
+// long traces still show where execution began and the failure region (AccountNotFound usually appears at the end).
+func submitTransactionSimulateLogsSandwich(logs []string, head, tail int) []string {
+	if head < 0 {
+		head = 0
+	}
+	if tail < 0 {
+		tail = 0
+	}
+	if len(logs) <= head+tail {
+		out := make([]string, len(logs))
+		copy(out, logs)
+		return out
+	}
+	out := make([]string, 0, head+tail+1)
+	out = append(out, logs[:head]...)
+	out = append(out, fmt.Sprintf("... omitted %d log lines ...", len(logs)-head-tail))
+	out = append(out, logs[len(logs)-tail:]...)
+	return out
+}
+
+// submitTransactionSimulateLogInsights extracts lines that usually pinpoint AccountNotFound and instruction failure.
+func submitTransactionSimulateLogInsights(logs []string) (accountNotFoundHints, instructionFailLines, programFlowTail []string) {
+	var progFlow []string
+	for _, line := range logs {
+		low := strings.ToLower(line)
+		if strings.Contains(low, "accountnotfound") ||
+			strings.Contains(low, "could not find account") ||
+			strings.Contains(low, "failed: account") {
+			accountNotFoundHints = append(accountNotFoundHints, line)
+		}
+		if strings.Contains(line, "Instruction ") && strings.Contains(line, "Failed") {
+			instructionFailLines = append(instructionFailLines, line)
+		}
+		if strings.HasPrefix(line, "Program ") {
+			progFlow = append(progFlow, line)
+		}
+	}
+	if len(progFlow) > submitTransactionSimProgramFlowTailCap {
+		progFlow = progFlow[len(progFlow)-submitTransactionSimProgramFlowTailCap:]
+	}
+	return accountNotFoundHints, instructionFailLines, progFlow
+}
 
 // submitTransactionDebugPreflight simulates the unsigned tx and logs missing static accounts.
 // v0 / address lookup table accounts resolved only at execution time are not in Message.AccountKeys and are not checked here.
@@ -399,18 +522,29 @@ func (ss *solanaService) submitTransactionDebugPreflight(ctx context.Context, r 
 	if simErr != nil {
 		ss.logger.Warnw("SubmitTransaction preflight simulation RPC failed", "err", simErr, "transactionID", transactionID)
 	} else if simRes != nil && simRes.Err != nil {
-		logs := simRes.Logs
-		if len(logs) > submitTransactionSimLogLinesCap {
-			truncated := len(logs) - submitTransactionSimLogLinesCap
-			logs = append(append([]string(nil), logs[:submitTransactionSimLogLinesCap]...),
-				fmt.Sprintf("... truncated %d log lines", truncated))
+		rawLogs := simRes.Logs
+		anfHints, instFail, progTail := submitTransactionSimulateLogInsights(rawLogs)
+		sandwich := submitTransactionSimulateLogsSandwich(rawLogs, submitTransactionSimLogHeadLines, submitTransactionSimLogTailLines)
+		args := []interface{}{
+			"transactionID", transactionID,
+			"simErr", simRes.Err,
+			"simErrJSON", submitTransactionMarshalSimJSON(simRes.Err),
+			"simLogsTotalLines", len(rawLogs),
+			"simAccountNotFoundHints", anfHints,
+			"simInstructionFailureLines", instFail,
+			"simProgramInvokeFlowTail", progTail,
+			"simLogsHeadAndTail", sandwich,
 		}
-		ss.logger.Warnw("SubmitTransaction preflight simulation failed", "transactionID", transactionID, "simErr", simRes.Err, "logs", logs)
+		if simRes.UnitsConsumed != nil {
+			args = append(args, "simUnitsConsumed", *simRes.UnitsConsumed)
+		}
+		ss.logger.Warnw("SubmitTransaction preflight simulation failed", args...)
 	}
 
 	// Static message keys only (see doc comment on missing ALT accounts).
 	keys := tx.Message.AccountKeys
 	opts := &rpc.GetMultipleAccountsOpts{Commitment: commitment}
+	var missingDetails []submitTransactionMissingAccount
 	for start := 0; start < len(keys); start += submitTransactionGetMultipleAccountsChunk {
 		end := start + submitTransactionGetMultipleAccountsChunk
 		if end > len(keys) {
@@ -431,15 +565,43 @@ func (ss *solanaService) submitTransactionDebugPreflight(ctx context.Context, r 
 				"transactionID", transactionID, "want", len(chunk), "got", len(res.Value))
 			continue
 		}
-		var missing []string
 		for i, v := range res.Value {
-			if v == nil {
-				missing = append(missing, chunk[i].String())
+			if v != nil {
+				continue
 			}
+			globalIdx := start + i
+			pk := chunk[i]
+			signer := tx.Message.IsSigner(pk)
+			writable := (&tx.Message).IsWritableStatic(pk)
+			asAcct, asProg := submitTransactionIxRefsForAccount(tx.Message, globalIdx)
+			hint := submitTransactionWellKnownAccount(pk)
+			fwdSlots := keystoneForwarderReportSlotLabels(tx.Message, globalIdx)
+			missingDetails = append(missingDetails, submitTransactionMissingAccount{
+				MessageAccountIndex:            globalIdx,
+				PublicKey:                      pk.String(),
+				Signer:                         signer,
+				Writable:                       writable,
+				Role:                           submitTransactionAccountRole(signer, writable),
+				ReferencedByInstructionIndexes: asAcct,
+				ProgramForInstructionIndexes:   asProg,
+				WellKnownProgramOrSysvar:       hint,
+				KeystoneForwarderReportSlots:   fwdSlots,
+			})
 		}
-		if len(missing) > 0 {
-			ss.logger.Warnw("SubmitTransaction preflight accounts missing on-chain", "transactionID", transactionID, "missing", missing)
+	}
+	if len(missingDetails) > 0 {
+		logArgs := []interface{}{
+			"transactionID", transactionID,
+			"missingDetails", missingDetails,
 		}
+		if rp := keystoneForwarderReceiverProgramFromMessage(tx.Message); !rp.IsZero() {
+			logArgs = append(logArgs, "keystoneForwarderReceiverProgram", rp.String())
+		}
+		if summary := keystoneForwarderSummarizeMissingReportRoles(missingDetails); summary.any() {
+			logArgs = append(logArgs, "keystoneMissingReportPreflight", summary)
+		}
+		logArgs = append(logArgs, "note", "getMultipleAccounts returns nil for accounts that do not exist yet; writableUnsigned accounts may be PDAs created in the same transaction (e.g. ExecutionState). When keystoneForwarderReportSlots is set, each entry is ix<I>:<role> for a compiled keystone_forwarder::report instruction (program id must match the generated chainlink-solana ProgramID): ForwarderState, OraclesConfigPDA, Transmitter, ForwarderAuthorityPDA, ExecutionState, ReceiverProgram, SystemProgram, then ReceiverCPIAccount_0.. for CPI accounts. messageAccountIndex is Message.AccountKeys index (0 = fee payer after relay rewrite). keystoneMissingReportPreflight booleans are explicit: missingExecutionState is often benign before first init; missingForwarderAuthorityPDA is often an RPC false positive (signer PDA may have no account data).")
+		ss.logger.Warnw("SubmitTransaction preflight accounts missing on-chain", logArgs...)
 	}
 }
 
