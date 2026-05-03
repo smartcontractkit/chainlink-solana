@@ -329,6 +329,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
+	ss.submitTransactionDebugPreflight(ctx, r, tx, transactionID)
+
 	err = ss.chain.TxManager().Enqueue(ctx, feePayer.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
@@ -365,6 +367,80 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+}
+
+const (
+	submitTransactionGetMultipleAccountsChunk = 100
+	submitTransactionSimLogLinesCap           = 64
+)
+
+// submitTransactionDebugPreflight simulates the unsigned tx and logs missing static accounts.
+// v0 / address lookup table accounts resolved only at execution time are not in Message.AccountKeys and are not checked here.
+// Signature placeholders are cleared before return so TXM enqueue behavior matches the prior path.
+func (ss *solanaService) submitTransactionDebugPreflight(ctx context.Context, r client.Reader, tx *solana.Transaction, transactionID string) {
+	commitment := ss.chain.Config().Commitment()
+
+	nReq := int(tx.Message.Header.NumRequiredSignatures)
+	if nReq < 0 {
+		nReq = 0
+	}
+	for len(tx.Signatures) < nReq {
+		tx.Signatures = append(tx.Signatures, solana.Signature{})
+	}
+
+	mc := ss.chain.MultiClient()
+	simRes, simErr := mc.SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{
+		SigVerify:              false,
+		ReplaceRecentBlockhash: true,
+		Commitment:             commitment,
+	})
+	tx.Signatures = tx.Signatures[:0]
+
+	if simErr != nil {
+		ss.logger.Warnw("SubmitTransaction preflight simulation RPC failed", "err", simErr, "transactionID", transactionID)
+	} else if simRes != nil && simRes.Err != nil {
+		logs := simRes.Logs
+		if len(logs) > submitTransactionSimLogLinesCap {
+			truncated := len(logs) - submitTransactionSimLogLinesCap
+			logs = append(append([]string(nil), logs[:submitTransactionSimLogLinesCap]...),
+				fmt.Sprintf("... truncated %d log lines", truncated))
+		}
+		ss.logger.Warnw("SubmitTransaction preflight simulation failed", "transactionID", transactionID, "simErr", simRes.Err, "logs", logs)
+	}
+
+	// Static message keys only (see doc comment on missing ALT accounts).
+	keys := tx.Message.AccountKeys
+	opts := &rpc.GetMultipleAccountsOpts{Commitment: commitment}
+	for start := 0; start < len(keys); start += submitTransactionGetMultipleAccountsChunk {
+		end := start + submitTransactionGetMultipleAccountsChunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		chunk := keys[start:end]
+		res, err := r.GetMultipleAccountsWithOpts(ctx, chunk, opts)
+		if err != nil {
+			ss.logger.Warnw("SubmitTransaction preflight getMultipleAccounts failed", "err", err, "transactionID", transactionID, "start", start, "end", end)
+			continue
+		}
+		if res == nil {
+			ss.logger.Warnw("SubmitTransaction preflight getMultipleAccounts nil result", "transactionID", transactionID, "start", start, "end", end)
+			continue
+		}
+		if len(res.Value) != len(chunk) {
+			ss.logger.Warnw("SubmitTransaction preflight getMultipleAccounts unexpected value length",
+				"transactionID", transactionID, "want", len(chunk), "got", len(res.Value))
+			continue
+		}
+		var missing []string
+		for i, v := range res.Value {
+			if v == nil {
+				missing = append(missing, chunk[i].String())
+			}
+		}
+		if len(missing) > 0 {
+			ss.logger.Warnw("SubmitTransaction preflight accounts missing on-chain", "transactionID", transactionID, "missing", missing)
+		}
+	}
 }
 
 // getPublicKeyWithHighestLamports returns the account with the largest SOL (lamport) balance.
