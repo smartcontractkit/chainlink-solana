@@ -481,7 +481,12 @@ func (env *IdlEnumFields) UnmarshalJSON(data []byte) error {
 
 		firstItem := v[0]
 
-		if _, ok := firstItem.(map[string]any)["name"]; ok {
+		firstItemMap, ok := firstItem.(map[string]any)
+		if !ok {
+			return fmt.Errorf("unexpected type for first item in enum fields array: %T", firstItem)
+		}
+
+		if _, ok := firstItemMap["name"]; ok {
 			// TODO:
 			// If has `name` field, then it's most likely a IdlEnumFieldsNamed.
 			return utilz.TranscodeJSON(temp, &env.IdlEnumFieldsNamed)
