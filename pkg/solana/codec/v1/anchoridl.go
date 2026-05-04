@@ -328,6 +328,12 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if !ok {
 				return fmt.Errorf("value is unexpected type: %T, expected float64", arrVal[1])
 			}
+			// Enforce a reasonable array length to prevent panic or undefined behavior when decoding.
+			// Realistically an array would never define a length of 10_000_000 due to solana program space limitations.
+			// https://github.com/smartcontractkit/chainlink-common/blob/main/pkg/codec/encodings/array.go
+			if num < 0 || num > 10_000_000 {
+				return fmt.Errorf("array length defined in IDL type is excessively large: %f, expect reasonable length less than 10,000,000", num)
+			}
 			target.Num = int(num)
 			env.AsIdlTypeArray = &target
 		}
