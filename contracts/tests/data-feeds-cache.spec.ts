@@ -33,6 +33,25 @@ import {
 
 // chai.use(chaiAsPromised);
 
+// ReceivedDecimalReport: { timestamp: u32, answer: u128, data_id: [u8; 16] }
+// Anchor 0.31 IDL no longer exposes this type (instruction arg is opaque bytes),
+// so we Borsh-encode it manually.
+const receivedDecimalReportLayout = struct([
+  u32("timestamp"),
+  u128("answer"),
+  array(u8(), 16, "dataId"),
+]);
+
+function encodeReceivedDecimalReport(report: {
+  timestamp: BN;
+  answer: BN;
+  dataId: number[];
+}): Buffer {
+  const buf = Buffer.alloc(36); // 4 + 16 + 16
+  receivedDecimalReportLayout.encode(report, buf);
+  return buf;
+}
+
 const workflowMetadataEq = (a: WorkflowMetadata, b: WorkflowMetadata) => {
   return (
     a.allowedSender.equals(b.allowedSender) &&
@@ -369,23 +388,10 @@ describe("data feeds cache", function () {
           })
           .rpc();
 
-        try {
-          await cacheProgram.account.writePermissionFlag.fetch(
-            legacyFeedConfigAccount2
-          );
-          assert.fail("Account should not exist anymore");
-        } catch (err) {
-          if (!err.message.includes("Account does not exist")) {
-            assert.fail("Account should not exist anymore");
-          }
-        }
-
-        // assert.isRejected(
-        //   cacheProgram.account.writePermissionFlag.fetch(
-        //     legacyFeedConfigAccount2
-        //   ),
-        //   /Account does not exist/
-        // );
+        const info = await provider.connection.getAccountInfo(
+          legacyFeedConfigAccount2
+        );
+        assert.isNull(info, "Account should not exist anymore");
       });
     });
   });
@@ -814,15 +820,10 @@ describe("data feeds cache", function () {
         .signers([feedAdminA.keypair])
         .rpc();
 
-      const actualWritePermissionFlag =
-        await cacheProgram.account.writePermissionFlag.fetch(
-          feedAPermissionFlagAccount
-        );
-
-      assert.isTrue(
-        Object.keys(actualWritePermissionFlag).length === 0,
-        "flag exists"
+      const permFlagInfo = await provider.connection.getAccountInfo(
+        feedAPermissionFlagAccount
       );
+      assert.isNotNull(permFlagInfo, "flag exists");
 
       const actualFeedConfig = await cacheProgram.account.feedConfig.fetch(
         feedAConfigAccount
@@ -1020,6 +1021,7 @@ describe("data feeds cache", function () {
         .accounts({
           feedAdmin: feedAdminA.keypair.publicKey,
           state: cacheStateAccount.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
         })
         .remainingAccounts(
           remainingAccounts2.concat(
@@ -1034,14 +1036,8 @@ describe("data feeds cache", function () {
         .rpc();
 
       for (let x of deletePermissionAccounts) {
-        try {
-          await cacheProgram.account.writePermissionFlag.fetch(x);
-          assert.fail("Account should not exist anymore");
-        } catch (err) {
-          if (!err.message.includes("Account does not exist")) {
-            assert.fail("Account should not exist anymore");
-          }
-        }
+        const info = await provider.connection.getAccountInfo(x);
+        assert.isNull(info, "Account should not exist anymore");
       }
 
       // check the state of stuff here
@@ -1229,7 +1225,7 @@ describe("data feeds cache", function () {
 
       const submissionEvent = waitForEvent(
         mockLegacyStoreProgram,
-        "Submit",
+        "submit",
         (event: any, slot) => {
           assert.strictEqual(
             event.feeds.length,
@@ -1252,7 +1248,7 @@ describe("data feeds cache", function () {
       );
 
       const feedReports = legacyFeeds.map((f, i) => {
-        return cacheProgram.coder.types.encode("ReceivedDecimalReport", {
+        return encodeReceivedDecimalReport({
           timestamp: new BN(i + 10),
           answer: new BN(i + 10),
           dataId: f.dataId,
@@ -1350,14 +1346,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1462,14 +1455,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1532,14 +1522,11 @@ describe("data feeds cache", function () {
       assert.isTrue(report.answer.eq(new BN(321)), "answers match");
       assert.isTrue(report.timestamp == 123, "answers match");
 
-      const staleReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const staleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const staleLenPrefix = Buffer.alloc(4);
       staleLenPrefix.writeUInt32LE(1, 0);
@@ -1549,7 +1536,7 @@ describe("data feeds cache", function () {
 
       const staleReportEvent = waitForEvent(
         cacheProgram,
-        "StaleDecimalReport",
+        "staleDecimalReport",
         (event: any, slot) => {
           assert.isTrue(
             Buffer.from(event.dataId).equals(feedA.dataId),
@@ -1619,14 +1606,11 @@ describe("data feeds cache", function () {
         unauthorizedWorkflow[0].allowedWorkflowName
       );
 
-      const singleReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1645,7 +1629,7 @@ describe("data feeds cache", function () {
 
       const invalidUpdatePermissionEvent = waitForEvent(
         cacheProgram,
-        "InvalidUpdatePermission",
+        "invalidUpdatePermission",
         (event: any, slot) => {
           assert.isTrue(
             Buffer.from(event.dataId).equals(feedA.dataId),
@@ -1728,14 +1712,11 @@ describe("data feeds cache", function () {
         legacyWorkflowMetadatas[0].allowedWorkflowName
       );
 
-      const singleReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(123),
-          answer: new BN(321),
-          dataId: feedA.dataId,
-        }
-      );
+      const singleReport = encodeReceivedDecimalReport({
+        timestamp: new BN(123),
+        answer: new BN(321),
+        dataId: feedA.dataId,
+      });
 
       const lenPrefix = Buffer.alloc(4);
       lenPrefix.writeUInt32LE(1, 0);
@@ -1798,14 +1779,11 @@ describe("data feeds cache", function () {
       assert.isTrue(report.answer.eq(new BN(321)), "answers match");
       assert.isTrue(report.timestamp == 123, "answers match");
 
-      const newReport = cacheProgram.coder.types.encode(
-        "ReceivedDecimalReport",
-        {
-          timestamp: new BN(323),
-          answer: new BN(721),
-          dataId: feedA.dataId,
-        }
-      );
+      const newReport = encodeReceivedDecimalReport({
+        timestamp: new BN(323),
+        answer: new BN(721),
+        dataId: feedA.dataId,
+      });
 
       const newLenPrefix = Buffer.alloc(4);
       newLenPrefix.writeUInt32LE(1, 0);

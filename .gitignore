@@ -21,6 +21,8 @@ contracts/artifacts/*
 ops/localnet.json
 test-ledger
 contracts/target
+.build-tmp
+.cargo-home
 #!contracts/target/idl/
 #!contracts/target/idl/*
 #contracts/target/idl/*

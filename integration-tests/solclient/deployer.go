@@ -155,17 +155,18 @@ func (c *ContractDeployer) DeployOCRv2Store(billingAC string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	initInstr, err := store2.NewInitializeInstruction(
+		c.Accounts.Store.PublicKey(),
+		c.Accounts.Owner.PublicKey(),
+		bacPublicKey,
+	)
+	if err != nil {
+		return nil, err
+	}
 	err = c.Client.TXSync(
 		"Deploy store",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			accInstruction,
-			store2.NewInitializeInstruction(
-				c.Accounts.Store.PublicKey(),
-				c.Accounts.Owner.PublicKey(),
-				bacPublicKey,
-			).Build(),
-		},
+		[]solana.Instruction{accInstruction, initInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(c.Accounts.Owner.PublicKey()) {
 				return &c.Accounts.Owner.PrivateKey
@@ -199,20 +200,21 @@ func (c *ContractDeployer) CreateFeed(desc string, decimals uint8, granularity u
 	if err != nil {
 		return err
 	}
+	createFeedInstr, err := store2.NewCreateFeedInstruction(
+		desc,
+		decimals,
+		granularity,
+		liveLength,
+		c.Accounts.Feed.PublicKey(),
+		c.Accounts.Owner.PublicKey(),
+	)
+	if err != nil {
+		return err
+	}
 	err = c.Client.TXSync(
 		"Create feed",
 		rpc.CommitmentConfirmed,
-		[]solana.Instruction{
-			feedAccInstruction,
-			store2.NewCreateFeedInstruction(
-				desc,
-				decimals,
-				granularity,
-				liveLength,
-				c.Accounts.Feed.PublicKey(),
-				c.Accounts.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{feedAccInstruction, createFeedInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(c.Accounts.Owner.PublicKey()) {
 				return &c.Accounts.Owner.PrivateKey
@@ -287,27 +289,23 @@ func (c *ContractDeployer) InitOCR2(billingControllerAddr string, requesterContr
 	if err != nil {
 		return nil, err
 	}
+	ocrInitInstr, err := ocr_2.NewInitializeInstruction(
+		ag_binary.Int128{Lo: 1, Hi: 0},
+		ag_binary.Int128{Lo: 1000000, Hi: 0},
+		c.Accounts.OCR.PublicKey(),
+		c.Accounts.Feed.PublicKey(),
+		c.Accounts.Owner.PublicKey(),
+		c.Accounts.Mint.PublicKey(),
+		*assocVault,
+		*vault,
+		racPubKey,
+		bacPubKey,
+	)
+	if err != nil {
+		return nil, err
+	}
 	instr := make([]solana.Instruction, 0)
-	instr = append(instr,
-		ocrAccInstruction,
-		ocr_2.NewInitializeInstructionBuilder().
-			SetMinAnswer(ag_binary.Int128{
-				Lo: 1,
-				Hi: 0,
-			}).
-			SetMaxAnswer(ag_binary.Int128{
-				Lo: 1000000,
-				Hi: 0,
-			}).
-			SetStateAccount(c.Accounts.OCR.PublicKey()).
-			SetFeedAccount(c.Accounts.Feed.PublicKey()).
-			SetOwnerAccount(c.Accounts.Owner.PublicKey()).
-			SetTokenMintAccount(c.Accounts.Mint.PublicKey()).
-			SetTokenVaultAccount(*assocVault).
-			SetVaultAuthorityAccount(*vault).
-			SetRequesterAccessControllerAccount(racPubKey).
-			SetBillingAccessControllerAccount(bacPubKey).
-			Build())
+	instr = append(instr, ocrAccInstruction, ocrInitInstr)
 	err = c.Client.TXSync(
 		"Initializing OCRv2",
 		rpc.CommitmentConfirmed,
@@ -377,15 +375,16 @@ func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, err
 	if err != nil {
 		return nil, err
 	}
+	acInitInstr, err := access_controller2.NewInitializeInstruction(
+		stateAcc.PublicKey(),
+		c.Accounts.Owner.PublicKey(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	err = c.Client.TXAsync(
 		"Initializing access controller",
-		[]solana.Instruction{
-			accInstruction,
-			access_controller2.NewInitializeInstruction(
-				stateAcc.PublicKey(),
-				c.Accounts.Owner.PublicKey(),
-			).Build(),
-		},
+		[]solana.Instruction{accInstruction, acInitInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(c.Accounts.Owner.PublicKey()) {
 				return &c.Accounts.Owner.PrivateKey
@@ -412,9 +411,9 @@ func (c *ContractDeployer) DeployOCRv2AccessController() (*AccessController, err
 }
 
 func (c *ContractDeployer) RegisterAnchorPrograms() {
-	access_controller2.SetProgramID(c.Client.ProgramWallets["access_controller-keypair.json"].PublicKey())
-	store2.SetProgramID(c.Client.ProgramWallets["store-keypair.json"].PublicKey())
-	ocr_2.SetProgramID(c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey())
+	access_controller2.ProgramID = c.Client.ProgramWallets["access_controller-keypair.json"].PublicKey()
+	store2.ProgramID = c.Client.ProgramWallets["store-keypair.json"].PublicKey()
+	ocr_2.ProgramID = c.Client.ProgramWallets["ocr2-keypair.json"].PublicKey()
 }
 
 func (c *ContractDeployer) ValidateProgramsDeployed() error {

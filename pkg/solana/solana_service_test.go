@@ -7,6 +7,7 @@ import (
 
 	solana "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -14,6 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+
+	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 )
 
 func Test_Converters(t *testing.T) {
@@ -273,6 +276,48 @@ func Test_Converters(t *testing.T) {
 	})
 }
 
+func Test_getPublicKeyWithHighestLamports(t *testing.T) {
+	ctx := t.Context()
+	ss := &solanaService{logger: logger.Test(t)}
+
+	t.Run("single account", func(t *testing.T) {
+		k, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, nil, []string{k.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, k.PublicKey(), got)
+	})
+
+	t.Run("picks highest balance", func(t *testing.T) {
+		kLow, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		kHigh, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		mockR := clientmocks.NewReaderWriter(t)
+		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(100), nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(9000), nil).Once()
+
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{kLow.PublicKey().String(), kHigh.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, kHigh.PublicKey(), got)
+	})
+
+	t.Run("fallback when all balances fail", func(t *testing.T) {
+		k0, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+		k1, err := solana.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		mockR := clientmocks.NewReaderWriter(t)
+		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return(uint64(0), errors.New("rpc down")).Twice()
+
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{k0.PublicKey().String(), k1.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, k0.PublicKey(), got)
+	})
+}
+
 func pk(i byte) solana.PublicKey {
 	var p solana.PublicKey
 	for j := range p {
@@ -300,10 +345,10 @@ type mockLogPoller struct {
 	ready error
 }
 
-func (m *mockLogPoller) Start(context.Context) error                      { return nil }
-func (m *mockLogPoller) Ready() error                                     { return m.ready }
-func (m *mockLogPoller) Close() error                                     { return nil }
-func (m *mockLogPoller) HasFilter(context.Context, string) bool           { return false }
+func (m *mockLogPoller) Start(context.Context) error            { return nil }
+func (m *mockLogPoller) Ready() error                           { return m.ready }
+func (m *mockLogPoller) Close() error                           { return nil }
+func (m *mockLogPoller) HasFilter(context.Context, string) bool { return false }
 func (m *mockLogPoller) RegisterFilter(context.Context, logpollertypes.Filter) error {
 	return nil
 }

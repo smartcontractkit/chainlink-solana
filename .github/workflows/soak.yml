@@ -8,7 +8,8 @@ on:
         default: develop
         type: string
       cl_image_ecr:
-        description: Name of the AWS ECR repository containing the Chainlink image (without AWS account and region, e.g. "chainlink")
+        description: Name of the AWS ECR repository containing the Chainlink image
+          (without AWS account and region, e.g. "chainlink")
         required: false
         type: string
         default: chainlink
@@ -20,7 +21,10 @@ env:
 jobs:
   get_projectserum_version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -33,12 +37,15 @@ jobs:
 
   e2e_custom_build_artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest-32cores-128GB # ghv-ignore!
-    needs: [get_projectserum_version]
+    needs: [ get_projectserum_version ]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -51,7 +58,10 @@ jobs:
 
   e2e_soak_test:
     name: E2E Soak Test (${{ matrix.variant }})
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
@@ -65,7 +75,7 @@ jobs:
             configs: env.toml,products/solana/basic.toml,products/solana/soak.toml
           - variant: plugins
             configs: env.toml,products/solana/basic.toml,products/solana/soak.toml,products/solana/plugins.toml
-    needs: [e2e_custom_build_artifacts]
+    needs: [ e2e_custom_build_artifacts ]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -126,7 +136,10 @@ jobs:
       - name: Setup Environment
         working-directory: integration-tests/devenv
         env:
-          CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/${{ github.event.inputs.cl_image_ecr }}:${{ github.event.inputs.cl_image_tag }}
+          CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{
+            secrets.QA_AWS_REGION }}.amazonaws.com/${{
+            github.event.inputs.cl_image_ecr }}:${{
+            github.event.inputs.cl_image_tag }}
         run: go run ./cmd u ${{ matrix.configs }} && go run ./cmd obs up -f
 
       - name: Run Soak Test
