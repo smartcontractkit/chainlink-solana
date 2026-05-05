@@ -311,8 +311,8 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 		if err != nil {
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error getting value at location %s: %w", pda.InternalField.Location, err))
 		}
-		if len(value) > 1 {
-			return nil, lookupErrWithName(pda.Name, fmt.Errorf("multiple values found at location %s", pda.InternalField.Location))
+		if len(value) != 1 {
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("expected 1 value at location %s, got %d", pda.InternalField.Location, len(value)))
 		}
 
 		result = append(result, &solana.AccountMeta{

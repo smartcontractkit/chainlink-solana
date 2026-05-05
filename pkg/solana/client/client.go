@@ -148,6 +148,9 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 	if !ok {
 		return 0, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
 	}
+	if res == nil {
+		return 0, errors.New("Balance returned nil result")
+	}
 	return res.Value, err
 }
 
@@ -168,6 +171,9 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	res, ok := v.(*rpc.GetBalanceResult)
 	if !ok {
 		return 0, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
+	}
+	if res == nil {
+		return 0, errors.New("BalanceWithCommitment returned nil result")
 	}
 	return res.Value, err
 }
@@ -225,6 +231,9 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (t
 	res, ok := v.(*rpc.GetTransactionResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetTransactionResult{})
+	}
+	if res == nil {
+		return nil, errors.New("GetTransaction returned nil result")
 	}
 	return res, err
 }
@@ -309,6 +318,9 @@ func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBloc
 	res, ok := v.(*rpc.GetLatestBlockhashResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetLatestBlockhashResult{})
+	}
+	if res == nil || res.Value == nil {
+		return nil, errors.New("LatestBlockhash returned nil result")
 	}
 	return res, err
 }
@@ -475,6 +487,9 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBlockResult{})
 	}
+	if res == nil {
+		return nil, errors.New("GetBlock returned nil result")
+	}
 	return res, err
 }
 
@@ -493,6 +508,9 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 	res, ok := v.(*rpc.BlocksResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.BlocksResult{})
+	}
+	if res == nil {
+		return nil, errors.New("GetBlocksWithLimit returned nil result")
 	}
 	return res, err
 }
