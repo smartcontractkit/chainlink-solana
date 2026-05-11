@@ -3,6 +3,7 @@ package fees
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -108,7 +109,7 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
 		rw.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).Return(lastSlot, nil)
-		rw.On("GetBlockWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("fail rpc call"))
+		rw.On("GetBlockWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fail rpc call"))
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Ensure the price remains unchanged
