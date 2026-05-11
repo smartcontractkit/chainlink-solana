@@ -40,22 +40,6 @@ func HeadMetadataGetBlockOpts(commitment rpc.CommitmentType) *rpc.GetBlockOpts {
 	}
 }
 
-// FeeEstimatorGetBlockOpts returns options for getBlock tuned for the BlockHistoryEstimator.
-// This includes the full transaction list which is needed to inspect compute budget instructions
-// and tx fees, but with rewards excluded and base64 transaction encoding so the response is
-// decoded via the binary path instead of reflective JSON (memory heavy, 1-4MB JSON payload per block).
-func FeeEstimatorGetBlockOpts(commitment rpc.CommitmentType) *rpc.GetBlockOpts {
-	rewards := false
-	v := MaxSupportTransactionVersion
-	return &rpc.GetBlockOpts{
-		Commitment:                     commitment,
-		Encoding:                       solana.EncodingBase64,
-		TransactionDetails:             rpc.TransactionDetailsFull,
-		Rewards:                        &rewards,
-		MaxSupportedTransactionVersion: &v,
-	}
-}
-
 type ReaderWriter interface {
 	Writer
 	Reader
@@ -493,11 +477,11 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 	// it would treat all GetBlock calls as identical and merge them, returning whichever block it fetched first to all callers.
 	key := fmt.Sprintf("GetBlockWithOpts(%d)", slot)
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
-		// The only production caller of this method (and the GetLatestBlock wrapper above) seems to be the
-		// BlockHistoryEstimator, which only consumes tx.Meta.Fee and tx.Message.Instructions/AccountKeys.
-		// Use the BHE-tuned opts so we don't pull rewards/balances/log messages or pay heavy reflective
-		// JSON decoding cost on every poll. See FeeEstimatorGetBlockOpts for rationale.
-		return c.rpc.GetBlockWithOpts(ctx, slot, FeeEstimatorGetBlockOpts(c.commitment))
+		version := MaxSupportTransactionVersion
+		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
+			Commitment:                     c.commitment,
+			MaxSupportedTransactionVersion: &version,
+		})
 	})
 	res, ok := v.(*rpc.GetBlockResult)
 	if !ok {
