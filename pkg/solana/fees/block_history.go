@@ -16,6 +16,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
+
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 )
@@ -30,6 +33,20 @@ var (
 var _ Estimator = &blockHistoryEstimator{}
 
 var errNoComputeUnitPriceCollected = fmt.Errorf("no compute unit prices collected")
+
+// blockHistoryGetBlockOpts returns getBlock options tuned for fee estimation: full transactions with
+// base64 encoding so responses decode via the binary path, rewards omitted.
+func blockHistoryGetBlockOpts(commitment rpc.CommitmentType) *rpc.GetBlockOpts {
+	rewards := false
+	v := client.MaxSupportTransactionVersion
+	return &rpc.GetBlockOpts{
+		Commitment:                     commitment,
+		Encoding:                       solana.EncodingBase64,
+		TransactionDetails:             rpc.TransactionDetailsFull,
+		Rewards:                        &rewards,
+		MaxSupportedTransactionVersion: &v,
+	}
+}
 
 type blockHistoryEstimator struct {
 	starter services.StateMachine
@@ -156,8 +173,12 @@ func (bhe *blockHistoryEstimator) calculatePriceFromLatestBlock(ctx context.Cont
 		return fmt.Errorf("failed to get client: %w", err)
 	}
 
-	// get latest block based on configured confirmation
-	block, err := c.GetLatestBlock(ctx)
+	slot, err := c.SlotHeightWithCommitment(ctx, bhe.cfg.Commitment())
+	if err != nil {
+		return fmt.Errorf("failed to get slot: %w", err)
+	}
+
+	block, err := c.GetBlockWithOpts(ctx, slot, blockHistoryGetBlockOpts(bhe.cfg.Commitment()))
 	if err != nil {
 		return fmt.Errorf("failed to get block: %w", err)
 	}
@@ -281,7 +302,7 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 			defer func() { <-semaphore }()
 
 			// Fetch the block details
-			block, errGetBlock := c.GetBlock(ctx, s)
+			block, errGetBlock := c.GetBlockWithOpts(ctx, s, blockHistoryGetBlockOpts(bhe.cfg.Commitment()))
 			if errGetBlock != nil {
 				bhe.lgr.Errorw("BlockHistoryEstimator: failed to get block at slot", "slot", s, "error", errGetBlock)
 				return
