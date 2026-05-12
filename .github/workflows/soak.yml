@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -89,7 +89,7 @@ jobs:
           mask-aws-account-id: true
 
       - name: Authenticate to ECR
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2.1.2
+        uses: aws-actions/amazon-ecr-login@fa648b43de3d4d023bcb3f89ed6940096949c419 # v2.1.5
         with:
           registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
         env:
