@@ -1,10 +1,11 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 use anchor_spl::token;
 
 use arrayref::{array_ref, array_refs};
 use state::{Billing, Proposal, ProposedOracle, STATE_VERSION};
 
-declare_id!("cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ");
+declare_id!("E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x");
 
 mod context;
 pub mod event;
@@ -45,8 +46,8 @@ pub mod ocr_2 {
         config.requester_access_controller = ctx.accounts.requester_access_controller.key();
         config.billing_access_controller = ctx.accounts.billing_access_controller.key();
 
-        config.min_answer = min_answer;
-        config.max_answer = max_answer;
+        config.min_answer = min_answer.to_le_bytes();
+        config.max_answer = max_answer.to_le_bytes();
 
         Ok(())
     }
@@ -744,7 +745,8 @@ fn transmit_impl(ctx: Context<Transmit<'_>>, data: &[u8]) -> Result<()> {
     require!(config.f < report.observer_count, ErrorCode::InvalidInput);
 
     require!(
-        report.median >= state.config.min_answer && report.median <= state.config.max_answer,
+        report.median >= i128::from_le_bytes(state.config.min_answer)
+            && report.median <= i128::from_le_bytes(state.config.max_answer),
         ErrorCode::MedianOutOfRange
     );
 
@@ -1076,9 +1078,12 @@ pub mod query {
 
     // https://github.com/coral-xyz/anchor/pull/2770
     macro_rules! try_from {
-        ($ty: ty, $acc: expr) => {
-            <$ty>::try_from(unsafe { core::mem::transmute::<_, &AccountInfo<'_>>($acc.as_ref()) })
-        };
+        ($ty: ty, $acc: expr) => {{
+            let acc_ref = $acc.as_ref();
+            <$ty>::try_from(unsafe {
+                core::mem::transmute::<&AccountInfo<'_>, &AccountInfo<'_>>(acc_ref)
+            })
+        }};
     }
 
     pub fn latest_config_details(account: &AccountInfo) -> Result<LatestConfig> {

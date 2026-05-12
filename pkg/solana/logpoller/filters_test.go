@@ -1,6 +1,7 @@
 package logpoller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
+	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
@@ -31,19 +36,10 @@ func TestFilters_LoadFilters(t *testing.T) {
 		Name:      "Deleted",
 		IsDeleted: true,
 	}
-	happyPath := types.Filter{
-		ID:           1,
-		Name:         "Happy path",
-		EventName:    "happyPath1",
-		EventSig:     types.NewEventSignatureFromName("happyPath1"),
-		IsBackfilled: true,
-	}
-	happyPath2 := types.Filter{
-		ID:        2,
-		Name:      "Happy path 2",
-		EventName: "happyPath2",
-		EventSig:  types.NewEventSignatureFromName("happyPath2"),
-	}
+	addr := newRandomPublicKey(t)
+	happyPath := decoderReadyTestFilter(t, 1, "Happy path", "TestEvent", addr)
+	happyPath.IsBackfilled = true
+	happyPath2 := decoderReadyTestFilter(t, 2, "Happy path 2", "TestItem", addr)
 	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{
 		deleted,
 		happyPath,
@@ -106,6 +102,21 @@ func requireNoInIndices(t *testing.T, fs *filters, f types.Filter) {
 	require.NotContains(t, fs.filtersToBackfill, f.ID)
 }
 
+// decoderReadyTestFilter returns a filter LoadFilters can load (newDecoder succeeds).
+// eventName must exist in codecv1.FetchLogpollerTypeTestIDL() (e.g. "TestEvent", "TestItem").
+func decoderReadyTestFilter(t *testing.T, id int64, name, eventName string, address types.PublicKey) types.Filter {
+	t.Helper()
+	return types.Filter{
+		ID:          id,
+		Name:        name,
+		Address:     address,
+		EventName:   eventName,
+		EventSig:    types.NewEventSignatureFromName(eventName),
+		ContractIdl: codecv1.FetchLogpollerTypeTestIDL(),
+		SubkeyPaths: [][]string{{"Field1"}},
+	}
+}
+
 func TestFilters_RegisterFilter(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	t.Run("Returns an error if name is empty", func(t *testing.T) {
@@ -152,9 +163,10 @@ func TestFilters_RegisterFilter(t *testing.T) {
 				orm := mocks.NewMockORM(t)
 				fs := newFilters(lggr, orm, nil)
 				const filterName = "Filter"
-				dbFilter := types.Filter{Name: filterName}
+				addr := newRandomPublicKey(t)
+				dbFilter := decoderReadyTestFilter(t, 1, filterName, "TestEvent", addr)
 				orm.On("SelectFilters", mock.Anything).Return([]types.Filter{dbFilter}, nil).Once()
-				orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil)
+				orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 				newFilter := dbFilter
 				tc.ModifyField(&newFilter)
 				err := fs.RegisterFilter(t.Context(), newFilter)
@@ -166,25 +178,16 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 		addr := newRandomPublicKey(t)
-		eventSig := newRandomEventSignature(t)
+		const eventName = "TestEvent"
 
-		filter1 := types.Filter{
-			ID:              1,
-			Name:            "existingFilter",
-			Address:         addr,
-			EventSig:        eventSig,
-			IncludeReverted: false,
-			IsBackfilled:    true,
-		}
+		filter1 := decoderReadyTestFilter(t, 1, "existingFilter", eventName, addr)
+		filter1.IncludeReverted = false
+		filter1.IsBackfilled = true
 		orm.EXPECT().SelectFilters(mock.Anything).Return(
 			[]types.Filter{filter1}, nil).Once()
-		filter2 := types.Filter{
-			Name:            "new filter",
-			Address:         addr,
-			EventSig:        eventSig,
-			IncludeReverted: true,
-			IsBackfilled:    true,
-		}
+		filter2 := decoderReadyTestFilter(t, 0, "new filter", eventName, addr)
+		filter2.IncludeReverted = true
+		filter2.IsBackfilled = true
 		orm.EXPECT().SelectSeqNums(mock.Anything).Return(nil, nil).Once()
 		err := fs.RegisterFilter(t.Context(), filter2)
 		require.ErrorContains(t, err, "conflicts with IncludeReverted=true", "shouldn't allow more than one value for IncludeReverted for an event")
@@ -212,10 +215,11 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 		const filterName = "Filter"
+		addr := newRandomPublicKey(t)
+		filter := decoderReadyTestFilter(t, 0, filterName, "TestEvent", addr)
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(0), errors.New("failed to insert")).Once()
-		filter := types.Filter{Name: filterName}
 		err := fs.RegisterFilter(t.Context(), filter)
 		require.Error(t, err)
 
@@ -239,29 +243,100 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		// all indices contain filter
 		requireIndexed(t, fs, filter)
 	})
+	t.Run("Happy path versioned", func(t *testing.T) {
+		// 1. Create decoder codecs for the same event using two different IDL formats
+		// 2. Create encoded event data
+		// 3. Decode subkey from event data using both codecs and verify the results are the same
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+		eventName := "TestEvent"
+
+		// Test with codec v1 (CodecEventIdl)
+		codecV1Filter := types.Filter{
+			Name:        "codecV1Filter",
+			ContractIdl: codecv1.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV1FilterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV1FilterID, nil).Once()
+		err := fs.RegisterFilter(t.Context(), codecV1Filter)
+		require.NoError(t, err)
+
+		// Test with codec v2 (Codecv2EventIdl)
+		codecV2Filter := types.Filter{
+			Name:        "codecV2Filter",
+			ContractIdl: codecv2.FetchLogpollerTypeTestIDL(),
+			EventName:   eventName,
+		}
+		const codecV2FilterID = int64(2)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(codecV2FilterID, nil).Once()
+		err = fs.RegisterFilter(t.Context(), codecV2Filter)
+		require.NoError(t, err)
+
+		// Verify both filters are registered
+		require.Len(t, fs.filtersToBackfill, 2)
+		require.Contains(t, fs.filtersToBackfill, codecV1FilterID)
+		require.Contains(t, fs.filtersToBackfill, codecV2FilterID)
+
+		// Test DecodeSubKey for both codec versions
+		// Define test event structs matching the IDL field names
+		type TestEvent struct {
+			Field1 int64
+		}
+
+		// Create test data
+		testValue := int64(12345)
+
+		// Borsh encode for event data
+		// Events use sha256("event:<EventName>")[:8] as discriminator
+		discriminator := solcommoncodec.NewDiscriminatorHashPrefix(eventName, false)
+		eventData := TestEvent{Field1: testValue}
+		buf := new(bytes.Buffer)
+		buf.Write(discriminator)
+		require.NoError(t, binary.NewBorshEncoder(buf).Encode(eventData))
+		encodedBytes := buf.Bytes()
+
+		// Test DecodeSubKey for v1
+		v1Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV1FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v1Result)
+
+		// Test DecodeSubKey for v2
+		v2Result, err := fs.DecodeSubKey(t.Context(), lggr, encodedBytes, codecV2FilterID, []string{"Field1"})
+		require.NoError(t, err)
+		require.Equal(t, testValue, v2Result)
+	})
 	t.Run("Can reregister after unregister", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 		const filterName = "Filter"
+		addr := newRandomPublicKey(t)
+		registered := decoderReadyTestFilter(t, 0, filterName, "TestEvent", addr)
 		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		const filterID = int64(10)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
-		err := fs.RegisterFilter(t.Context(), types.Filter{Name: filterName})
+		err := fs.RegisterFilter(t.Context(), registered)
 		require.NoError(t, err)
-		requireIndexed(t, fs, types.Filter{Name: filterName, ID: filterID})
+		want := registered
+		want.ID = filterID
+		requireIndexed(t, fs, want)
 		orm.On("MarkFilterDeleted", mock.Anything, filterID).Return(nil).Once()
 		err = fs.UnregisterFilter(t.Context(), filterName)
 		require.NoError(t, err)
-		requireNoInIndices(t, fs, types.Filter{Name: filterName, ID: filterID})
+		requireNoInIndices(t, fs, want)
 		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID+1, nil).Once()
-		err = fs.RegisterFilter(t.Context(), types.Filter{Name: filterName})
+		err = fs.RegisterFilter(t.Context(), registered)
 		require.NoError(t, err)
 		require.Len(t, fs.filtersToDelete, 1)
-		require.Equal(t, types.Filter{Name: filterName, ID: filterID}, fs.filtersToDelete[filterID])
+		require.Equal(t, want, fs.filtersToDelete[filterID])
 		require.Len(t, fs.filtersToBackfill, 1)
 		require.Contains(t, fs.filtersToBackfill, filterID+1)
-		requireIndexed(t, fs, types.Filter{Name: filterName, ID: filterID + 1})
+		want2 := registered
+		want2.ID = filterID + 1
+		requireIndexed(t, fs, want2)
 	})
 }
 
@@ -288,7 +363,8 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm, nil)
 		const filterName = "Filter"
 		const id int64 = 10
-		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{{ID: id, Name: filterName}}, nil).Once()
+		f := decoderReadyTestFilter(t, id, filterName, "TestEvent", newRandomPublicKey(t))
+		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{f}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(errors.New("db query failed")).Once()
 		err := fs.UnregisterFilter(t.Context(), filterName)
@@ -299,7 +375,7 @@ func TestFilters_UnregisterFilter(t *testing.T) {
 		fs := newFilters(lggr, orm, nil)
 		const filterName = "Filter"
 		const id int64 = 10
-		f := types.Filter{ID: id, Name: filterName}
+		f := decoderReadyTestFilter(t, id, filterName, "TestEvent", newRandomPublicKey(t))
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{f}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
 		orm.On("MarkFilterDeleted", mock.Anything, id).Return(nil).Once()
@@ -320,12 +396,10 @@ func TestFilters_PruneFilters(t *testing.T) {
 			Name:      "To delete",
 			IsDeleted: true,
 		}
+		toKeep := decoderReadyTestFilter(t, 2, "To keep", "TestEvent", newRandomPublicKey(t))
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{
 			toDelete,
-			{
-				ID:   2,
-				Name: "To keep",
-			},
+			toKeep,
 		}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
 			2: 25,
@@ -343,21 +417,16 @@ func TestFilters_PruneFilters(t *testing.T) {
 			Name:      "To delete",
 			IsDeleted: true,
 		}
+		toKeep2 := decoderReadyTestFilter(t, 2, "To keep", "TestItem", newRandomPublicKey(t))
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{
 			toDelete,
-			{
-				ID:   2,
-				Name: "To keep",
-			},
+			toKeep2,
 		}, nil).Once()
 		orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
 			1: 18,
 			2: 25,
 		}, nil).Once()
-		newToDelete := types.Filter{
-			ID:   3,
-			Name: "To delete 2",
-		}
+		newToDelete := decoderReadyTestFilter(t, 3, "To delete 2", "TestEvent", newRandomPublicKey(t))
 		orm.On("DeleteFilters", mock.Anything, map[int64]types.Filter{toDelete.ID: toDelete}).Return(errors.New("db failed")).Run(func(_ mock.Arguments) {
 			orm.On("MarkFilterDeleted", mock.Anything, newToDelete.ID).Return(nil).Once()
 			orm.On("InsertFilter", mock.Anything, mock.Anything).Return(newToDelete.ID, nil).Once()
@@ -373,31 +442,13 @@ func TestFilters_PruneFilters(t *testing.T) {
 func TestFilters_MatchingFilters(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
-	expectedFilter1 := types.Filter{
-		ID:       1,
-		Name:     "expectedFilter1",
-		Address:  newRandomPublicKey(t),
-		EventSig: newRandomEventSignature(t),
-	}
-	expectedFilter2 := types.Filter{
-		ID:       2,
-		Name:     "expectedFilter2",
-		Address:  expectedFilter1.Address,
-		EventSig: expectedFilter1.EventSig,
-	}
-	sameAddress := types.Filter{
-		ID:       3,
-		Name:     "sameAddressWrongEventSig",
-		Address:  expectedFilter1.Address,
-		EventSig: newRandomEventSignature(t),
-	}
+	addr := newRandomPublicKey(t)
+	const sharedEvent = "TestEvent"
+	expectedFilter1 := decoderReadyTestFilter(t, 1, "expectedFilter1", sharedEvent, addr)
+	expectedFilter2 := decoderReadyTestFilter(t, 2, "expectedFilter2", sharedEvent, addr)
+	sameAddress := decoderReadyTestFilter(t, 3, "sameAddressWrongEventSig", "TestItem", addr)
 
-	sameEventSig := types.Filter{
-		ID:       4,
-		Name:     "wrongAddressSameEventSig",
-		Address:  newRandomPublicKey(t),
-		EventSig: expectedFilter1.EventSig,
-	}
+	sameEventSig := decoderReadyTestFilter(t, 4, "wrongAddressSameEventSig", sharedEvent, newRandomPublicKey(t))
 	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{expectedFilter1, expectedFilter2, sameAddress, sameEventSig}, nil).Once()
 	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{
 		1: 18,
@@ -421,17 +472,12 @@ func TestFilters_MatchingFilters(t *testing.T) {
 func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
-	backfilledFilter := types.Filter{
-		ID:            1,
-		Name:          "backfilled",
-		StartingBlock: 100,
-		IsBackfilled:  true,
-	}
-	notBackfilled := types.Filter{
-		ID:            2,
-		StartingBlock: 101,
-		Name:          "notBackfilled",
-	}
+	addr := newRandomPublicKey(t)
+	backfilledFilter := decoderReadyTestFilter(t, 1, "backfilled", "TestEvent", addr)
+	backfilledFilter.StartingBlock = 100
+	backfilledFilter.IsBackfilled = true
+	notBackfilled := decoderReadyTestFilter(t, 2, "notBackfilled", "TestItem", addr)
+	notBackfilled.StartingBlock = 101
 	orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{backfilledFilter, notBackfilled}, nil).Once()
 	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{
 		1: 18,
@@ -441,40 +487,93 @@ func TestFilters_GetFiltersToBackfill(t *testing.T) {
 	err := filters.LoadFilters(t.Context())
 	require.NoError(t, err)
 	// filters that were not backfilled are properly identified on load
-	ensureInQueue := func(expectedFilters ...types.Filter) {
-		filtersToBackfill := filters.GetFiltersToBackfill()
+	ensureInQueue := func(targetBlock int64, expectedStartingBlock int64, expectedFilters ...types.Filter) {
+		filtersToBackfill, actualStartingBlock := filters.GetFiltersToBackfill(targetBlock)
 		require.Len(t, filtersToBackfill, len(expectedFilters))
+		require.Equal(t, expectedStartingBlock, actualStartingBlock)
 		for _, expectedFilter := range expectedFilters {
 			require.Contains(t, filtersToBackfill, expectedFilter)
 		}
 	}
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter remains in queue if failed to mark as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(errors.New("db call failed")).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.Error(t, err)
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 101, notBackfilled)
 	// filter is removed from queue, if marked as backfilled
 	orm.EXPECT().MarkFilterBackfilled(mock.Anything, notBackfilled.ID).Return(nil).Once()
-	err = filters.MarkFilterBackfilled(t.Context(), notBackfilled.ID)
+	err = filters.UpdateBackfillProgress(t.Context(), notBackfilled, 110, true)
 	require.NoError(t, err)
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue := func() {
+		filterToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+		require.Empty(t, filterToBackfill)
+		require.Equal(t, int64(110), startingBlock)
+	}
+	requireEmptyBackfillQueue()
 	// re adding identical filter won't trigger backfill
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(backfilledFilter.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), backfilledFilter))
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	require.Empty(t, filters.GetFiltersToBackfill())
+	requireEmptyBackfillQueue()
 	// older StartingBlock trigger backfill
 	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
 	orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).Return(notBackfilled.ID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
-	ensureInQueue(notBackfilled)
+	ensureInQueue(110, 100, notBackfilled)
 	// new filter is always added to the queue
-	newFilter := types.Filter{Name: "new filter"}
-	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(3, nil).Once()
+	newAddr := newRandomPublicKey(t)
+	newFilter := decoderReadyTestFilter(t, 0, "new filter", "TestEvent", newAddr)
+	const newFilterID = int64(3)
+	orm.EXPECT().InsertFilter(mock.Anything, newFilter).Return(newFilterID, nil).Once()
 	require.NoError(t, filters.RegisterFilter(t.Context(), newFilter))
-	ensureInQueue(notBackfilled, types.Filter{ID: 3, Name: "new filter"})
+	newFilter.ID = newFilterID
+	ensureInQueue(110, 100, notBackfilled, *filters.filtersByID[newFilterID])
+	// update of the starting block via RegisterFilter between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock := filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 2)
+	require.Equal(t, int64(100), startingBlock)
+	notBackfilled.StartingBlock = notBackfilled.StartingBlock - 1
+	orm.EXPECT().InsertFilter(mock.Anything, notBackfilled).Return(notBackfilled.ID, nil).Once()
+	require.NoError(t, filters.RegisterFilter(t.Context(), notBackfilled))
+	orm.EXPECT().MarkFilterBackfilled(mock.Anything, newFilterID).Return(nil).Once()
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	ensureInQueue(110, 99, notBackfilled)
+	// replay between GetFiltersToBackfill and UpdateBackfillProgress prevents filter from being marked as backfilled and keeps it in the queue
+	filtersToBackfill, startingBlock = filters.GetFiltersToBackfill(110)
+	require.Len(t, filtersToBackfill, 1)
+	require.Equal(t, int64(99), startingBlock)
+	filters.UpdateStartingBlocks(98)
+	for _, filter := range filtersToBackfill {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	// reflect new starting block and backfill status caused by UpdateStartingBlocks
+	for _, filter := range []*types.Filter{&notBackfilled, &backfilledFilter, &newFilter} {
+		filter.StartingBlock = 98
+		filter.IsBackfilled = false
+	}
+	// all filters are now in the queue due to global starting block update
+	ensureInQueue(110, 98, notBackfilled, backfilledFilter, newFilter)
+	// partial backfill update doesn't remove filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 109, false)
+		require.NoError(t, err)
+	}
+	require.NoError(t, err)
+	ensureInQueue(110, 109, notBackfilled, backfilledFilter, newFilter)
+	// full backfill update removes filters from the queue
+	for _, filter := range []types.Filter{notBackfilled, backfilledFilter, newFilter} {
+		orm.EXPECT().MarkFilterBackfilled(mock.Anything, filter.ID).Return(nil).Once()
+		err = filters.UpdateBackfillProgress(t.Context(), filter, 110, true)
+		require.NoError(t, err)
+	}
+	filtersToBackfill, _ = filters.GetFiltersToBackfill(110)
+	require.Empty(t, filtersToBackfill)
 }
 
 func TestFilters_ExtractField(t *testing.T) {
@@ -544,8 +643,10 @@ func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	fs := newFilters(lggr, orm, nil)
 
-	filter1 := types.Filter{ID: 1, Name: "filter1", EventName: "event1", EventSig: types.NewEventSignatureFromName("event1")}
-	filter2 := types.Filter{ID: 2, Name: "filter2", EventName: "event2", EventSig: types.NewEventSignatureFromName("event2")}
+	addr1 := newRandomPublicKey(t)
+	addr2 := newRandomPublicKey(t)
+	filter1 := decoderReadyTestFilter(t, 1, "filter1", "TestEvent", addr1)
+	filter2 := decoderReadyTestFilter(t, 2, "filter2", "TestItem", addr2)
 	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
 	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
 
@@ -610,16 +711,13 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 	lggr := logger.Sugared(logger.Test(t))
 	filters := newFilters(lggr, orm, nil)
 
-	origFilters := []types.Filter{{
-		ID:            1,
-		Name:          "backfilled",
-		StartingBlock: 29500,
-		IsBackfilled:  true,
-	}, {
-		ID:            2,
-		StartingBlock: 52000,
-		Name:          "notBackfilled",
-	}}
+	addr := newRandomPublicKey(t)
+	orig0 := decoderReadyTestFilter(t, 1, "backfilled", "TestEvent", addr)
+	orig0.StartingBlock = 29500
+	orig0.IsBackfilled = true
+	orig1 := decoderReadyTestFilter(t, 2, "notBackfilled", "TestItem", addr)
+	orig1.StartingBlock = 52000
+	origFilters := []types.Filter{orig0, orig1}
 	ids := make([]int64, 2)
 	for i, filter := range origFilters {
 		ids[i] = filter.ID
@@ -665,7 +763,7 @@ func TestFilters_UpdateStartingBlocks(t *testing.T) {
 			copy(newFilters, origFilters)
 			filters.filtersByID[ids[0]] = &newFilters[0]
 			filters.filtersByID[ids[1]] = &newFilters[1]
-			filters.filtersToBackfill = map[int64]struct{}{ids[0]: {}}
+			filters.filtersToBackfill = map[int64]int64{ids[0]: 0}
 			filters.UpdateStartingBlocks(tt.replayBlock)
 			assert.Len(t, filters.filtersToBackfill, 2) // all filters should end up in the backfill queue
 
@@ -708,18 +806,10 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 
-		filter1 := types.Filter{
-			ID:        1,
-			Name:      "filter1",
-			EventName: "event1",
-			EventSig:  types.NewEventSignatureFromName("event1"),
-		}
-		filter2 := types.Filter{
-			ID:        2,
-			Name:      "filter2",
-			EventName: "event2",
-			EventSig:  types.NewEventSignatureFromName("event2"),
-		}
+		a1 := newRandomPublicKey(t)
+		a2 := newRandomPublicKey(t)
+		filter1 := decoderReadyTestFilter(t, 1, "filter1", "TestEvent", a1)
+		filter2 := decoderReadyTestFilter(t, 2, "filter2", "TestItem", a2)
 
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1, filter2}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0, 2: 0}, nil).Once()
@@ -735,12 +825,7 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 
-		activeFilter := types.Filter{
-			ID:        1,
-			Name:      "activeFilter",
-			EventName: "event1",
-			EventSig:  types.NewEventSignatureFromName("event1"),
-		}
+		activeFilter := decoderReadyTestFilter(t, 1, "activeFilter", "TestEvent", newRandomPublicKey(t))
 		deletedFilter := types.Filter{
 			ID:        2,
 			Name:      "deletedFilter",
@@ -761,13 +846,8 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 
-		filter1 := types.Filter{
-			ID:            1,
-			Name:          "filter1",
-			EventName:     "event1",
-			EventSig:      types.NewEventSignatureFromName("event1"),
-			StartingBlock: 100,
-		}
+		filter1 := decoderReadyTestFilter(t, 1, "filter1", "TestEvent", newRandomPublicKey(t))
+		filter1.StartingBlock = 100
 
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()
@@ -796,12 +876,7 @@ func TestFilters_GetFilters(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)
 
-		filter1 := types.Filter{
-			ID:        1,
-			Name:      "filter1",
-			EventName: "event1",
-			EventSig:  types.NewEventSignatureFromName("event1"),
-		}
+		filter1 := decoderReadyTestFilter(t, 1, "filter1", "TestEvent", newRandomPublicKey(t))
 
 		orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter1}, nil).Once()
 		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{1: 0}, nil).Once()

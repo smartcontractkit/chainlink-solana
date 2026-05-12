@@ -3,6 +3,7 @@ package codecv2
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
 	"github.com/gagliardetto/anchor-go/idl/idltype"
@@ -20,6 +21,35 @@ const (
 	DefaultHashBitLength = 32
 	unknownIDLFormat     = "%w: unknown IDL type def %q"
 )
+
+// snakeToPascal converts a snake_case string to PascalCase.
+// e.g. "transmission_id" -> "TransmissionId", "don_id" -> "DonId"
+// Returns an error if the conversion produces an empty string (e.g. underscore-only inputs).
+func snakeToPascal(s string) (string, error) {
+	caser := cases.Title(language.English)
+	parts := strings.Split(s, "_")
+	var result strings.Builder
+	for _, part := range parts {
+		if len(part) > 0 {
+			result.WriteString(caser.String(part))
+		}
+	}
+	if result.Len() == 0 {
+		return "", fmt.Errorf("%w: field name %q converts to an empty PascalCase string", commontypes.ErrInvalidConfig, s)
+	}
+	return result.String(), nil
+}
+
+func validateUniqueFieldNames(named []commonencodings.NamedTypeCodec) error {
+	seen := make(map[string]struct{}, len(named))
+	for _, n := range named {
+		if _, exists := seen[n.Name]; exists {
+			return fmt.Errorf("%w: duplicate PascalCase field name %q", commontypes.ErrInvalidConfig, n.Name)
+		}
+		seen[n.Name] = struct{}{}
+	}
+	return nil
+}
 
 func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl anchoridl.Idl, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
@@ -149,7 +179,14 @@ func asStruct(
 				return name, nil, err
 			}
 
-			named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+			pascalName, err := snakeToPascal(fieldName)
+			if err != nil {
+				return name, nil, err
+			}
+			named[idx] = commonencodings.NamedTypeCodec{Name: pascalName, Codec: typedCodec}
+		}
+		if err := validateUniqueFieldNames(named); err != nil {
+			return name, nil, err
 		}
 		structCodec, err := commonencodings.NewStructCodec(named)
 		if err != nil {
@@ -175,7 +212,11 @@ func asStructForInstructionArgs(
 		if err != nil {
 			return nil, err
 		}
-		named[idx] = commonencodings.NamedTypeCodec{Name: cases.Title(language.English, cases.NoLower).String(fieldName), Codec: typedCodec}
+		pascalName, err := snakeToPascal(fieldName)
+		if err != nil {
+			return nil, err
+		}
+		named[idx] = commonencodings.NamedTypeCodec{Name: pascalName, Codec: typedCodec}
 	}
 
 	var isVecOrArray bool
@@ -193,6 +234,10 @@ func asStructForInstructionArgs(
 	// If it's an instruction arg that's just a single array/vec → return the array codec directly (no struct wrapper)
 	if len(named) == 1 && isVecOrArray {
 		return named[0].Codec, nil
+	}
+
+	if err := validateUniqueFieldNames(named); err != nil {
+		return nil, err
 	}
 
 	structCodec, err := commonencodings.NewStructCodec(named)
