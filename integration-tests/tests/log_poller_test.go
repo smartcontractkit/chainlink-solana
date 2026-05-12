@@ -290,9 +290,9 @@ func (s *logSender) sendLog(
 
 	pubKey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(s.t, err)
-	contract.SetProgramID(pubKey)
+	contract.ProgramID = pubKey
 
-	inst, err := contract.NewCreateLogInstruction(value, payer, solana.SystemProgramID).ValidateAndBuild()
+	inst, err := contract.NewCreateLogInstruction(value, payer, solana.SystemProgramID)
 	if err != nil {
 		return err
 	}
@@ -310,9 +310,9 @@ func (s *logSender) sendTruncatedLog(
 
 	pubKey, err := solana.PublicKeyFromBase58(programPubKey)
 	require.NoError(s.t, err)
-	contract.SetProgramID(pubKey)
+	contract.ProgramID = pubKey
 
-	inst, err := contract.NewCreateTruncatedLogInstruction(value, payer, solana.SystemProgramID).ValidateAndBuild()
+	inst, err := contract.NewCreateTruncatedLogInstruction(value, payer, solana.SystemProgramID)
 	if err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func (s *logSender) sendTruncatedLog(
 
 func (s *logSender) sendInstruction(
 	ctx context.Context,
-	inst *contract.Instruction,
+	inst solana.Instruction,
 	signerFunc func(key solana.PublicKey) *solana.PrivateKey,
 	payer solana.PublicKey,
 ) error {

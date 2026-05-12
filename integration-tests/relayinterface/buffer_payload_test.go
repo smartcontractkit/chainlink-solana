@@ -189,8 +189,8 @@ func initializeTestContract(t *testing.T, client *rpc.Client, sender solana.Priv
 
 	configPDA, _, err := solana.FindProgramAddress([][]byte{[]byte("config")}, programID)
 	require.NoError(t, err)
-	buffer_payload.SetProgramID(programID)
-	initIx, err := buffer_payload.NewInitializeInstruction(configPDA, sender.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+	buffer_payload.ProgramID = programID
+	initIx, err := buffer_payload.NewInitializeInstruction(configPDA, sender.PublicKey(), solana.SystemProgramID)
 	require.NoError(t, err)
 	utils.SendAndConfirm(t.Context(), t, client, []solana.Instruction{initIx}, sender, rpc.CommitmentFinalized)
 }
