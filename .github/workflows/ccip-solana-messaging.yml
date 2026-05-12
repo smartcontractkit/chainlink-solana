@@ -36,7 +36,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Get core ref
         id: get-core-ref
@@ -67,12 +67,12 @@ jobs:
             loopp: true
     steps:
       - name: Checkout chainlink-solana
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: chainlink-solana
 
       - name: Checkout chainlink
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ needs.get-core-ref.outputs.core-ref }}
@@ -137,7 +137,7 @@ jobs:
 
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ccip-messaging-${{ matrix.test.slug }}-${{ github.run_id }}
           path: ccip-test-artifacts/

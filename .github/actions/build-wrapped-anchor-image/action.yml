@@ -8,7 +8,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Get ProjectSerum Version
       uses: ./.github/actions/projectserum_version
@@ -16,7 +16,7 @@ runs:
 
     - name: cache docker build image
       id: cache-image
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: contracts/docker-build.tar
         key: ${{ inputs.runner-os }}-docker-pnpm-build-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}

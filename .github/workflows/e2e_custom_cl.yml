@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
           check-latest: true
@@ -45,7 +45,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get ProjectSerum Version
         id: psversion
@@ -57,7 +57,7 @@ jobs:
     outputs:
       changed: ${{ steps.changes.outputs.contracts }}
     steps:
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: changes
         with:
           base: develop
@@ -79,7 +79,7 @@ jobs:
     needs: [ get_projectserum_version ]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
@@ -102,7 +102,7 @@ jobs:
     if: needs.contract-changes.outputs.changed == 'true'
     steps:
       - name: Checkout previous release
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: v1.0.2 # set to v1.1.0 after v1.1.0 is deployed to mainnet
       - name: build contracts
@@ -124,7 +124,7 @@ jobs:
           # clean up the container
           docker stop build-container
           docker rm build-container
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifacts-previous
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
@@ -145,7 +145,7 @@ jobs:
     outputs:
       changed: ${{ steps.check.outputs.continue }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts
           path: ./temp/artifacts
@@ -155,7 +155,7 @@ jobs:
           cd ./temp/artifacts # need to be in directory for hashes to  compare without path differences
           # shellcheck disable=SC2035
           echo "hash=$(sha1sum * | sha1sum)" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: artifacts-previous
           path: ./temp/artifacts/previous
@@ -174,7 +174,7 @@ jobs:
           if [ "${{ steps.previous.outputs.hash }}" != "${{ steps.current.outputs.hash }}" ]; then
             echo "continue=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.check.outputs.continue
         with:
           name: artifacts
@@ -193,7 +193,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get core ref
         id: get-core-ref
@@ -213,7 +213,7 @@ jobs:
     steps:
       - name: Check if image exists in ECR
         id: check-image-exists
-        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
+        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.2.0
         with:
           repository: "chainlink"
           tag: solana.${{ github.sha }}
@@ -221,7 +221,7 @@ jobs:
 
       - name: Checkout Chainlink repo
         if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ needs.get-core-ref.outputs.core-ref }}
@@ -275,10 +275,10 @@ jobs:
         secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
         with:
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -286,7 +286,7 @@ jobs:
           mask-aws-account-id: true
 
       - name: Authenticate to ECR
-        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2.1.2
         with:
           registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
         env:
@@ -299,7 +299,7 @@ jobs:
         uses: ./.github/actions/build-gauntlet
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
           cache: true
@@ -310,7 +310,7 @@ jobs:
         run: go mod download
 
       - name: Download contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
@@ -356,7 +356,7 @@ jobs:
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-test-logs-${{ matrix.variant }}
           path: |
@@ -412,10 +412,10 @@ jobs:
         secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.sha) }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
         with:
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -423,7 +423,7 @@ jobs:
           mask-aws-account-id: true
 
       - name: Authenticate to ECR
-        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2.1.2
         with:
           registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
         env:
@@ -436,7 +436,7 @@ jobs:
         uses: ./.github/actions/build-gauntlet
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
           cache: true
@@ -447,13 +447,13 @@ jobs:
         run: go mod download
 
       - name: Download previous contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: artifacts-previous
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
 
       - name: Download current contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: artifacts
           path: contracts/target/deploy-upgrade
@@ -489,7 +489,7 @@ jobs:
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: upgrade-test-logs-${{ matrix.variant }}
           path: |

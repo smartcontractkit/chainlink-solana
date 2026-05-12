@@ -14,7 +14,7 @@ runs:
   steps:
     - name: Setup Postgres
       id: setup-postgres
-      uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+      uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/v1
       with:
         tmpfs: 'true'
     # This is considered untrusted code from the POV of chainlink-solana, but this is safe as long as we:
@@ -23,7 +23,7 @@ runs:
     # - Unset all secrets passed to this action by workflows calling it, before running "go run ./core/store/cmd/preparetest"
     # codeql[actions/untrusted-checkout]: disable
     - name: Checkout chainlink
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: smartcontractkit/chainlink
         ref: ${{ inputs.core-ref || 'develop' }}
