@@ -1,3 +1,6 @@
+// anchor-lang 0.31 #[program] macro emits AccountInfo::realloc; allow until we upgrade
+#![allow(deprecated)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
 

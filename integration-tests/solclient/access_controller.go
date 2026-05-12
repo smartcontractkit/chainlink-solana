@@ -23,15 +23,17 @@ func (s *AccessController) AddAccess(addr string) error {
 	if err != nil {
 		return nil
 	}
+	addAccessInstr, err := access_controller2.NewAddAccessInstruction(
+		s.State.PublicKey(),
+		s.Owner.PublicKey(),
+		validatorPubKey,
+	)
+	if err != nil {
+		return err
+	}
 	err = s.Client.TXAsync(
 		"Add validator access",
-		[]solana.Instruction{
-			access_controller2.NewAddAccessInstruction(
-				s.State.PublicKey(),
-				s.Owner.PublicKey(),
-				validatorPubKey,
-			).Build(),
-		},
+		[]solana.Instruction{addAccessInstr},
 		func(key solana.PublicKey) *solana.PrivateKey {
 			if key.Equals(s.Owner.PublicKey()) {
 				return &s.Owner.PrivateKey

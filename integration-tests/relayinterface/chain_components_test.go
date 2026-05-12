@@ -1162,11 +1162,11 @@ func (h *helper) Init(t *testing.T) {
 
 	primaryPubkey, err := solana.PublicKeyFromBase58(primaryProgramPubKey)
 	require.NoError(t, err)
-	contractprimary.SetProgramID(primaryPubkey)
+	contractprimary.ProgramID = primaryPubkey
 
 	secondaryPubkey, err := solana.PublicKeyFromBase58(secondaryProgramPubKey)
 	require.NoError(t, err)
-	contractsecondary.SetProgramID(secondaryPubkey)
+	contractsecondary.ProgramID = secondaryPubkey
 
 	h.primaryProgramID = primaryPubkey
 	h.secondaryProgramID = secondaryPubkey

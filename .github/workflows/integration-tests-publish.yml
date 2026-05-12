@@ -8,13 +8,17 @@ on:
   workflow_dispatch:
 
 env:
-  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-solana-tests:develop
+  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION
+    }}.amazonaws.com/chainlink-solana-tests:develop
   CONTRACT_ARTIFACTS_PATH: contracts/target/deploy
 
 jobs:
   get-projectserum-version:
     name: Get ProjectSerum Version
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     runs-on: ubuntu-latest
     outputs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
@@ -27,12 +31,15 @@ jobs:
 
   e2e-custom-build-artifacts:
     name: E2E Custom Build Artifacts
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    needs: [get-projectserum-version]
+    needs: [ get-projectserum-version ]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -44,13 +51,16 @@ jobs:
           image-version: ${{ needs.get-projectserum-version.outputs.projectserum_version }}
 
   publish-integration-test-image:
-    environment: integration
+    environment:
+      # http://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments#using-environments-without-deployments
+      name: integration
+      deployment: false
     permissions:
       id-token: write
       contents: read
     name: Publish Integration Test Image
     runs-on: ubuntu-latest
-    needs: [e2e-custom-build-artifacts]
+    needs: [ e2e-custom-build-artifacts ]
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -72,4 +82,13 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
         with:
           channel-id: "#team-test-tooling-internal"
-          slack-message: ":x: :mild-panic-intensifies: Publish Integration Test Image failed: \n${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}\nRepository: Solana\n${{ format('Notifying <!subteam^{0}|{0}>', secrets.GUARDIAN_SLACK_NOTIFICATION_HANDLE)}}"
+          slack-message: ":x: :mild-panic-intensifies: Publish Integration Test Image
+            failed:\ 
+
+            ${{ format('https://github.com/{0}/actions/runs/{1}',
+            github.repository, github.run_id) }}
+
+            Repository: Solana
+
+            ${{ format('Notifying <!subteam^{0}|{0}>',
+            secrets.GUARDIAN_SLACK_NOTIFICATION_HANDLE)}}"

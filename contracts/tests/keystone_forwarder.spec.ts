@@ -123,7 +123,7 @@ describe("keystone_storage", function () {
   it("Is initialized!", async () => {
     const eventPromise = waitForEvent(
       program,
-      "ForwarderInitialize",
+      "forwarderInitialize",
       (event: any, slot) => {
         assert.isNotNull(event.authorityNonce);
         assert.isTrue(
@@ -166,7 +166,7 @@ describe("keystone_storage", function () {
     // transfer ownership event emitted
     // const transferOwnershipEventPromise = waitForEvent(
     //   program,
-    //   "OwnershipTransfer",
+    //   "ownershipTransfer",
     //   (event: any, slot) => {
     //     assert.isTrue(
     //       event.proposedOwner.equals(proposedOwner.publicKey),
@@ -206,7 +206,7 @@ describe("keystone_storage", function () {
 
     // const acceptOwnershipEventPromise = waitForEvent(
     //   program,
-    //   "OwnershipAcceptance",
+    //   "ownershipAcceptance",
     //   (event: any, slot) => {
     //     assert.isTrue(
     //       event.newOwner.equals(proposedOwner.publicKey),
@@ -362,7 +362,7 @@ describe("keystone_storage", function () {
 
     const configPromise = waitForEvent(
       program,
-      "ConfigSet",
+      "configSet",
       (event: any, slot) => {
         assert.isTrue(event.donId === 7, "don Id set");
         assert.isTrue(event.f === f, "f is equal");
@@ -385,10 +385,6 @@ describe("keystone_storage", function () {
         owner: provider.wallet.publicKey,
       })
       .rpc();
-
-    // const actualUpdatedConfig = await program.account.oraclesConfig.fetch(
-    //   oraclesConfigStorage
-    // );
 
     // Parse updated config using helper function
     const updatedConfig = await getOraclesConfigAccount(
@@ -649,7 +645,7 @@ describe("keystone_storage", function () {
 
     const reportPromise = waitForEvent(
       program,
-      "ReportProcessed",
+      "reportProcessed",
       (event: any, slot) => {
         // console.log(event);
         assert.isTrue(
@@ -819,6 +815,8 @@ describe("keystone_storage", function () {
       actualMetadata,
       "metadatas match"
     );
+
+    await reportPromise;
 
     const sameReportMessage = new TransactionMessage({
       payerKey: provider.wallet.publicKey, // Account paying for the transaction

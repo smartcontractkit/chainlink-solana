@@ -54,7 +54,7 @@ func TestEncodedLogCollector_MultipleEventOrdered(t *testing.T) {
 	address, err := solana.PublicKeyFromBase58("J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4")
 	require.NoError(t, err)
 	slots := []uint64{44, 43, 42, 41}
-	var txSigsResponse []*rpc.TransactionSignature
+	txSigsResponse := make([]*rpc.TransactionSignature, 0, len(slots))
 	for _, slot := range slots {
 		txSigsResponse = append(txSigsResponse, &rpc.TransactionSignature{Slot: slot})
 	}

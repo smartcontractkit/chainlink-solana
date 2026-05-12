@@ -236,21 +236,21 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 
 				// retry count starts at 0 so check if it equals max retry count to determine if it has reached the threshold
 				if retry.count >= g.maxRetryCount {
-					g.lggr.Criticalf("job %s exceeded max retry count %d. Resolution most likely requires manual intervention. Errors: %s", failedAttempt.Job, g.maxRetryCount, errors.Join(retry.errs...))
+					g.lggr.Criticalw("job exceeded max retry count. Resolution most likely requires manual intervention.", "job", failedAttempt.Job, "maxRetryCount", g.maxRetryCount, "errors", errors.Join(retry.errs...))
 					if err := retry.Abort(ctx); err != nil {
-						g.lggr.Criticalf("failed to abort retry: %s", err)
+						g.lggr.Criticalw("failed to abort retry", "err", err)
 					}
 					// Continue to avoid adding job back to retry map
 					continue
 				}
 
-				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
+				g.lggr.Errorw("retrying job", "job", failedAttempt.Job, "wait", wait)
 				retry.when = time.Now().Add(wait)
 			default:
 				// first retry
 				wait := calculateExponentialBackoffWithJitter(0)
 
-				g.lggr.Errorf("retrying job %s in %s", failedAttempt.Job, wait)
+				g.lggr.Errorw("retrying job", "job", failedAttempt.Job, "wait", wait)
 
 				retry = retryableJob{
 					name: createRandomString(12),
@@ -264,7 +264,7 @@ func (g *Group) runRetryQueue(ctx context.Context) {
 			g.retryMap[retry.name] = retry
 
 			if len(g.retryMap) >= DefaultNotifyRetryDepth {
-				g.lggr.Errorf("retry queue depth: %d", len(g.retryMap))
+				g.lggr.Errorw("retry queue depth", "depth", len(g.retryMap))
 			}
 			g.mu.Unlock()
 		}

@@ -1,18 +1,28 @@
+[toolchain]
+anchor_version = "0.31.0"
+
+[features]
+resolution = false
+skip-lint = false
+
 [programs.localnet]
-hello_world = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+hello_world = "2zqDPfT7nqvL7NrptW13BVmaXcZqyin7RubAGfxEK1om"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-# wallet = "~/.config/solana/id.json"
 wallet = "../../id.json"
 
 [scripts]
 test = "pnpm run test"
 
-# TODO: clone from devnet once available
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
+
 [[test.genesis]]
-address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+address = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC"
 program = "../../target/deploy/store.so"
