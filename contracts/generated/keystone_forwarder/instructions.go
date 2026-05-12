@@ -233,8 +233,8 @@ func NewReportInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "oracles_config": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(oraclesConfigAccount, true, false))
+		// Account 1 "oracles_config": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(oraclesConfigAccount, false, false))
 		// Account 2 "transmitter": Writable, Signer, Required
 		accounts__.Append(solanago.NewAccountMeta(transmitterAccount, true, true))
 		// Account 3 "forwarder_authority": Read-only, Non-signer, Required
@@ -862,7 +862,6 @@ type ReportInstruction struct {
 	// Accounts:
 	State                  solanago.PublicKey `json:"state"`
 	OraclesConfig          solanago.PublicKey `json:"oracles_config"`
-	OraclesConfigWritable  bool               `json:"oracles_config_writable"`
 	Transmitter            solanago.PublicKey `json:"transmitter"`
 	TransmitterWritable    bool               `json:"transmitter_writable"`
 	TransmitterSigner      bool               `json:"transmitter_signer"`
