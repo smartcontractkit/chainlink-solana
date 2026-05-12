@@ -777,6 +777,7 @@ func TestSubmitTransaction_NilCfg(t *testing.T) {
 	assert.Equal(t, commonsol.TxSuccess, reply.Status)
 	assert.Nil(t, capturedCfgs, "no tx configs should be set when Cfg is nil")
 }
+
 // mockLogPoller is a minimal LogPoller implementation for testing readiness guards.
 type mockLogPoller struct {
 	ready error
