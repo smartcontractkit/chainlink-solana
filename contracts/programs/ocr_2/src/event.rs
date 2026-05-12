@@ -25,7 +25,6 @@ pub struct RoundRequested {
 
 #[event]
 pub struct NewTransmission {
-    #[index]
     pub round_id: u32,
     pub config_digest: [u8; 32],
     pub answer: i128,

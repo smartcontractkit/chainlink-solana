@@ -2,8 +2,18 @@
 resolver = "2"
 members = [
   "programs/*",
-  "crates/*",
+  "crates/arrayvec",
+  "crates/chainlink-solana-data-feeds-cache",
+  # Exclude crates/chainlink-solana-data-streams: it uses solana-sdk 1.17 which
+  # pulls zeroize <1.4, conflicting with anchor-spl 0.31 (zeroize ^1.7).
+  # Not used by any program; only for off-chain/tests (cfg(not(target_os = "solana"))).
 ]
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = [
+  'cfg(target_os, values("solana"))',
+  'cfg(feature, values("anchor-debug", "no-log-ix-name"))',
+] }
 
 [profile.dev]
 overflow-checks = true
