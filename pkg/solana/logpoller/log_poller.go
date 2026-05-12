@@ -55,8 +55,8 @@ type filtersI interface {
 	PruneLogs(ctx context.Context) error
 	GetDistinctAddresses(ctx context.Context) ([]types.PublicKey, error)
 	GetFilters(ctx context.Context) (map[string]types.Filter, error)
-	GetFiltersToBackfill() []types.Filter
-	MarkFilterBackfilled(ctx context.Context, filterID int64) error
+	GetFiltersToBackfill(to int64) ([]types.Filter, int64)
+	UpdateBackfillProgress(ctx context.Context, filter types.Filter, backfilledTo int64, isComplete bool) error
 	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
@@ -351,10 +351,12 @@ func (lp *Service) getLastProcessedSlot(ctx context.Context) (lastProcessed int6
 	}
 	if lookbackSlot > lastProcessed {
 		lp.lggr.Infow("last processed slot is older than lookback window, skipping ahead", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
+		lp.lastProcessedSlot = lookbackSlot
 		return lookbackSlot, nil
 	}
 	lp.lggr.Infow("last processed slot is still within lookback window, resuming at last processed slot", "lastProcessed", lastProcessed, "lookbackSlot", lookbackSlot)
 
+	lp.lastProcessedSlot = lastProcessed
 	return lastProcessed, nil
 }
 
@@ -373,31 +375,54 @@ func (lp *Service) checkForReplayRequest() bool {
 	return true
 }
 
-func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, to int64) error {
+func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, minSlot, to int64) error {
 	isReplay := lp.checkForReplayRequest()
 
 	addressesSet := make(map[types.PublicKey]struct{})
 	addresses := make([]types.PublicKey, 0, len(filters))
-	minSlot := to
 
 	for _, filter := range filters {
 		if _, ok := addressesSet[filter.Address]; !ok {
 			addressesSet[filter.Address] = struct{}{}
 			addresses = append(addresses, filter.Address)
 		}
-		if filter.StartingBlock != 0 && filter.StartingBlock < minSlot {
-			minSlot = filter.StartingBlock
+	}
+
+	var markedCompleted bool
+	saveBackfillProgress := func(ctx context.Context, lastProcessed int64) error {
+		if markedCompleted {
+			return nil
 		}
+
+		isComplete := lastProcessed >= to
+		var err error
+		for _, filter := range filters {
+			filterErr := lp.filters.UpdateBackfillProgress(ctx, filter, lastProcessed, isComplete)
+			if filterErr != nil {
+				err = errors.Join(err, fmt.Errorf("failed to mark filter %d backfilled: %w", filter.ID, filterErr))
+			}
+		}
+
+		if err != nil {
+			return err
+		}
+
+		markedCompleted = isComplete
+		return nil
 	}
 
 	if minSlot < to {
-		err := lp.processBlocksRangeInBatches(ctx, addresses, minSlot, to)
+		err := lp.processBlocksRange(ctx, addresses, minSlot, to, saveBackfillProgress)
 		if err != nil {
 			return err
 		}
 
 		lp.lggr.Infow("Done backfilling filters", "filters", len(filters), "from", minSlot, "to", to)
 	} else {
+		err := saveBackfillProgress(ctx, to)
+		if err != nil {
+			return fmt.Errorf("failed to save filters backfill progress: %w", err)
+		}
 		lp.lggr.Infow("Starting block for filters backfill is greater than the latest processed block - marking filters as backfilled and starting global processing", "filters", len(filters), "from", minSlot, "to", to)
 	}
 
@@ -405,31 +430,10 @@ func (lp *Service) backfillFilters(ctx context.Context, filters []types.Filter, 
 		lp.replayComplete(minSlot, to)
 	}
 
-	var err error
-	for _, filter := range filters {
-		filterErr := lp.filters.MarkFilterBackfilled(ctx, filter.ID)
-		if filterErr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to mark filter %d backfilled: %w", filter.ID, filterErr))
-		}
-	}
-
-	return err
-}
-
-func (lp *Service) processBlocksRangeInBatches(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
-	lp.lggr.Infow("Processing block range in batches", "from", from, "to", to, "batchSize", lp.slotsBatchSize)
-	for batchStart := from; batchStart <= to; batchStart += lp.slotsBatchSize {
-		batchEnd := min(batchStart+lp.slotsBatchSize-1, to)
-		err := lp.processBlocksRange(ctx, addresses, batchStart, batchEnd)
-		if err != nil {
-			return fmt.Errorf("failed processing batch [%d, %d]: %w", batchStart, batchEnd, err)
-		}
-	}
-
 	return nil
 }
 
-func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.PublicKey, from, to int64) error {
+func (lp *Service) processBlocksRange(ctx context.Context, addresses []types.PublicKey, from, to int64, saveProgress func(ctx context.Context, lastProcessed int64) error) error {
 	start := time.Now()
 	lp.lggr.Infow("Processing block range", "from", from, "to", to)
 	defer func() {
@@ -464,14 +468,16 @@ consumedAllBlocks:
 			// nolint:gosec
 			// G115: integer overflow conversion uint64 -> int64
 			highestInBatch := int64(batch[len(batch)-1].SlotNumber)
-			if highestInBatch > lp.lastProcessedSlot {
-				lp.lastProcessedSlot = highestInBatch
-				lp.metrics.SetLatestProcessedSlot(ctx, lp.lastProcessedSlot)
+			err = saveProgress(ctx, highestInBatch)
+			if err != nil {
+				return fmt.Errorf("failed to save progress after processing block %d: %w", highestInBatch, err)
 			}
 		}
 	}
 
-	return nil
+	// If we processed all blocks successfully, it's still possible that highestProcessedBlock < to, if 'to' does not contain any transactions with logs/events for the filters we care about.
+	// In that case, we should save 'to' as the highest processed block.
+	return saveProgress(ctx, to)
 }
 
 func (lp *Service) processBlocksImpl(ctx context.Context, blocks []types.Block) error {
@@ -503,10 +509,10 @@ func (lp *Service) run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed getting last processed slot: %w", err)
 	}
 
-	filtersToBackfill := lp.filters.GetFiltersToBackfill()
+	filtersToBackfill, backfillStartingBlock := lp.filters.GetFiltersToBackfill(lastProcessedSlot)
 	if len(filtersToBackfill) != 0 {
 		lp.lggr.Debugw("Got new filters to backfill", "filters_len", len(filtersToBackfill))
-		return lp.backfillFilters(ctx, filtersToBackfill, lastProcessedSlot)
+		return lp.backfillFilters(ctx, filtersToBackfill, backfillStartingBlock, lastProcessedSlot)
 	}
 
 	addresses, err := lp.filters.GetDistinctAddresses(ctx)
@@ -535,12 +541,15 @@ func (lp *Service) run(ctx context.Context) (err error) {
 	}
 
 	lp.lggr.Debugw("Got new slot range to process", "from", lastProcessedSlot+1, "to", highestSlot)
-	err = lp.processBlocksRangeInBatches(ctx, addresses, lastProcessedSlot+1, highestSlot)
+	err = lp.processBlocksRange(ctx, addresses, lastProcessedSlot+1, highestSlot, func(ctx context.Context, lastProcessed int64) error {
+		lp.lastProcessedSlot = lastProcessed
+		lp.metrics.SetLatestProcessedSlot(ctx, lp.lastProcessedSlot)
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("failed processing block range [%d, %d]: %w", lastProcessedSlot+1, highestSlot, err)
 	}
 
-	lp.lastProcessedSlot = highestSlot
 	return nil
 }
 

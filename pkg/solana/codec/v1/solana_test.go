@@ -152,6 +152,35 @@ func TestNewIDLCodec_WithModifiers(t *testing.T) {
 	require.Equal(t, expected.EnumVal, unmodifiedDecoded.EnumVal)
 }
 
+func TestNewEventArgsEntryWrapper_RejectsV2IDL(t *testing.T) {
+	t.Parallel()
+
+	// Minimal v2-style IDL: has events without inline fields and no top-level "version".
+	// This would unmarshal successfully into the v1 IDL struct, producing an event
+	// with empty Fields that generates an empty codec — the exact vulnerability.
+	v2StyleIDL := `{
+		"name": "test_program",
+		"instructions": [],
+		"events": [{"name": "TestItem", "discriminator": [119, 183, 160, 247, 84, 104, 222, 251]}],
+		"types": [{"name": "TestItem", "type": {"kind": "struct", "fields": [{"name": "field", "type": "i32"}]}}]
+	}`
+
+	_, err := codecv1.NewEventArgsEntryWrapper("TestItem", v2StyleIDL, true, nil, binary.LittleEndian())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a legacy Anchor IDL")
+}
+
+func TestNewEventArgsEntry_RejectsEmptyFields(t *testing.T) {
+	t.Parallel()
+
+	_, err := codecv1.NewEventArgsEntry("TestEmpty", codecv1.EventIDLTypes{
+		Event: codecv1.IdlEvent{Name: "TestEmpty", Fields: nil},
+		Types: nil,
+	}, true, nil, binary.LittleEndian())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "has no fields")
+}
+
 func TestNewIDLCodec_CircularDependency(t *testing.T) {
 	t.Parallel()
 

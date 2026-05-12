@@ -1,3 +1,4 @@
+#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 use anchor_lang::prelude::*;
 
 declare_id!("CGn5MQX5GK9qKqERhjnADhd6i2LiSF6XUC2ewUHND1Mw");
@@ -48,7 +49,6 @@ pub struct Initialize {}
 
 /// Events and structs copied from the CCIP contracts
 /// https://github.com/smartcontractkit/chainlink-ccip/tree/main/chains/solana/contracts/programs
-
 /// --------------------- CCIPMessageSent --------------------- ///
 #[event]
 pub struct CCIPMessageSent {

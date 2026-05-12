@@ -17,14 +17,30 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+var ErrLogPollerNotStarted = errors.New("log poller is not started; register/unregister/query operations require a running log poller")
+
+type AddressLister interface {
+	Accounts(ctx context.Context) (accounts []string, err error)
+}
+
 type solanaService struct {
 	commontypes.UnimplementedSolanaService
-	chain  Chain
-	logger logger.Logger
+	addressLister AddressLister
+	chain         Chain
+	logger        logger.Logger
+}
+
+func (ss *solanaService) requireLogPoller() (LogPoller, error) {
+	lp := ss.chain.LogPoller()
+	if err := lp.Ready(); err != nil {
+		return nil, ErrLogPollerNotStarted
+	}
+	return lp, nil
 }
 
 func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockRequest) (*commonsol.GetBlockReply, error) {
@@ -44,7 +60,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 }
 
 func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlock, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	n, err := lp.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest lp block: %w", err)
@@ -125,7 +145,11 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 }
 
 func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if lp.HasFilter(ctx, req.Name) {
 		return nil
 	}
@@ -144,7 +168,11 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 }
 
 func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName string) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if !lp.HasFilter(ctx, filterName) {
 		return nil
 	}
@@ -154,7 +182,11 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
 	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	queryName, err := deriveNameFromFilterQuery(filterQuery)
 	if err != nil {
 		return nil, err
@@ -186,7 +218,12 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 }
 
 func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) {
-	filters, err := ss.chain.LogPoller().GetFilters(ctx)
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
+	filters, err := lp.GetFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -285,11 +322,29 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 	// remove dummy signatures (were injected by tx.MarshalBinary)
 	tx.Signatures = tx.Signatures[:0]
-	forwarder := solana.PublicKey(req.Receiver)
+	if len(tx.Message.AccountKeys) == 0 {
+		return nil, errors.New("transaction has no account keys")
+	}
+	if ss.addressLister == nil {
+		return nil, errors.New("address lister is not initialized")
+	}
+	accountAddrs, err := ss.addressLister.Accounts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounts: %w", err)
+	}
+	if len(accountAddrs) == 0 {
+		return nil, errors.New("no accounts available")
+	}
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
+	feePayer, err := ss.getPublicKeyWithHighestLamports(ctx, r, accountAddrs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine fee payer for SubmitTransaction: %w", err)
+	}
+	ss.logger.Debugw("Using fee payer", "publicKey", feePayer.String())
+	tx.Message.AccountKeys[0] = feePayer
 
 	blockhash, err := r.LatestBlockhash(ctx)
 	if err != nil {
@@ -309,7 +364,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
-	err = ss.chain.TxManager().Enqueue(ctx, forwarder.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
+	err = ss.chain.TxManager().Enqueue(ctx, feePayer.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
@@ -340,11 +395,60 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("failed getting transaction status. %w", err)
 	}
 
-	if txStatus == commonsol.TxFatal {
-		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+}
+
+// getPublicKeyWithHighestLamports returns the account with the largest SOL (lamport) balance.
+// If all balance queries fail, it falls back to the first successfully parsed address (same idea as EVM relay).
+func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r client.Reader, accounts []string) (solana.PublicKey, error) {
+	if len(accounts) == 0 {
+		return solana.PublicKey{}, errors.New("no accounts provided")
+	}
+	if len(accounts) == 1 {
+		pk, err := solana.PublicKeyFromBase58(accounts[0])
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("invalid account address: %w", err)
+		}
+		ss.logger.Debugw("only one enabled account for chain", "account", accounts[0])
+		return pk, nil
 	}
 
-	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+	var highestLamports uint64
+	var selected solana.PublicKey
+	var haveAnyBalance bool
+
+	for _, acct := range accounts {
+		pk, err := solana.PublicKeyFromBase58(acct)
+		if err != nil {
+			ss.logger.Warnw("skipping invalid account string", "account", acct, "err", err)
+			continue
+		}
+		balance, err := r.BalanceWithCommitment(ctx, pk, rpc.CommitmentConfirmed)
+		if err != nil {
+			ss.logger.Warnw("failed to get balance for account, skipping", "account", acct, "err", err)
+			continue
+		}
+		if !haveAnyBalance || balance > highestLamports {
+			highestLamports = balance
+			selected = pk
+			haveAnyBalance = true
+		}
+	}
+
+	if !haveAnyBalance {
+		pk, err := solana.PublicKeyFromBase58(accounts[0])
+		if err != nil {
+			return solana.PublicKey{}, fmt.Errorf("failed to parse any valid account: %w", err)
+		}
+		return pk, nil
+	}
+
+	ss.logger.Debugw("selected fee payer with highest lamport balance for chain",
+		"publicKey", selected.String(),
+		"lamports", highestLamports,
+		"totalAccounts", len(accounts))
+
+	return selected, nil
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
@@ -652,24 +756,38 @@ func convertSolPubKeysToCommon(keys []solana.PublicKey) []commonsol.PublicKey {
 }
 
 func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
-	var idl logpollertypes.EventIdl
-	err := json.Unmarshal(f.ContractIdlJSON, &idl)
-	if err != nil {
-		return logpollertypes.Filter{}, fmt.Errorf("invalid event idl: %w", err)
-	}
-
-	return logpollertypes.Filter{
+	filter := logpollertypes.Filter{
 		Name:            f.Name,
 		Address:         logpollertypes.PublicKey(f.Address),
 		EventName:       f.EventName,
 		EventSig:        logpollertypes.EventSignature(f.EventSig),
 		StartingBlock:   f.StartingBlock,
-		EventIdl:        idl,
+		ContractIdl:     string(f.ContractIdlJSON),
 		SubkeyPaths:     logpollertypes.SubKeyPaths(f.SubkeyPaths),
 		Retention:       f.Retention,
 		MaxLogsKept:     f.MaxLogsKept,
 		IncludeReverted: f.IncludeReverted,
-	}, nil
+	}
+
+	if f.CPIFilterConfig != nil {
+		if len(f.CPIFilterConfig.DestAddress) != solana.PublicKeyLength {
+			return logpollertypes.Filter{}, fmt.Errorf("invalid CPI filter dest address length: expected %d, got %d", solana.PublicKeyLength, len(f.CPIFilterConfig.DestAddress))
+		}
+		var destProgram logpollertypes.PublicKey
+		copy(destProgram[:], f.CPIFilterConfig.DestAddress[:])
+		var methodSig logpollertypes.EventSignature
+		if f.CPIFilterConfig.MethodName == logpollertypes.AnchorCPIMethodName {
+			methodSig = logpollertypes.AnchorCPIEventDiscriminator()
+		} else {
+			methodSig = logpollertypes.NewMethodSignatureFromName(f.CPIFilterConfig.MethodName)
+		}
+		filter.ExtraFilterConfig = logpollertypes.ExtraFilterConfig{
+			DestProgram:     destProgram,
+			MethodSignature: methodSig,
+		}
+	}
+
+	return filter, nil
 }
 
 func convertAccounts(accs []*rpc.Account) ([]*commonsol.Account, error) {

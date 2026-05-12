@@ -54,9 +54,6 @@ type Workflow interface {
 	IsEnabled() bool
 	AcceptanceTimeout() time.Duration
 	PollPeriod() time.Duration
-	ForwarderAddress() *solana.PublicKey
-	FromAddress() *solana.PublicKey
-	ForwarderState() *solana.PublicKey
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
 	Local() bool // shows if workflow is run against local network
@@ -64,8 +61,17 @@ type Workflow interface {
 
 type WorkflowConfig struct {
 	AcceptanceTimeout *config.Duration
-	ForwarderAddress  *solana.PublicKey
-	ForwarderState    *solana.PublicKey
+	// ForwarderAddress is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: configure the forwarder program address via capability config at runtime, not TOML.
+	ForwarderAddress *solana.PublicKey
+	// ForwarderState is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: configure the forwarder state account via capability config at runtime, not TOML.
+	ForwarderState *solana.PublicKey
+	// FromAddress is accepted for TOML compatibility only; runtime does not use chain config for this.
+	//
+	// Deprecated: use the workflow transmitter / capability-injected key material instead of TOML.
 	FromAddress       *solana.PublicKey
 	GasLimitDefault   *uint64
 	Local             *bool
@@ -73,10 +79,13 @@ type WorkflowConfig struct {
 	TxAcceptanceState *commontypes.TransactionStatus
 }
 
+// IsEnabled reports whether workflow-style settings are configured: both AcceptanceTimeout and
+// PollPeriod must be present with positive durations. Used e.g. to start the log poller.
 func (w *WorkflowConfig) IsEnabled() bool {
-	return (w.ForwarderAddress != nil && !w.ForwarderAddress.IsZero()) ||
-		(w.ForwarderState != nil && !w.ForwarderState.IsZero()) ||
-		(w.FromAddress != nil && !w.FromAddress.IsZero())
+	if w.AcceptanceTimeout == nil || w.PollPeriod == nil {
+		return false
+	}
+	return w.AcceptanceTimeout.Duration() > 0 && w.PollPeriod.Duration() > 0
 }
 
 func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
