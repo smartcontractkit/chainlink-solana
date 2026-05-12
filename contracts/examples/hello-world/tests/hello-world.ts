@@ -3,7 +3,8 @@ import * as fs from "fs";
 import { Program, BN } from "@coral-xyz/anchor";
 import { HelloWorld } from "../target/types/hello_world";
 
-const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
+// Must match `store` in `contracts/Anchor.toml` and `programs/store` `declare_id!`.
+const CHAINLINK_PROGRAM_ID = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC";
 
 describe("hello-world", () => {
   const provider = anchor.AnchorProvider.env();
@@ -24,13 +25,15 @@ describe("hello-world", () => {
     let storeIdl = JSON.parse(
       fs.readFileSync("../../target/idl/store.json", "utf-8")
     );
-    const storeProgram = new Program(storeIdl, CHAINLINK_PROGRAM_ID, provider);
+    storeIdl.address = CHAINLINK_PROGRAM_ID;
+    const storeProgram = new Program(storeIdl, provider);
 
     // Create a feed
     const description = "FOO/BAR";
     const decimals = 18;
     const granularity = 30;
-    const liveLength = 3;
+    // chainlink_solana v2 read_feed_v2 requires exactly one live transmission
+    const liveLength = 1;
     const historicalLength = 3;
     await storeProgram.methods
       .createFeed(description, decimals, granularity, liveLength)

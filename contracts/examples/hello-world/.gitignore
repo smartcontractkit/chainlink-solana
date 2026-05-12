@@ -1,6 +1,9 @@
 
 .anchor
 .DS_Store
-target
+target/*
+!target/deploy/
+target/deploy/*
+!target/deploy/hello_world-keypair.json
 **/*.rs.bk
 node_modules
