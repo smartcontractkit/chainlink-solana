@@ -350,6 +350,10 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
+	if blockhash.Value == nil {
+		return nil, errors.New("received nil blockhash from rpc")
+	}
+
 	transactionID := txID.String()
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
