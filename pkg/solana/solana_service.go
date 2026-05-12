@@ -814,7 +814,13 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 	if acc == nil {
 		return nil, nil
 	}
-
+	if acc.Value == nil {
+		return &commonsol.GetAccountInfoReply{
+			RPCContext: commonsol.RPCContext{
+				Slot: acc.Context.Slot,
+			},
+		}, nil
+	}
 	var a *commonsol.Account
 	data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
 	if err != nil {
