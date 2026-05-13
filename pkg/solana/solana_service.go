@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -311,6 +312,8 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 	return &commonsol.GetSlotHeightReply{Height: slot}, nil
 }
 
+const minimumConfirmationTime = 2 * time.Second
+
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
 	if err != nil {
@@ -358,8 +361,11 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
-		if req.Cfg.ComputeLimit != nil {
+		if req.Cfg.ComputeLimit != nil && *req.Cfg.ComputeLimit != 0 {
 			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		}
+		if req.Cfg.ComputeMaxPrice != nil && *req.Cfg.ComputeMaxPrice != 0 {
+			cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
 		}
 	}
 
@@ -369,7 +375,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
 
-	maximumWaitTimeForConfirmation := ss.chain.Config().WF().AcceptanceTimeout()
+	maximumWaitTimeForConfirmation := max(ss.chain.Config().WF().AcceptanceTimeout(), minimumConfirmationTime)
+
 	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
 	defer cancel()
 
@@ -392,7 +399,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed getting transaction status. %w", err)
+		return nil, fmt.Errorf("failed getting transaction status for tx %s: %w", transactionID, err)
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
@@ -822,11 +829,11 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 		}, nil
 	}
 	var a *commonsol.Account
-	data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
-	if err != nil {
-		return nil, err
-	}
 	if acc.Value != nil {
+		data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
+		if err != nil {
+			return nil, err
+		}
 		a = &commonsol.Account{
 			Lamports:   acc.Value.Lamports,
 			Executable: acc.Value.Executable,
