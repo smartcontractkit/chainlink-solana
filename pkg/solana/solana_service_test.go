@@ -1,18 +1,37 @@
 package solana
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
+	"time"
 
-	solana "github.com/gagliardetto/solana-go"
+	solanago "github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
+	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
+
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
+	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
+	configmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/config/mocks"
+	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
 func Test_Converters(t *testing.T) {
 	t.Run("convertMessageHeader", func(t *testing.T) {
-		h := solana.MessageHeader{
+		h := solanago.MessageHeader{
 			NumRequiredSignatures:       3,
 			NumReadonlySignedAccounts:   1,
 			NumReadonlyUnsignedAccounts: 2,
@@ -26,7 +45,7 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertCompiledInstruction", func(t *testing.T) {
-		ix := solana.CompiledInstruction{
+		ix := solanago.CompiledInstruction{
 			ProgramIDIndex: 5,
 			Accounts:       []uint16{1, 2, 9},
 			Data:           []byte{0xde, 0xad, 0xbe, 0xef},
@@ -39,7 +58,7 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertAddressTableLookupSlice", func(t *testing.T) {
-		in := []solana.MessageAddressTableLookup{
+		in := []solanago.MessageAddressTableLookup{
 			{
 				AccountKey:      pk(7),
 				WritableIndexes: []uint8{1, 3},
@@ -55,18 +74,18 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertMessage", func(t *testing.T) {
-		m := solana.Message{
-			AccountKeys: solana.PublicKeySlice{pk(1), pk(2)},
-			Header: solana.MessageHeader{
+		m := solanago.Message{
+			AccountKeys: solanago.PublicKeySlice{pk(1), pk(2)},
+			Header: solanago.MessageHeader{
 				NumRequiredSignatures:       2,
 				NumReadonlySignedAccounts:   1,
 				NumReadonlyUnsignedAccounts: 0,
 			},
-			RecentBlockhash: solana.Hash(pk(9)),
-			Instructions: []solana.CompiledInstruction{
+			RecentBlockhash: solanago.Hash(pk(9)),
+			Instructions: []solanago.CompiledInstruction{
 				{ProgramIDIndex: 0, Accounts: []uint16{0, 1}, Data: []byte("hi")},
 			},
-			AddressTableLookups: []solana.MessageAddressTableLookup{
+			AddressTableLookups: []solanago.MessageAddressTableLookup{
 				{AccountKey: pk(3), WritableIndexes: []uint8{5}, ReadonlyIndexes: []uint8{7}},
 			},
 		}
@@ -141,12 +160,12 @@ func Test_Converters(t *testing.T) {
 				{AccountIndex: 1, Owner: &owner, ProgramId: &prog, Mint: pk(10), UiTokenAmount: &rpc.UiTokenAmount{Amount: "2", Decimals: 0, UiAmountString: "2"}},
 			},
 			LoadedAddresses: rpc.LoadedAddresses{
-				ReadOnly: []solana.PublicKey{pk(1)},
-				Writable: []solana.PublicKey{pk(2)},
+				ReadOnly: []solanago.PublicKey{pk(1)},
+				Writable: []solanago.PublicKey{pk(2)},
 			},
 			ReturnData: rpc.ReturnData{
 				ProgramId: pk(3),
-				Data:      solana.Data{Content: []byte{0xde, 0xad}, Encoding: solana.EncodingBase64},
+				Data:      solanago.Data{Content: []byte{0xde, 0xad}, Encoding: solanago.EncodingBase64},
 			},
 		}
 		consumed := uint64(777)
@@ -169,7 +188,7 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, commonsol.PublicKeySlice{cpk(2)}, got.LoadedAddresses.Writable)
 		require.Equal(t, commonsol.PublicKey(pk(3)), got.ReturnData.ProgramId)
 		require.Equal(t, []byte{0xde, 0xad}, got.ReturnData.Data.Content)
-		require.Equal(t, commonsol.EncodingType(solana.EncodingBase64), got.ReturnData.Data.Encoding)
+		require.Equal(t, commonsol.EncodingType(solanago.EncodingBase64), got.ReturnData.Data.Encoding)
 	})
 
 	t.Run("convertTransactionMeta_nil", func(t *testing.T) {
@@ -184,7 +203,7 @@ func Test_Converters(t *testing.T) {
 			MinContextSlot: uint64Ptr(77),
 		}
 		got := convertAccountInfoOpts(opts)
-		require.Equal(t, solana.EncodingType(commonsol.EncodingBase64), got.Encoding)
+		require.Equal(t, solanago.EncodingType(commonsol.EncodingBase64), got.Encoding)
 		require.Equal(t, rpc.CommitmentType(commonsol.CommitmentConfirmed), got.Commitment)
 		require.NotNil(t, got.DataSlice)
 		require.Equal(t, uint64(5), *got.DataSlice.Offset)
@@ -199,12 +218,12 @@ func Test_Converters(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("convertBlock_minimal", func(t *testing.T) {
-		bt := solana.UnixTimeSeconds(1730000000)
+		bt := solanago.UnixTimeSeconds(1730000000)
 		rpcBlock := &rpc.GetBlockResult{
-			Blockhash:         solana.Hash(pk(1)),
-			PreviousBlockhash: solana.Hash(pk(2)),
+			Blockhash:         solanago.Hash(pk(1)),
+			PreviousBlockhash: solanago.Hash(pk(2)),
 			ParentSlot:        100,
-			Signatures:        []solana.Signature{sig(5)},
+			Signatures:        []solanago.Signature{sig(5)},
 			BlockTime:         &bt,
 			BlockHeight:       uint64Ptr(1234),
 			Transactions: []rpc.TransactionWithMeta{
@@ -229,13 +248,13 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertTransaction_basic", func(t *testing.T) {
-		tx := &solana.Transaction{
-			Signatures: []solana.Signature{sig(9)},
-			Message: solana.Message{
-				AccountKeys:     solana.PublicKeySlice{pk(7)},
-				Header:          solana.MessageHeader{},
-				RecentBlockhash: solana.Hash(pk(8)),
-				Instructions: []solana.CompiledInstruction{
+		tx := &solanago.Transaction{
+			Signatures: []solanago.Signature{sig(9)},
+			Message: solanago.Message{
+				AccountKeys:     solanago.PublicKeySlice{pk(7)},
+				Header:          solanago.MessageHeader{},
+				RecentBlockhash: solanago.Hash(pk(8)),
+				Instructions: []solanago.CompiledInstruction{
 					{ProgramIDIndex: 0, Accounts: []uint16{0}, Data: []byte{1}},
 				},
 			},
@@ -253,13 +272,13 @@ func Test_Converters(t *testing.T) {
 		require.Nil(t, res)
 	})
 	t.Run("convertTransaction", func(t *testing.T) {
-		tx, err := solana.TransactionFromBase64("AduqZjAgyh5j1WdY3U9AeS2ipk4CKvAwg05YgEE/PuGmiCKV01sK5OosREvDUtzYgEcy8udNEgrJ3h6EyNSiygoBAAEDW/Kcohx9SWr/V/UMmcy8RLIcyoTiGMJUzTO0hUeDFhBPITyQP/O3TBMr+8ECxBuHQ3bPl6iselx2P3Pd0jC7jQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4idjTDYMB0/8Mqa9G/bgm/1maapeTeQPGS9KIGaXpwBAgIAAQwCAAAAgJaYAAAAAAA=")
+		tx, err := solanago.TransactionFromBase64("AduqZjAgyh5j1WdY3U9AeS2ipk4CKvAwg05YgEE/PuGmiCKV01sK5OosREvDUtzYgEcy8udNEgrJ3h6EyNSiygoBAAEDW/Kcohx9SWr/V/UMmcy8RLIcyoTiGMJUzTO0hUeDFhBPITyQP/O3TBMr+8ECxBuHQ3bPl6iselx2P3Pd0jC7jQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4idjTDYMB0/8Mqa9G/bgm/1maapeTeQPGS9KIGaXpwBAgIAAQwCAAAAgJaYAAAAAAA=")
 		require.NoError(t, err)
 		got := convertTransaction(tx)
 
 		require.Len(t, tx.Message.AccountKeys, len(got.Message.AccountKeys))
 		for i := range tx.Message.AccountKeys {
-			require.Equal(t, tx.Message.AccountKeys[i], solana.PublicKey(got.Message.AccountKeys[i]))
+			require.Equal(t, tx.Message.AccountKeys[i], solanago.PublicKey(got.Message.AccountKeys[i]))
 		}
 		require.Equal(t, tx.Message.Header.NumReadonlySignedAccounts, got.Message.Header.NumReadonlySignedAccounts)
 		require.Equal(t, tx.Message.Header.NumReadonlyUnsignedAccounts, got.Message.Header.NumReadonlyUnsignedAccounts)
@@ -267,8 +286,50 @@ func Test_Converters(t *testing.T) {
 	})
 }
 
-func pk(i byte) solana.PublicKey {
-	var p solana.PublicKey
+func Test_getPublicKeyWithHighestLamports(t *testing.T) {
+	ctx := t.Context()
+	ss := &solanaService{logger: logger.Test(t)}
+
+	t.Run("single account", func(t *testing.T) {
+		k, err := solanago.NewRandomPrivateKey()
+		require.NoError(t, err)
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, nil, []string{k.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, k.PublicKey(), got)
+	})
+
+	t.Run("picks highest balance", func(t *testing.T) {
+		kLow, err := solanago.NewRandomPrivateKey()
+		require.NoError(t, err)
+		kHigh, err := solanago.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		mockR := clientmocks.NewReaderWriter(t)
+		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(100), nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(9000), nil).Once()
+
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{kLow.PublicKey().String(), kHigh.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, kHigh.PublicKey(), got)
+	})
+
+	t.Run("fallback when all balances fail", func(t *testing.T) {
+		k0, err := solanago.NewRandomPrivateKey()
+		require.NoError(t, err)
+		k1, err := solanago.NewRandomPrivateKey()
+		require.NoError(t, err)
+
+		mockR := clientmocks.NewReaderWriter(t)
+		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return(uint64(0), errors.New("rpc down")).Twice()
+
+		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{k0.PublicKey().String(), k1.PublicKey().String()})
+		require.NoError(t, err)
+		require.Equal(t, k0.PublicKey(), got)
+	})
+}
+
+func pk(i byte) solanago.PublicKey {
+	var p solanago.PublicKey
 	for j := range p {
 		p[j] = i
 	}
@@ -277,8 +338,8 @@ func pk(i byte) solana.PublicKey {
 
 func cpk(i byte) commonsol.PublicKey { return commonsol.PublicKey(pk(i)) }
 
-func sig(i byte) solana.Signature {
-	var s solana.Signature
+func sig(i byte) solanago.Signature {
+	var s solanago.Signature
 	for j := range s {
 		s[j] = i
 	}
@@ -288,3 +349,536 @@ func sig(i byte) solana.Signature {
 func csig(i byte) commonsol.Signature { return commonsol.Signature(sig(i)) }
 
 func uint64Ptr(v uint64) *uint64 { return &v }
+
+// submitStubChain implements the Chain interface with only the methods needed by
+// SubmitTransaction, avoiding the import cycle that mocks/chain.go causes.
+type submitStubChain struct {
+	Chain
+	reader    client.Reader
+	readerErr error
+	txm       TxManager
+	cfg       config.Config
+}
+
+func (c *submitStubChain) Reader() (client.Reader, error) { return c.reader, c.readerErr }
+func (c *submitStubChain) TxManager() TxManager           { return c.txm }
+func (c *submitStubChain) Config() config.Config          { return c.cfg }
+
+// stubAddressLister supplies enabled chain accounts for SubmitTransaction (fee payer selection).
+type stubAddressLister struct {
+	accounts []string
+}
+
+func (s *stubAddressLister) Accounts(ctx context.Context) ([]string, error) {
+	return s.accounts, nil
+}
+
+type stubWorkflow struct {
+	acceptanceTimeout time.Duration
+}
+
+func (w *stubWorkflow) IsEnabled() bool                                   { return true }
+func (w *stubWorkflow) AcceptanceTimeout() time.Duration                  { return w.acceptanceTimeout }
+func (w *stubWorkflow) PollPeriod() time.Duration                         { return time.Second }
+func (w *stubWorkflow) ForwarderAddress() *solanago.PublicKey             { return nil }
+func (w *stubWorkflow) FromAddress() *solanago.PublicKey                  { return nil }
+func (w *stubWorkflow) ForwarderState() *solanago.PublicKey               { return nil }
+func (w *stubWorkflow) GasLimitDefault() *uint64                          { return nil }
+func (w *stubWorkflow) TxAcceptanceState() *commontypes.TransactionStatus { return nil }
+func (w *stubWorkflow) Local() bool                                       { return false }
+
+type stubTxManager struct {
+	mock.Mock
+}
+
+func (m *stubTxManager) Start(context.Context) error    { return nil }
+func (m *stubTxManager) Close() error                   { return nil }
+func (m *stubTxManager) Ready() error                   { return nil }
+func (m *stubTxManager) HealthReport() map[string]error { return nil }
+func (m *stubTxManager) Name() string                   { return "stubTxManager" }
+
+func (m *stubTxManager) Enqueue(ctx context.Context, accountID string, tx *solanago.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error {
+	args := m.MethodCalled("Enqueue", ctx, accountID, tx, txID, lastValidBlockHeight, txCfgs)
+	return args.Error(0)
+}
+
+func (m *stubTxManager) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
+	args := m.MethodCalled("GetTransactionStatus", ctx, transactionID)
+	return args.Get(0).(commontypes.TransactionStatus), args.Error(1)
+}
+
+func (m *stubTxManager) GetTransactionSig(transactionID string) (solanago.Signature, error) {
+	args := m.MethodCalled("GetTransactionSig", transactionID)
+	return args.Get(0).(solanago.Signature), args.Error(1)
+}
+
+func validBase64Tx(t *testing.T) string {
+	t.Helper()
+	tx, err := solanago.NewTransaction(
+		[]solanago.Instruction{
+			solanago.NewInstruction(
+				pk(0),
+				solanago.AccountMetaSlice{
+					solanago.NewAccountMeta(pk(1), true, true),
+				},
+				[]byte{0x01, 0x02},
+			),
+		},
+		solanago.Hash(pk(9)),
+		solanago.TransactionPayer(pk(1)),
+	)
+	require.NoError(t, err)
+
+	raw, err := tx.MarshalBinary()
+	require.NoError(t, err)
+	return base64.StdEncoding.EncodeToString(raw)
+}
+
+// --- convertAccountResult tests ---
+
+func TestConvertAccountResult(t *testing.T) {
+	t.Run("nil input returns nil", func(t *testing.T) {
+		got, err := convertAccountResult(nil, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.Nil(t, got)
+	})
+
+	t.Run("non-nil result with nil Value", func(t *testing.T) {
+		acc := &rpc.GetAccountInfoResult{
+			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 42}},
+			Value:      nil,
+		}
+		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, uint64(42), got.Slot)
+		assert.Nil(t, got.Value)
+	})
+
+	t.Run("non-nil result with populated Value", func(t *testing.T) {
+		data := rpc.DataBytesOrJSONFromBytes([]byte{0xca, 0xfe})
+		acc := &rpc.GetAccountInfoResult{
+			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 100}},
+			Value: &rpc.Account{
+				Lamports:   999,
+				Owner:      pk(5),
+				Data:       data,
+				Executable: true,
+				Space:      64,
+			},
+		}
+		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, uint64(100), got.Slot)
+		require.NotNil(t, got.Value)
+		assert.Equal(t, uint64(999), got.Value.Lamports)
+		assert.Equal(t, cpk(5), got.Value.Owner)
+		assert.True(t, got.Value.Executable)
+		require.NotNil(t, got.Value.Data)
+		assert.Equal(t, commonsol.EncodingBase64, got.Value.Data.RawDataEncoding)
+		assert.Equal(t, []byte{0xca, 0xfe}, got.Value.Data.AsDecodedBinary)
+	})
+
+	t.Run("non-nil result with nil Data inside Value", func(t *testing.T) {
+		acc := &rpc.GetAccountInfoResult{
+			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 7}},
+			Value: &rpc.Account{
+				Lamports: 1,
+				Owner:    pk(2),
+				Data:     nil,
+			},
+		}
+		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.NotNil(t, got.Value)
+		assert.Nil(t, got.Value.Data)
+	})
+}
+
+// --- convertDataBytesOrJSON tests ---
+
+func TestConvertDataBytesOrJSON(t *testing.T) {
+	t.Run("nil input returns nil", func(t *testing.T) {
+		got, err := convertDataBytesOrJSON(nil, "")
+		require.NoError(t, err)
+		require.Nil(t, got)
+	})
+
+	t.Run("base64 default when pref is empty", func(t *testing.T) {
+		raw := []byte{0xde, 0xad, 0xbe, 0xef}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, "")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.NotNil(t, got.AsJSON)
+	})
+
+	t.Run("base64 explicit pref with binary data", func(t *testing.T) {
+		raw := []byte{0x01, 0x02, 0x03}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+	})
+
+	t.Run("JSON fallback with EncodingJSON", func(t *testing.T) {
+		raw := []byte{0xaa, 0xbb}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, commonsol.EncodingJSON)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingJSON, got.RawDataEncoding)
+		assert.NotNil(t, got.AsJSON)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+	})
+
+	t.Run("JSON fallback with EncodingJSONParsed", func(t *testing.T) {
+		raw := []byte{0xcc, 0xdd}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, commonsol.EncodingJSONParsed)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingJSONParsed, got.RawDataEncoding)
+		assert.NotNil(t, got.AsJSON)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+	})
+
+	t.Run("base64 fallback parses json array when GetBinary is empty", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("hello world"))
+		rawJSON := fmt.Sprintf(`[%q, "base64"]`, encoded)
+		var obj rpc.DataBytesOrJSON
+		err := json.Unmarshal([]byte(rawJSON), &obj)
+		require.NoError(t, err)
+
+		got, err := convertDataBytesOrJSON(&obj, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
+		assert.Equal(t, []byte("hello world"), got.AsDecodedBinary)
+	})
+
+	t.Run("unknown encoding with binary data falls back to base64", func(t *testing.T) {
+		raw := []byte{0x11, 0x22}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, "some-unknown-encoding")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+	})
+}
+
+// --- SubmitTransaction tests ---
+
+func newSubmitTestHarness(t *testing.T, acceptanceTimeout time.Duration) (*solanaService, *clientmocks.ReaderWriter, *stubTxManager) {
+	t.Helper()
+
+	mockReader := clientmocks.NewReaderWriter(t)
+	mockCfg := configmocks.NewConfig(t)
+	txm := &stubTxManager{}
+	txm.Test(t)
+	t.Cleanup(func() { txm.AssertExpectations(t) })
+
+	wf := &stubWorkflow{acceptanceTimeout: acceptanceTimeout}
+	mockCfg.EXPECT().WF().Return(wf).Maybe()
+
+	chain := &submitStubChain{
+		reader: mockReader,
+		txm:    txm,
+		cfg:    mockCfg,
+	}
+
+	ss := &solanaService{
+		chain:         chain,
+		logger:        logger.Nop(),
+		addressLister: &stubAddressLister{accounts: []string{pk(1).String()}},
+	}
+	return ss, mockReader, txm
+}
+
+func TestSubmitTransaction_ZeroAcceptanceTimeout(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 0)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	txm.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	// retry.Do executes the function at least once even when the context is
+	// already expired. Return Pending so the retry loop tries to continue but
+	// finds the context cancelled.
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Pending, nil).Maybe()
+
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t),
+		Receiver:           cpk(1),
+	}
+
+	_, err := ss.SubmitTransaction(t.Context(), req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "context")
+}
+
+func TestSubmitTransaction_NonNilComputeMaxPrice(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 5*time.Second)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	var capturedCfgs []txmutils.SetTxConfig
+	txm.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			capturedCfgs = args.Get(5).([]txmutils.SetTxConfig)
+		}).
+		Return(nil)
+
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Unconfirmed, nil)
+
+	maxPrice := uint64(100_000)
+	computeLimit := uint32(200_000)
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t),
+		Receiver:           cpk(1),
+		Cfg: &commonsol.ComputeConfig{
+			ComputeLimit:    &computeLimit,
+			ComputeMaxPrice: &maxPrice,
+		},
+	}
+
+	reply, err := ss.SubmitTransaction(t.Context(), req)
+	require.NoError(t, err)
+	require.NotNil(t, reply)
+	assert.Equal(t, commonsol.TxSuccess, reply.Status)
+
+	// Cfg is non-nil so we expect: SetEstimateComputeUnitLimit + SetComputeUnitLimit + SetComputeUnitPriceMax
+	require.Len(t, capturedCfgs, 3)
+
+	// Apply captured configs to a zero TxConfig and verify the values.
+	var applied txmutils.TxConfig
+	for _, fn := range capturedCfgs {
+		fn(&applied)
+	}
+	assert.False(t, applied.EstimateComputeUnitLimit)
+	assert.Equal(t, computeLimit, applied.ComputeUnitLimit)
+	assert.Equal(t, maxPrice, applied.ComputeUnitPriceMax)
+}
+
+func TestSubmitTransaction_ContextExpiresBeforeConfirmation(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 10*time.Second)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	txm.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Pending, nil)
+
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t),
+		Receiver:           cpk(1),
+	}
+
+	// Cancel immediately so both the parent context and the internal
+	// retry context are expired before confirmation can succeed.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := ss.SubmitTransaction(ctx, req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "context")
+	assert.Contains(t, err.Error(), "tx with ID")
+}
+
+func TestSubmitTransaction_FatalStatus(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 5*time.Second)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	txm.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Fatal, nil)
+
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t),
+		Receiver:           cpk(1),
+	}
+
+	reply, err := ss.SubmitTransaction(t.Context(), req)
+	require.NoError(t, err)
+	require.NotNil(t, reply)
+	assert.Equal(t, commonsol.TxFatal, reply.Status)
+	assert.NotEmpty(t, reply.IdempotencyKey)
+}
+
+func TestSubmitTransaction_NilCfg(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 5*time.Second)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	var capturedCfgs []txmutils.SetTxConfig
+	txm.On("Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			capturedCfgs = args.Get(5).([]txmutils.SetTxConfig)
+		}).
+		Return(nil)
+
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Unconfirmed, nil)
+
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t),
+		Receiver:           cpk(1),
+		Cfg:                nil,
+	}
+
+	reply, err := ss.SubmitTransaction(t.Context(), req)
+	require.NoError(t, err)
+	require.NotNil(t, reply)
+	assert.Equal(t, commonsol.TxSuccess, reply.Status)
+	assert.Nil(t, capturedCfgs, "no tx configs should be set when Cfg is nil")
+}
+
+// mockLogPoller is a minimal LogPoller implementation for testing readiness guards.
+type mockLogPoller struct {
+	ready error
+}
+
+func (m *mockLogPoller) Start(context.Context) error            { return nil }
+func (m *mockLogPoller) Ready() error                           { return m.ready }
+func (m *mockLogPoller) Close() error                           { return nil }
+func (m *mockLogPoller) HasFilter(context.Context, string) bool { return false }
+func (m *mockLogPoller) RegisterFilter(context.Context, logpollertypes.Filter) error {
+	return nil
+}
+func (m *mockLogPoller) UnregisterFilter(context.Context, string) error { return nil }
+func (m *mockLogPoller) GetFilters(context.Context) (map[string]logpollertypes.Filter, error) {
+	return nil, nil
+}
+func (m *mockLogPoller) GetLatestBlock(context.Context) (int64, error) { return 0, nil }
+func (m *mockLogPoller) FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error) {
+	return nil, nil
+}
+func (m *mockLogPoller) Replay(int64)           {}
+func (m *mockLogPoller) CPIEventsEnabled() bool { return false }
+
+// stubChain is a minimal Chain stub that only provides a LogPoller.
+// It embeds the Chain interface so unimplemented methods panic if called.
+type lpStubChain struct {
+	Chain
+	lp LogPoller
+}
+
+func (s *lpStubChain) LogPoller() LogPoller { return s.lp }
+
+func newSolanaService(t *testing.T, lpReady error) *solanaService {
+	t.Helper()
+	return &solanaService{
+		chain:  &lpStubChain{lp: &mockLogPoller{ready: lpReady}},
+		logger: logger.Test(t),
+	}
+}
+
+func TestLogPollerReadinessGuard(t *testing.T) {
+	ctx := t.Context()
+	errNotStarted := errors.New("not started")
+
+	t.Run("RegisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		err := ss.RegisterLogTracking(ctx, commonsol.LPFilterQuery{Name: "test"})
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("RegisterLogTracking succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		err := ss.RegisterLogTracking(ctx, commonsol.LPFilterQuery{
+			Name:            "test",
+			ContractIdlJSON: []byte(`{}`),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("UnregisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		err := ss.UnregisterLogTracking(ctx, "test")
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("UnregisterLogTracking succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		err := ss.UnregisterLogTracking(ctx, "test")
+		require.NoError(t, err)
+	})
+
+	t.Run("QueryTrackedLogs returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.QueryTrackedLogs(ctx, nil, query.LimitAndSort{})
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetLatestLPBlock returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.GetLatestLPBlock(ctx)
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetLatestLPBlock succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		block, err := ss.GetLatestLPBlock(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, block)
+		require.Equal(t, uint64(0), block.Slot)
+	})
+
+	t.Run("GetFiltersNames returns error when LogPoller not started", func(t *testing.T) {
+		ss := newSolanaService(t, errNotStarted)
+		_, err := ss.GetFiltersNames(ctx)
+		require.ErrorIs(t, err, ErrLogPollerNotStarted)
+	})
+
+	t.Run("GetFiltersNames succeeds when LogPoller is ready", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		names, err := ss.GetFiltersNames(ctx)
+		require.NoError(t, err)
+		require.Empty(t, names)
+	})
+}

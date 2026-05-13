@@ -59,14 +59,15 @@ type Relayer struct {
 }
 
 // Note: constructed in core
-func NewRelayer(lggr logger.Logger, chain Chain) *Relayer {
+func NewRelayer(lggr logger.Logger, chain Chain, addressLister AddressLister) *Relayer {
 	return &Relayer{
 		lggr:   logger.Named(lggr, "Relayer"),
 		chain:  chain,
 		stopCh: make(services.StopChan),
 		solanaService: solanaService{
-			chain:  chain,
-			logger: lggr,
+			addressLister: addressLister,
+			chain:         chain,
+			logger:        lggr,
 		},
 	}
 }
