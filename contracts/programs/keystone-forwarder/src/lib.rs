@@ -328,7 +328,6 @@ pub mod keystone_forwarder {
             state: ctx.accounts.state.key(),
             receiver: ctx.accounts.receiver_program.key(),
             transmission_id,
-            result: true,
         });
 
         Ok(())

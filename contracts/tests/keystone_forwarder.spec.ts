@@ -652,7 +652,6 @@ describe("keystone_storage", function () {
           receiver.equals(event.receiver),
           "receiver pub key emitted"
         );
-        assert.isTrue(event.result, "Successful report emitted");
         assert.isNotNull(event.transmissionId, "Transmission Id present");
       }
     );
