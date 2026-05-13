@@ -380,11 +380,9 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
 	defer cancel()
 
-	var lastStatusErr error
 	txStatus, err := retry.Do(retryContext, ss.logger, func(ctx context.Context) (commonsol.TransactionStatus, error) {
 		txStatus, txStatusErr := ss.chain.TxManager().GetTransactionStatus(ctx, transactionID)
 		if txStatusErr != nil {
-			lastStatusErr = txStatusErr
 			return commonsol.TxFatal, txStatusErr
 		}
 
@@ -394,18 +392,13 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		case commontypes.Unconfirmed, commontypes.Finalized:
 			return commonsol.TxSuccess, nil
 		case commontypes.Pending, commontypes.Unknown:
-			lastStatusErr = fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
-			return commonsol.TxFatal, lastStatusErr
+			return commonsol.TxFatal, fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
 		default:
-			lastStatusErr = fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
-			return commonsol.TxFatal, lastStatusErr
+			return commonsol.TxFatal, fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
 		}
 	})
 
 	if err != nil {
-		if lastStatusErr != nil {
-			return nil, fmt.Errorf("failed getting transaction status for tx %s: %w: %w", transactionID, lastStatusErr, err)
-		}
 		return nil, fmt.Errorf("failed getting transaction status for tx %s: %w", transactionID, err)
 	}
 

@@ -631,7 +631,7 @@ func TestSubmitTransaction_ZeroAcceptanceTimeout(t *testing.T) {
 		Receiver:           cpk(1),
 	}
 
-	_, err := ss.SubmitTransaction(context.Background(), req)
+	_, err := ss.SubmitTransaction(t.Context(), req)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context")
 }
@@ -667,7 +667,7 @@ func TestSubmitTransaction_NonNilComputeMaxPrice(t *testing.T) {
 		},
 	}
 
-	reply, err := ss.SubmitTransaction(context.Background(), req)
+	reply, err := ss.SubmitTransaction(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, reply)
 	assert.Equal(t, commonsol.TxSuccess, reply.Status)
@@ -708,7 +708,7 @@ func TestSubmitTransaction_ContextExpiresBeforeConfirmation(t *testing.T) {
 
 	// Cancel immediately so both the parent context and the internal
 	// retry context are expired before confirmation can succeed.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := ss.SubmitTransaction(ctx, req)
@@ -738,7 +738,7 @@ func TestSubmitTransaction_FatalStatus(t *testing.T) {
 		Receiver:           cpk(1),
 	}
 
-	reply, err := ss.SubmitTransaction(context.Background(), req)
+	reply, err := ss.SubmitTransaction(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, reply)
 	assert.Equal(t, commonsol.TxFatal, reply.Status)
@@ -771,7 +771,7 @@ func TestSubmitTransaction_NilCfg(t *testing.T) {
 		Cfg:                nil,
 	}
 
-	reply, err := ss.SubmitTransaction(context.Background(), req)
+	reply, err := ss.SubmitTransaction(t.Context(), req)
 	require.NoError(t, err)
 	require.NotNil(t, reply)
 	assert.Equal(t, commonsol.TxSuccess, reply.Status)
@@ -819,7 +819,7 @@ func newSolanaService(t *testing.T, lpReady error) *solanaService {
 }
 
 func TestLogPollerReadinessGuard(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	errNotStarted := errors.New("not started")
 
 	t.Run("RegisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
