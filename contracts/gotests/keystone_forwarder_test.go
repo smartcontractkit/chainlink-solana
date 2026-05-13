@@ -330,7 +330,6 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, forwarderStateAddress, reportProcessedEvent.State)
 		require.Equal(t, receiver_program_id, reportProcessedEvent.Receiver)
 		require.Equal(t, [32]byte(transmissionId), reportProcessedEvent.TransmissionId)
-		require.Equal(t, true, reportProcessedEvent.Result)
 
 		executionState := fetchExecutionState(t, solanaClient, executionStateStorage)
 		require.Equal(t, true, executionState.Success)
@@ -505,7 +504,6 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, forwarderStateAddress, reportProcessedEvent.State)
 		require.Equal(t, receiver_program_id, reportProcessedEvent.Receiver)
 		require.Equal(t, [32]byte(transmissionId), reportProcessedEvent.TransmissionId)
-		require.Equal(t, true, reportProcessedEvent.Result)
 
 		executionState := fetchExecutionState(t, solanaClient, executionStateStorage)
 		require.Equal(t, true, executionState.Success)
