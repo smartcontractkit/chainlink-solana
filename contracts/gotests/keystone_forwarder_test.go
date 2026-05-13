@@ -66,7 +66,6 @@ type ReportProcessedEvent struct {
 	State          solana.PublicKey
 	Receiver       solana.PublicKey
 	TransmissionId [32]byte
-	Result         bool
 }
 
 type Signer struct {
