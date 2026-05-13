@@ -1,3 +1,6 @@
+// anchor-lang 0.31 #[program] macro emits AccountInfo::realloc; allow until we upgrade
+#![allow(deprecated)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{hash, hash::Hash, keccak, secp256k1_recover::*};
 
@@ -297,20 +300,10 @@ pub mod keystone_forwarder {
 
         let ix = Instruction::new_with_bytes(ctx.accounts.receiver_program.key(), &payload, metas);
 
-        // used to derive the forwarder authority PDA
         let forwarder_state = ctx.accounts.state.key();
         let receiver_program = ctx.accounts.receiver_program.key();
 
-        // calculate the bump on-the-fly
-        let (_, authority_bump) = Pubkey::find_program_address(
-            &[
-                b"forwarder",
-                forwarder_state.as_ref(),
-                receiver_program.as_ref(),
-            ],
-            &crate::ID,
-        );
-
+        let authority_bump = ctx.bumps.forwarder_authority;
         let signers_seeds = &[
             b"forwarder",
             forwarder_state.as_ref(),

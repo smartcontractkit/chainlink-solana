@@ -28,8 +28,8 @@ apt install git -y
 cd "${REPO}"
 git config --global --add safe.directory "${REPO}"
 
-# install achor-go
-go install github.com/gagliardetto/anchor-go@v0.2.3
+# install anchor-go
+go install github.com/Unheilbar/anchor-go@v1.0.3
 
 # initial build
 cd "${CONTRACTS}"

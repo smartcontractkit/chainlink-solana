@@ -175,28 +175,35 @@ export const newWorkflows = (n: number, allowedSender: PublicKey) => {
 export function waitForEvent<T>(
   program: any,
   eventName: string,
-  validate: (event: T, slot: number) => void
+  validate: (event: T, slot: number) => void,
+  timeoutMs: number = 30_000
 ): Promise<T> {
-  const promise = new Promise<T>((resolve, reject) => {
-    const listener = program.addEventListener(
-      eventName,
-      (event: T, slot: number) => {
-        try {
-          validate(event, slot);
-          resolve(event);
-        } catch (err) {
-          reject(err);
-        } finally {
-          program.removeEventListener(listener);
-        }
+  let listener: number | undefined;
+
+  const eventPromise = new Promise<T>((resolve, reject) => {
+    listener = program.addEventListener(eventName, (event: T, slot: number) => {
+      try {
+        validate(event, slot);
+        resolve(event);
+      } catch (err) {
+        reject(err);
       }
-    );
+    });
+
+    setTimeout(() => {
+      reject(
+        new Error(
+          `waitForEvent: "${eventName}" not received within ${timeoutMs}ms`
+        )
+      );
+    }, timeoutMs);
   });
 
-  // Attach catch to prevent unhandled rejection warning — but DO NOT rethrow
-  promise.catch(() => {});
-
-  return promise;
+  return eventPromise.finally(() => {
+    if (listener !== undefined) {
+      program.removeEventListener(listener);
+    }
+  });
 }
 
 // initializes it, sets oracle config, and returns enough information to create a message

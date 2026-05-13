@@ -1,13 +1,15 @@
 [toolchain]
-anchor_version = "0.29.0"
+anchor_version = "0.31.0"
 
 [features]
 seeds = false
 skip-lint = false
+# Let IDL build succeed for keystone-forwarder (seeds from instruction data).
+resolution = false
 
 [programs.localnet]
 # note: replace underscores "_" with dashes "-" for "anchor test" to use declared program id
-access_controller = "9xi644bRR8birboDGdTiwBq3C7VEeR7VuamRYYXCubUW"
+access_controller = "2ckhep7Mvy1dExenBqpcdevhRu7CLuuctMcx7G9mWEvo"
 buffer-payload = "85bivLENWAX36kyWC9zemZu9H3D88J79wXdHgR6ZmZHX"
 contract-reader-interface = "6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE"
 contract-reader-interface-secondary = "9SFyk8NmGYh5D612mJwUYhguCRY9cFgaS2vksrigepjf"
@@ -16,8 +18,8 @@ keystone_forwarder = "whV7Q5pi17hPPyaPksToDw1nMx6Lh8qmNWKFaLRQ4wz"
 data_feeds_cache = "3kX63udXtYcsdj2737Wi2KGd2PhqiKPgAFAxstrjtRUa"
 log-read-test = "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4"
 mock-ccip-events = "CGn5MQX5GK9qKqERhjnADhd6i2LiSF6XUC2ewUHND1Mw"
-ocr_2 = "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
-store = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+ocr_2 = "E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x"
+store = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC"
 
 [registry]
 url = "https://anchor.projectserum.com"

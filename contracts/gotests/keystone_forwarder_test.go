@@ -137,7 +137,6 @@ func TestKeystoneForwarder(t *testing.T) {
 		forwarderStateAddress = forwarderStateKey.PublicKey()
 		proposedOwner, err = solana.NewRandomPrivateKey()
 		require.NoError(t, err)
-		keystone_forwarder.SetProgramID(solana.MustPublicKeyFromBase58(SolanaProgramIDs["keystone_forwarder"]))
 		receiver_program.SetProgramID(receiver_program_id)
 		defaultSigners = generateSigners(t, 16)
 		defaultTransmitters = generateTransmitters(t, deployerKey, 16)
@@ -149,18 +148,17 @@ func TestKeystoneForwarder(t *testing.T) {
 	})
 
 	t.Run("Initialize Forwarder", func(t *testing.T) {
-		ix, err := keystone_forwarder.NewInitializeInstruction(forwarderStateAddress, deployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+		ix, err := keystone_forwarder.NewInitializeInstruction(forwarderStateAddress, deployerKey.PublicKey(), solana.SystemProgramID)
 		require.NoError(t, err)
 		soltesting.FundTestAccounts(t, []solana.PublicKey{forwarderStateKey.PublicKey(), deployerKey.PublicKey(), proposedOwner.PublicKey()}, solanaChain.URL)
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{ix}, deployerKey, rpc.CommitmentConfirmed, common.AddSigners(forwarderStateKey))
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, forwarderStateAddress, rpc.CommitmentConfirmed, &forwarderStateData)
-		require.NoError(t, err)
-		require.Equal(t, forwarderStateData.Version, uint8(1))
-		require.Equal(t, forwarderStateData.Owner, deployerKey.PublicKey())
-		require.Equal(t, forwarderStateData.ProposedOwner, solana.PublicKey{})
+		forwarderStateData = fetchForwarderState(t, solanaClient, forwarderStateAddress)
+		require.Equal(t, uint8(1), forwarderStateData.Version)
+		require.Equal(t, deployerKey.PublicKey(), forwarderStateData.Owner)
+		require.Equal(t, solana.PublicKey{}, forwarderStateData.ProposedOwner)
 
 		type ForwarderInitializeEvent struct {
 			Discriminator [8]byte
@@ -173,29 +171,27 @@ func TestKeystoneForwarder(t *testing.T) {
 	})
 
 	t.Run("Transfer Ownership", func(t *testing.T) {
-		transferIx, err := keystone_forwarder.NewTransferOwnershipInstruction(proposedOwner.PublicKey(), forwarderStateAddress, deployerKey.PublicKey()).ValidateAndBuild()
+		transferIx, err := keystone_forwarder.NewTransferOwnershipInstruction(proposedOwner.PublicKey(), forwarderStateAddress, deployerKey.PublicKey())
 		require.NoError(t, err)
 		_, err = common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{transferIx}, deployerKey, rpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, forwarderStateAddress, rpc.CommitmentConfirmed, &forwarderStateData)
-		require.NoError(t, err)
-		require.Equal(t, forwarderStateData.Owner, deployerKey.PublicKey())
-		require.Equal(t, forwarderStateData.ProposedOwner, proposedOwner.PublicKey())
+		forwarderStateData = fetchForwarderState(t, solanaClient, forwarderStateAddress)
+		require.Equal(t, deployerKey.PublicKey(), forwarderStateData.Owner)
+		require.Equal(t, proposedOwner.PublicKey(), forwarderStateData.ProposedOwner)
 	})
 
 	t.Run("Accept Ownership", func(t *testing.T) {
-		acceptIx, err := keystone_forwarder.NewAcceptOwnershipInstruction(forwarderStateAddress, proposedOwner.PublicKey()).ValidateAndBuild()
+		acceptIx, err := keystone_forwarder.NewAcceptOwnershipInstruction(forwarderStateAddress, proposedOwner.PublicKey())
 		require.NoError(t, err)
 		_, err = common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{acceptIx}, proposedOwner, rpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, forwarderStateAddress, rpc.CommitmentConfirmed, &forwarderStateData)
-		require.NoError(t, err)
-		require.Equal(t, forwarderStateData.Owner, proposedOwner.PublicKey())
-		require.Equal(t, forwarderStateData.ProposedOwner, solana.PublicKey{})
+		forwarderStateData = fetchForwarderState(t, solanaClient, forwarderStateAddress)
+		require.Equal(t, proposedOwner.PublicKey(), forwarderStateData.Owner)
+		require.Equal(t, solana.PublicKey{}, forwarderStateData.ProposedOwner)
 	})
 
 	t.Run("Transfer Ownership Back", func(t *testing.T) {
@@ -203,21 +199,20 @@ func TestKeystoneForwarder(t *testing.T) {
 			deployerKey.PublicKey(),
 			forwarderStateAddress,
 			proposedOwner.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		acceptBackIx, err := keystone_forwarder.NewAcceptOwnershipInstruction(
 			forwarderStateAddress,
 			deployerKey.PublicKey(),
-		).ValidateAndBuild()
+		)
 		require.NoError(t, err)
 		_, err = common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{transferBackIx, acceptBackIx}, proposedOwner, rpc.CommitmentConfirmed, common.AddSigners(deployerKey))
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, forwarderStateAddress, rpc.CommitmentConfirmed, &forwarderStateData)
-		require.NoError(t, err)
-		require.Equal(t, forwarderStateData.Owner, deployerKey.PublicKey())
-		require.Equal(t, forwarderStateData.ProposedOwner, solana.PublicKey{})
+		forwarderStateData = fetchForwarderState(t, solanaClient, forwarderStateAddress)
+		require.Equal(t, deployerKey.PublicKey(), forwarderStateData.Owner)
+		require.Equal(t, solana.PublicKey{}, forwarderStateData.ProposedOwner)
 	})
 
 	t.Run("Initialize Oracles Config", func(t *testing.T) {
@@ -231,14 +226,13 @@ func TestKeystoneForwarder(t *testing.T) {
 		oraclesConfigAddress := getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion)
 		initOraclesConfigIx, err := keystone_forwarder.NewInitOraclesConfigInstruction(
 			donId, configVersion, f, initialEthAddresses, forwarderStateAddress, oraclesConfigAddress,
-			deployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+			deployerKey.PublicKey(), solana.SystemProgramID)
 		require.NoError(t, err)
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{initOraclesConfigIx}, deployerKey, rpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, oraclesConfigAddress, rpc.CommitmentConfirmed, &oraclesConfigData)
-		require.NoError(t, err)
+		oraclesConfigData = fetchOraclesConfig(t, solanaClient, oraclesConfigAddress)
 		require.Equal(t, oraclesConfigData.ConfigId, getConfigId(donId, configVersion))
 		require.Equal(t, oraclesConfigData.F, f)
 
@@ -262,14 +256,13 @@ func TestKeystoneForwarder(t *testing.T) {
 		}
 		updateOraclesConfigIx, err := keystone_forwarder.NewUpdateOraclesConfigInstruction(
 			donId, configVersion, F, allEthAddresses, forwarderStateAddress, oraclesConfigAddress,
-			deployerKey.PublicKey()).ValidateAndBuild()
+			deployerKey.PublicKey())
 		require.NoError(t, err)
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{updateOraclesConfigIx}, deployerKey, rpc.CommitmentConfirmed)
 		require.NoError(t, err)
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, oraclesConfigAddress, rpc.CommitmentConfirmed, &oraclesConfigData)
-		require.NoError(t, err)
+		oraclesConfigData = fetchOraclesConfig(t, solanaClient, oraclesConfigAddress)
 		require.Equal(t, oraclesConfigData.F, F)
 		err = common.ParseEvent(res.Meta.LogMessages, "ConfigSet", &configSetEvent)
 		require.NoError(t, err)
@@ -309,7 +302,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		payload := []byte{255}
 		dataBytes, rawReportBytes := getDataBytes(t, accountHash, payload, reportId, signers)
 
-		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
 			forwarderStateAddress,
 			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
@@ -319,14 +312,14 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
-		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
 		require.NoError(t, err)
+		fwdOnReportIx := fwdOnReportIxGeneric.(*solana.GenericInstruction)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
 
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			deployerKey,
 			rpc.CommitmentConfirmed,
 			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
@@ -340,9 +333,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, [32]byte(transmissionId), reportProcessedEvent.TransmissionId)
 		require.Equal(t, true, reportProcessedEvent.Result)
 
-		var executionState keystone_forwarder.ExecutionState
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
-		require.NoError(t, err)
+		executionState := fetchExecutionState(t, solanaClient, executionStateStorage)
 		require.Equal(t, true, executionState.Success)
 		require.Equal(t, [32]byte(transmissionId), executionState.TransmissionId)
 		require.Equal(t, deployerKey.PublicKey(), executionState.Transmitter)
@@ -359,7 +350,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		res, err = common.SendAndFailWith(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			deployerKey,
 			rpc.CommitmentConfirmed,
 			[]string{"Execution already succeded"},
@@ -397,7 +388,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		payload := []byte{0xBB}
 		dataBytes, _ := getDataBytes(t, accountHash, payload, wrongAccountsReportId, signers)
 
-		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
 			forwarderStateAddress,
 			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
@@ -407,21 +398,21 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
+		require.NoError(t, err)
+		fwdOnReportIx := fwdOnReportIxGeneric.(*solana.GenericInstruction)
 
 		// Only append the ACTUAL remaining accounts (not the extra one)
 		actualRemainingAccounts := []solana.PublicKey{
 			wrongAccountsReportState.PublicKey(),
 		}
 		appendRemainingAccounts(fwdOnReportIx, actualRemainingAccounts)
-		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
-		require.NoError(t, err)
 
 		// Should fail with InvalidAccountHash error because account hash includes
 		// extraAccount but the actual transaction doesn't
 		_, err = common.SendAndFailWith(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			deployerKey,
 			rpc.CommitmentConfirmed,
 			[]string{"Invalid Account Hash"},
@@ -480,7 +471,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		payload := []byte{255}
 		dataBytes, rawReportBytes := getDataBytes(t, accountHash, payload, lookupReportId, signers)
 
-		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
 			forwarderStateAddress,
 			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
@@ -490,9 +481,9 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
-		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
 		require.NoError(t, err)
+		fwdOnReportIx := fwdOnReportIxGeneric.(*solana.GenericInstruction)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
 
 		// Create lookup tables map
 		lookupTablesMap := make(map[solana.PublicKey]solana.PublicKeySlice)
@@ -502,7 +493,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		res, err := common.SendAndConfirmWithLookupTables(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			deployerKey,
 			rpc.CommitmentConfirmed,
 			lookupTablesMap, // Include our lookup table map
@@ -517,9 +508,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.Equal(t, [32]byte(transmissionId), reportProcessedEvent.TransmissionId)
 		require.Equal(t, true, reportProcessedEvent.Result)
 
-		var executionState keystone_forwarder.ExecutionState
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
-		require.NoError(t, err)
+		executionState := fetchExecutionState(t, solanaClient, executionStateStorage)
 		require.Equal(t, true, executionState.Success)
 
 		// Verify the payload was received correctly
@@ -557,7 +546,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		diffTransmitter := defaultTransmitters[1]
 		soltesting.FundTestAccounts(t, []solana.PublicKey{diffTransmitter.privKey.PublicKey()}, solanaChain.URL)
 
-		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
 			forwarderStateAddress,
 			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
@@ -567,23 +556,21 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
-		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
 		require.NoError(t, err)
+		fwdOnReportIx := fwdOnReportIxGeneric.(*solana.GenericInstruction)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
 
 		_, err = common.SendAndConfirm(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			diffTransmitter.privKey,
 			rpc.CommitmentConfirmed,
 			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
 		)
 		require.NoError(t, err)
 
-		var executionState keystone_forwarder.ExecutionState
-		err = common.GetAccountDataBorshInto(t.Context(), solanaClient, executionStateStorage, rpc.CommitmentConfirmed, &executionState)
-		require.NoError(t, err)
+		executionState := fetchExecutionState(t, solanaClient, executionStateStorage)
 		require.Equal(t, true, executionState.Success)
 		require.Equal(t, [32]byte(transmissionId), executionState.TransmissionId)
 		require.Equal(t, diffTransmitter.privKey.PublicKey(), executionState.Transmitter)
@@ -617,7 +604,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		require.NoError(t, err)
 		soltesting.FundTestAccounts(t, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
 
-		fwdOnReportIx := keystone_forwarder.NewReportInstruction(
+		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
 			forwarderStateAddress,
 			getOraclesConfigAddress(t, forwarderStateAddress, donId, configVersion),
@@ -627,14 +614,14 @@ func TestKeystoneForwarder(t *testing.T) {
 			receiver_program_id,
 			solana.SystemProgramID,
 		)
-		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
-		fwdOnReportIxWithRemainingAccounts, err := fwdOnReportIx.ValidateAndBuild()
 		require.NoError(t, err)
+		fwdOnReportIx := fwdOnReportIxGeneric.(*solana.GenericInstruction)
+		appendRemainingAccounts(fwdOnReportIx, remainingAccounts)
 
 		_, err = common.SendAndConfirm(
 			t.Context(),
 			solanaClient,
-			[]solana.Instruction{fwdOnReportIxWithRemainingAccounts},
+			[]solana.Instruction{fwdOnReportIx},
 			randomTransmitter,
 			rpc.CommitmentConfirmed,
 			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)),
@@ -781,14 +768,44 @@ func initializeReceiverProgram(t *testing.T, reportState solana.PrivateKey, depl
 
 // appendRemainingAccounts appends remaining accounts to an instruction
 // reportState should always be first in the remainingAccounts slice
-func appendRemainingAccounts(ix *keystone_forwarder.Report, remainingAccounts []solana.PublicKey) {
+func appendRemainingAccounts(ix *solana.GenericInstruction, remainingAccounts []solana.PublicKey) {
 	for _, account := range remainingAccounts {
-		ix.Append(&solana.AccountMeta{
+		ix.AccountValues.Append(&solana.AccountMeta{
 			PublicKey:  account,
 			IsWritable: true,
 			IsSigner:   false,
 		})
 	}
+}
+
+func fetchForwarderState(t *testing.T, client *rpc.Client, addr solana.PublicKey) keystone_forwarder.ForwarderState {
+	t.Helper()
+	resp, err := client.GetAccountInfoWithOpts(t.Context(), addr, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Value, "ForwarderState account not found: %s", addr)
+	parsed, err := keystone_forwarder.ParseAccount_ForwarderState(resp.Value.Data.GetBinary())
+	require.NoError(t, err)
+	return *parsed
+}
+
+func fetchExecutionState(t *testing.T, client *rpc.Client, addr solana.PublicKey) keystone_forwarder.ExecutionState {
+	t.Helper()
+	resp, err := client.GetAccountInfoWithOpts(t.Context(), addr, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Value, "ExecutionState account not found: %s", addr)
+	parsed, err := keystone_forwarder.ParseAccount_ExecutionState(resp.Value.Data.GetBinary())
+	require.NoError(t, err)
+	return *parsed
+}
+
+func fetchOraclesConfig(t *testing.T, client *rpc.Client, addr solana.PublicKey) keystone_forwarder.OraclesConfig {
+	t.Helper()
+	resp, err := client.GetAccountInfoWithOpts(t.Context(), addr, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Value, "OraclesConfig account not found: %s", addr)
+	parsed, err := keystone_forwarder.ParseAccount_OraclesConfig(resp.Value.Data.GetBinary())
+	require.NoError(t, err)
+	return *parsed
 }
 
 // encode forwarder report

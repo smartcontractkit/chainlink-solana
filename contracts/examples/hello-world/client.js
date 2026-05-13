@@ -1,7 +1,7 @@
 const anchor = require("@coral-xyz/anchor");
 
 // devnet IDs
-const CHAINLINK_PROGRAM_ID = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
+const CHAINLINK_PROGRAM_ID = "9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC";
 // USDT/USD
 const CHAINLINK_FEED = "CwBg8pxL73LvuJ781cWBGF1e64G2z7AbZ22J2g8Lp35a";
 

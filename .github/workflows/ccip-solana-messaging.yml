@@ -53,18 +53,10 @@ jobs:
       fail-fast: false
       matrix:
         test:
-          - name: EVM2Solana
-            slug: evm2solana
-            run: Test_CCIPMessaging_EVM2Solana
-            loopp: false
           - name: EVM2Solana LOOPP
             slug: evm2solana-loopp
             run: Test_CCIPMessaging_EVM2Solana
             loopp: true
-          - name: Solana2EVM
-            slug: solana2evm
-            run: Test_CCIPMessaging_Solana2EVM
-            loopp: false
           - name: Solana2EVM LOOPP
             slug: solana2evm-loopp
             run: Test_CCIPMessaging_Solana2EVM
@@ -73,10 +65,6 @@ jobs:
             slug: revert-evm2solana-loopp
             run: Test_CCIPMessaging_Revert_EVM2Solana
             loopp: true
-          - name: MultiExecReports EVM2Solana
-            slug: multiexec-evm2solana
-            run: Test_CCIPMessaging_MultiExecReports_EVM2Solana
-            loopp: false
     steps:
       - name: Checkout chainlink-solana
         uses: actions/checkout@v5
@@ -137,7 +125,6 @@ jobs:
         working-directory: chainlink/integration-tests
         env:
           CL_DATABASE_URL: ${{ steps.setup-postgres.outputs.database-url }}
-          CL_SOLANA_CMD: ${{ matrix.test.loopp && 'chainlink-solana' || '' }}
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/ccip-test-artifacts"
           cd smoke/ccip

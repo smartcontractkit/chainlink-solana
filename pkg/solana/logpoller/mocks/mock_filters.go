@@ -204,24 +204,34 @@ func (_c *MockFilters_GetFilters_Call) RunAndReturn(run func(context.Context) (m
 	return _c
 }
 
-// GetFiltersToBackfill provides a mock function with no fields
-func (_m *MockFilters) GetFiltersToBackfill() []types.Filter {
-	ret := _m.Called()
+// GetFiltersToBackfill provides a mock function with given fields: to
+func (_m *MockFilters) GetFiltersToBackfill(to int64) ([]types.Filter, int64) {
+	ret := _m.Called(to)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFiltersToBackfill")
 	}
 
 	var r0 []types.Filter
-	if rf, ok := ret.Get(0).(func() []types.Filter); ok {
-		r0 = rf()
+	var r1 int64
+	if rf, ok := ret.Get(0).(func(int64) ([]types.Filter, int64)); ok {
+		return rf(to)
+	}
+	if rf, ok := ret.Get(0).(func(int64) []types.Filter); ok {
+		r0 = rf(to)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Filter)
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(int64) int64); ok {
+		r1 = rf(to)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+
+	return r0, r1
 }
 
 // MockFilters_GetFiltersToBackfill_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFiltersToBackfill'
@@ -230,23 +240,24 @@ type MockFilters_GetFiltersToBackfill_Call struct {
 }
 
 // GetFiltersToBackfill is a helper method to define mock.On call
-func (_e *MockFilters_Expecter) GetFiltersToBackfill() *MockFilters_GetFiltersToBackfill_Call {
-	return &MockFilters_GetFiltersToBackfill_Call{Call: _e.mock.On("GetFiltersToBackfill")}
+//   - to int64
+func (_e *MockFilters_Expecter) GetFiltersToBackfill(to interface{}) *MockFilters_GetFiltersToBackfill_Call {
+	return &MockFilters_GetFiltersToBackfill_Call{Call: _e.mock.On("GetFiltersToBackfill", to)}
 }
 
-func (_c *MockFilters_GetFiltersToBackfill_Call) Run(run func()) *MockFilters_GetFiltersToBackfill_Call {
+func (_c *MockFilters_GetFiltersToBackfill_Call) Run(run func(to int64)) *MockFilters_GetFiltersToBackfill_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(int64))
 	})
 	return _c
 }
 
-func (_c *MockFilters_GetFiltersToBackfill_Call) Return(_a0 []types.Filter) *MockFilters_GetFiltersToBackfill_Call {
-	_c.Call.Return(_a0)
+func (_c *MockFilters_GetFiltersToBackfill_Call) Return(_a0 []types.Filter, _a1 int64) *MockFilters_GetFiltersToBackfill_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockFilters_GetFiltersToBackfill_Call) RunAndReturn(run func() []types.Filter) *MockFilters_GetFiltersToBackfill_Call {
+func (_c *MockFilters_GetFiltersToBackfill_Call) RunAndReturn(run func(int64) ([]types.Filter, int64)) *MockFilters_GetFiltersToBackfill_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -386,53 +397,6 @@ func (_c *MockFilters_LoadFilters_Call) Return(_a0 error) *MockFilters_LoadFilte
 }
 
 func (_c *MockFilters_LoadFilters_Call) RunAndReturn(run func(context.Context) error) *MockFilters_LoadFilters_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// MarkFilterBackfilled provides a mock function with given fields: ctx, filterID
-func (_m *MockFilters) MarkFilterBackfilled(ctx context.Context, filterID int64) error {
-	ret := _m.Called(ctx, filterID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for MarkFilterBackfilled")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = rf(ctx, filterID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockFilters_MarkFilterBackfilled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkFilterBackfilled'
-type MockFilters_MarkFilterBackfilled_Call struct {
-	*mock.Call
-}
-
-// MarkFilterBackfilled is a helper method to define mock.On call
-//   - ctx context.Context
-//   - filterID int64
-func (_e *MockFilters_Expecter) MarkFilterBackfilled(ctx interface{}, filterID interface{}) *MockFilters_MarkFilterBackfilled_Call {
-	return &MockFilters_MarkFilterBackfilled_Call{Call: _e.mock.On("MarkFilterBackfilled", ctx, filterID)}
-}
-
-func (_c *MockFilters_MarkFilterBackfilled_Call) Run(run func(ctx context.Context, filterID int64)) *MockFilters_MarkFilterBackfilled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
-	})
-	return _c
-}
-
-func (_c *MockFilters_MarkFilterBackfilled_Call) Return(_a0 error) *MockFilters_MarkFilterBackfilled_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockFilters_MarkFilterBackfilled_Call) RunAndReturn(run func(context.Context, int64) error) *MockFilters_MarkFilterBackfilled_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -667,6 +631,55 @@ func (_c *MockFilters_UnregisterFilter_Call) Return(_a0 error) *MockFilters_Unre
 }
 
 func (_c *MockFilters_UnregisterFilter_Call) RunAndReturn(run func(context.Context, string) error) *MockFilters_UnregisterFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateBackfillProgress provides a mock function with given fields: ctx, filter, backfilledTo, isComplete
+func (_m *MockFilters) UpdateBackfillProgress(ctx context.Context, filter types.Filter, backfilledTo int64, isComplete bool) error {
+	ret := _m.Called(ctx, filter, backfilledTo, isComplete)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateBackfillProgress")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.Filter, int64, bool) error); ok {
+		r0 = rf(ctx, filter, backfilledTo, isComplete)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockFilters_UpdateBackfillProgress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateBackfillProgress'
+type MockFilters_UpdateBackfillProgress_Call struct {
+	*mock.Call
+}
+
+// UpdateBackfillProgress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filter types.Filter
+//   - backfilledTo int64
+//   - isComplete bool
+func (_e *MockFilters_Expecter) UpdateBackfillProgress(ctx interface{}, filter interface{}, backfilledTo interface{}, isComplete interface{}) *MockFilters_UpdateBackfillProgress_Call {
+	return &MockFilters_UpdateBackfillProgress_Call{Call: _e.mock.On("UpdateBackfillProgress", ctx, filter, backfilledTo, isComplete)}
+}
+
+func (_c *MockFilters_UpdateBackfillProgress_Call) Run(run func(ctx context.Context, filter types.Filter, backfilledTo int64, isComplete bool)) *MockFilters_UpdateBackfillProgress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.Filter), args[2].(int64), args[3].(bool))
+	})
+	return _c
+}
+
+func (_c *MockFilters_UpdateBackfillProgress_Call) Return(_a0 error) *MockFilters_UpdateBackfillProgress_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFilters_UpdateBackfillProgress_Call) RunAndReturn(run func(context.Context, types.Filter, int64, bool) error) *MockFilters_UpdateBackfillProgress_Call {
 	_c.Call.Return(run)
 	return _c
 }

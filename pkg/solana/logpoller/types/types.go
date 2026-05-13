@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql/driver"
 	"encoding/binary"
 	"encoding/json"
@@ -17,6 +18,10 @@ import (
 	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	codecv1 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v1"
 )
+
+// AnchorCPIMethodName is the method name used by Anchor's emit_cpi! macro.
+// The discriminator is the first 8 bytes of SHA256("anchor:event").
+const AnchorCPIMethodName = "anchor:event"
 
 type PublicKey solana.PublicKey
 
@@ -127,6 +132,18 @@ func NewEventSignatureFromName(eventName string) EventSignature {
 
 func NewMethodSignatureFromName(methodName string) EventSignature {
 	return EventSignature(solcommoncodec.NewMethodDiscriminatorHashPrefix(methodName))
+}
+
+// AnchorCPIEventDiscriminator returns the 8-byte instruction discriminator used by
+// Anchor's emit_cpi! macro. Anchor computes SHA256("anchor:event"), interprets the
+// first 8 bytes as a big-endian u64, and writes it on-chain as little-endian.
+// This matches Anchor's EVENT_IX_TAG_LE constant.
+func AnchorCPIEventDiscriminator() EventSignature {
+	sum := sha256.Sum256([]byte(AnchorCPIMethodName))
+	var sig EventSignature
+	copy(sig[:], sum[:EventSignatureLength])
+	slices.Reverse(sig[:])
+	return sig
 }
 
 // Scan implements Scanner for database/sql.
