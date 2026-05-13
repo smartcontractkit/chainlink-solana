@@ -609,7 +609,6 @@ type ReportProcessed struct {
 	State          solanago.PublicKey `json:"state"`
 	Receiver       solanago.PublicKey `json:"receiver"`
 	TransmissionId [32]uint8          `json:"transmission_id"`
-	Result         bool               `json:"result"`
 }
 
 func (obj ReportProcessed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -627,11 +626,6 @@ func (obj ReportProcessed) MarshalWithEncoder(encoder *binary.Encoder) (err erro
 	err = encoder.Encode(obj.TransmissionId)
 	if err != nil {
 		return errors.NewField("TransmissionId", err)
-	}
-	// Serialize `Result`:
-	err = encoder.Encode(obj.Result)
-	if err != nil {
-		return errors.NewField("Result", err)
 	}
 	return nil
 }
@@ -661,11 +655,6 @@ func (obj *ReportProcessed) UnmarshalWithDecoder(decoder *binary.Decoder) (err e
 	err = decoder.Decode(&obj.TransmissionId)
 	if err != nil {
 		return errors.NewField("TransmissionId", err)
-	}
-	// Deserialize `Result`:
-	err = decoder.Decode(&obj.Result)
-	if err != nil {
-		return errors.NewField("Result", err)
 	}
 	return nil
 }
