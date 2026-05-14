@@ -419,7 +419,7 @@ func TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests(t *testin
 	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](slotsBatchSize)
 
 	lp := newMockedLPwithConfig(t, cfg, chainID)
-	loader := NewEncodedLogCollector(lp.Client, logger.Test(t), t.Name(), nil, nil)
+	loader := NewEncodedLogCollector(lp.Client, logger.Test(t), t.Name(), nil, nil, slotsBatchSize)
 	require.NoError(t, loader.Start(t.Context()))
 	t.Cleanup(func() { require.NoError(t, loader.Close()) })
 	lp.LogPoller.loader = loader
