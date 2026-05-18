@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	commonhttp "github.com/smartcontractkit/chainlink-common/pkg/http"
@@ -34,7 +35,7 @@ func TestClient_ResponseSizeLimit_FromContext(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(body))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	t.Cleanup(srv.Close)
 
@@ -58,7 +59,8 @@ func TestClient_ResponseSizeLimit_FromContext(t *testing.T) {
 		c, err := NewClient(srv.URL, cfg, requestTimeout, logger.Test(t))
 		require.NoError(t, err)
 
-		ctx := commonhttp.WithResponseSizeLimit(t.Context(), uint32(len(body))+1024)
+		// Fixed headroom above body size; avoid uint32(len(body)) (G115 on int→uint32).
+		ctx := commonhttp.WithResponseSizeLimit(t.Context(), 2*1024*1024)
 		_, err = c.ChainID(ctx)
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), "response is too large",
