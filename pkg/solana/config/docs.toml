@@ -119,6 +119,9 @@ Local = false # Default
 PollPeriod = '3s' # Default
 # TxAcceptanceState is the default acceptance state for writer DON tranmissions.
 TxAcceptanceState = 3 # Default
+# RequestSizeLimit caps the size in bytes of HTTP responses from Solana RPC for requests originated
+# by workflow capabilities (external requests). Set to 0 to disable the cap.
+RequestSizeLimit = 0 # Default
 
 [[Nodes]]
 # Name is a unique (per-chain) identifier for this node.

@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 	"golang.org/x/sync/singleflight"
 
+	commonhttp "github.com/smartcontractkit/chainlink-common/pkg/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
@@ -115,8 +118,21 @@ func NewTestClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.
 		log:             log,
 		requestGroup:    &singleflight.Group{},
 	}
-	rpcClient.rpc = rpc.New(endpoint)
+	rpcClient.rpc = newRPCClientWithLimitedTransport(endpoint)
 	return &rpcClient, rpcClient.rpc, nil
+}
+
+// newRPCClientWithLimitedTransport constructs a solana-go *rpc.Client whose HTTP transport is
+// wrapped with commonhttp.LimitedTransport. The size cap is opt-in per request via
+// commonhttp.WithResponseSizeLimit on the request context; when no limit is set the wrapper is a
+// no-op. The underlying transport is http.DefaultTransport, so time bounds come from each method's
+// context.WithTimeout(ctx, c.contextDuration) wrapper.
+func newRPCClientWithLimitedTransport(endpoint string) *rpc.Client {
+	httpClient := &http.Client{
+		Transport: &commonhttp.LimitedTransport{RoundTripper: http.DefaultTransport},
+	}
+	jrpc := jsonrpc.NewClientWithOpts(endpoint, &jsonrpc.RPCClientOpts{HTTPClient: httpClient})
+	return rpc.NewWithCustomRPCClient(jrpc)
 }
 
 func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {

@@ -323,6 +323,12 @@ func (wc *workflowConfig) TxAcceptanceState() *types.TransactionStatus {
 func (wc *workflowConfig) Local() bool {
 	return *wc.conf.Local
 }
+func (wc *workflowConfig) RequestSizeLimit() uint32 {
+	if wc.conf.RequestSizeLimit == nil {
+		return 0
+	}
+	return *wc.conf.RequestSizeLimit
+}
 
 func (c *TOMLConfig) BlockTime() time.Duration {
 	return c.Chain.BlockTime.Duration()

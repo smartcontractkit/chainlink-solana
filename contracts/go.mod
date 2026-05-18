@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/contracts
 
-go 1.25.7
+go 1.26.2
 
 require (
 	github.com/Unheilbar/anchor-go v1.0.3
@@ -110,7 +110,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.98 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260310183131-8d0f0e383288 // indirect
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260421191147-d10b9943ac71 // indirect
+	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518103118-9aa0c6a3be1a // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.6 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20260218133534-cbd44da2856b // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect

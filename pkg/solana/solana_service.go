@@ -12,6 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
@@ -50,9 +51,7 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
-	result, err := reader.GetBlockWithOpts(ctx, req.Slot, &rpc.GetBlockOpts{
-		Commitment: rpc.CommitmentType(req.Opts.Commitment),
-	})
+	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(req.Opts.Commitment)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
@@ -77,11 +76,14 @@ func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlo
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
+
 	reader, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 	opts := convertAccountInfoOpts(req.Opts)
+
 	account, err := reader.GetAccountInfoWithOpts(ctx, solana.PublicKey(req.Account), opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
@@ -107,6 +109,7 @@ func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanc
 }
 
 func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateTXRequest) (*commonsol.SimulateTXReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	tx, err := solana.TransactionFromBase64(req.EncodedTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode transaction: %w", err)
@@ -548,6 +551,14 @@ func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.Get
 	return &commonsol.GetFeeForMessageReply{
 		Fee: fee,
 	}, nil
+}
+
+func (ss *solanaService) wrapCtx(ctx context.Context, isExternal bool) context.Context {
+	if isExternal {
+		ctx = http.WithResponseSizeLimit(ctx, ss.chain.Config().WF().RequestSizeLimit())
+	}
+
+	return ctx
 }
 
 // converters
