@@ -5,7 +5,6 @@ pub struct ReportProcessed {
     pub state: Pubkey,
     pub receiver: Pubkey,
     pub transmission_id: [u8; 32],
-    pub result: bool,
 }
 
 #[event]

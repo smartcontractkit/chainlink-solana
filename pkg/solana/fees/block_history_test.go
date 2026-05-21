@@ -3,6 +3,7 @@ package fees
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -51,10 +52,12 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 	lastBlock := testBlocks[len(testBlocks)-1]
 	lastBlockFeeData, _ := ParseBlock(lastBlock)
 	lastBlockMedianPrice, _ := mathutil.Median(lastBlockFeeData.Prices...)
+	lastSlot := lastBlock.ParentSlot + 1
 
 	rw := clientmock.NewReaderWriter(t)
 	rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
-	rw.On("GetLatestBlock", mock.Anything).Return(lastBlock, nil)
+	rw.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).Return(lastSlot, nil)
+	rw.On("GetBlockWithOpts", mock.Anything, lastSlot, mock.Anything).Return(lastBlock, nil)
 
 	t.Run("Successful Estimation", func(t *testing.T) {
 		// Setup
@@ -105,13 +108,14 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
-		rw.On("GetLatestBlock", mock.Anything).Return(nil, fmt.Errorf("fail rpc call")) // Mock GetLatestBlock returning error
+		rw.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).Return(lastSlot, nil)
+		rw.On("GetBlockWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fail rpc call"))
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Ensure the price remains unchanged
-		require.Error(t, estimator.calculatePrice(ctx), "Expected error when GetLatestBlock fails")
+		require.Error(t, estimator.calculatePrice(ctx), "Expected error when GetBlockWithOpts fails")
 		cfg.On("ComputeUnitPriceMax").Return(maxPrice)
-		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when GetLatestBlock fails")
+		assert.Equal(t, uint64(100), estimator.BaseComputeUnitPrice(), "Price should not change when GetBlockWithOpts fails")
 	})
 
 	t.Run("Failed to Parse Block", func(t *testing.T) {
@@ -120,7 +124,8 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
-		rw.On("GetLatestBlock", mock.Anything).Return(nil, nil) // Mock GetLatestBlock returning nil
+		rw.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).Return(lastSlot, nil)
+		rw.On("GetBlockWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Ensure the price remains unchanged
@@ -135,7 +140,8 @@ func TestBlockHistoryEstimator_LatestBlock(t *testing.T) {
 		rwLoader := func(ctx context.Context) (client.ReaderWriter, error) { return rw, nil }
 		cfg := cfgmock.NewConfig(t)
 		setupConfigMock(cfg, defaultPrice, minPrice, pollPeriod, depth)
-		rw.On("GetLatestBlock", mock.Anything).Return(&rpc.GetBlockResult{}, nil) // Mock GetLatestBlock returning empty block
+		rw.On("SlotHeightWithCommitment", mock.Anything, mock.Anything).Return(lastSlot, nil)
+		rw.On("GetBlockWithOpts", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.GetBlockResult{}, nil)
 		estimator := initializeEstimator(ctx, t, rwLoader, cfg, logger.Test(t), chainID)
 
 		// Ensure the price remains unchanged
@@ -203,7 +209,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 	rw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 		Return(&testSlotsResult, nil)
 	for i, slot := range testSlots {
-		rw.On("GetBlock", mock.Anything, slot).
+		rw.On("GetBlockWithOpts", mock.Anything, slot, mock.Anything).
 			Return(testBlocks[i], nil)
 	}
 
@@ -234,7 +240,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 			if i == 0 {
 				continue
 			}
-			partialCacheRW.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+			partialCacheRW.On("GetBlockWithOpts", mock.Anything, slot, mock.Anything).Return(testBlocks[i], nil).Once()
 		}
 
 		// Setup
@@ -404,7 +410,7 @@ func TestBlockHistoryEstimator_MultipleBlocks(t *testing.T) {
 		cleanCacheRw.On("GetBlocksWithLimit", mock.Anything, mock.Anything, mock.Anything).
 			Return(&testSlotsResult, nil).Once()
 		for i, slot := range testSlots {
-			cleanCacheRw.On("GetBlock", mock.Anything, slot).Return(testBlocks[i], nil).Once()
+			cleanCacheRw.On("GetBlockWithOpts", mock.Anything, slot, mock.Anything).Return(testBlocks[i], nil).Once()
 		}
 
 		// Setup
@@ -453,6 +459,7 @@ func setupConfigMock(cfg *cfgmock.Config, defaultPrice uint64, minPrice uint64, 
 	cfg.On("BlockHistoryPollPeriod").Return(pollPeriod).Once()
 	cfg.On("BlockHistorySize").Return(depth)
 	cfg.On("BlockHistoryBatchLoadSize").Return(uint64(20)).Maybe()
+	cfg.On("Commitment").Return(rpc.CommitmentConfirmed).Maybe()
 }
 
 // initializeEstimator initializes, starts, and ensures cleanup of the BlockHistoryEstimator.

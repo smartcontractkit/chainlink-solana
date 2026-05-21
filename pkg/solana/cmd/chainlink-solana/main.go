@@ -90,7 +90,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, rawConfig string, keysto
 		return nil, fmt.Errorf("failed to create chain: %w", err)
 	}
 
-	ra := solana.NewRelayer(c.Logger, chain, capRegistry, keystore)
+	ra := solana.NewRelayer(c.Logger, chain, keystore)
 
 	c.SubService(ra)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -22,6 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
+var ErrLogPollerNotStarted = errors.New("log poller is not started; register/unregister/query operations require a running log poller")
+
 type AddressLister interface {
 	Accounts(ctx context.Context) (accounts []string, err error)
 }
@@ -31,6 +34,14 @@ type solanaService struct {
 	addressLister AddressLister
 	chain         Chain
 	logger        logger.Logger
+}
+
+func (ss *solanaService) requireLogPoller() (LogPoller, error) {
+	lp := ss.chain.LogPoller()
+	if err := lp.Ready(); err != nil {
+		return nil, ErrLogPollerNotStarted
+	}
+	return lp, nil
 }
 
 func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockRequest) (*commonsol.GetBlockReply, error) {
@@ -50,7 +61,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 }
 
 func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlock, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	n, err := lp.GetLatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest lp block: %w", err)
@@ -131,7 +146,11 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 }
 
 func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.LPFilterQuery) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if lp.HasFilter(ctx, req.Name) {
 		return nil
 	}
@@ -150,7 +169,11 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 }
 
 func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName string) error {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return err
+	}
+
 	if !lp.HasFilter(ctx, filterName) {
 		return nil
 	}
@@ -160,7 +183,11 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
 	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
-	lp := ss.chain.LogPoller()
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
 	queryName, err := deriveNameFromFilterQuery(filterQuery)
 	if err != nil {
 		return nil, err
@@ -192,7 +219,12 @@ func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []que
 }
 
 func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) {
-	filters, err := ss.chain.LogPoller().GetFilters(ctx)
+	lp, err := ss.requireLogPoller()
+	if err != nil {
+		return nil, err
+	}
+
+	filters, err := lp.GetFilters(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -280,6 +312,8 @@ func (ss *solanaService) GetSlotHeight(ctx context.Context, req commonsol.GetSlo
 	return &commonsol.GetSlotHeightReply{Height: slot}, nil
 }
 
+const minimumConfirmationTime = 2 * time.Second
+
 func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.SubmitTransactionRequest) (*commonsol.SubmitTransactionReply, error) {
 	txID, err := uuid.NewUUID() // NOTE: TXM expects us to generate an ID, rather than return one
 	if err != nil {
@@ -319,12 +353,19 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
+	if blockhash.Value == nil {
+		return nil, errors.New("received nil blockhash from rpc")
+	}
+
 	transactionID := txID.String()
 	var cfg []utils.SetTxConfig
 	if req.Cfg != nil {
 		cfg = append(cfg, utils.SetEstimateComputeUnitLimit(false))
-		if req.Cfg.ComputeLimit != nil {
+		if req.Cfg.ComputeLimit != nil && *req.Cfg.ComputeLimit != 0 {
 			cfg = append(cfg, utils.SetComputeUnitLimit(*req.Cfg.ComputeLimit))
+		}
+		if req.Cfg.ComputeMaxPrice != nil && *req.Cfg.ComputeMaxPrice != 0 {
+			cfg = append(cfg, utils.SetComputeUnitPriceMax(*req.Cfg.ComputeMaxPrice))
 		}
 	}
 
@@ -334,7 +375,8 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
 
-	maximumWaitTimeForConfirmation := ss.chain.Config().WF().AcceptanceTimeout()
+	maximumWaitTimeForConfirmation := max(ss.chain.Config().WF().AcceptanceTimeout(), minimumConfirmationTime)
+
 	retryContext, cancel := context.WithTimeout(ctx, maximumWaitTimeForConfirmation)
 	defer cancel()
 
@@ -357,11 +399,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed getting transaction status. %w", err)
-	}
-
-	if txStatus == commonsol.TxFatal {
-		return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
+		return nil, fmt.Errorf("failed getting transaction status for tx %s: %w", transactionID, err)
 	}
 
 	return &commonsol.SubmitTransactionReply{Status: txStatus, IdempotencyKey: transactionID}, nil
@@ -783,13 +821,19 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 	if acc == nil {
 		return nil, nil
 	}
-
-	var a *commonsol.Account
-	data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
-	if err != nil {
-		return nil, err
+	if acc.Value == nil {
+		return &commonsol.GetAccountInfoReply{
+			RPCContext: commonsol.RPCContext{
+				Slot: acc.Context.Slot,
+			},
+		}, nil
 	}
+	var a *commonsol.Account
 	if acc.Value != nil {
+		data, err := convertDataBytesOrJSON(acc.Value.Data, enc)
+		if err != nil {
+			return nil, err
+		}
 		a = &commonsol.Account{
 			Lamports:   acc.Value.Lamports,
 			Executable: acc.Value.Executable,
@@ -822,6 +866,15 @@ func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountI
 	}
 }
 
+const maxDiagPayloadLen = 1024
+
+func truncateDiag(s string) string {
+	if len(s) <= maxDiagPayloadLen {
+		return s
+	}
+	return s[:maxDiagPayloadLen] + "...(truncated)"
+}
+
 func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingType) (*commonsol.DataBytesOrJSON, error) {
 	if obj == nil {
 		return nil, nil
@@ -850,16 +903,16 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		// Fallback: decode ["<base64>", "base64"] manually
 		var arr []string
 		if err := json.Unmarshal(txJSON, &arr); err != nil {
-			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, string(txJSON))
+			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, truncateDiag(string(txJSON)))
 		}
 		if len(arr) != 2 {
-			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), string(txJSON))
+			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), truncateDiag(string(txJSON)))
 		}
 
 		s := arr[0]
 		enc := arr[1]
 		if enc != "base64" {
-			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, string(txJSON))
+			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", enc, truncateDiag(string(txJSON)))
 		}
 
 		b, err := base64.StdEncoding.DecodeString(s)
@@ -884,7 +937,7 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 	default:
 		// Treat unknown as base64 preference
 		if len(txBytes) == 0 {
-			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", string(txJSON))
+			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", truncateDiag(string(txJSON)))
 		}
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
