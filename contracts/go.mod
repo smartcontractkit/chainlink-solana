@@ -95,7 +95,6 @@ require (
 	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
-	github.com/morikuni/aec v1.1.0 // indirect
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -111,7 +110,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.100 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260415165642-49f23e4d76cc // indirect
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518103118-9aa0c6a3be1a // indirect
+	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260527130547-9af3631555c1 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.6 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20260218133534-cbd44da2856b // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
