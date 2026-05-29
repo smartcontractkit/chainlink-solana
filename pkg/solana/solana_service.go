@@ -462,6 +462,7 @@ func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r 
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
@@ -514,6 +515,7 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 }
 
 func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTransactionRequest) (*commonsol.GetTransactionReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
