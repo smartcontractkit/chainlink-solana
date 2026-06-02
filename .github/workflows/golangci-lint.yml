@@ -23,7 +23,7 @@ jobs:
           echo "version=${version}" | tee -a "$GITHUB_OUTPUT"
       - name: Run golangci-lint (integration-tests)
         if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
-        uses: smartcontractkit/.github/actions/ci-lint-go@cdcf67030997adc322ddb2ad48949f394f5b04a3 #ci-lint-go/3.0.0
+        uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/v4
         env:
           checkout-repo: false
           golangci-lint-version: v${{ steps.get-version.outputs.version }}
@@ -50,7 +50,7 @@ jobs:
 
       - name: Run golangci-lint (relay)
         if: ${{ always() && !contains(join(github.event.pull_request.labels.*.name, ' '), 'allow-lint-issues') }}
-        uses: smartcontractkit/.github/actions/ci-lint-go@cdcf67030997adc322ddb2ad48949f394f5b04a3 #ci-lint-go/3.0.0
+        uses: smartcontractkit/.github/actions/ci-lint-go@ci-lint-go/v4
         with:
           checkout-repo: false
           golangci-lint-version: v${{ steps.get-version.outputs.version }}

@@ -357,6 +357,7 @@ GasLimitDefault = 300_000 # Default
 Local = false # Default
 PollPeriod = '3s' # Default
 TxAcceptanceState = 3 # Default
+RequestSizeLimit = 0 # Default
 ```
 
 
@@ -410,6 +411,13 @@ PollPeriod is the default poll period for checking transmission state
 TxAcceptanceState = 3 # Default
 ```
 TxAcceptanceState is the default acceptance state for writer DON tranmissions.
+
+### RequestSizeLimit
+```toml
+RequestSizeLimit = 0 # Default
+```
+RequestSizeLimit caps the size in bytes of HTTP responses from Solana RPC for requests originated
+by workflow capabilities (external requests). Set to 0 to disable the cap.
 
 ## Nodes
 ```toml

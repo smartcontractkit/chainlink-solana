@@ -66,6 +66,7 @@ var fullConfig = TOMLConfig{
 		Local:             ptr(true),
 		PollPeriod:        config.MustNewDuration(9 * time.Second),
 		TxAcceptanceState: ptr(types.Finalized),
+		RequestSizeLimit:  ptr[uint32](1048576),
 	},
 	MultiNode: mnCfg.MultiNodeConfig{
 		MultiNode: mnCfg.MultiNode{

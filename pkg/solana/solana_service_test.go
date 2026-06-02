@@ -386,6 +386,7 @@ func (w *stubWorkflow) ForwarderState() *solanago.PublicKey               { retu
 func (w *stubWorkflow) GasLimitDefault() *uint64                          { return nil }
 func (w *stubWorkflow) TxAcceptanceState() *commontypes.TransactionStatus { return nil }
 func (w *stubWorkflow) Local() bool                                       { return false }
+func (w *stubWorkflow) RequestSizeLimit() uint32                          { return 0 }
 
 type stubTxManager struct {
 	mock.Mock
