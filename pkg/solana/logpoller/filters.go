@@ -183,18 +183,6 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
-	// ensure that the value of IncludeReverted isn't different from any other filters with the same address and event type
-	if contractFilters, okAddr := fl.filtersByAddress[filter.Address]; okAddr {
-		if similarFilters, okEv := contractFilters[filter.EventSig]; okEv {
-			for id := range similarFilters {
-				if conflicting := fl.filtersByID[id]; conflicting.IncludeReverted != filter.IncludeReverted {
-					return fmt.Errorf("IncludeReverted=%v for filter %v conflicts with IncludeReverted=%v for filter %v",
-						conflicting.IncludeReverted, conflicting, filter.IncludeReverted, filter)
-				}
-			}
-		}
-	}
-
 	decoder, err := newDecoder(filter)
 	if err != nil {
 		return err

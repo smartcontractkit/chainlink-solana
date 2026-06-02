@@ -410,6 +410,77 @@ func TestFilteredLogs(t *testing.T) {
 	}
 }
 
+func TestFilteredLogsScopedByName(t *testing.T) {
+	sqltest.SkipInMemory(t)
+	t.Parallel()
+	lggr := logger.Test(t)
+	dbx := sqltest.NewDB(t, sqltest.TestURL(t))
+	orm := NewORM(chainID, dbx, lggr)
+	ctx := t.Context()
+
+	filterA := newRandomFilter(t)
+	filterA.Name = "filter-a"
+	filterAID, err := orm.InsertFilter(ctx, filterA)
+	require.NoError(t, err)
+
+	filterB := filterA
+	filterB.Name = "filter-b"
+	filterBID, err := orm.InsertFilter(ctx, filterB)
+	require.NoError(t, err)
+
+	blockTimestamp := time.Now().UTC()
+	logs := []types.Log{
+		{
+			ChainID:        chainID,
+			FilterID:       filterAID,
+			BlockNumber:    10,
+			LogIndex:       1,
+			BlockTimestamp: blockTimestamp,
+			Address:        filterA.Address,
+			EventSig:       filterA.EventSig,
+			TxHash:         types.Signature{1},
+			Data:           []byte("a"),
+			SequenceNum:    1,
+		},
+		{
+			ChainID:        chainID,
+			FilterID:       filterBID,
+			BlockNumber:    10,
+			LogIndex:       1,
+			BlockTimestamp: blockTimestamp,
+			Address:        filterB.Address,
+			EventSig:       filterB.EventSig,
+			TxHash:         types.Signature{2},
+			Data:           []byte("b"),
+			SequenceNum:    42,
+		},
+	}
+	require.NoError(t, orm.InsertLogs(ctx, logs))
+
+	unscoped, err := orm.FilteredLogs(ctx, nil, query.LimitAndSort{}, "")
+	require.NoError(t, err)
+	require.Len(t, unscoped, 1, "legacy unscoped queries should dedupe duplicates")
+
+	scopedA, err := orm.FilteredLogs(ctx, nil, query.LimitAndSort{}, filterA.Name)
+	require.NoError(t, err)
+	require.Len(t, scopedA, 1)
+	assert.Equal(t, filterAID, scopedA[0].FilterID)
+	assert.Equal(t, int64(1), scopedA[0].SequenceNum)
+	assert.Equal(t, types.Signature{1}, scopedA[0].TxHash)
+	assert.Equal(t, []byte("a"), scopedA[0].Data)
+
+	scopedB, err := orm.FilteredLogs(ctx, nil, query.LimitAndSort{}, filterB.Name)
+	require.NoError(t, err)
+	require.Len(t, scopedB, 1)
+	assert.Equal(t, filterBID, scopedB[0].FilterID)
+	assert.Equal(t, int64(42), scopedB[0].SequenceNum)
+	assert.Equal(t, types.Signature{2}, scopedB[0].TxHash)
+	assert.Equal(t, []byte("b"), scopedB[0].Data)
+
+	_, err = orm.FilteredLogs(ctx, nil, query.LimitAndSort{}, "missing-filter")
+	require.ErrorContains(t, err, "not found")
+}
+
 func TestPruneLogsForFilter(t *testing.T) {
 	t.Parallel()
 	sqltest.SkipInMemory(t)

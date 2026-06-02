@@ -185,18 +185,13 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 }
 
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
-	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
+	limitAndSort query.LimitAndSort, filterName string) ([]*commonsol.Log, error) {
 	lp, err := ss.requireLogPoller()
 	if err != nil {
 		return nil, err
 	}
 
-	queryName, err := deriveNameFromFilterQuery(filterQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, queryName)
+	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter logs: %w", err)
 	}

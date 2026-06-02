@@ -163,6 +163,9 @@ func (b *eventReadBinding) deriveName() string {
 			data = append(data, key...)
 		}
 	}
+	if b.filter.filter.IncludeReverted {
+		data = append(data, byte(1))
+	}
 	hash := sha3.Sum256(data)
 
 	ret := fmt.Sprintf("%s.%s.%x", b.namespace, b.genericName, hash[:])
@@ -272,7 +275,7 @@ func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal
 		return err
 	}
 
-	logs, err := b.reader.FilteredLogs(ctx, filter, limiter, b.namespace+"-"+pubKey.String()+"-"+b.genericName)
+	logs, err := b.reader.FilteredLogs(ctx, filter, limiter, b.deriveName())
 	if err != nil {
 		return err
 	}
@@ -309,9 +312,7 @@ func (b *eventReadBinding) QueryKey(
 		logpoller.NewEventSigFilter(b.eventSig),
 	}, filter.Expressions...)
 
-	itemType := strings.Join([]string{b.namespace, b.genericName}, "-")
-
-	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, itemType)
+	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, b.deriveName())
 	if err != nil {
 		return nil, err
 	}

@@ -37,12 +37,36 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{}
 		limiter := query.LimitAndSort{}
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, logsQuery(" WHERE chain_id = :chain_id ORDER BY "+defaultSort), result)
 
 		assertArgs(t, args, 1)
+	})
+
+	t.Run("query scoped by filter id uses scoped fields and no distinct", func(t *testing.T) {
+		t.Parallel()
+
+		parser := &pgDSLParser{}
+		filterID := int64(42)
+		expressions := []query.Expression{}
+		limiter := query.LimitAndSort{}
+
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, &filterID)
+
+		require.NoError(t, err)
+		expected := logsQueryWithFields(
+			" WHERE chain_id = :chain_id AND filter_id = :filter_id ORDER BY "+defaultSort,
+			scopedLogsFields[:],
+			false,
+		)
+		assert.Equal(t, expected, result)
+
+		values, err := args.toArgs()
+		require.NoError(t, err)
+		assert.Len(t, values, 2)
+		assert.Equal(t, filterID, values["filter_id"])
 	})
 
 	t.Run("query with cursor and no order by", func(t *testing.T) {
@@ -68,7 +92,7 @@ func TestDSLParser(t *testing.T) {
 		}
 		limiter := query.NewLimitAndSort(query.CursorLimit(fmt.Sprintf("10-5-%s", txHash), query.CursorFollowing, 20))
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"AND (address = :address_0 AND event_sig = :event_sig_0 AND subkey_values[:subkey_index_0] >= :subkey_value_0 " +
@@ -105,7 +129,7 @@ func TestDSLParser(t *testing.T) {
 		}
 		limiter := query.NewLimitAndSort(query.CountLimit(20))
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"AND (address = :address_0 AND event_sig = :event_sig_0 " +
@@ -126,7 +150,7 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{}
 		limiter := query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Desc))
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"ORDER BY block_number DESC, log_index DESC, tx_hash DESC")
@@ -144,7 +168,7 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{}
 		limiter := query.NewLimitAndSort(query.Limit{}, query.NewSortByBlock(query.Asc), query.NewSortByTimestamp(query.Desc))
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"ORDER BY block_number ASC, block_timestamp DESC")
@@ -167,7 +191,7 @@ func TestDSLParser(t *testing.T) {
 		}
 		limiter := query.NewLimitAndSort(query.CursorLimit(fmt.Sprintf("10-20-%s", txHash), query.CursorPrevious, 20))
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp = :block_timestamp_0 AND tx_hash = :tx_hash_0 " +
@@ -190,7 +214,7 @@ func TestDSLParser(t *testing.T) {
 			expressions := []query.Expression{query.Confidence(primitives.Finalized)}
 			limiter := query.LimitAndSort{}
 
-			result, args, err := parser.buildQuery(chainID, expressions, limiter)
+			result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 			expected := logsQuery(
 				" WHERE chain_id = :chain_id " +
 					"ORDER BY " + defaultSort)
@@ -206,7 +230,7 @@ func TestDSLParser(t *testing.T) {
 			expressions := []query.Expression{query.Confidence(primitives.Unconfirmed)}
 			limiter := query.LimitAndSort{}
 
-			result, args, err := parser.buildQuery(chainID, expressions, limiter)
+			result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 			expected := logsQuery(
 				" WHERE chain_id = :chain_id " +
 					"ORDER BY " + defaultSort)
@@ -231,7 +255,7 @@ func TestDSLParser(t *testing.T) {
 		expressions := []query.Expression{subKeyFilter}
 		limiter := query.LimitAndSort{}
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		require.NoError(t, err)
 		expectedQuery := logsQuery(
 			" WHERE chain_id = :chain_id " +
@@ -282,7 +306,7 @@ func TestDSLParser(t *testing.T) {
 		}
 		limiter := query.LimitAndSort{}
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp >= :block_timestamp_0 AND tx_hash = :tx_hash_0) " +
@@ -324,7 +348,7 @@ func TestDSLParser(t *testing.T) {
 			}},
 		}
 
-		result, args, err := parser.buildQuery(chainID, expressions, limiter)
+		result, args, err := parser.buildQuery(chainID, expressions, limiter, nil)
 		expected := logsQuery(
 			" WHERE chain_id = :chain_id " +
 				"AND (block_timestamp = :block_timestamp_0 " +

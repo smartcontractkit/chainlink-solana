@@ -140,8 +140,20 @@ func (q *queryArgs) withExtraFilterConfig(cfg types.ExtraFilterConfig) *queryArg
 }
 
 func logsQuery(clause string) string {
-	// TODO: using DISTINCT in a query is less efficient but required because of duplicate logs coming from multipler filters
-	return fmt.Sprintf(`SELECT DISTINCT %s FROM solana.logs %s`, strings.Join(logsFields[:], ", "), clause)
+	return logsQueryWithDistinct(clause, true)
+}
+
+func logsQueryWithDistinct(clause string, distinct bool) string {
+	return logsQueryWithFields(clause, logsFields[:], distinct)
+}
+
+func logsQueryWithFields(clause string, fields []string, distinct bool) string {
+	distinctClause := ""
+	if distinct {
+		// DISTINCT is required when queries are not scoped to a specific filter.
+		distinctClause = "DISTINCT "
+	}
+	return fmt.Sprintf(`SELECT %s%s FROM solana.logs %s`, distinctClause, strings.Join(fields, ", "), clause)
 }
 
 func filtersQuery(clause string) string {

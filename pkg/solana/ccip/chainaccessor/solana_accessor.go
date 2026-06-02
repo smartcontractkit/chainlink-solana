@@ -270,9 +270,13 @@ func (a *SolanaAccessor) MsgsBetweenSeqNums(ctx context.Context, dest ccipocr3.C
 			Count: uint64(count),
 		},
 	}
+	filterName, err := a.ccipMessageSentFilterName()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve filter name for %s: %w", consts.EventNameCCIPMessageSent, err)
+	}
 
 	// query Solana logs
-	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch filtered logs from log poller: %w", err)
 	}
@@ -343,9 +347,13 @@ func (a *SolanaAccessor) LatestMessageTo(ctx context.Context, dest ccipocr3.Chai
 		},
 		Limit: query.Limit{Count: 1},
 	}
+	filterName, err := a.ccipMessageSentFilterName()
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve filter name for %s: %w", consts.EventNameCCIPMessageSent, err)
+	}
 
 	// query solana logs
-	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, filterName)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch logs from log poller: %w", err)
 	}
@@ -486,9 +494,13 @@ func (a *SolanaAccessor) CommitReportsGTETimestamp(ctx context.Context, ts time.
 			Count: uint64(internalLimit), // nolint:gosec // G115: limit can never reasonably exceed uint64 max
 		},
 	}
+	filterName, err := a.filterNameForEvent(consts.ContractNameOffRamp, consts.EventNameCommitReportAccepted)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve filter name for %s: %w", consts.EventNameCommitReportAccepted, err)
+	}
 
 	// query solana logs
-	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch commit report accepted logs from log poller: %w", err)
 	}
@@ -537,8 +549,12 @@ func (a *SolanaAccessor) ExecutedMessages(ctx context.Context, ranges map[ccipoc
 		logpoller.NewEventSigFilter(logpollertypes.NewEventSignatureFromName(consts.EventNameExecutionStateChanged)),
 	}
 	expressions = append(expressions, keyFilter.Expressions...)
+	filterName, err := a.filterNameForEvent(consts.ContractNameOffRamp, consts.EventNameExecutionStateChanged)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve filter name for %s: %w", consts.EventNameExecutionStateChanged, err)
+	}
 
-	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query executed message logs from log poller: %w", err)
 	}
@@ -768,8 +784,12 @@ func (a *SolanaAccessor) MessagesByTokenID(
 		query.Limit{Count: uint64(len(cctpExpressions))},
 		query.NewSortBySequence(query.Asc),
 	)
+	filterName, err := a.filterNameForEvent(consts.ContractNameUSDCTokenPool, consts.EventNameCCTPMessageSent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve filter name for %s: %w", consts.EventNameCCTPMessageSent, err)
+	}
 	// query solana logs
-	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, "")
+	logs, err := a.logPoller.FilteredLogs(ctx, expressions, limitSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cctp message sent logs from log poller: %w", err)
 	}
@@ -799,6 +819,60 @@ func batchPDAs(addrs []solana.PublicKey) [][]solana.PublicKey {
 	}
 
 	return batchAddrs
+}
+
+func (a *SolanaAccessor) ccipMessageSentFilterName() (string, error) {
+	if !a.logPoller.CPIEventsEnabled() {
+		return a.filterNameForEvent(consts.ContractNameOnRamp, consts.EventNameCCIPMessageSent)
+	}
+
+	cfgByEvent, ok := cpiFilterConfigMap[consts.ContractNameRouter]
+	if !ok {
+		return "", fmt.Errorf("missing CPI filter config for contract %s", consts.ContractNameRouter)
+	}
+	cfg, ok := cfgByEvent[consts.EventNameCCIPMessageSent]
+	if !ok {
+		return "", fmt.Errorf("missing CPI filter config for event %s", consts.EventNameCCIPMessageSent)
+	}
+
+	sourceAddr, err := a.pdaCache.getBinding(consts.ContractNameRouter)
+	if err != nil {
+		return "", fmt.Errorf("failed to get %s binding: %w", consts.ContractNameRouter, err)
+	}
+	destAddr, err := a.pdaCache.getBinding(cfg.destContractName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get %s binding: %w", cfg.destContractName, err)
+	}
+
+	filter := filterFromConfig(cfg, sourceAddr, destAddr)
+	name, err := deriveName(filter)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive filter name: %w", err)
+	}
+	return name, nil
+}
+
+func (a *SolanaAccessor) filterNameForEvent(contractName, eventName string) (string, error) {
+	cfgByEvent, ok := eventFilterConfigMap[contractName]
+	if !ok {
+		return "", fmt.Errorf("missing filter config for contract %s", contractName)
+	}
+	cfg, ok := cfgByEvent[eventName]
+	if !ok {
+		return "", fmt.Errorf("missing filter config for event %s", eventName)
+	}
+
+	sourceAddr, err := a.pdaCache.getBinding(contractName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get %s binding: %w", contractName, err)
+	}
+
+	filter := filterFromConfig(cfg, sourceAddr, solana.PublicKey{})
+	name, err := deriveName(filter)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive filter name: %w", err)
+	}
+	return name, nil
 }
 
 // deduplicateEvents removes duplicate events for the same SequenceNumber,
