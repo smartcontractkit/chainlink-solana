@@ -234,10 +234,26 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 
 	eventName := filterConfig.chainSpecificName
 
-	filter := filterFromConfig(filterConfig, sourceAddr, destAddr)
-	filter.StartingBlock = conf.GetStartingBlock()
-	filter.Retention = conf.GetRetention()
-	filter.MaxLogsKept = conf.GetMaxLogsKept()
+	subKeyPaths := processSubKeyPaths(filterConfig)
+
+	filter := logpollertypes.Filter{
+		Address:         logpollertypes.PublicKey(sourceAddr),
+		EventName:       eventName,
+		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
+		ContractIdl:     filterConfig.idl,
+		SubkeyPaths:     subKeyPaths,
+		StartingBlock:   conf.GetStartingBlock(),
+		Retention:       conf.GetRetention(),
+		MaxLogsKept:     conf.GetMaxLogsKept(),
+		IncludeReverted: filterConfig.includeReverted,
+	}
+
+	if filterConfig.isCPIFilter() {
+		filter.SetCPIFilterConfig(logpollertypes.ExtraFilterConfig{
+			DestProgram:     logpollertypes.PublicKey(destAddr),
+			MethodSignature: logpollertypes.NewMethodSignatureFromName(filterConfig.methodName),
+		})
+	}
 
 	filterName, err := deriveName(filter)
 	if err != nil {
@@ -272,27 +288,6 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	return nil
-}
-
-func filterFromConfig(filterConfig filterConfig, sourceAddr solana.PublicKey, destAddr solana.PublicKey) logpollertypes.Filter {
-	eventName := filterConfig.chainSpecificName
-	filter := logpollertypes.Filter{
-		Address:         logpollertypes.PublicKey(sourceAddr),
-		EventName:       eventName,
-		EventSig:        logpollertypes.NewEventSignatureFromName(eventName),
-		ContractIdl:     filterConfig.idl,
-		SubkeyPaths:     processSubKeyPaths(filterConfig),
-		IncludeReverted: filterConfig.includeReverted,
-	}
-
-	if filterConfig.isCPIFilter() {
-		filter.SetCPIFilterConfig(logpollertypes.ExtraFilterConfig{
-			DestProgram:     logpollertypes.PublicKey(destAddr),
-			MethodSignature: logpollertypes.NewMethodSignatureFromName(filterConfig.methodName),
-		})
-	}
-
-	return filter
 }
 
 // convertCCIPMessageSent converts a Solana-specific CCIPMessageSent event to a generic

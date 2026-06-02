@@ -140,11 +140,7 @@ func (q *queryArgs) withExtraFilterConfig(cfg types.ExtraFilterConfig) *queryArg
 }
 
 func logsQuery(clause string) string {
-	return logsQueryWithDistinct(clause, true)
-}
-
-func logsQueryWithDistinct(clause string, distinct bool) string {
-	return logsQueryWithFields(clause, logsFields[:], distinct)
+	return logsQueryWithFields(clause, logsFields[:], true)
 }
 
 func logsQueryWithFields(clause string, fields []string, distinct bool) string {
