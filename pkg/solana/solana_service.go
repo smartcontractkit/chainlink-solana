@@ -17,7 +17,6 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
@@ -185,18 +184,13 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 }
 
 func (ss *solanaService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
-	limitAndSort query.LimitAndSort) ([]*commonsol.Log, error) {
+	limitAndSort query.LimitAndSort, filterName string) ([]*commonsol.Log, error) {
 	lp, err := ss.requireLogPoller()
 	if err != nil {
 		return nil, err
 	}
 
-	queryName, err := deriveNameFromFilterQuery(filterQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, queryName)
+	logs, err := lp.FilteredLogs(ctx, filterQuery, limitAndSort, filterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter logs: %w", err)
 	}
@@ -236,40 +230,6 @@ func (ss *solanaService) GetFiltersNames(ctx context.Context) ([]string, error) 
 		filterNames = append(filterNames, name)
 	}
 	return filterNames, nil
-}
-
-var (
-	errMissingEventSigPrimitive = errors.New("missing event signature primitive in filter query")
-	errMissingAddressPrimitive  = errors.New("missing address primitive in filter query")
-)
-
-func deriveNameFromFilterQuery(filter []query.Expression) (string, error) {
-	var address string
-	var eventSig string
-
-	for _, expr := range filter {
-		if expr.IsPrimitive() {
-			switch primitive := expr.Primitive.(type) {
-			case *solprimitives.Address:
-				address = solana.PublicKey(primitive.PubKey).String()
-			case *solprimitives.EventSig:
-				eventSig = fmt.Sprintf("%x", primitive.Sig)
-			}
-		}
-	}
-
-	var errs []error
-	if address == "" {
-		errs = append(errs, errMissingAddressPrimitive)
-	}
-	if eventSig == "" {
-		errs = append(errs, errMissingEventSigPrimitive)
-	}
-	if len(errs) > 0 {
-		return "", errors.Join(errs...)
-	}
-
-	return address + "-" + eventSig, nil
 }
 
 func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol.GetSignatureStatusesRequest) (*commonsol.GetSignatureStatusesReply, error) {

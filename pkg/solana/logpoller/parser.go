@@ -19,6 +19,7 @@ import (
 
 const (
 	blockFieldName        = "block_number"
+	filterIDFieldName     = "filter_id"
 	chainIDFieldName      = "chain_id"
 	timestampFieldName    = "block_timestamp"
 	txHashFieldName       = "tx_hash"
@@ -40,6 +41,9 @@ var (
 
 	logsFields = [...]string{"chain_id", "log_index", "block_hash", "block_number", "block_timestamp", "address",
 		"event_sig", "tx_hash", "data", "error"}
+
+	scopedLogsFields = [...]string{"filter_id", "chain_id", "log_index", "block_hash", "block_number", "block_timestamp", "address",
+		"event_sig", "tx_hash", "data", "sequence_num", "error"}
 
 	filterFields = [...]string{"id", "name", "address", "event_name", "event_sig", "starting_block",
 		"event_idl", "COALESCE(contract_idl, '') as contract_idl", "subkey_paths", "retention", "max_logs_kept", "is_deleted", "is_backfilled", "include_reverted",
@@ -177,6 +181,7 @@ func (v *pgDSLParser) buildQuery(
 	chainID string,
 	expressions []query.Expression,
 	limiter query.LimitAndSort,
+	filterID *int64,
 ) (string, *queryArgs, error) {
 	// reset transient properties
 	v.args = newQueryArgs(chainID)
@@ -184,9 +189,13 @@ func (v *pgDSLParser) buildQuery(
 	v.err = nil
 
 	// build the query string
-	clauses := []string{logsQuery("")}
+	fields := logsFields[:]
+	if filterID != nil {
+		fields = scopedLogsFields[:]
+	}
+	clauses := []string{logsQueryWithFields("", fields, filterID == nil)}
 
-	where, err := v.whereClause(expressions, limiter)
+	where, err := v.whereClause(expressions, limiter, filterID)
 	if err != nil {
 		return "", nil, err
 	}
@@ -210,7 +219,7 @@ func (v *pgDSLParser) buildQuery(
 	return strings.Join(clauses, " "), v.args, nil
 }
 
-func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.LimitAndSort) (string, error) {
+func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.LimitAndSort, filterID *int64) (string, error) {
 	segment := fmt.Sprintf("WHERE %s = :chain_id", chainIDFieldName)
 
 	if len(expressions) > 0 {
@@ -244,6 +253,11 @@ func (v *pgDSLParser) whereClause(expressions []query.Expression, limiter query.
 
 		v.args.withField("cursor_block_number", block).
 			withField("cursor_log_index", logIdx)
+	}
+
+	if filterID != nil {
+		segment = fmt.Sprintf("%s AND %s = :%s", segment, filterIDFieldName, filterIDFieldName)
+		v.args.withField(filterIDFieldName, *filterID)
 	}
 
 	return segment, nil

@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -245,8 +246,20 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address types.
 	return logs, nil
 }
 
-func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, _ string) ([]types.Log, error) {
-	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter, limitAndSort)
+// FilteredLogs runs a DSL query against stored logs. When queryName is set, results are
+// scoped to that registered filter (filter_id in SQL, no dedup). An empty queryName is the
+// legacy path: query all filters for the chain and dedupe by (block_number, log_index).
+func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error) {
+	var filterID *int64
+	if queryName != "" {
+		id, err := o.filterIDByName(ctx, queryName)
+		if err != nil {
+			return nil, err
+		}
+		filterID = &id
+	}
+
+	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter, limitAndSort, filterID)
 	if err != nil {
 		return nil, err
 	}
@@ -264,6 +277,11 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 	var logs []types.Log
 	if err = o.ds.SelectContext(ctx, &logs, query, sqlArgs...); err != nil {
 		return nil, err
+	}
+
+	if filterID != nil {
+		// Rows are already scoped by filter_id, so no deduplication is required.
+		return logs, nil
 	}
 
 	// We want each log returned to have a unique (BlockNumber, LogIndex)
@@ -285,6 +303,22 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 		res = append(res, log)
 	}
 	return res, nil
+}
+
+func (o *DSORM) filterIDByName(ctx context.Context, filterName string) (int64, error) {
+	query := `
+		SELECT id FROM solana.log_poller_filters
+		WHERE is_deleted = false AND chain_id = $1 AND name = $2
+		LIMIT 1`
+
+	var id int64
+	if err := o.ds.GetContext(ctx, &id, query, o.chainID, filterName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("filter %q not found for chain %q", filterName, o.chainID)
+		}
+		return 0, err
+	}
+	return id, nil
 }
 
 func (o *DSORM) GetLatestBlock(ctx context.Context) (int64, error) {

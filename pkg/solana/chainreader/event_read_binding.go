@@ -272,7 +272,9 @@ func (b *eventReadBinding) GetLatestValue(ctx context.Context, params, returnVal
 		return err
 	}
 
-	logs, err := b.reader.FilteredLogs(ctx, filter, limiter, b.namespace+"-"+pubKey.String()+"-"+b.genericName)
+	// Empty filterName preserves legacy unscoped reads (merge + dedup across filters).
+	// Filters are still registered under deriveName(); only CRE callers pass a name to scope queries.
+	logs, err := b.reader.FilteredLogs(ctx, filter, limiter, "")
 	if err != nil {
 		return err
 	}
@@ -309,9 +311,8 @@ func (b *eventReadBinding) QueryKey(
 		logpoller.NewEventSigFilter(b.eventSig),
 	}, filter.Expressions...)
 
-	itemType := strings.Join([]string{b.namespace, b.genericName}, "-")
-
-	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, itemType)
+	// unscoped query preserves pre-existing chainreader behavior.
+	logs, err := b.reader.FilteredLogs(ctx, filter.Expressions, limitAndSort, "")
 	if err != nil {
 		return nil, err
 	}

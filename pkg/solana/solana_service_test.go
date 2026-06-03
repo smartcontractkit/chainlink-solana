@@ -852,7 +852,7 @@ func TestLogPollerReadinessGuard(t *testing.T) {
 
 	t.Run("QueryTrackedLogs returns error when LogPoller not started", func(t *testing.T) {
 		ss := newSolanaService(t, errNotStarted)
-		_, err := ss.QueryTrackedLogs(ctx, nil, query.LimitAndSort{})
+		_, err := ss.QueryTrackedLogs(ctx, nil, query.LimitAndSort{}, "")
 		require.ErrorIs(t, err, ErrLogPollerNotStarted)
 	})
 

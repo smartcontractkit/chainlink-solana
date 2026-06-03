@@ -189,27 +189,22 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		filter2.IncludeReverted = true
 		filter2.IsBackfilled = true
 		orm.EXPECT().SelectSeqNums(mock.Anything).Return(nil, nil).Once()
+		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter types.Filter) (int64, error) {
+			assert.True(t, filter.IncludeReverted, "new filter should keep IncludeReverted=true")
+			assert.False(t, filter.IsBackfilled, "newly-added filter should be queued for backfill")
+			return 2, nil
+		}).Once()
 		err := fs.RegisterFilter(t.Context(), filter2)
-		require.ErrorContains(t, err, "conflicts with IncludeReverted=true", "shouldn't allow more than one value for IncludeReverted for an event")
+		require.NoError(t, err)
 
 		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter types.Filter) (int64, error) {
 			assert.True(t, filter.IncludeReverted, "IncludeReverted should be true now")
 			assert.False(t, filter.IsBackfilled, "new backfill should be triggered when IsReverted updated from false to true")
-			return 2, nil
+			return 1, nil
 		}).Once()
 		filter1.IncludeReverted = true // update IncludeReverted field of filter1 to true
 		err = fs.RegisterFilter(t.Context(), filter1)
 		require.NoError(t, err)
-
-		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, filter types.Filter) (int64, error) {
-			assert.True(t, filter.IncludeReverted)
-			assert.False(t, filter.IsBackfilled, "backfill should happen when new filter is added") // should trigger new backfill since reverted has been updated to true
-			return 3, nil
-		}).Once()
-
-		// should succeed this time
-		err = fs.RegisterFilter(t.Context(), filter2)
-		assert.NoError(t, err)
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
