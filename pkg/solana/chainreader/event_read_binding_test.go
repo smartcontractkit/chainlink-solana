@@ -73,9 +73,6 @@ func TestBind(t *testing.T) {
 		name := reader2.deriveName()
 		assert.Equal(t, "TestNamespace.GenericName.9a5cc2ed54afdbd1136f222be651c4ad12afbc95f6438e7dddc7c92e4532156f", name)
 		require.NotEqual(t, name0, name)
-		reader.filter.filter.IncludeReverted = true
-		require.NotEqual(t, name0, reader.deriveName(), "IncludeReverted should affect derived filter names")
-		reader.filter.filter.IncludeReverted = false
 		ctx := t.Context()
 
 		require.NoError(t, reader.Register(ctx))

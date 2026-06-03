@@ -25,10 +25,4 @@ func Test_deriveName(t *testing.T) {
 	name2, err2 := deriveName(f2)
 	require.NoError(t, err2)
 	require.NotEqual(t, name1, name2)
-
-	f3 := f1
-	f3.IncludeReverted = true
-	name3, err3 := deriveName(f3)
-	require.NoError(t, err3)
-	require.NotEqual(t, name1, name3)
 }

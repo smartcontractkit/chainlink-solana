@@ -369,9 +369,6 @@ func deriveName(filter logpollertypes.Filter) (string, error) {
 		data = append(data, filter.ExtraFilterConfig.DestProgram[:]...)
 		data = append(data, filter.ExtraFilterConfig.MethodSignature[:]...)
 	}
-	if filter.IncludeReverted {
-		data = append(data, byte(1))
-	}
 
 	hash := sha3.Sum256(data)
 
