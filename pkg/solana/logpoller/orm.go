@@ -246,6 +246,9 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address types.
 	return logs, nil
 }
 
+// FilteredLogs runs a DSL query against stored logs. When queryName is set, results are
+// scoped to that registered filter (filter_id in SQL, no dedup). An empty queryName is the
+// legacy path: query all filters for the chain and dedupe by (block_number, log_index).
 func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error) {
 	var filterID *int64
 	if queryName != "" {
