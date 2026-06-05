@@ -378,7 +378,10 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 		return nil, fmt.Errorf("failed to initialize solana txm: %w", err)
 	}
 	ch.txm = solTxm
-	ch.balanceMonitor = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+	ch.balanceMonitor, err = monitor.NewBalanceMonitor(ch.id, cfg, lggr, ks, bc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize solana balance monitor: %w", err)
+	}
 	return &ch, nil
 }
 
