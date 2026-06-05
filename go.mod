@@ -22,12 +22,12 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260317185256-d5f7db87ae70
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260310183131-8d0f0e383288
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260310183131-8d0f0e383288
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260604133138-930561c898fc
+	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260604234426-27a72f7f8cf8
 	github.com/smartcontractkit/chainlink-common/keystore v1.0.2
 	github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20251215152504-b1e41f508340
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260521164805-26d78d5e1243
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260521164805-26d78d5e1243
-	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260602131523-5168ac1ba014
+	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260604171908-6734db2d444f
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/libocr v0.0.0-20260403184524-b6409238958d
 	github.com/stretchr/testify v1.11.1
