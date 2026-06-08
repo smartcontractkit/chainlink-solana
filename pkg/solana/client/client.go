@@ -73,6 +73,7 @@ type Reader interface {
 type AccountReader interface {
 	GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
 	GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error)
+	GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error)
 	GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, accountType any) (err error)
 }
 
@@ -272,6 +273,19 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	defer cancel()
 	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
+func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error) {
+	done := c.latency("program_accounts")
+	defer func() { done(err) }()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetProgramAccountsOpts{}
+	}
+	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	return c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
 }
 
 func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {

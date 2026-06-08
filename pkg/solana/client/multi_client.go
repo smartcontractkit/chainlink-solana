@@ -77,6 +77,15 @@ func (m *MultiClient) GetMultipleAccountsWithOpts(ctx context.Context, accounts 
 	return r.GetMultipleAccountsWithOpts(ctx, accounts, opts)
 }
 
+func (m *MultiClient) GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error) {
+	r, err := m.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetProgramAccountsWithOpts(ctx, program, opts)
+}
+
 func (m *MultiClient) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
