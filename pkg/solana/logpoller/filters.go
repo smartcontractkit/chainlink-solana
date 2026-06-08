@@ -165,7 +165,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	defer fl.filtersMutex.Unlock()
 
 	filter.IsBackfilled = false
-	// persist in memory existingFilter in case registration fails later
+	// persist in memory existingFilter (if it exists) to wait to remove it from memory only if registration succeeds later.
 	var existingFilter *types.Filter
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
 		existingFilter = fl.filtersByID[existingFilterID]
