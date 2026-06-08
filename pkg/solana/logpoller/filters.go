@@ -165,6 +165,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	defer fl.filtersMutex.Unlock()
 
 	filter.IsBackfilled = false
+	// persist in memory existingFilter in case registration fails later
 	var existingFilter *types.Filter
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
 		existingFilter = fl.filtersByID[existingFilterID]
@@ -186,6 +187,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	if contractFilters, okAddr := fl.filtersByAddress[filter.Address]; okAddr {
 		if similarFilters, okEv := contractFilters[filter.EventSig]; okEv {
 			for id := range similarFilters {
+				// ignore existing filter so it doesn't conflict with itself
 				if existingFilter != nil && id == existingFilter.ID {
 					continue
 				}
@@ -207,6 +209,7 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 		return fmt.Errorf("failed to insert filter: %w", err)
 	}
 
+	// only remove existing filter from memory if registration succeeded
 	if existingFilter != nil {
 		fl.removeFilterFromIndexes(*existingFilter)
 	}
