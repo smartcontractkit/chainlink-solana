@@ -56,6 +56,7 @@ type Reader interface {
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (uint64, error)
 	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
@@ -385,6 +386,25 @@ func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (fee uint64, 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 	res, err := c.rpc.GetFeeForMessage(ctx, msg, c.commitment)
+	if err != nil {
+		return 0, fmt.Errorf("error in GetFeeForMessage: %w", err)
+	}
+
+	if res == nil || res.Value == nil {
+		return 0, errors.New("nil pointer in GetFeeForMessage")
+	}
+	return *res.Value, nil
+}
+
+func (c *Client) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (fee uint64, err error) {
+	done := c.latency("fee_for_message")
+	defer func() { done(err) }()
+
+	// msg is base58 encoded data
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	res, err := c.rpc.GetFeeForMessage(ctx, msg, commitment)
 	if err != nil {
 		return 0, fmt.Errorf("error in GetFeeForMessage: %w", err)
 	}

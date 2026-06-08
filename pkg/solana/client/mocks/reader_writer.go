@@ -599,6 +599,64 @@ func (_c *ReaderWriter_GetFeeForMessage_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetFeeForMessageWithCommitment provides a mock function with given fields: ctx, msg, commitment
+func (_m *ReaderWriter) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (uint64, error) {
+	ret := _m.Called(ctx, msg, commitment)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFeeForMessageWithCommitment")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, rpc.CommitmentType) (uint64, error)); ok {
+		return rf(ctx, msg, commitment)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, rpc.CommitmentType) uint64); ok {
+		r0 = rf(ctx, msg, commitment)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, rpc.CommitmentType) error); ok {
+		r1 = rf(ctx, msg, commitment)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetFeeForMessageWithCommitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFeeForMessageWithCommitment'
+type ReaderWriter_GetFeeForMessageWithCommitment_Call struct {
+	*mock.Call
+}
+
+// GetFeeForMessageWithCommitment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - msg string
+//   - commitment rpc.CommitmentType
+func (_e *ReaderWriter_Expecter) GetFeeForMessageWithCommitment(ctx interface{}, msg interface{}, commitment interface{}) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	return &ReaderWriter_GetFeeForMessageWithCommitment_Call{Call: _e.mock.On("GetFeeForMessageWithCommitment", ctx, msg, commitment)}
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) Run(run func(ctx context.Context, msg string, commitment rpc.CommitmentType)) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(rpc.CommitmentType))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) Return(_a0 uint64, _a1 error) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) RunAndReturn(run func(context.Context, string, rpc.CommitmentType) (uint64, error)) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetFirstAvailableBlock provides a mock function with given fields: ctx
 func (_m *ReaderWriter) GetFirstAvailableBlock(ctx context.Context) (uint64, error) {
 	ret := _m.Called(ctx)

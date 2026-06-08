@@ -51,7 +51,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
-	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(req.Opts.Commitment)))
+	commitment := commonsol.CommitmentFinalized
+	if req.Opts != nil {
+		commitment = req.Opts.Commitment
+	}
+	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(commitment)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
@@ -89,7 +93,11 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccountResult(account, req.Opts.Encoding)
+	enc := commonsol.EncodingType("")
+	if req.Opts != nil {
+		enc = req.Opts.Encoding
+	}
+	return convertAccountResult(account, enc)
 }
 
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
@@ -614,7 +622,7 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 }
 
 func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.GetFeeForMessageRequest) (*commonsol.GetFeeForMessageReply, error) {
-	fee, err := ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
+	fee, err := ss.chain.MultiClient().GetFeeForMessageWithCommitment(ctx, req.Message, rpc.CommitmentType(req.Commitment))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee for message: %w", err)
 	}
@@ -950,6 +958,9 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 }
 
 func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountInfoOpts {
+	if opts == nil {
+		return nil
+	}
 	var ds *rpc.DataSlice
 	if opts.DataSlice != nil {
 		ds = &rpc.DataSlice{}

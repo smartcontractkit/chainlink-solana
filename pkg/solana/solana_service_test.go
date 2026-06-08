@@ -285,6 +285,10 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, tx.Message.Header.NumRequiredSignatures, got.Message.Header.NumRequiredSignatures)
 	})
 
+	t.Run("convertAccountInfoOpts_nil", func(t *testing.T) {
+		require.Nil(t, convertAccountInfoOpts(nil))
+	})
+
 	t.Run("convertProgramAccountsOpts_nil", func(t *testing.T) {
 		opts, enc := convertProgramAccountsOpts(nil)
 		require.Nil(t, opts)

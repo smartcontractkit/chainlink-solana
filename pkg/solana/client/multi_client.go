@@ -158,6 +158,15 @@ func (m *MultiClient) GetFeeForMessage(ctx context.Context, msg string) (uint64,
 	return r.GetFeeForMessage(ctx, msg)
 }
 
+func (m *MultiClient) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (uint64, error) {
+	r, err := m.getClient(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return r.GetFeeForMessageWithCommitment(ctx, msg, commitment)
+}
+
 func (m *MultiClient) GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
