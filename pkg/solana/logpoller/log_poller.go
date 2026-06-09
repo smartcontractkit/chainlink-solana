@@ -61,8 +61,6 @@ type filtersI interface {
 	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
 	IncrementSeqNum(filterID int64) int64
-	stageSeqNums(logs []types.Log)
-	commitSeqNums(logs []types.Log)
 }
 
 type ReplayInfo struct {
@@ -259,11 +257,15 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return nil
 	}
 
-	lp.filters.stageSeqNums(logs)
+	if fl, ok := lp.filters.(*filters); ok {
+		fl.stageSeqNums(logs)
+	}
 	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
 		return err
 	}
-	lp.filters.commitSeqNums(logs)
+	if fl, ok := lp.filters.(*filters); ok {
+		fl.commitSeqNums(logs)
+	}
 	return nil
 }
 
