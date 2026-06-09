@@ -690,8 +690,7 @@ func TestFilters_RegisterFilter_PreservesSeqNumOnUpdate(t *testing.T) {
 
 func TestFilters_stageSeqNums_Commit(t *testing.T) {
 	fs := newFilters(logger.Sugared(logger.Test(t)), nil, nil)
-	fs.seqNums[1] = 10
-	fs.seqNums[2] = 20
+	fs.seqNums = map[int64]int64{1: 10, 2: 20}
 
 	logs := []types.Log{
 		{FilterID: 1},
