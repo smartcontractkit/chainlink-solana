@@ -211,6 +211,34 @@ func TestFilters_RegisterFilter(t *testing.T) {
 		err = fs.RegisterFilter(t.Context(), filter2)
 		assert.NoError(t, err)
 	})
+	t.Run("Leaves in-memory state unchanged when re-register insert fails", func(t *testing.T) {
+		orm := mocks.NewMockORM(t)
+		fs := newFilters(lggr, orm, nil)
+		const filterName = "Filter"
+		addr := newRandomPublicKey(t)
+		registered := decoderReadyTestFilter(t, 100, filterName, "TestEvent", addr)
+		orm.On("SelectFilters", mock.Anything).Return(nil, nil).Once()
+		orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{}, nil).Once()
+		const filterID = int64(1)
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
+		err := fs.RegisterFilter(t.Context(), registered)
+		require.NoError(t, err)
+		want := *fs.filtersByID[filterID]
+		requireIndexed(t, fs, want)
+
+		updated := want
+		updated.StartingBlock = 200
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(int64(0), errors.New("failed to insert")).Once()
+		err = fs.RegisterFilter(t.Context(), updated)
+		require.EqualError(t, err, "failed to insert filter: failed to insert")
+		requireIndexed(t, fs, want)
+
+		orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
+		err = fs.RegisterFilter(t.Context(), updated)
+		require.NoError(t, err)
+		want.StartingBlock = 200
+		requireIndexed(t, fs, want)
+	})
 	t.Run("Happy path", func(t *testing.T) {
 		orm := mocks.NewMockORM(t)
 		fs := newFilters(lggr, orm, nil)

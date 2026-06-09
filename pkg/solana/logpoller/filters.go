@@ -165,8 +165,10 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	defer fl.filtersMutex.Unlock()
 
 	filter.IsBackfilled = false
+	// persist in memory existingFilter (if it exists) to wait to remove it from memory only if registration succeeds later.
+	var existingFilter *types.Filter
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
-		existingFilter := fl.filtersByID[existingFilterID]
+		existingFilter = fl.filtersByID[existingFilterID]
 		if !existingFilter.MatchSameLogs(filter) {
 			return ErrFilterNameConflict
 		}
@@ -179,14 +181,16 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 				filter.IsBackfilled = false
 			}
 		}
-
-		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
 	// ensure that the value of IncludeReverted isn't different from any other filters with the same address and event type
 	if contractFilters, okAddr := fl.filtersByAddress[filter.Address]; okAddr {
 		if similarFilters, okEv := contractFilters[filter.EventSig]; okEv {
 			for id := range similarFilters {
+				// ignore existing filter so it doesn't conflict with itself
+				if existingFilter != nil && id == existingFilter.ID {
+					continue
+				}
 				if conflicting := fl.filtersByID[id]; conflicting.IncludeReverted != filter.IncludeReverted {
 					return fmt.Errorf("IncludeReverted=%v for filter %v conflicts with IncludeReverted=%v for filter %v",
 						conflicting.IncludeReverted, conflicting, filter.IncludeReverted, filter)
@@ -203,6 +207,11 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to insert filter: %w", err)
+	}
+
+	// only remove existing filter from memory if registration succeeded
+	if existingFilter != nil {
+		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
 	filter.ID = filterID
