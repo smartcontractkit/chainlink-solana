@@ -354,16 +354,6 @@ func (_c *MockFilters_IncrementSeqNum_Call) RunAndReturn(run func(int64) int64) 
 	return _c
 }
 
-// stageSeqNums provides a mock function with given fields: logs
-func (_m *MockFilters) stageSeqNums(logs []types.Log) {
-	_m.Called(logs)
-}
-
-// commitSeqNums provides a mock function with given fields: logs
-func (_m *MockFilters) commitSeqNums(logs []types.Log) {
-	_m.Called(logs)
-}
-
 // LoadFilters provides a mock function with given fields: ctx
 func (_m *MockFilters) LoadFilters(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -722,6 +712,72 @@ func (_c *MockFilters_UpdateStartingBlocks_Call) Return() *MockFilters_UpdateSta
 }
 
 func (_c *MockFilters_UpdateStartingBlocks_Call) RunAndReturn(run func(int64)) *MockFilters_UpdateStartingBlocks_Call {
+	_c.Run(run)
+	return _c
+}
+
+// commitSeqNums provides a mock function with given fields: logs
+func (_m *MockFilters) commitSeqNums(logs []types.Log) {
+	_m.Called(logs)
+}
+
+// MockFilters_commitSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'commitSeqNums'
+type MockFilters_commitSeqNums_Call struct {
+	*mock.Call
+}
+
+// commitSeqNums is a helper method to define mock.On call
+//   - logs []types.Log
+func (_e *MockFilters_Expecter) commitSeqNums(logs interface{}) *MockFilters_commitSeqNums_Call {
+	return &MockFilters_commitSeqNums_Call{Call: _e.mock.On("commitSeqNums", logs)}
+}
+
+func (_c *MockFilters_commitSeqNums_Call) Run(run func(logs []types.Log)) *MockFilters_commitSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]types.Log))
+	})
+	return _c
+}
+
+func (_c *MockFilters_commitSeqNums_Call) Return() *MockFilters_commitSeqNums_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockFilters_commitSeqNums_Call) RunAndReturn(run func([]types.Log)) *MockFilters_commitSeqNums_Call {
+	_c.Run(run)
+	return _c
+}
+
+// stageSeqNums provides a mock function with given fields: logs
+func (_m *MockFilters) stageSeqNums(logs []types.Log) {
+	_m.Called(logs)
+}
+
+// MockFilters_stageSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'stageSeqNums'
+type MockFilters_stageSeqNums_Call struct {
+	*mock.Call
+}
+
+// stageSeqNums is a helper method to define mock.On call
+//   - logs []types.Log
+func (_e *MockFilters_Expecter) stageSeqNums(logs interface{}) *MockFilters_stageSeqNums_Call {
+	return &MockFilters_stageSeqNums_Call{Call: _e.mock.On("stageSeqNums", logs)}
+}
+
+func (_c *MockFilters_stageSeqNums_Call) Run(run func(logs []types.Log)) *MockFilters_stageSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]types.Log))
+	})
+	return _c
+}
+
+func (_c *MockFilters_stageSeqNums_Call) Return() *MockFilters_stageSeqNums_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockFilters_stageSeqNums_Call) RunAndReturn(run func([]types.Log)) *MockFilters_stageSeqNums_Call {
 	_c.Run(run)
 	return _c
 }
