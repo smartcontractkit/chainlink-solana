@@ -685,10 +685,14 @@ func TestFilters_RegisterFilter_PreservesSeqNumOnUpdate(t *testing.T) {
 	orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
 	require.NoError(t, fs.RegisterFilter(t.Context(), filter))
 
-	require.Equal(t, int64(43), fs.IncrementSeqNum(filterID))
+	logs := []types.Log{{FilterID: filterID}}
+	fs.StageSeqNums(logs)
+	require.Equal(t, int64(43), logs[0].SequenceNum)
+	fs.CommitSeqNums(logs)
+	require.Equal(t, int64(43), fs.seqNums[filterID])
 }
 
-func TestFilters_stageSeqNums_Commit(t *testing.T) {
+func TestFilters_StageSeqNums_Commit(t *testing.T) {
 	fs := newFilters(logger.Sugared(logger.Test(t)), nil, nil)
 	fs.seqNums = map[int64]int64{1: 10, 2: 20}
 
@@ -697,7 +701,7 @@ func TestFilters_stageSeqNums_Commit(t *testing.T) {
 		{FilterID: 1},
 		{FilterID: 2},
 	}
-	fs.stageSeqNums(logs)
+	fs.StageSeqNums(logs)
 
 	require.Equal(t, int64(11), logs[0].SequenceNum)
 	require.Equal(t, int64(12), logs[1].SequenceNum)
@@ -705,12 +709,12 @@ func TestFilters_stageSeqNums_Commit(t *testing.T) {
 	require.Equal(t, int64(10), fs.seqNums[1], "in-memory state unchanged before commit")
 	require.Equal(t, int64(20), fs.seqNums[2])
 
-	fs.commitSeqNums(logs)
+	fs.CommitSeqNums(logs)
 	require.Equal(t, int64(12), fs.seqNums[1])
 	require.Equal(t, int64(21), fs.seqNums[2])
 }
 
-func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
+func TestFilters_StageSeqNums_Commit_Concurrent(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	fs := newFilters(lggr, orm, nil)
@@ -732,14 +736,20 @@ func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
 	seqNumsFilter2 := make(chan int64, numGoroutines*incrementsPerGoroutine)
 
 	var wg sync.WaitGroup
+	// prod code calls Process() sequentially, so for this concurrent test we lock around the stage/commit calls to simulate prod behavior.
+	var processMu sync.Mutex
 	wg.Add(numGoroutines * 2)
 
 	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter1.ID)
-				seqNumsFilter1 <- seqNum
+				logs := []types.Log{{FilterID: filter1.ID}}
+				processMu.Lock()
+				fs.StageSeqNums(logs)
+				fs.CommitSeqNums(logs)
+				processMu.Unlock()
+				seqNumsFilter1 <- logs[0].SequenceNum
 			}
 		}()
 	}
@@ -748,8 +758,12 @@ func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter2.ID)
-				seqNumsFilter2 <- seqNum
+				logs := []types.Log{{FilterID: filter2.ID}}
+				processMu.Lock()
+				fs.StageSeqNums(logs)
+				fs.CommitSeqNums(logs)
+				processMu.Unlock()
+				seqNumsFilter2 <- logs[0].SequenceNum
 			}
 		}()
 	}

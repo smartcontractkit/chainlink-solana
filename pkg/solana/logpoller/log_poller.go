@@ -60,7 +60,8 @@ type filtersI interface {
 	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
-	IncrementSeqNum(filterID int64) int64
+	StageSeqNums(logs []types.Log)
+	CommitSeqNums(logs []types.Log)
 }
 
 type ReplayInfo struct {
@@ -257,16 +258,11 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return nil
 	}
 
-	fl, ok := lp.filters.(*filters)
-	if !ok {
-		// shouldn't ever actually happen
-		return errors.New("sequence number tracking requires *filters")
-	}
-	fl.stageSeqNums(logs)
+	lp.filters.StageSeqNums(logs)
 	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
 		return err
 	}
-	fl.commitSeqNums(logs)
+	lp.filters.CommitSeqNums(logs)
 	return nil
 }
 

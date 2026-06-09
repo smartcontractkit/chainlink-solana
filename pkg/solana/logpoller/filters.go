@@ -53,18 +53,9 @@ func newFilters(lggr logger.Logger, orm ORM, cpiEventExtractor *CPIEventExtracto
 	}
 }
 
-// IncrementSeqNum increments the sequence number for a filterID and returns the new
-// number. This means the sequence number assigned to the first log matched after registration will be 1.
-func (fl *filters) IncrementSeqNum(filterID int64) int64 {
-	fl.seqNumsMutex.Lock()
-	defer fl.seqNumsMutex.Unlock()
-	fl.seqNums[filterID]++
-	return fl.seqNums[filterID]
-}
-
-// stageSeqNums assigns sequence numbers to logs from the current in-memory state
-// without updating that state. commitSeqNums must be called after a successful insert.
-func (fl *filters) stageSeqNums(logs []types.Log) {
+// StageSeqNums assigns sequence numbers to logs from the current in-memory state
+// without updating that state. CommitSeqNums must be called after a successful insert.
+func (fl *filters) StageSeqNums(logs []types.Log) {
 	fl.seqNumsMutex.Lock()
 	defer fl.seqNumsMutex.Unlock()
 
@@ -76,8 +67,8 @@ func (fl *filters) stageSeqNums(logs []types.Log) {
 	}
 }
 
-// commitSeqNums advances in-memory sequence numbers after logs are persisted.
-func (fl *filters) commitSeqNums(logs []types.Log) {
+// CommitSeqNums advances in-memory sequence numbers after logs are persisted.
+func (fl *filters) CommitSeqNums(logs []types.Log) {
 	fl.seqNumsMutex.Lock()
 	defer fl.seqNumsMutex.Unlock()
 
