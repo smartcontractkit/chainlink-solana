@@ -751,6 +751,24 @@ func TestProcess(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("rolls back sequence number when insert fails", func(t *testing.T) {
+		expectedLogAfterRetry := expectedLog
+		expectedLogAfterRetry.SequenceNum = 2
+
+		insertErr := errors.New("insert failed")
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).Return(insertErr).Once()
+		err = lp.Process(ctx, ev)
+		require.ErrorIs(t, err, insertErr)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+			require.Len(t, logs, 1)
+			assert.Equal(t, expectedLogAfterRetry, logs[0])
+			return nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
 	t.Run("populates expiresAt field when retention is set", func(t *testing.T) {
 		filter.Retention = 30 * time.Minute
 		orm.EXPECT().InsertFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) {

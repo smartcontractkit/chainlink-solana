@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -636,6 +637,50 @@ func TestFilters_ExtractField(t *testing.T) {
 			assert.Equal(t, c.Result, result)
 		})
 	}
+}
+
+func TestFilters_RegisterFilter_PreservesSeqNumOnUpdate(t *testing.T) {
+	lggr := logger.Sugared(logger.Test(t))
+	orm := mocks.NewMockORM(t)
+	fs := newFilters(lggr, orm, nil)
+
+	const filterID = int64(1)
+	const filterName = "Filter"
+	addr := newRandomPublicKey(t)
+	filter := decoderReadyTestFilter(t, filterID, filterName, "TestEvent", addr)
+
+	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter}, nil).Once()
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{filterID: 42}, nil).Once()
+	require.NoError(t, fs.LoadFilters(t.Context()))
+
+	filter.Retention = time.Hour
+	orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
+	require.NoError(t, fs.RegisterFilter(t.Context(), filter))
+
+	require.Equal(t, int64(43), fs.IncrementSeqNum(filterID))
+}
+
+func TestFilters_stageSeqNums_Commit(t *testing.T) {
+	fs := newFilters(logger.Sugared(logger.Test(t)), nil, nil)
+	fs.seqNums[1] = 10
+	fs.seqNums[2] = 20
+
+	logs := []types.Log{
+		{FilterID: 1},
+		{FilterID: 1},
+		{FilterID: 2},
+	}
+	fs.stageSeqNums(logs)
+
+	require.Equal(t, int64(11), logs[0].SequenceNum)
+	require.Equal(t, int64(12), logs[1].SequenceNum)
+	require.Equal(t, int64(21), logs[2].SequenceNum)
+	require.Equal(t, int64(10), fs.seqNums[1], "in-memory state unchanged before commit")
+	require.Equal(t, int64(20), fs.seqNums[2])
+
+	fs.commitSeqNums(logs)
+	require.Equal(t, int64(12), fs.seqNums[1])
+	require.Equal(t, int64(21), fs.seqNums[2])
 }
 
 func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {

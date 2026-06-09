@@ -354,6 +354,16 @@ func (_c *MockFilters_IncrementSeqNum_Call) RunAndReturn(run func(int64) int64) 
 	return _c
 }
 
+// stageSeqNums provides a mock function with given fields: logs
+func (_m *MockFilters) stageSeqNums(logs []types.Log) {
+	_m.Called(logs)
+}
+
+// commitSeqNums provides a mock function with given fields: logs
+func (_m *MockFilters) commitSeqNums(logs []types.Log) {
+	_m.Called(logs)
+}
+
 // LoadFilters provides a mock function with given fields: ctx
 func (_m *MockFilters) LoadFilters(ctx context.Context) error {
 	ret := _m.Called(ctx)

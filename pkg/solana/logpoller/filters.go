@@ -62,6 +62,33 @@ func (fl *filters) IncrementSeqNum(filterID int64) int64 {
 	return fl.seqNums[filterID]
 }
 
+// stageSeqNums assigns sequence numbers to logs from the current in-memory state
+// without updating that state. commitSeqNums must be called after a successful insert.
+func (fl *filters) stageSeqNums(logs []types.Log) {
+	fl.seqNumsMutex.Lock()
+	defer fl.seqNumsMutex.Unlock()
+
+	pending := make(map[int64]int64)
+	for i := range logs {
+		filterID := logs[i].FilterID
+		pending[filterID]++
+		logs[i].SequenceNum = fl.seqNums[filterID] + pending[filterID]
+	}
+}
+
+// commitSeqNums advances in-memory sequence numbers after logs are persisted.
+func (fl *filters) commitSeqNums(logs []types.Log) {
+	fl.seqNumsMutex.Lock()
+	defer fl.seqNumsMutex.Unlock()
+
+	for i := range logs {
+		filterID := logs[i].FilterID
+		if logs[i].SequenceNum > fl.seqNums[filterID] {
+			fl.seqNums[filterID] = logs[i].SequenceNum
+		}
+	}
+}
+
 // PruneFilters - prunes all filters marked to be deleted from the database and all corresponding logs.
 func (fl *filters) PruneFilters(ctx context.Context) error {
 	err := fl.LoadFilters(ctx)
@@ -295,6 +322,10 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 
 	fl.removeFilterFromIndexes(*filter)
 
+	fl.seqNumsMutex.Lock()
+	delete(fl.seqNums, filter.ID)
+	fl.seqNumsMutex.Unlock()
+
 	fl.filtersToDelete[filter.ID] = *filter
 	return nil
 }
@@ -305,9 +336,6 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
-	fl.seqNumsMutex.Lock()
-	delete(fl.seqNums, filter.ID)
-	fl.seqNumsMutex.Unlock()
 	delete(fl.decoders, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]
