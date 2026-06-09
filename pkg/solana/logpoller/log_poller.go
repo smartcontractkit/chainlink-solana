@@ -257,15 +257,16 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return nil
 	}
 
-	if fl, ok := lp.filters.(*filters); ok {
-		fl.stageSeqNums(logs)
+	fl, ok := lp.filters.(*filters)
+	if !ok {
+		// shouldn't ever actually happen
+		return errors.New("sequence number tracking requires *filters")
 	}
+	fl.stageSeqNums(logs)
 	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
 		return err
 	}
-	if fl, ok := lp.filters.(*filters); ok {
-		fl.commitSeqNums(logs)
-	}
+	fl.commitSeqNums(logs)
 	return nil
 }
 
