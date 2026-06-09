@@ -671,7 +671,6 @@ func TestProcess(t *testing.T) {
 	expectedLog.Address = addr
 	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
 	require.NoError(t, err)
-	expectedLog.SequenceNum = 1
 	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA, subKeyValB}
 
 	expectedLog.Data, err = bin.MarshalBorsh(&event)
@@ -740,29 +739,42 @@ func TestProcess(t *testing.T) {
 	err = lp.RegisterFilter(ctx, filter)
 	require.NoError(t, err)
 
+	var nextSeqNum int64
+
 	t.Run("accepts matching log", func(t *testing.T) {
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+
 		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
-			log := logs[0]
-			assert.Equal(t, expectedLog, log)
+			assert.Equal(t, want, logs[0])
 			return nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
 	})
 
-	t.Run("rolls back sequence number when insert fails", func(t *testing.T) {
-		expectedLogAfterRetry := expectedLog
-		expectedLogAfterRetry.SequenceNum = 2
+	t.Run("does not advance sequence number when insert fails", func(t *testing.T) {
+		fl := lp.filters.(*filters)
 
 		insertErr := errors.New("insert failed")
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).Return(insertErr).Once()
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+			require.Len(t, logs, 1)
+			assert.Equal(t, nextSeqNum+1, logs[0].SequenceNum, "insert should still receive the staged sequence number")
+			return insertErr
+		}).Once()
 		err = lp.Process(ctx, ev)
 		require.ErrorIs(t, err, insertErr)
+		assert.Equal(t, nextSeqNum, fl.seqNums[filterID], "in-memory counter must not advance after failed insert")
+
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
 
 		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
-			assert.Equal(t, expectedLogAfterRetry, logs[0])
+			assert.Equal(t, want, logs[0])
 			return nil
 		}).Once()
 		err = lp.Process(ctx, ev)
@@ -783,6 +795,8 @@ func TestProcess(t *testing.T) {
 			log := logs[0]
 			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
 			assert.Greater(t, time.Until(*log.ExpiresAt), 29*time.Minute)
+			nextSeqNum++
+			assert.Equal(t, nextSeqNum, log.SequenceNum)
 			return nil
 		}).Once()
 		err = lp.Process(ctx, ev)
@@ -809,13 +823,15 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("accepts reverted log when IncludeReverted = true", func(t *testing.T) {
-		expectedLog.Error = new(string)
-		*expectedLog.Error = string(jsonErr)
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+		want.Error = new(string)
+		*want.Error = string(jsonErr)
 
 		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
 			require.Len(t, logs, 1)
-			log := logs[0]
-			assert.Equal(t, expectedLog, log)
+			assert.Equal(t, want, logs[0])
 			return nil
 		}).Once()
 
