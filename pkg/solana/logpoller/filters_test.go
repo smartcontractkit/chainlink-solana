@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -666,7 +667,54 @@ func TestFilters_ExtractField(t *testing.T) {
 	}
 }
 
-func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
+func TestFilters_RegisterFilter_PreservesSeqNumOnUpdate(t *testing.T) {
+	lggr := logger.Sugared(logger.Test(t))
+	orm := mocks.NewMockORM(t)
+	fs := newFilters(lggr, orm, nil)
+
+	const filterID = int64(1)
+	const filterName = "Filter"
+	addr := newRandomPublicKey(t)
+	filter := decoderReadyTestFilter(t, filterID, filterName, "TestEvent", addr)
+
+	orm.On("SelectFilters", mock.Anything).Return([]types.Filter{filter}, nil).Once()
+	orm.On("SelectSeqNums", mock.Anything).Return(map[int64]int64{filterID: 42}, nil).Once()
+	require.NoError(t, fs.LoadFilters(t.Context()))
+
+	filter.Retention = time.Hour
+	orm.On("InsertFilter", mock.Anything, mock.Anything).Return(filterID, nil).Once()
+	require.NoError(t, fs.RegisterFilter(t.Context(), filter))
+
+	logs := []types.Log{{FilterID: filterID}}
+	fs.StageSeqNums(logs)
+	require.Equal(t, int64(43), logs[0].SequenceNum)
+	fs.CommitSeqNums(logs)
+	require.Equal(t, int64(43), fs.seqNums[filterID])
+}
+
+func TestFilters_StageSeqNums_Commit(t *testing.T) {
+	fs := newFilters(logger.Sugared(logger.Test(t)), nil, nil)
+	fs.seqNums = map[int64]int64{1: 10, 2: 20}
+
+	logs := []types.Log{
+		{FilterID: 1},
+		{FilterID: 1},
+		{FilterID: 2},
+	}
+	fs.StageSeqNums(logs)
+
+	require.Equal(t, int64(11), logs[0].SequenceNum)
+	require.Equal(t, int64(12), logs[1].SequenceNum)
+	require.Equal(t, int64(21), logs[2].SequenceNum)
+	require.Equal(t, int64(10), fs.seqNums[1], "in-memory state unchanged before commit")
+	require.Equal(t, int64(20), fs.seqNums[2])
+
+	fs.CommitSeqNums(logs)
+	require.Equal(t, int64(12), fs.seqNums[1])
+	require.Equal(t, int64(21), fs.seqNums[2])
+}
+
+func TestFilters_StageSeqNums_Commit_Concurrent(t *testing.T) {
 	orm := mocks.NewMockORM(t)
 	lggr := logger.Sugared(logger.Test(t))
 	fs := newFilters(lggr, orm, nil)
@@ -688,14 +736,20 @@ func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
 	seqNumsFilter2 := make(chan int64, numGoroutines*incrementsPerGoroutine)
 
 	var wg sync.WaitGroup
+	// prod code calls Process() sequentially, so for this concurrent test we lock around the stage/commit calls to simulate prod behavior.
+	var processMu sync.Mutex
 	wg.Add(numGoroutines * 2)
 
 	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter1.ID)
-				seqNumsFilter1 <- seqNum
+				logs := []types.Log{{FilterID: filter1.ID}}
+				processMu.Lock()
+				fs.StageSeqNums(logs)
+				fs.CommitSeqNums(logs)
+				processMu.Unlock()
+				seqNumsFilter1 <- logs[0].SequenceNum
 			}
 		}()
 	}
@@ -704,8 +758,12 @@ func TestFilters_IncrementSeqNum_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for range incrementsPerGoroutine {
-				seqNum := fs.IncrementSeqNum(filter2.ID)
-				seqNumsFilter2 <- seqNum
+				logs := []types.Log{{FilterID: filter2.ID}}
+				processMu.Lock()
+				fs.StageSeqNums(logs)
+				fs.CommitSeqNums(logs)
+				processMu.Unlock()
+				seqNumsFilter2 <- logs[0].SequenceNum
 			}
 		}()
 	}

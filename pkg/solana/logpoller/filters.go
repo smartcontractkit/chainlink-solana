@@ -53,13 +53,31 @@ func newFilters(lggr logger.Logger, orm ORM, cpiEventExtractor *CPIEventExtracto
 	}
 }
 
-// IncrementSeqNum increments the sequence number for a filterID and returns the new
-// number. This means the sequence number assigned to the first log matched after registration will be 1.
-func (fl *filters) IncrementSeqNum(filterID int64) int64 {
+// StageSeqNums assigns sequence numbers to logs from the current in-memory state
+// without updating that state. CommitSeqNums must be called after a successful insert.
+func (fl *filters) StageSeqNums(logs []types.Log) {
 	fl.seqNumsMutex.Lock()
 	defer fl.seqNumsMutex.Unlock()
-	fl.seqNums[filterID]++
-	return fl.seqNums[filterID]
+
+	pending := make(map[int64]int64)
+	for i := range logs {
+		filterID := logs[i].FilterID
+		pending[filterID]++
+		logs[i].SequenceNum = fl.seqNums[filterID] + pending[filterID]
+	}
+}
+
+// CommitSeqNums advances in-memory sequence numbers after logs are persisted.
+func (fl *filters) CommitSeqNums(logs []types.Log) {
+	fl.seqNumsMutex.Lock()
+	defer fl.seqNumsMutex.Unlock()
+
+	for i := range logs {
+		filterID := logs[i].FilterID
+		if logs[i].SequenceNum > fl.seqNums[filterID] {
+			fl.seqNums[filterID] = logs[i].SequenceNum
+		}
+	}
 }
 
 // PruneFilters - prunes all filters marked to be deleted from the database and all corresponding logs.
@@ -304,6 +322,11 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 
 	fl.removeFilterFromIndexes(*filter)
 
+	// only update sequence numbers on Unregister so it doesn't reset to 0 when a filter gets updated.
+	fl.seqNumsMutex.Lock()
+	delete(fl.seqNums, filter.ID)
+	fl.seqNumsMutex.Unlock()
+
 	fl.filtersToDelete[filter.ID] = *filter
 	return nil
 }
@@ -314,9 +337,6 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
-	fl.seqNumsMutex.Lock()
-	delete(fl.seqNums, filter.ID)
-	fl.seqNumsMutex.Unlock()
 	delete(fl.decoders, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]

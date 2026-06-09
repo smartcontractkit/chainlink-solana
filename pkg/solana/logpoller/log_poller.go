@@ -60,7 +60,8 @@ type filtersI interface {
 	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
-	IncrementSeqNum(filterID int64) int64
+	StageSeqNums(logs []types.Log)
+	CommitSeqNums(logs []types.Log)
 }
 
 type ReplayInfo struct {
@@ -244,8 +245,6 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 			log.SubkeyValues[idx] = indexedVal
 		}
 
-		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
-
 		if filter.Retention > 0 {
 			expiresAt := time.Now().Add(filter.Retention).UTC()
 			log.ExpiresAt = &expiresAt
@@ -259,7 +258,12 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return nil
 	}
 
-	return lp.orm.InsertLogs(ctx, logs)
+	lp.filters.StageSeqNums(logs)
+	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
+		return err
+	}
+	lp.filters.CommitSeqNums(logs)
+	return nil
 }
 
 func (lp *Service) HasFilter(ctx context.Context, name string) bool {
