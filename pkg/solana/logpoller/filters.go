@@ -331,6 +331,7 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 
 	fl.removeFilterFromIndexes(*filter)
 
+	// only update sequence numbers on Unregister so it doesn't reset to 0 when a filter gets updated.
 	fl.seqNumsMutex.Lock()
 	delete(fl.seqNums, filter.ID)
 	fl.seqNumsMutex.Unlock()
