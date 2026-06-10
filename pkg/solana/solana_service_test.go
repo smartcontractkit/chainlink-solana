@@ -285,6 +285,13 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, tx.Message.Header.NumRequiredSignatures, got.Message.Header.NumRequiredSignatures)
 	})
 
+	t.Run("convertSimulateTXOpts_nil", func(t *testing.T) {
+		opts := convertSimulateTXOpts(nil)
+		require.NotNil(t, opts)
+		require.Equal(t, rpc.CommitmentFinalized, opts.Commitment)
+		require.Nil(t, opts.Accounts)
+	})
+
 	t.Run("convertAccountInfoOpts_nil", func(t *testing.T) {
 		require.Nil(t, convertAccountInfoOpts(nil))
 	})
@@ -369,8 +376,8 @@ func Test_getPublicKeyWithHighestLamports(t *testing.T) {
 		require.NoError(t, err)
 
 		mockR := clientmocks.NewReaderWriter(t)
-		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(100), nil).Once()
-		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(9000), nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(&rpc.GetBalanceResult{Value: 100}, nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(&rpc.GetBalanceResult{Value: 9000}, nil).Once()
 
 		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{kLow.PublicKey().String(), kHigh.PublicKey().String()})
 		require.NoError(t, err)
@@ -384,7 +391,7 @@ func Test_getPublicKeyWithHighestLamports(t *testing.T) {
 		require.NoError(t, err)
 
 		mockR := clientmocks.NewReaderWriter(t)
-		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return(uint64(0), errors.New("rpc down")).Twice()
+		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return((*rpc.GetBalanceResult)(nil), errors.New("rpc down")).Twice()
 
 		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{k0.PublicKey().String(), k1.PublicKey().String()})
 		require.NoError(t, err)

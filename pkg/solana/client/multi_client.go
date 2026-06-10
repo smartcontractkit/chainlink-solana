@@ -104,10 +104,10 @@ func (m *MultiClient) Balance(ctx context.Context, addr solana.PublicKey) (uint6
 	return r.Balance(ctx, addr)
 }
 
-func (m *MultiClient) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error) {
+func (m *MultiClient) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (*rpc.GetBalanceResult, error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	return r.BalanceWithCommitment(ctx, addr, commitment)
@@ -158,10 +158,10 @@ func (m *MultiClient) GetFeeForMessage(ctx context.Context, msg string) (uint64,
 	return r.GetFeeForMessage(ctx, msg)
 }
 
-func (m *MultiClient) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (uint64, error) {
+func (m *MultiClient) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error) {
 	r, err := m.getClient(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	return r.GetFeeForMessageWithCommitment(ctx, msg, commitment)
