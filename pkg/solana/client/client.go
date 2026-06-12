@@ -51,11 +51,12 @@ type ReaderWriter interface {
 type Reader interface {
 	AccountReader
 	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
-	BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error)
+	BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (*rpc.GetBalanceResult, error)
 	SlotHeight(ctx context.Context) (uint64, error)
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error)
 	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
@@ -171,7 +172,7 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 	return res.Value, err
 }
 
-func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (bal uint64, err error) {
+func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (bal *rpc.GetBalanceResult, err error) {
 	done := c.latency("balance")
 	defer func() { done(err) }()
 
@@ -183,16 +184,16 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	})
 
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	res, ok := v.(*rpc.GetBalanceResult)
 	if !ok {
-		return 0, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
+		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
 	}
 	if res == nil {
-		return 0, errors.New("BalanceWithCommitment returned nil result")
+		return nil, errors.New("BalanceWithCommitment returned nil result")
 	}
-	return res.Value, err
+	return res, err
 }
 
 func (c *Client) SlotHeight(ctx context.Context) (uint64, error) {
@@ -393,6 +394,25 @@ func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (fee uint64, 
 		return 0, errors.New("nil pointer in GetFeeForMessage")
 	}
 	return *res.Value, nil
+}
+
+func (c *Client) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (result *rpc.GetFeeForMessageResult, err error) {
+	done := c.latency("fee_for_message")
+	defer func() { done(err) }()
+
+	// msg is base58 encoded data
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	res, err := c.rpc.GetFeeForMessage(ctx, msg, commitment)
+	if err != nil {
+		return nil, fmt.Errorf("error in GetFeeForMessage: %w", err)
+	}
+
+	if res == nil || res.Value == nil {
+		return nil, errors.New("nil pointer in GetFeeForMessage")
+	}
+	return res, nil
 }
 
 // https://docs.solana.com/developing/clients/jsonrpc-api#getsignaturestatuses

@@ -82,22 +82,24 @@ func (_c *ReaderWriter_Balance_Call) RunAndReturn(run func(context.Context, sola
 }
 
 // BalanceWithCommitment provides a mock function with given fields: ctx, addr, commitment
-func (_m *ReaderWriter) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error) {
+func (_m *ReaderWriter) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (*rpc.GetBalanceResult, error) {
 	ret := _m.Called(ctx, addr, commitment)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BalanceWithCommitment")
 	}
 
-	var r0 uint64
+	var r0 *rpc.GetBalanceResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) (uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) (*rpc.GetBalanceResult, error)); ok {
 		return rf(ctx, addr, commitment)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) uint64); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, solana.PublicKey, rpc.CommitmentType) *rpc.GetBalanceResult); ok {
 		r0 = rf(ctx, addr, commitment)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetBalanceResult)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, solana.PublicKey, rpc.CommitmentType) error); ok {
@@ -129,12 +131,12 @@ func (_c *ReaderWriter_BalanceWithCommitment_Call) Run(run func(ctx context.Cont
 	return _c
 }
 
-func (_c *ReaderWriter_BalanceWithCommitment_Call) Return(_a0 uint64, _a1 error) *ReaderWriter_BalanceWithCommitment_Call {
+func (_c *ReaderWriter_BalanceWithCommitment_Call) Return(_a0 *rpc.GetBalanceResult, _a1 error) *ReaderWriter_BalanceWithCommitment_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ReaderWriter_BalanceWithCommitment_Call) RunAndReturn(run func(context.Context, solana.PublicKey, rpc.CommitmentType) (uint64, error)) *ReaderWriter_BalanceWithCommitment_Call {
+func (_c *ReaderWriter_BalanceWithCommitment_Call) RunAndReturn(run func(context.Context, solana.PublicKey, rpc.CommitmentType) (*rpc.GetBalanceResult, error)) *ReaderWriter_BalanceWithCommitment_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -595,6 +597,66 @@ func (_c *ReaderWriter_GetFeeForMessage_Call) Return(_a0 uint64, _a1 error) *Rea
 }
 
 func (_c *ReaderWriter_GetFeeForMessage_Call) RunAndReturn(run func(context.Context, string) (uint64, error)) *ReaderWriter_GetFeeForMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetFeeForMessageWithCommitment provides a mock function with given fields: ctx, msg, commitment
+func (_m *ReaderWriter) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error) {
+	ret := _m.Called(ctx, msg, commitment)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFeeForMessageWithCommitment")
+	}
+
+	var r0 *rpc.GetFeeForMessageResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error)); ok {
+		return rf(ctx, msg, commitment)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, rpc.CommitmentType) *rpc.GetFeeForMessageResult); ok {
+		r0 = rf(ctx, msg, commitment)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.GetFeeForMessageResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, rpc.CommitmentType) error); ok {
+		r1 = rf(ctx, msg, commitment)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReaderWriter_GetFeeForMessageWithCommitment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFeeForMessageWithCommitment'
+type ReaderWriter_GetFeeForMessageWithCommitment_Call struct {
+	*mock.Call
+}
+
+// GetFeeForMessageWithCommitment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - msg string
+//   - commitment rpc.CommitmentType
+func (_e *ReaderWriter_Expecter) GetFeeForMessageWithCommitment(ctx interface{}, msg interface{}, commitment interface{}) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	return &ReaderWriter_GetFeeForMessageWithCommitment_Call{Call: _e.mock.On("GetFeeForMessageWithCommitment", ctx, msg, commitment)}
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) Run(run func(ctx context.Context, msg string, commitment rpc.CommitmentType)) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(rpc.CommitmentType))
+	})
+	return _c
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) Return(_a0 *rpc.GetFeeForMessageResult, _a1 error) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *ReaderWriter_GetFeeForMessageWithCommitment_Call) RunAndReturn(run func(context.Context, string, rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error)) *ReaderWriter_GetFeeForMessageWithCommitment_Call {
 	_c.Call.Return(run)
 	return _c
 }

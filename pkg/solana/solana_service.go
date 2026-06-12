@@ -51,7 +51,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
-	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(req.Opts.Commitment)))
+	commitment := commonsol.CommitmentFinalized
+	if req.Opts != nil {
+		commitment = req.Opts.Commitment
+	}
+	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(commitment)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
@@ -89,7 +93,11 @@ func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commons
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccountResult(account, req.Opts.Encoding)
+	enc := commonsol.EncodingType("")
+	if req.Opts != nil {
+		enc = req.Opts.Encoding
+	}
+	return convertAccountResult(account, enc)
 }
 
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
@@ -104,7 +112,8 @@ func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanc
 	}
 
 	return &commonsol.GetBalanceReply{
-		Value: balance,
+		Value: balance.Value,
+		Slot:  balance.Context.Slot,
 	}, nil
 }
 
@@ -114,20 +123,7 @@ func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateT
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode transaction: %w", err)
 	}
-	accounts := &rpc.SimulateTransactionAccountsOpts{
-		Encoding:  solana.EncodingType(req.Opts.Accounts.Encoding),
-		Addresses: make([]solana.PublicKey, 0, len(req.Opts.Accounts.Addresses)),
-	}
-	for _, addr := range req.Opts.Accounts.Addresses {
-		accounts.Addresses = append(accounts.Addresses, solana.PublicKey(addr))
-	}
-
-	res, err := ss.chain.MultiClient().SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{
-		SigVerify:              req.Opts.SigVerify,
-		Commitment:             rpc.CommitmentType(req.Opts.Commitment),
-		ReplaceRecentBlockhash: req.Opts.ReplaceRecentBlockhash,
-		Accounts:               accounts,
-	})
+	res, err := ss.chain.MultiClient().SimulateTx(ctx, tx, convertSimulateTXOpts(req.Opts))
 	if err != nil {
 		return nil, fmt.Errorf("simulate tx failed: %w", err)
 	}
@@ -438,8 +434,9 @@ func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r 
 			ss.logger.Warnw("failed to get balance for account, skipping", "account", acct, "err", err)
 			continue
 		}
-		if !haveAnyBalance || balance > highestLamports {
-			highestLamports = balance
+		val := balance.Value
+		if !haveAnyBalance || val > highestLamports {
+			highestLamports = val
 			selected = pk
 			haveAnyBalance = true
 		}
@@ -614,13 +611,14 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 }
 
 func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.GetFeeForMessageRequest) (*commonsol.GetFeeForMessageReply, error) {
-	fee, err := ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
+	res, err := ss.chain.MultiClient().GetFeeForMessageWithCommitment(ctx, req.Message, rpc.CommitmentType(req.Commitment))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee for message: %w", err)
 	}
 
 	return &commonsol.GetFeeForMessageReply{
-		Fee: fee,
+		Fee:  *res.Value,
+		Slot: res.Context.Slot,
 	}, nil
 }
 
@@ -949,7 +947,35 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 	}, nil
 }
 
+func convertSimulateTXOpts(opts *commonsol.SimulateTXOpts) *rpc.SimulateTransactionOpts {
+	commitment := rpc.CommitmentFinalized
+	if opts != nil {
+		commitment = rpc.CommitmentType(opts.Commitment)
+	}
+	out := &rpc.SimulateTransactionOpts{
+		Commitment: commitment,
+	}
+	if opts == nil {
+		return out
+	}
+	out.SigVerify = opts.SigVerify
+	out.ReplaceRecentBlockhash = opts.ReplaceRecentBlockhash
+	if opts.Accounts != nil {
+		out.Accounts = &rpc.SimulateTransactionAccountsOpts{
+			Encoding:  solana.EncodingType(opts.Accounts.Encoding),
+			Addresses: make([]solana.PublicKey, 0, len(opts.Accounts.Addresses)),
+		}
+		for _, addr := range opts.Accounts.Addresses {
+			out.Accounts.Addresses = append(out.Accounts.Addresses, solana.PublicKey(addr))
+		}
+	}
+	return out
+}
+
 func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountInfoOpts {
+	if opts == nil {
+		return nil
+	}
 	var ds *rpc.DataSlice
 	if opts.DataSlice != nil {
 		ds = &rpc.DataSlice{}
