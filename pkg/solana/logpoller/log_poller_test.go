@@ -868,7 +868,6 @@ func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
 
 	goodFilterID := rand.Int63()
 	badFilterID := goodFilterID + 1
-	chainID := uuid.NewString()
 
 	txIndex := int(rand.Int31())
 	txLogIndex := uint(rand.Uint32())
@@ -886,7 +885,7 @@ func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
 	ev := types.ProgramEvent{
 		Program: addr.ToSolana().String(),
 		BlockData: types.BlockData{
-			SlotNumber:          uint64(expectedLog.BlockNumber),
+			SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec
 			BlockHash:           expectedLog.BlockHash.ToSolana(),
 			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
 			TransactionHash:     expectedLog.TxHash.ToSolana(),

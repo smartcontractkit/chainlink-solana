@@ -153,7 +153,7 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 	// Replace an existing filter so config changes (e.g. subkey paths) take effect.
 	// RegisterFilter alone returns ErrFilterNameConflict when subkey paths differ.
 	if lp.HasFilter(ctx, req.Name) {
-		if err := lp.UnregisterFilter(ctx, req.Name); err != nil {
+		if err = lp.UnregisterFilter(ctx, req.Name); err != nil {
 			return fmt.Errorf("failed to unregister existing filter %q: %w", req.Name, err)
 		}
 	}
