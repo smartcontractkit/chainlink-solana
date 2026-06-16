@@ -853,6 +853,109 @@ func TestProcess(t *testing.T) {
 	})
 }
 
+func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
+	ctx := t.Context()
+
+	addr := newRandomPublicKey(t)
+	eventName := "myEvent"
+	eventSig := types.NewEventSignatureFromName(eventName)
+	event := struct {
+		A int64
+		B string
+	}{55, "hello"}
+	subKeyValA, err := types.NewIndexedValue(event.A)
+	require.NoError(t, err)
+
+	goodFilterID := rand.Int63()
+	badFilterID := goodFilterID + 1
+	chainID := uuid.NewString()
+
+	txIndex := int(rand.Int31())
+	txLogIndex := uint(rand.Uint32())
+
+	expectedLog := newRandomLog(t, goodFilterID, chainID, eventName)
+	expectedLog.Address = addr
+	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
+	require.NoError(t, err)
+	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA}
+
+	expectedLog.Data, err = bin.MarshalBorsh(&event)
+	require.NoError(t, err)
+	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
+
+	ev := types.ProgramEvent{
+		Program: addr.ToSolana().String(),
+		BlockData: types.BlockData{
+			SlotNumber:          uint64(expectedLog.BlockNumber),
+			BlockHash:           expectedLog.BlockHash.ToSolana(),
+			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+			TransactionHash:     expectedLog.TxHash.ToSolana(),
+			TransactionIndex:    txIndex,
+			TransactionLogIndex: txLogIndex,
+		},
+		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
+	}
+
+	orm := mocks.NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lggr := logger.Sugared(logger.Test(t))
+	lp, err := New(lggr, orm, cl, config.NewDefault(), chainID)
+	require.NoError(t, err)
+
+	var idlTypeInt64 codecv1.IdlType
+	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
+	require.NoError(t, err)
+
+	idl := types.EventIdl{
+		Event: codecv1.IdlEvent{
+			Name: "myEvent",
+			Fields: []codecv1.IdlEventField{{
+				Name: "A",
+				Type: idlTypeInt64,
+			}},
+		},
+	}
+
+	goodFilter := types.Filter{
+		Name:        "good filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"A"}},
+	}
+	badFilter := types.Filter{
+		Name:        "bad filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"MissingField"}},
+	}
+
+	orm.EXPECT().ChainID().Return(chainID).Maybe()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.MatchedBy(func(f types.Filter) bool { return f.Name == goodFilter.Name })).
+		RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) { return goodFilterID, nil }).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.MatchedBy(func(f types.Filter) bool { return f.Name == badFilter.Name })).
+		RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) { return badFilterID, nil }).Once()
+
+	require.NoError(t, lp.RegisterFilter(ctx, goodFilter))
+	require.NoError(t, lp.RegisterFilter(ctx, badFilter))
+
+	want := expectedLog
+	want.SequenceNum = 1
+
+	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		require.Len(t, logs, 1)
+		assert.Equal(t, want, logs[0])
+		return nil
+	}).Once()
+
+	require.NoError(t, lp.Process(ctx, ev))
+}
+
 func Test_LogPoller_Replay(t *testing.T) {
 	t.Parallel()
 	fromBlock := int64(5)

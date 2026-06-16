@@ -1015,6 +1015,24 @@ func TestLogPollerReadinessGuard(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("RegisterLogTracking replaces existing filter", func(t *testing.T) {
+		ss := newSolanaService(t, nil)
+		filterName := "test-replace"
+		first := commonsol.LPFilterQuery{
+			Name:            filterName,
+			ContractIdlJSON: []byte(`{}`),
+			SubkeyPaths:     [][]string{{"OldField"}},
+		}
+		second := commonsol.LPFilterQuery{
+			Name:            filterName,
+			ContractIdlJSON: []byte(`{}`),
+			SubkeyPaths:     [][]string{{"NewField"}},
+		}
+
+		require.NoError(t, ss.RegisterLogTracking(ctx, first))
+		require.NoError(t, ss.RegisterLogTracking(ctx, second))
+	})
+
 	t.Run("UnregisterLogTracking returns error when LogPoller not started", func(t *testing.T) {
 		ss := newSolanaService(t, errNotStarted)
 		err := ss.UnregisterLogTracking(ctx, "test")
