@@ -123,10 +123,10 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 		}
 
 		blockData := types.BlockData{
-			SlotNumber:  100,
-			BlockHeight: 99,
-			BlockHash:   solana.Hash{1, 2, 3},
-			BlockTime:   solana.UnixTimeSeconds(12345),
+			SlotNumber:       100,
+			BlockHeight:      99,
+			BlockHash:        solana.Hash{1, 2, 3},
+			BlockTime:        solana.UnixTimeSeconds(12345),
 			TransactionIndex: 0,
 			TransactionHash:  solana.Signature{4, 5, 6},
 		}
