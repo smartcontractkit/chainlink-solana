@@ -11,43 +11,11 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 )
 
-// Builds a "accept_ownership" instruction.
-// Step 2 of 2-step ownership process: accept ownership.
-func NewAcceptOwnershipInstruction(
-	stateAccount solanago.PublicKey,
-	proposedOwnerAccount solanago.PublicKey,
-) (solanago.Instruction, error) {
-	buf__ := new(bytes.Buffer)
-	enc__ := binary.NewBorshEncoder(buf__)
-
-	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_AcceptOwnership[:], false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
-	}
-	accounts__ := solanago.AccountMetaSlice{}
-
-	// Add the accounts to the instruction.
-	{
-		// Account 0 "state": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
-		// Account 1 "proposed_owner": Read-only, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(proposedOwnerAccount, false, true))
-	}
-
-	// Create the instruction.
-	return solanago.NewInstruction(
-		ProgramID,
-		accounts__,
-		buf__.Bytes(),
-	), nil
-}
-
 // Builds a "initialize" instruction.
-// Initializes a new mock-forwarder instance and stores data in its state account.
+// Creates a new (empty) `ForwarderState` account. The account only exists // to anchor the `forwarder_authority` PDA — its contents are unused.
 func NewInitializeInstruction(
 	stateAccount solanago.PublicKey,
-	ownerAccount solanago.PublicKey,
+	payerAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
@@ -64,8 +32,8 @@ func NewInitializeInstruction(
 	{
 		// Account 0 "state": Writable, Signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, true))
-		// Account 1 "owner": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
+		// Account 1 "payer": Writable, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(payerAccount, true, true))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 	}
@@ -133,156 +101,15 @@ func NewReportInstruction(
 	), nil
 }
 
-// Builds a "transfer_ownership" instruction.
-// Step 1 of 2-step ownership process: propose a new owner.
-func NewTransferOwnershipInstruction(
-	// Params:
-	proposedOwnerParam solanago.PublicKey,
-
-	// Accounts:
-	stateAccount solanago.PublicKey,
-	currentOwnerAccount solanago.PublicKey,
-) (solanago.Instruction, error) {
-	buf__ := new(bytes.Buffer)
-	enc__ := binary.NewBorshEncoder(buf__)
-
-	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_TransferOwnership[:], false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
-	}
-	{
-		// Serialize `proposedOwnerParam`:
-		err = enc__.Encode(proposedOwnerParam)
-		if err != nil {
-			return nil, errors.NewField("proposedOwnerParam", err)
-		}
-	}
-	accounts__ := solanago.AccountMetaSlice{}
-
-	// Add the accounts to the instruction.
-	{
-		// Account 0 "state": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
-		// Account 1 "current_owner": Read-only, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(currentOwnerAccount, false, true))
-	}
-
-	// Create the instruction.
-	return solanago.NewInstruction(
-		ProgramID,
-		accounts__,
-		buf__.Bytes(),
-	), nil
-}
-
-type AcceptOwnershipInstruction struct {
-
-	// Accounts:
-	State               solanago.PublicKey `json:"state"`
-	StateWritable       bool               `json:"state_writable"`
-	ProposedOwner       solanago.PublicKey `json:"proposed_owner"`
-	ProposedOwnerSigner bool               `json:"proposed_owner_signer"`
-}
-
-func (obj *AcceptOwnershipInstruction) GetDiscriminator() []byte {
-	return Instruction_AcceptOwnership[:]
-}
-
-// UnmarshalWithDecoder unmarshals the AcceptOwnershipInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *AcceptOwnershipInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
-	// Read the discriminator and check it against the expected value:
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "AcceptOwnershipInstruction", err)
-	}
-	if discriminator != Instruction_AcceptOwnership {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "AcceptOwnershipInstruction", Instruction_AcceptOwnership, discriminator)
-	}
-	return nil
-}
-
-func (obj *AcceptOwnershipInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
-	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
-	decoder := binary.NewBorshDecoder(buf)
-	indices := make([]uint8, 0)
-	index := uint8(0)
-	var err error
-	// Decode from state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from proposed_owner account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "proposed_owner", err)
-	}
-	indices = append(indices, index)
-	return indices, nil
-}
-
-func (obj *AcceptOwnershipInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
-	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
-	}
-	indexOffset := 0
-	// Set state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
-	}
-	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set proposed_owner account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "proposed_owner", len(accountKeys)-1)
-	}
-	obj.ProposedOwner = accountKeys[indices[indexOffset]]
-	indexOffset++
-	return nil
-}
-
-func (obj *AcceptOwnershipInstruction) GetAccountKeys() []solanago.PublicKey {
-	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.State)
-	keys = append(keys, obj.ProposedOwner)
-	return keys
-}
-
-// Unmarshal unmarshals the AcceptOwnershipInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *AcceptOwnershipInstruction) Unmarshal(buf []byte) error {
-	var err error
-	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling AcceptOwnershipInstruction: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalAcceptOwnershipInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalAcceptOwnershipInstruction(buf []byte) (*AcceptOwnershipInstruction, error) {
-	obj := new(AcceptOwnershipInstruction)
-	var err error
-	err = obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type InitializeInstruction struct {
 
 	// Accounts:
 	State         solanago.PublicKey `json:"state"`
 	StateWritable bool               `json:"state_writable"`
 	StateSigner   bool               `json:"state_signer"`
-	Owner         solanago.PublicKey `json:"owner"`
-	OwnerWritable bool               `json:"owner_writable"`
-	OwnerSigner   bool               `json:"owner_signer"`
+	Payer         solanago.PublicKey `json:"payer"`
+	PayerWritable bool               `json:"payer_writable"`
+	PayerSigner   bool               `json:"payer_signer"`
 	SystemProgram solanago.PublicKey `json:"system_program"`
 }
 
@@ -316,11 +143,11 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from owner account index
+	// Decode from payer account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "owner", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "payer", err)
 	}
 	indices = append(indices, index)
 	// Decode from system_program account index
@@ -345,11 +172,11 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set owner account from index
+	// Set payer account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "owner", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "payer", len(accountKeys)-1)
 	}
-	obj.Owner = accountKeys[indices[indexOffset]]
+	obj.Payer = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set system_program account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -363,7 +190,7 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.Owner)
+	keys = append(keys, obj.Payer)
 	keys = append(keys, obj.SystemProgram)
 	return keys
 }
@@ -555,111 +382,6 @@ func UnmarshalReportInstruction(buf []byte) (*ReportInstruction, error) {
 	return obj, nil
 }
 
-type TransferOwnershipInstruction struct {
-	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
-
-	// Accounts:
-	State              solanago.PublicKey `json:"state"`
-	StateWritable      bool               `json:"state_writable"`
-	CurrentOwner       solanago.PublicKey `json:"current_owner"`
-	CurrentOwnerSigner bool               `json:"current_owner_signer"`
-}
-
-func (obj *TransferOwnershipInstruction) GetDiscriminator() []byte {
-	return Instruction_TransferOwnership[:]
-}
-
-// UnmarshalWithDecoder unmarshals the TransferOwnershipInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *TransferOwnershipInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
-	var err error
-	// Read the discriminator and check it against the expected value:
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "TransferOwnershipInstruction", err)
-	}
-	if discriminator != Instruction_TransferOwnership {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "TransferOwnershipInstruction", Instruction_TransferOwnership, discriminator)
-	}
-	// Deserialize `ProposedOwner`:
-	err = decoder.Decode(&obj.ProposedOwner)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *TransferOwnershipInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
-	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
-	decoder := binary.NewBorshDecoder(buf)
-	indices := make([]uint8, 0)
-	index := uint8(0)
-	var err error
-	// Decode from state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from current_owner account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "current_owner", err)
-	}
-	indices = append(indices, index)
-	return indices, nil
-}
-
-func (obj *TransferOwnershipInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
-	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
-	}
-	indexOffset := 0
-	// Set state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
-	}
-	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set current_owner account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "current_owner", len(accountKeys)-1)
-	}
-	obj.CurrentOwner = accountKeys[indices[indexOffset]]
-	indexOffset++
-	return nil
-}
-
-func (obj *TransferOwnershipInstruction) GetAccountKeys() []solanago.PublicKey {
-	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.State)
-	keys = append(keys, obj.CurrentOwner)
-	return keys
-}
-
-// Unmarshal unmarshals the TransferOwnershipInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *TransferOwnershipInstruction) Unmarshal(buf []byte) error {
-	var err error
-	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling TransferOwnershipInstruction: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalTransferOwnershipInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalTransferOwnershipInstruction(buf []byte) (*TransferOwnershipInstruction, error) {
-	obj := new(TransferOwnershipInstruction)
-	var err error
-	err = obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 // Instruction interface defines common methods for all instruction types
 type Instruction interface {
 	GetDiscriminator() []byte
@@ -685,24 +407,6 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 	copy(discriminator[:], instructionData[0:8])
 	// Parse based on discriminator
 	switch discriminator {
-	case Instruction_AcceptOwnership:
-		instruction := new(AcceptOwnershipInstruction)
-		decoder := binary.NewBorshDecoder(instructionData)
-		err := instruction.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as AcceptOwnershipInstruction: %w", err)
-		}
-		if accountIndicesData != nil && len(accountIndicesData) > 0 {
-			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
-			}
-			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
-			if err != nil {
-				return nil, fmt.Errorf("failed to populate accounts: %w", err)
-			}
-		}
-		return instruction, nil
 	case Instruction_Initialize:
 		instruction := new(InitializeInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
@@ -727,24 +431,6 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as ReportInstruction: %w", err)
-		}
-		if accountIndicesData != nil && len(accountIndicesData) > 0 {
-			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
-			}
-			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
-			if err != nil {
-				return nil, fmt.Errorf("failed to populate accounts: %w", err)
-			}
-		}
-		return instruction, nil
-	case Instruction_TransferOwnership:
-		instruction := new(TransferOwnershipInstruction)
-		decoder := binary.NewBorshDecoder(instructionData)
-		err := instruction.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as TransferOwnershipInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
