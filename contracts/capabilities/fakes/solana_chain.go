@@ -5,7 +5,6 @@ package fakes
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -267,18 +266,12 @@ func (fc *FakeSolanaChain) WriteReport(
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("derive forwarder authority: %w", err), caperrors.Internal)
 	}
-	transmissionID := extractTransmissionID(receiver, input.Report)
-	executionState, _, err := deriveExecutionState(fc.forwarderProgramID, fc.forwarderStateAccount, transmissionID)
-	if err != nil {
-		return nil, caperrors.NewPublicSystemError(fmt.Errorf("derive execution state: %w", err), caperrors.Internal)
-	}
 
 	ix, err := mock_forwarder.NewReportInstruction(
 		payload,
 		fc.forwarderStateAccount,
 		fc.transmitter.PublicKey(),
 		authority,
-		executionState,
 		receiver,
 		solana.SystemProgramID,
 	)
@@ -430,29 +423,6 @@ func deriveForwarderAuthority(programID, state, receiver solana.PublicKey) (sola
 		receiver.Bytes(),
 	}, programID)
 	return pk, bump, err
-}
-
-// deriveExecutionState computes the PDA ["execution_state", state, transmission_id]
-// — same scheme as keystone-forwarder.
-func deriveExecutionState(programID, state solana.PublicKey, transmissionID [32]byte) (solana.PublicKey, uint8, error) {
-	pk, bump, err := solana.FindProgramAddress([][]byte{
-		[]byte("execution_state"),
-		state.Bytes(),
-		transmissionID[:],
-	}, programID)
-	return pk, bump, err
-}
-
-// extractTransmissionID mirrors keystone-forwarder/src/utils.rs::extract_transmission_id:
-// sha256(receiver || raw_report[1..33] || raw_report[107..109]).
-func extractTransmissionID(receiver solana.PublicKey, report interface{ GetRawReport() []byte }) [32]byte {
-	raw := report.GetRawReport()
-	workflowExecutionID := raw[1:33]
-	reportID := raw[107:109]
-	buf := append([]byte{}, receiver.Bytes()...)
-	buf = append(buf, workflowExecutionID...)
-	buf = append(buf, reportID...)
-	return sha256.Sum256(buf)
 }
 
 // receiverStatusFromLogs distinguishes forwarder-side aborts from receiver-side

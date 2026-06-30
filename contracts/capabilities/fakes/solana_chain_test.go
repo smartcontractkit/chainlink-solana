@@ -253,21 +253,7 @@ func TestBuildReportPayload(t *testing.T) {
 	})
 }
 
-func TestExtractTransmissionID_DeterministicAndReceiverDependent(t *testing.T) {
-	t.Parallel()
-	report := mkReport()
-	a := solana.NewWallet().PublicKey()
-	b := solana.NewWallet().PublicKey()
-
-	idA1 := extractTransmissionID(a, report)
-	idA2 := extractTransmissionID(a, report)
-	idB := extractTransmissionID(b, report)
-
-	assert.Equal(t, idA1, idA2, "same input must produce same id")
-	assert.NotEqual(t, idA1, idB, "different receivers must produce different ids")
-}
-
-func TestDerivePDAs_StableForSameInputs(t *testing.T) {
+func TestDeriveForwarderAuthority_Stable(t *testing.T) {
 	t.Parallel()
 	prog := testForwarderProgramID(t)
 	state := testForwarderStateAccount(t)
@@ -278,13 +264,6 @@ func TestDerivePDAs_StableForSameInputs(t *testing.T) {
 	a2, _, err := deriveForwarderAuthority(prog, state, receiver)
 	require.NoError(t, err)
 	assert.Equal(t, a1, a2)
-
-	tid := [32]byte{1, 2, 3}
-	e1, _, err := deriveExecutionState(prog, state, tid)
-	require.NoError(t, err)
-	e2, _, err := deriveExecutionState(prog, state, tid)
-	require.NoError(t, err)
-	assert.Equal(t, e1, e2)
 }
 
 func TestReceiverStatusFromLogs(t *testing.T) {
