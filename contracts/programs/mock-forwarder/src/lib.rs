@@ -42,23 +42,19 @@ pub mod mock_forwarder {
     ///
     /// Same payload layout as keystone-forwarder
     /// (`data = len_sigs (1) | signatures (N*65) | raw_report (M) | report_context (96)`),
-    /// but signatures are **not** verified. Account-hash check + replay protection
-    /// + receiver CPI all mirror prod so workflows assemble payloads the same way
-    /// in simulation and in production.
+    /// but signatures are **not** verified, and there is **no replay protection**:
+    /// devs iterating against the simulator should be able to resubmit the same
+    /// transmission_id freely. (Matches the EVM `MockKeystoneForwarder` precedent.)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
+
         let raw_report = extract_raw_report(&data);
 
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
-
-        let execution_state = &mut ctx.accounts.execution_state;
-        require!(
-            !execution_state.success,
-            ForwarderError::ExecutionAlreadySucceded
-        );
 
         let forwarder_authority_pda = ctx.accounts.forwarder_authority.clone();
 
@@ -142,10 +138,6 @@ pub mod mock_forwarder {
         });
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
-
-        execution_state.transmitter = ctx.accounts.transmitter.key();
-        execution_state.transmission_id = transmission_id;
-        execution_state.success = true;
 
         emit!(ReportProcessed {
             state: ctx.accounts.state.key(),

@@ -23,9 +23,6 @@ pub enum ForwarderError {
     #[msg("Report does not meet minimum length")]
     InvalidReport,
 
-    #[msg("Execution already succeded")]
-    ExecutionAlreadySucceded,
-
     #[msg("Forwarder Report Expected")]
     ForwarderReportExpected,
 
@@ -61,16 +58,6 @@ pub struct ReportProcessed {
 #[derive(Default, InitSpace)]
 pub struct ForwarderState {}
 
-/// Per-transmission account. Persists so repeat submissions for the same
-/// `transmission_id` abort — mirrors prod replay-protection semantics.
-#[account]
-#[derive(Default, InitSpace)]
-pub struct ExecutionState {
-    pub transmitter: Pubkey,
-    pub transmission_id: [u8; 32],
-    pub success: bool,
-}
-
 // ---------- instruction contexts ----------
 
 #[derive(Accounts)]
@@ -87,7 +74,6 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(data: Vec<u8>)]
 pub struct Report<'info> {
     pub state: Account<'info, ForwarderState>,
 
@@ -97,20 +83,6 @@ pub struct Report<'info> {
     /// CHECK: This is a PDA
     #[account(seeds = [b"forwarder", state.key().as_ref(), receiver_program.key().as_ref()], bump)]
     pub forwarder_authority: UncheckedAccount<'info>,
-
-    #[account(
-        init_if_needed,
-        constraint = report_size_ok(&data) @ ForwarderError::InvalidReport,
-        payer = transmitter,
-        space = ANCHOR_DISCRIMINATOR + ExecutionState::INIT_SPACE,
-        seeds = [
-            b"execution_state",
-            state.key().as_ref(),
-            &extract_transmission_id(extract_raw_report(&data), receiver_program.key)
-        ],
-        bump
-    )]
-    pub execution_state: Account<'info, ExecutionState>,
 
     #[account(executable)]
     /// CHECK: Any executable program — Anchor `executable` constraint is enough.

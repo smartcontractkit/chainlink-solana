@@ -5,7 +5,6 @@ package mock_forwarder
 
 // Account discriminators
 var (
-	Account_ExecutionState = [8]byte{31, 209, 35, 133, 132, 142, 151, 100}
 	Account_ForwarderState = [8]byte{211, 150, 18, 11, 12, 158, 235, 175}
 )
 

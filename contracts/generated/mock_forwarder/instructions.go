@@ -47,7 +47,7 @@ func NewInitializeInstruction(
 }
 
 // Builds a "report" instruction.
-// Relays a report to the receiver program. //  // Same payload layout as keystone-forwarder // (`data = len_sigs (1) | signatures (N*65) | raw_report (M) | report_context (96)`), // but signatures are **not** verified. Account-hash check + replay protection // + receiver CPI all mirror prod so workflows assemble payloads the same way // in simulation and in production.
+// Relays a report to the receiver program. //  // Same payload layout as keystone-forwarder // (`data = len_sigs (1) | signatures (N*65) | raw_report (M) | report_context (96)`), // but signatures are **not** verified, and there is **no replay protection**: // devs iterating against the simulator should be able to resubmit the same // transmission_id freely. (Matches the EVM `MockKeystoneForwarder` precedent.)
 func NewReportInstruction(
 	// Params:
 	dataParam []byte,
@@ -56,7 +56,6 @@ func NewReportInstruction(
 	stateAccount solanago.PublicKey,
 	transmitterAccount solanago.PublicKey,
 	forwarderAuthorityAccount solanago.PublicKey,
-	executionStateAccount solanago.PublicKey,
 	receiverProgramAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -85,11 +84,9 @@ func NewReportInstruction(
 		accounts__.Append(solanago.NewAccountMeta(transmitterAccount, true, true))
 		// Account 2 "forwarder_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(forwarderAuthorityAccount, false, false))
-		// Account 3 "execution_state": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(executionStateAccount, true, false))
-		// Account 4 "receiver_program": Read-only, Non-signer, Required
+		// Account 3 "receiver_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(receiverProgramAccount, false, false))
-		// Account 5 "system_program": Read-only, Non-signer, Required
+		// Account 4 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 	}
 
@@ -220,15 +217,13 @@ type ReportInstruction struct {
 	Data []byte `json:"data"`
 
 	// Accounts:
-	State                  solanago.PublicKey `json:"state"`
-	Transmitter            solanago.PublicKey `json:"transmitter"`
-	TransmitterWritable    bool               `json:"transmitter_writable"`
-	TransmitterSigner      bool               `json:"transmitter_signer"`
-	ForwarderAuthority     solanago.PublicKey `json:"forwarder_authority"`
-	ExecutionState         solanago.PublicKey `json:"execution_state"`
-	ExecutionStateWritable bool               `json:"execution_state_writable"`
-	ReceiverProgram        solanago.PublicKey `json:"receiver_program"`
-	SystemProgram          solanago.PublicKey `json:"system_program"`
+	State               solanago.PublicKey `json:"state"`
+	Transmitter         solanago.PublicKey `json:"transmitter"`
+	TransmitterWritable bool               `json:"transmitter_writable"`
+	TransmitterSigner   bool               `json:"transmitter_signer"`
+	ForwarderAuthority  solanago.PublicKey `json:"forwarder_authority"`
+	ReceiverProgram     solanago.PublicKey `json:"receiver_program"`
+	SystemProgram       solanago.PublicKey `json:"system_program"`
 }
 
 func (obj *ReportInstruction) GetDiscriminator() []byte {
@@ -281,13 +276,6 @@ func (obj *ReportInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, erro
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "forwarder_authority", err)
 	}
 	indices = append(indices, index)
-	// Decode from execution_state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "execution_state", err)
-	}
-	indices = append(indices, index)
 	// Decode from receiver_program account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -307,8 +295,8 @@ func (obj *ReportInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, erro
 
 func (obj *ReportInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 6 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 6, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set state account from index
@@ -328,12 +316,6 @@ func (obj *ReportInstruction) PopulateFromAccountIndices(indices []uint8, accoun
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "forwarder_authority", len(accountKeys)-1)
 	}
 	obj.ForwarderAuthority = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set execution_state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "execution_state", len(accountKeys)-1)
-	}
-	obj.ExecutionState = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set receiver_program account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -355,7 +337,6 @@ func (obj *ReportInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.Transmitter)
 	keys = append(keys, obj.ForwarderAuthority)
-	keys = append(keys, obj.ExecutionState)
 	keys = append(keys, obj.ReceiverProgram)
 	keys = append(keys, obj.SystemProgram)
 	return keys

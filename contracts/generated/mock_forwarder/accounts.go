@@ -15,13 +15,6 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 		return nil, fmt.Errorf("failed to peek account discriminator: %w", err)
 	}
 	switch discriminator {
-	case Account_ExecutionState:
-		value := new(ExecutionState)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account as ExecutionState: %w", err)
-		}
-		return value, nil
 	case Account_ForwarderState:
 		value := new(ForwarderState)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -32,23 +25,6 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 	default:
 		return nil, fmt.Errorf("unknown discriminator: %s", binary.FormatDiscriminator(discriminator))
 	}
-}
-
-func ParseAccount_ExecutionState(accountData []byte) (*ExecutionState, error) {
-	decoder := binary.NewBorshDecoder(accountData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Account_ExecutionState {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Account_ExecutionState, binary.FormatDiscriminator(discriminator))
-	}
-	acc := new(ExecutionState)
-	err = acc.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account of type ExecutionState: %w", err)
-	}
-	return acc, nil
 }
 
 func ParseAccount_ForwarderState(accountData []byte) (*ForwarderState, error) {
