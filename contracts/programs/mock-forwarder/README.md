@@ -56,12 +56,12 @@ into `cre-cli/cmd/workflow/simulate/chain/solana/supported_chains.go`.
 
 ## Differences from `keystone-forwarder`
 
-| Feature                                 | keystone-forwarder | mock-forwarder       |
-| --------------------------------------- | ------------------ | -------------------- |
-| ECDSA signature verification            | required           | **skipped**          |
-| `oracles_config` PDA                    | required           | **removed**          |
-| `init_oracles_config` / `update` / `close` instructions | yes  | **removed**          |
-| Account-hash check (`ForwarderReport`)  | yes                | yes                  |
-| Replay protection via `execution_state` | yes                | yes                  |
-| `invoke_signed` into receiver           | yes                | yes (identical path) |
-| Events (`ReportInProgress`, `ReportProcessed`, ownership) | yes | yes |
+| Feature                                                   | keystone-forwarder | mock-forwarder       |
+| --------------------------------------------------------- | ------------------ | -------------------- |
+| ECDSA signature verification                              | required           | **skipped**          |
+| `oracles_config` PDA                                      | required           | **removed**          |
+| `init_oracles_config` / `update` / `close` instructions   | yes                | **removed**          |
+| Account-hash check (`ForwarderReport`)                    | yes                | yes                  |
+| Replay protection via `execution_state`                   | yes                | yes                  |
+| `invoke_signed` into receiver                             | yes                | yes (identical path) |
+| Events (`ReportInProgress`, `ReportProcessed`, ownership) | yes                | yes                  |
