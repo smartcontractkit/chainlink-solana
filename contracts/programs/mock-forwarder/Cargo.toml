@@ -1,0 +1,27 @@
+[package]
+name = "mock-forwarder"
+version = "0.1.0"
+description = "Dev/test mock of keystone-forwarder for cre-cli workflow simulation. Skips OCR signature + oracles_config checks; otherwise mirrors the prod CPI path."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mock_forwarder"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+# Pin blake3 to 1.8.2; 1.8.3+ uses edition2024 (Cargo 1.85+), not available in Anchor build image
+blake3 = "1.8.2"
+# Pin indexmap to 2.11.x; 2.12+ requires rustc 1.82, Solana tools ship 1.79
+indexmap = "2.11"
+
+[lints]
+workspace = true
