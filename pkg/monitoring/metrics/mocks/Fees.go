@@ -5,6 +5,7 @@ package mocks
 import (
 	metrics "github.com/smartcontractkit/chainlink-solana/pkg/monitoring/metrics"
 	fees "github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
+
 	mock "github.com/stretchr/testify/mock"
 )
 

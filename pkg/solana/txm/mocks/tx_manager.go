@@ -9,6 +9,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 
 	types "github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	utils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
