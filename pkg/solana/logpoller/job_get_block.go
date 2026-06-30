@@ -112,24 +112,24 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		return err
 	}
 
-	detail := eventDetail{
-		slotNumber: j.slotNumber,
-		blockHash:  block.Blockhash,
+	blockData := types.BlockData{
+		SlotNumber: j.slotNumber,
+		BlockHash:  block.Blockhash,
 	}
 
 	if block.BlockHeight == nil {
 		return fmt.Errorf("block at slot %d returned from rpc is missing block number", j.slotNumber)
 	}
-	detail.blockHeight = *block.BlockHeight
+	blockData.BlockHeight = *block.BlockHeight
 
 	if block.BlockTime == nil {
 		return fmt.Errorf("block at slot %d returned from rpc is missing block time", j.slotNumber)
 	}
-	detail.blockTime = *block.BlockTime
+	blockData.BlockTime = *block.BlockTime
 
 	events := make([]types.ProgramEvent, 0, len(block.Transactions))
 	for idx, txWithMeta := range block.Transactions {
-		detail.trxIdx = idx
+		blockData.TransactionIndex = idx
 		if txWithMeta.Transaction == nil {
 			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, j.slotNumber, errors.New("missing transaction field"))
 		}
@@ -143,20 +143,21 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		if txWithMeta.Meta == nil {
 			return fmt.Errorf("expected transaction to have meta. signature: %s; slot: %d; idx: %d", tx.Signatures[0], j.slotNumber, idx)
 		}
-		detail.trxSig = tx.Signatures[0] // according to Solana docs first signature is used as ID
-		detail.err = txWithMeta.Meta.Err
+		blockData.TransactionHash = tx.Signatures[0] // according to Solana docs first signature is used as ID
+		blockData.Error = txWithMeta.Meta.Err
 
 		txOutcome := txSucceeded
 		if txWithMeta.Meta.Err != nil {
 			txOutcome = txReverted
 		}
 
-		txEvents := j.messagesToEvents(ctx, txWithMeta.Meta.LogMessages, detail, txOutcome)
+		txEvents := j.messagesToEvents(ctx, txWithMeta.Meta.LogMessages, blockData, txOutcome)
 		events = append(events, txEvents...)
 
 		// Look for events corresponding to CPI filters
 		if j.cpiEventExtractor != nil && j.cpiEventExtractor.HasCPIFilters() {
-			cpiEvents := j.cpiEventExtractor.ExtractCPIEvents(tx, txWithMeta.Meta, detail, uint(len(txEvents)))
+			blockData.TransactionLogIndex = uint(len(txEvents))
+			cpiEvents := j.cpiEventExtractor.ExtractCPIEvents(tx, txWithMeta.Meta, blockData)
 			events = append(events, cpiEvents...)
 		}
 	}
@@ -178,32 +179,32 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 	return nil
 }
 
-func (j *getBlockJob) messagesToEvents(ctx context.Context, messages []string, detail eventDetail, txOutcome txOutcome) []types.ProgramEvent {
+func (j *getBlockJob) messagesToEvents(ctx context.Context, messages []string, blockData types.BlockData, txOutcome txOutcome) []types.ProgramEvent {
 	var logIdx uint
 	events := make([]types.ProgramEvent, 0, len(messages))
 	outputs, err := j.parseProgramLogs(messages)
 	if err != nil {
-		j.lggr.Errorf("failed to parse program logs at slot %d for tx %s. Skipping tx due to error: %v", detail.slotNumber, detail.trxSig, err)
+		j.lggr.Errorf("failed to parse program logs at slot %d for tx %s. Skipping tx due to error: %v", blockData.SlotNumber, blockData.TransactionHash, err)
 		j.metrics.IncrementTxsLogParsingError(ctx, txOutcome)
 		return events
 	}
 	for _, outputs := range outputs {
 		for i, event := range outputs.Events {
-			event.SlotNumber = detail.slotNumber
-			event.BlockHeight = detail.blockHeight
-			event.BlockHash = detail.blockHash
-			event.BlockTime = detail.blockTime
-			event.TransactionHash = detail.trxSig
-			event.TransactionIndex = detail.trxIdx
+			event.SlotNumber = blockData.SlotNumber
+			event.BlockHeight = blockData.BlockHeight
+			event.BlockHash = blockData.BlockHash
+			event.BlockTime = blockData.BlockTime
+			event.TransactionHash = blockData.TransactionHash
+			event.TransactionIndex = blockData.TransactionIndex
 			event.TransactionLogIndex = logIdx
-			event.Error = detail.err
+			event.Error = blockData.Error
 
 			logIdx++
 			outputs.Events[i] = event
 		}
 
 		if outputs.Truncated {
-			j.lggr.Warnw("Encountered truncated logs", "program", outputs.Program, "detail", detail)
+			j.lggr.Warnw("Encountered truncated logs", "program", outputs.Program, "blockData", blockData)
 			j.metrics.IncrementTruncatedTxs(ctx, txOutcome)
 		}
 
@@ -211,14 +212,4 @@ func (j *getBlockJob) messagesToEvents(ctx context.Context, messages []string, d
 	}
 
 	return events
-}
-
-type eventDetail struct {
-	slotNumber  uint64
-	blockHeight uint64
-	blockHash   solana.Hash
-	blockTime   solana.UnixTimeSeconds
-	trxIdx      int
-	trxSig      solana.Signature
-	err         interface{}
 }

@@ -2,9 +2,8 @@ package logpoller
 
 import (
 	"encoding/base64"
-	"sync"
-
 	bin "encoding/binary"
+	"sync"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -83,8 +82,7 @@ func (e *CPIEventExtractor) HasCPIFilters() bool {
 func (e *CPIEventExtractor) ExtractCPIEvents(
 	tx *solana.Transaction,
 	meta *rpc.TransactionMeta,
-	detail eventDetail,
-	logIdxOffset uint,
+	blockData types.BlockData,
 ) []types.ProgramEvent {
 	if meta == nil || len(meta.InnerInstructions) == 0 {
 		return nil
@@ -99,7 +97,7 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 	defer e.mu.RUnlock()
 
 	var events []types.ProgramEvent
-	logIdx := logIdxOffset
+	logIdx := blockData.TransactionLogIndex
 
 	for _, inner := range meta.InnerInstructions {
 		if int(inner.Index) >= len(tx.Message.Instructions) {
@@ -190,14 +188,14 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			event := types.ProgramEvent{
 				Program: sourceProgram.ToSolana().String(),
 				BlockData: types.BlockData{
-					SlotNumber:          detail.slotNumber,
-					BlockHeight:         detail.blockHeight,
-					BlockHash:           detail.blockHash,
-					BlockTime:           detail.blockTime,
-					TransactionHash:     detail.trxSig,
-					TransactionIndex:    detail.trxIdx,
+					SlotNumber:          blockData.SlotNumber,
+					BlockHeight:         blockData.BlockHeight,
+					BlockHash:           blockData.BlockHash,
+					BlockTime:           blockData.BlockTime,
+					TransactionHash:     blockData.TransactionHash,
+					TransactionIndex:    blockData.TransactionIndex,
 					TransactionLogIndex: logIdx,
-					Error:               detail.err,
+					Error:               blockData.Error,
 				},
 				Data:  encodedData,
 				IsCPI: true,
