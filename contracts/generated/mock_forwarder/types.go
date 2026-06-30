@@ -11,82 +11,8 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 )
 
-// Per-transmission account. Persists so repeat submissions for the same
-// `transmission_id` abort — mirrors prod replay-protection semantics.
-type ExecutionState struct {
-	Transmitter    solanago.PublicKey `json:"transmitter"`
-	TransmissionId [32]uint8          `json:"transmission_id"`
-	Success        bool               `json:"success"`
-}
-
-func (obj ExecutionState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Transmitter`:
-	err = encoder.Encode(obj.Transmitter)
-	if err != nil {
-		return errors.NewField("Transmitter", err)
-	}
-	// Serialize `TransmissionId`:
-	err = encoder.Encode(obj.TransmissionId)
-	if err != nil {
-		return errors.NewField("TransmissionId", err)
-	}
-	// Serialize `Success`:
-	err = encoder.Encode(obj.Success)
-	if err != nil {
-		return errors.NewField("Success", err)
-	}
-	return nil
-}
-
-func (obj ExecutionState) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding ExecutionState: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *ExecutionState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Transmitter`:
-	err = decoder.Decode(&obj.Transmitter)
-	if err != nil {
-		return errors.NewField("Transmitter", err)
-	}
-	// Deserialize `TransmissionId`:
-	err = decoder.Decode(&obj.TransmissionId)
-	if err != nil {
-		return errors.NewField("TransmissionId", err)
-	}
-	// Deserialize `Success`:
-	err = decoder.Decode(&obj.Success)
-	if err != nil {
-		return errors.NewField("Success", err)
-	}
-	return nil
-}
-
-func (obj *ExecutionState) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ExecutionState: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalExecutionState(buf []byte) (*ExecutionState, error) {
-	obj := new(ExecutionState)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type ForwarderInitialize struct {
 	State solanago.PublicKey `json:"state"`
-	Owner solanago.PublicKey `json:"owner"`
 }
 
 func (obj ForwarderInitialize) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -94,11 +20,6 @@ func (obj ForwarderInitialize) MarshalWithEncoder(encoder *binary.Encoder) (err 
 	err = encoder.Encode(obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
-	}
-	// Serialize `Owner`:
-	err = encoder.Encode(obj.Owner)
-	if err != nil {
-		return errors.NewField("Owner", err)
 	}
 	return nil
 }
@@ -118,11 +39,6 @@ func (obj *ForwarderInitialize) UnmarshalWithDecoder(decoder *binary.Decoder) (e
 	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
-	}
-	// Deserialize `Owner`:
-	err = decoder.Decode(&obj.Owner)
-	if err != nil {
-		return errors.NewField("Owner", err)
 	}
 	return nil
 }
@@ -144,29 +60,11 @@ func UnmarshalForwarderInitialize(buf []byte) (*ForwarderInitialize, error) {
 	return obj, nil
 }
 
-// Account which represents a distinct instance of a mock forwarder.
-type ForwarderState struct {
-	Version       uint8              `json:"version"`
-	Owner         solanago.PublicKey `json:"owner"`
-	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
-}
+// Empty marker account. Only its address matters — the report instruction uses
+// `state.key()` as a seed for the `forwarder_authority` PDA.
+type ForwarderState struct{}
 
 func (obj ForwarderState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Serialize `Owner`:
-	err = encoder.Encode(obj.Owner)
-	if err != nil {
-		return errors.NewField("Owner", err)
-	}
-	// Serialize `ProposedOwner`:
-	err = encoder.Encode(obj.ProposedOwner)
-	if err != nil {
-		return errors.NewField("ProposedOwner", err)
-	}
 	return nil
 }
 
@@ -181,21 +79,6 @@ func (obj ForwarderState) Marshal() ([]byte, error) {
 }
 
 func (obj *ForwarderState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Deserialize `Owner`:
-	err = decoder.Decode(&obj.Owner)
-	if err != nil {
-		return errors.NewField("Owner", err)
-	}
-	// Deserialize `ProposedOwner`:
-	err = decoder.Decode(&obj.ProposedOwner)
-	if err != nil {
-		return errors.NewField("ProposedOwner", err)
-	}
 	return nil
 }
 
@@ -209,148 +92,6 @@ func (obj *ForwarderState) Unmarshal(buf []byte) error {
 
 func UnmarshalForwarderState(buf []byte) (*ForwarderState, error) {
 	obj := new(ForwarderState)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type OwnershipAcceptance struct {
-	State         solanago.PublicKey `json:"state"`
-	PreviousOwner solanago.PublicKey `json:"previous_owner"`
-	NewOwner      solanago.PublicKey `json:"new_owner"`
-}
-
-func (obj OwnershipAcceptance) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `PreviousOwner`:
-	err = encoder.Encode(obj.PreviousOwner)
-	if err != nil {
-		return errors.NewField("PreviousOwner", err)
-	}
-	// Serialize `NewOwner`:
-	err = encoder.Encode(obj.NewOwner)
-	if err != nil {
-		return errors.NewField("NewOwner", err)
-	}
-	return nil
-}
-
-func (obj OwnershipAcceptance) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding OwnershipAcceptance: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *OwnershipAcceptance) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `PreviousOwner`:
-	err = decoder.Decode(&obj.PreviousOwner)
-	if err != nil {
-		return errors.NewField("PreviousOwner", err)
-	}
-	// Deserialize `NewOwner`:
-	err = decoder.Decode(&obj.NewOwner)
-	if err != nil {
-		return errors.NewField("NewOwner", err)
-	}
-	return nil
-}
-
-func (obj *OwnershipAcceptance) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling OwnershipAcceptance: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalOwnershipAcceptance(buf []byte) (*OwnershipAcceptance, error) {
-	obj := new(OwnershipAcceptance)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type OwnershipTransfer struct {
-	State         solanago.PublicKey `json:"state"`
-	CurrentOwner  solanago.PublicKey `json:"current_owner"`
-	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
-}
-
-func (obj OwnershipTransfer) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `CurrentOwner`:
-	err = encoder.Encode(obj.CurrentOwner)
-	if err != nil {
-		return errors.NewField("CurrentOwner", err)
-	}
-	// Serialize `ProposedOwner`:
-	err = encoder.Encode(obj.ProposedOwner)
-	if err != nil {
-		return errors.NewField("ProposedOwner", err)
-	}
-	return nil
-}
-
-func (obj OwnershipTransfer) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding OwnershipTransfer: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *OwnershipTransfer) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `CurrentOwner`:
-	err = decoder.Decode(&obj.CurrentOwner)
-	if err != nil {
-		return errors.NewField("CurrentOwner", err)
-	}
-	// Deserialize `ProposedOwner`:
-	err = decoder.Decode(&obj.ProposedOwner)
-	if err != nil {
-		return errors.NewField("ProposedOwner", err)
-	}
-	return nil
-}
-
-func (obj *OwnershipTransfer) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling OwnershipTransfer: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalOwnershipTransfer(buf []byte) (*OwnershipTransfer, error) {
-	obj := new(OwnershipTransfer)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err

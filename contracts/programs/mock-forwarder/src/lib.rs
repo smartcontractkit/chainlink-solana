@@ -12,27 +12,9 @@
 
 use anchor_lang::prelude::*;
 
-use common::{FORWARDER_METADATA_LENGTH, METADATA_LENGTH, ON_REPORT_DISCRIMINATOR, STATE_VERSION};
+mod internal;
+pub use internal::*;
 
-use events::{
-    ForwarderInitialize, OwnershipAcceptance, OwnershipTransfer, ReportInProgress,
-    ReportProcessed,
-};
-
-use context::*;
-pub use error::*;
-pub use state::{ExecutionState, ForwarderState};
-use utils::{extract_transmission_id, ForwarderReport};
-
-mod common;
-mod context;
-mod error;
-mod events;
-mod state;
-mod utils;
-
-// Placeholder ID (System Program ID). Replace via `anchor keys sync` after
-// `solana-keygen new -o target/deploy/mock_forwarder-keypair.json`.
 declare_id!("7kuEAA3mSC1Tz8gQjnvH7bKFda9xSPRRin9SZbH49cNK");
 
 /// Mock forwarder: relays chainlink reports to a receiver without verifying
@@ -45,61 +27,14 @@ pub mod mock_forwarder {
         hash, instruction::Instruction, program::invoke_signed,
     };
 
-    use crate::utils::extract_raw_report;
-
     use super::*;
 
-    /// Initializes a new mock-forwarder instance and stores data in its state account.
+    /// Creates a new (empty) `ForwarderState` account. The account only exists
+    /// to anchor the `forwarder_authority` PDA — its contents are unused.
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        let state = &mut ctx.accounts.state;
-        state.version = STATE_VERSION;
-        state.owner = ctx.accounts.owner.key();
-
         emit!(ForwarderInitialize {
-            state: state.key(),
-            owner: ctx.accounts.owner.key(),
+            state: ctx.accounts.state.key(),
         });
-
-        Ok(())
-    }
-
-    /// Step 1 of 2-step ownership process: propose a new owner.
-    pub fn transfer_ownership(
-        ctx: Context<TransferOwnership>,
-        proposed_owner: Pubkey,
-    ) -> Result<()> {
-        let state = &mut ctx.accounts.state;
-        require!(
-            proposed_owner != Pubkey::default()
-                && proposed_owner != state.owner
-                && proposed_owner != state.proposed_owner,
-            ForwarderError::InvalidProposedOwner
-        );
-
-        state.proposed_owner = proposed_owner;
-
-        emit!(OwnershipTransfer {
-            state: state.key(),
-            current_owner: state.owner,
-            proposed_owner: state.proposed_owner
-        });
-
-        Ok(())
-    }
-
-    /// Step 2 of 2-step ownership process: accept ownership.
-    pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        let state = &mut ctx.accounts.state;
-        let state_previous_owner = state.owner;
-        state.owner = state.proposed_owner;
-        state.proposed_owner = Pubkey::default();
-
-        emit!(OwnershipAcceptance {
-            state: state.key(),
-            previous_owner: state_previous_owner,
-            new_owner: state.owner
-        });
-
         Ok(())
     }
 
@@ -107,23 +42,19 @@ pub mod mock_forwarder {
     ///
     /// Same payload layout as keystone-forwarder
     /// (`data = len_sigs (1) | signatures (N*65) | raw_report (M) | report_context (96)`),
-    /// but signatures are **not** verified. Account-hash check + replay protection
-    /// + receiver CPI all mirror prod so workflows assemble payloads the same way
-    /// in simulation and in production.
+    /// but signatures are **not** verified, and there is **no replay protection**:
+    /// devs iterating against the simulator should be able to resubmit the same
+    /// transmission_id freely. (Matches the EVM `MockKeystoneForwarder` precedent.)
     pub fn report<'info>(
         ctx: Context<'_, '_, '_, 'info, Report<'info>>,
         data: Vec<u8>,
     ) -> Result<()> {
+        require!(report_size_ok(&data), ForwarderError::InvalidReport);
+
         let raw_report = extract_raw_report(&data);
 
         let transmission_id =
             extract_transmission_id(raw_report, ctx.accounts.receiver_program.key);
-
-        let execution_state = &mut ctx.accounts.execution_state;
-        require!(
-            !execution_state.success,
-            ForwarderError::ExecutionAlreadySucceded
-        );
 
         let forwarder_authority_pda = ctx.accounts.forwarder_authority.clone();
 
@@ -207,10 +138,6 @@ pub mod mock_forwarder {
         });
 
         invoke_signed(&ix, &account_infos, &[signers_seeds])?;
-
-        execution_state.transmitter = ctx.accounts.transmitter.key();
-        execution_state.transmission_id = transmission_id;
-        execution_state.success = true;
 
         emit!(ReportProcessed {
             state: ctx.accounts.state.key(),

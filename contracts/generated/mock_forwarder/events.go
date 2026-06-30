@@ -22,20 +22,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as ForwarderInitialize: %w", err)
 		}
 		return value, nil
-	case Event_OwnershipAcceptance:
-		value := new(OwnershipAcceptance)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as OwnershipAcceptance: %w", err)
-		}
-		return value, nil
-	case Event_OwnershipTransfer:
-		value := new(OwnershipTransfer)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as OwnershipTransfer: %w", err)
-		}
-		return value, nil
 	case Event_ReportInProgress:
 		value := new(ReportInProgress)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -68,40 +54,6 @@ func ParseEvent_ForwarderInitialize(eventData []byte) (*ForwarderInitialize, err
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type ForwarderInitialize: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_OwnershipAcceptance(eventData []byte) (*OwnershipAcceptance, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_OwnershipAcceptance {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_OwnershipAcceptance, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(OwnershipAcceptance)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type OwnershipAcceptance: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_OwnershipTransfer(eventData []byte) (*OwnershipTransfer, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_OwnershipTransfer {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_OwnershipTransfer, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(OwnershipTransfer)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type OwnershipTransfer: %w", err)
 	}
 	return event, nil
 }
