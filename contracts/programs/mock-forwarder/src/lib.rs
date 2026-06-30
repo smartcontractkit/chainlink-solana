@@ -23,9 +23,7 @@ declare_id!("7kuEAA3mSC1Tz8gQjnvH7bKFda9xSPRRin9SZbH49cNK");
 pub mod mock_forwarder {
     use std::io::Cursor;
 
-    use anchor_lang::solana_program::{
-        hash, instruction::Instruction, program::invoke_signed,
-    };
+    use anchor_lang::solana_program::{hash, instruction::Instruction, program::invoke_signed};
 
     use super::*;
 
