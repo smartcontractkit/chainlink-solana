@@ -57,7 +57,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: contracts/docker-build.tar
-          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+          key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: load cached image
         run: |
           docker load --input docker-build.tar
@@ -99,7 +99,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: contracts/docker-build.tar
-          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+          key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: load cached image
         run: |
           docker load --input docker-build.tar
@@ -147,7 +147,7 @@ jobs:
         with:
           fail-on-cache-miss: true
           path: contracts/docker-build.tar
-          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+          key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
 
       - name: load cached image
         run: |
@@ -213,7 +213,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: contracts/docker-build.tar
-          key: ${{ runner.os }}-docker-pnpm-build-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
+          key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: load cached image
         run: |
           docker load --input docker-build.tar
