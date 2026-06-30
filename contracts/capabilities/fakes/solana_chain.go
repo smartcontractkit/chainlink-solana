@@ -173,7 +173,7 @@ func (fc *FakeSolanaChain) GetBalance(
 		return nil, caperrors.NewPublicUserError(fmt.Errorf("addr: %w", err), caperrors.InvalidArgument)
 	}
 
-	out, err := fc.client.GetBalance(ctx, pk, rpc.CommitmentFinalized)
+	out, err := fc.client.GetBalance(ctx, pk, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("solana GetBalance: %w", err), caperrors.Unavailable)
 	}
@@ -187,7 +187,7 @@ func (fc *FakeSolanaChain) GetSlotHeight(
 	_ commonCap.RequestMetadata,
 	_ *solcap.GetSlotHeightRequest,
 ) (*commonCap.ResponseAndMetadata[*solcap.GetSlotHeightReply], caperrors.Error) {
-	slot, err := fc.client.GetSlot(ctx, rpc.CommitmentFinalized)
+	slot, err := fc.client.GetSlot(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("solana GetSlot: %w", err), caperrors.Unavailable)
 	}
@@ -320,7 +320,7 @@ func (fc *FakeSolanaChain) writeReportBroadcast(
 		ctx, fc.client,
 		[]solana.Instruction{ix},
 		fc.transmitter,
-		rpc.CommitmentFinalized,
+		rpc.CommitmentConfirmed,
 	)
 
 	reply := &solcap.WriteReportReply{}
@@ -371,7 +371,7 @@ func (fc *FakeSolanaChain) writeReportDryRun(
 		fc.transmitter,
 		rpc.SimulateTransactionOpts{
 			SigVerify:              false,
-			Commitment:             rpc.CommitmentFinalized,
+			Commitment:             rpc.CommitmentConfirmed,
 			ReplaceRecentBlockhash: true,
 		},
 	)
