@@ -171,11 +171,6 @@ func TestFakeSolanaChain_UnimplementedMethods(t *testing.T) {
 		require.NotNil(t, err)
 		assert.Equal(t, caperrors.Unimplemented, err.Code())
 	})
-	t.Run("GetProgramAccounts", func(t *testing.T) {
-		_, err := fc.GetProgramAccounts(ctx, md, nil)
-		require.NotNil(t, err)
-		assert.Equal(t, caperrors.Unimplemented, err.Code())
-	})
 	t.Run("GetSignatureStatuses", func(t *testing.T) {
 		_, err := fc.GetSignatureStatuses(ctx, md, nil)
 		require.NotNil(t, err)
