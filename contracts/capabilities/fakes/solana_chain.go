@@ -208,9 +208,6 @@ func (fc *FakeSolanaChain) GetFeeForMessage(_ context.Context, _ commonCap.Reque
 func (fc *FakeSolanaChain) GetMultipleAccountsWithOpts(_ context.Context, _ commonCap.RequestMetadata, _ *solcap.GetMultipleAccountsWithOptsRequest) (*commonCap.ResponseAndMetadata[*solcap.GetMultipleAccountsWithOptsReply], caperrors.Error) {
 	return nil, unimplemented("GetMultipleAccountsWithOpts")
 }
-func (fc *FakeSolanaChain) GetProgramAccounts(_ context.Context, _ commonCap.RequestMetadata, _ *solcap.GetProgramAccountsRequest) (*commonCap.ResponseAndMetadata[*solcap.GetProgramAccountsReply], caperrors.Error) {
-	return nil, unimplemented("GetProgramAccounts")
-}
 func (fc *FakeSolanaChain) GetSignatureStatuses(_ context.Context, _ commonCap.RequestMetadata, _ *solcap.GetSignatureStatusesRequest) (*commonCap.ResponseAndMetadata[*solcap.GetSignatureStatusesReply], caperrors.Error) {
 	return nil, unimplemented("GetSignatureStatuses")
 }
