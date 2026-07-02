@@ -214,6 +214,9 @@ func (fc *FakeSolanaChain) GetSignatureStatuses(_ context.Context, _ commonCap.R
 func (fc *FakeSolanaChain) GetTransaction(_ context.Context, _ commonCap.RequestMetadata, _ *solcap.GetTransactionRequest) (*commonCap.ResponseAndMetadata[*solcap.GetTransactionReply], caperrors.Error) {
 	return nil, unimplemented("GetTransaction")
 }
+func (fc *FakeSolanaChain) GetProgramAccounts(_ context.Context, _ commonCap.RequestMetadata, _ *solcap.GetProgramAccountsRequest) (*commonCap.ResponseAndMetadata[*solcap.GetProgramAccountsReply], caperrors.Error) {
+	return nil, unimplemented("GetProgramAccounts")
+}
 
 // ---------- triggers (no log-trigger support in v1) ----------
 
