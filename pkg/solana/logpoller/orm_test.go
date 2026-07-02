@@ -509,8 +509,7 @@ func sanitize(expected, actual *types.Log) {
 	expected.CreatedAt = actual.CreatedAt
 	expected.BlockTimestamp = expected.BlockTimestamp.UTC().Truncate(time.Millisecond)
 
-	// These are not returned by FilteredLogs
-	actual.SequenceNum = expected.SequenceNum
+	// FilteredLogs now returns sequence_num; other fields are still populated on write.
 	actual.FilterID = expected.FilterID
 	actual.SubkeyValues = expected.SubkeyValues
 }
