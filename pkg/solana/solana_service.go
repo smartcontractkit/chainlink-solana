@@ -974,7 +974,7 @@ func convertSimulateTXOpts(opts *commonsol.SimulateTXOpts) *rpc.SimulateTransact
 
 func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountInfoOpts {
 	if opts == nil {
-		return nil
+		return &rpc.GetAccountInfoOpts{}
 	}
 	var ds *rpc.DataSlice
 	if opts.DataSlice != nil {
