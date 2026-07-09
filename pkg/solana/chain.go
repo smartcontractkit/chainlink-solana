@@ -501,6 +501,9 @@ func (c *chain) Replay(ctx context.Context, fromBlock string, args map[string]an
 	if err != nil {
 		return err
 	}
+	if from < 0 {
+		return fmt.Errorf("fromBlock must be a non-negative slot number, got %d", from)
+	}
 
 	c.LogPoller().Replay(from)
 	return nil
