@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana/contracts
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/Unheilbar/anchor-go v1.0.3
