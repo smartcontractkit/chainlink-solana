@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-solana
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/cometbft/cometbft v0.38.21
