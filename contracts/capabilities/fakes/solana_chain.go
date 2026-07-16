@@ -253,8 +253,7 @@ func (fc *FakeSolanaChain) AckEvent(_ context.Context, _ string, _ string, _ str
 }
 
 // ManualTrigger validates a caller-supplied log against the registered filter and
-// delivers it to the workflow's trigger callback channel. Counterpart to
-// FakeEVMChain.ManualTrigger; used by cre-cli's `simulate` to replay a known
+// delivers it to the workflow's trigger callback channel. Used by cre-cli's `simulate` to replay a known
 // on-chain event.
 func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, log *solcap.Log) error {
 	if log == nil {
@@ -299,8 +298,6 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 //     match events from every program, a common and dangerous mistake.
 //   - EventName: when set, the log's EventSig must equal the Anchor discriminator
 //     derived from the event name.
-//   - Subkeys/CPI: intentionally rejected until the simulator can evaluate them
-//     with the same semantics as the production Solana log poller.
 func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
 	if log == nil {
 		return errors.New("log is nil")
@@ -317,10 +314,17 @@ func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTrigger
 		return fmt.Errorf("log program address must be %d bytes, got %d", solana.PublicKeyLength, len(log.GetAddress()))
 	}
 	if len(filter.GetSubkeys()) > 0 {
-		return errors.New("subkey log trigger filters are not supported in cre-cli simulate")
+		if err := subkeyFieldMatches(log, filter); err != nil {
+			return fmt.Errorf("subkey filter mismatch: %w", err)
+		}
 	}
 	if cfg := filter.GetCpiFilterConfig(); cfg != nil {
-		return errors.New("CPI log trigger filters are not supported in cre-cli simulate")
+		if len(cfg.GetDestAddress()) != solana.PublicKeyLength {
+			return fmt.Errorf("CPI filter destination address must be %d bytes, got %d", solana.PublicKeyLength, len(cfg.GetDestAddress()))
+		}
+		if len(cfg.GetMethodName()) == 0 {
+			return errors.New("CPI filter method name cannot be empty")
+		}
 	}
 	if !bytes.Equal(log.GetAddress(), filter.GetAddress()) {
 		return fmt.Errorf("log program address %x does not match filter address %x", log.GetAddress(), filter.GetAddress())

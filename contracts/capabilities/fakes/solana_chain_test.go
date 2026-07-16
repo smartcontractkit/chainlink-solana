@@ -289,7 +289,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		assert.Contains(t, err.Error(), "log program address must be 32 bytes")
 	})
 
-	t.Run("unsupported subkey and cpi filters fail closed", func(t *testing.T) {
+	t.Run("unsupported subkey filters fail closed", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
 		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
@@ -302,8 +302,35 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "subkey log trigger filters are not supported")
+	})
+
+	t.Run("cpi filters validate config and deliver extracted logs", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+			Address: prog.Bytes(),
+			CpiFilterConfig: &solcap.CPIFilterConfig{
+				DestAddress: []byte{0x01},
+				MethodName:  []byte("anchor:event"),
+			},
+		})
+		require.Nil(t, cerr)
+		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CPI filter destination address must be 32 bytes")
 
 		_, cerr = fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+			Address: prog.Bytes(),
+			CpiFilterConfig: &solcap.CPIFilterConfig{
+				DestAddress: prog.Bytes(),
+			},
+		})
+		require.Nil(t, cerr)
+		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CPI filter method name cannot be empty")
+
+		ch, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address: prog.Bytes(),
 			CpiFilterConfig: &solcap.CPIFilterConfig{
 				DestAddress: prog.Bytes(),
@@ -312,8 +339,12 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		})
 		require.Nil(t, cerr)
 		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "CPI log trigger filters are not supported")
+		require.NoError(t, err)
+		select {
+		case <-ch:
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected trigger event, got none")
+		}
 	})
 
 	t.Run("nil log is rejected", func(t *testing.T) {
