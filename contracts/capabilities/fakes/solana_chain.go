@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -52,6 +53,7 @@ type FakeSolanaChain struct {
 	dryRunWrites          bool
 
 	// log trigger callback channels and their registered filters
+	mu                sync.RWMutex
 	callbackCh        map[string]chan commonCap.TriggerAndId[*solcap.Log]
 	logTriggerFilters map[string]*solcap.FilterLogTriggerRequest
 }
@@ -229,12 +231,18 @@ func (fc *FakeSolanaChain) GetProgramAccounts(_ context.Context, _ commonCap.Req
 // ---------- triggers ----------
 
 func (fc *FakeSolanaChain) RegisterLogTrigger(_ context.Context, triggerID string, _ commonCap.RequestMetadata, input *solcap.FilterLogTriggerRequest) (<-chan commonCap.TriggerAndId[*solcap.Log], caperrors.Error) {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+
 	fc.callbackCh[triggerID] = make(chan commonCap.TriggerAndId[*solcap.Log])
 	fc.logTriggerFilters[triggerID] = input
 	return fc.callbackCh[triggerID], nil
 }
 
 func (fc *FakeSolanaChain) UnregisterLogTrigger(_ context.Context, triggerID string, _ commonCap.RequestMetadata, _ *solcap.FilterLogTriggerRequest) caperrors.Error {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+
 	delete(fc.logTriggerFilters, triggerID)
 	delete(fc.callbackCh, triggerID)
 	return nil
@@ -249,13 +257,21 @@ func (fc *FakeSolanaChain) AckEvent(_ context.Context, _ string, _ string, _ str
 // FakeEVMChain.ManualTrigger; used by cre-cli's `simulate` to replay a known
 // on-chain event.
 func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, log *solcap.Log) error {
+	if log == nil {
+		return errors.New("solana log trigger payload is nil")
+	}
+
 	fc.eng.Debugf("ManualTrigger: %s", log.String())
 
-	ch, ok := fc.callbackCh[triggerID]
-	if !ok {
+	fc.mu.RLock()
+	filter := fc.logTriggerFilters[triggerID]
+	ch := fc.callbackCh[triggerID]
+	fc.mu.RUnlock()
+
+	if ch == nil {
 		return fmt.Errorf("solana log trigger %q is not registered", triggerID)
 	}
-	if filter, ok := fc.logTriggerFilters[triggerID]; ok && filter != nil {
+	if filter != nil {
 		if err := fakeSolanaLogMatchesFilter(log, filter); err != nil {
 			return fmt.Errorf("log does not match registered filter for trigger %s: %w", triggerID, err)
 		}
@@ -283,16 +299,36 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 //     match events from every program, a common and dangerous mistake.
 //   - EventName: when set, the log's EventSig must equal the Anchor discriminator
 //     derived from the event name.
+//   - Subkeys/CPI: intentionally rejected until the simulator can evaluate them
+//     with the same semantics as the production Solana log poller.
 func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
+	if log == nil {
+		return errors.New("log is nil")
+	}
 	if len(filter.GetAddress()) == 0 {
 		return errors.New("filter is missing program address: " +
 			"omitting it would match events emitted by every program; " +
 			"set Address to the emitting program's public key")
 	}
+	if len(filter.GetAddress()) != solana.PublicKeyLength {
+		return fmt.Errorf("filter program address must be %d bytes, got %d", solana.PublicKeyLength, len(filter.GetAddress()))
+	}
+	if len(log.GetAddress()) != solana.PublicKeyLength {
+		return fmt.Errorf("log program address must be %d bytes, got %d", solana.PublicKeyLength, len(log.GetAddress()))
+	}
+	if len(filter.GetSubkeys()) > 0 {
+		return errors.New("subkey log trigger filters are not supported in cre-cli simulate")
+	}
+	if cfg := filter.GetCpiFilterConfig(); cfg != nil {
+		return errors.New("CPI log trigger filters are not supported in cre-cli simulate")
+	}
 	if !bytes.Equal(log.GetAddress(), filter.GetAddress()) {
 		return fmt.Errorf("log program address %x does not match filter address %x", log.GetAddress(), filter.GetAddress())
 	}
 	if name := filter.GetEventName(); name != "" {
+		if len(log.GetEventSig()) != 8 {
+			return fmt.Errorf("log event signature must be 8 bytes, got %d", len(log.GetEventSig()))
+		}
 		want := anchorEventDiscriminator(name)
 		if !bytes.Equal(log.GetEventSig(), want) {
 			return fmt.Errorf("log event signature %x does not match discriminator %x for event %q", log.GetEventSig(), want, name)
@@ -311,8 +347,12 @@ func anchorEventDiscriminator(eventName string) []byte {
 func (fc *FakeSolanaChain) createManualTriggerEvent(log *solcap.Log) commonCap.TriggerAndId[*solcap.Log] {
 	return commonCap.TriggerAndId[*solcap.Log]{
 		Trigger: log,
-		Id:      "manual-solana-chain-trigger-id",
+		Id:      manualSolanaTriggerEventID(log),
 	}
+}
+
+func manualSolanaTriggerEventID(log *solcap.Log) string {
+	return fmt.Sprintf("manual-solana-chain-trigger-%x-%x-%d", log.GetBlockHash(), log.GetTxHash(), log.GetLogIndex())
 }
 
 // ---------- writes ----------
