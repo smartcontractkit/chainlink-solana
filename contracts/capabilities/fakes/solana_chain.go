@@ -6,7 +6,6 @@ package fakes
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -24,6 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	ccipcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+
+	commoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 
 	mock_forwarder "github.com/smartcontractkit/chainlink-solana/contracts/generated/mock_forwarder"
 )
@@ -335,19 +336,12 @@ func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTrigger
 		if len(log.GetEventSig()) != 8 {
 			return fmt.Errorf("log event signature must be 8 bytes, got %d", len(log.GetEventSig()))
 		}
-		want := anchorEventDiscriminator(name)
+		want := commoncodec.NewDiscriminatorHashPrefix(name, false)
 		if !bytes.Equal(log.GetEventSig(), want) {
 			return fmt.Errorf("log event signature %x does not match discriminator %x for event %q", log.GetEventSig(), want, name)
 		}
 	}
 	return nil
-}
-
-// anchorEventDiscriminator returns the 8-byte discriminator Anchor prepends to
-// emitted event data: the first 8 bytes of sha256("event:<EventName>").
-func anchorEventDiscriminator(eventName string) []byte {
-	sum := sha256.Sum256([]byte("event:" + eventName))
-	return sum[:8]
 }
 
 func (fc *FakeSolanaChain) createManualTriggerEvent(log *solcap.Log) commonCap.TriggerAndId[*solcap.Log] {

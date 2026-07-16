@@ -3,37 +3,15 @@ package fakes
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
-	gbinary "github.com/gagliardetto/binary"
-
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
+	codecbinary "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
+
+	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 )
-
-// anchorDiscriminatorLen is the size of the discriminator Anchor prepends to
-// event log data (sha256("event:<Name>")[:8]).
-const anchorDiscriminatorLen = 8
-
-// idlField/idlTypeDef/idlDoc mirror just enough of the Anchor IDL JSON shape
-// to look up an event's field layout by name.
-type idlField struct {
-	Name string          `json:"name"`
-	Type json.RawMessage `json:"type"`
-}
-
-type idlTypeDef struct {
-	Name string `json:"name"`
-	Type struct {
-		Kind   string     `json:"kind"`
-		Fields []idlField `json:"fields"`
-	} `json:"type"`
-}
-
-type idlDoc struct {
-	Types []idlTypeDef `json:"types"`
-}
 
 // subkeyFieldMatches reports whether log satisfies every SubkeyConfig in the
 // filter. Each SubkeyConfig decodes one field (by Path) from the Anchor event
@@ -83,17 +61,18 @@ func subkeyFieldMatches(log *solcap.Log, filter *solcap.FilterLogTriggerRequest)
 }
 
 // normalizeFieldName strips underscores and lowercases, so IDL snake_case
-// field names ("u64_value") match codegen'd Go PascalCase subkey paths
-// ("U64Value") without needing exact case-conversion rules.
+// field names ("u64_value") and codegen'd Go PascalCase subkey paths
+// ("U64Value") compare equal without needing exact case-conversion rules.
 func normalizeFieldName(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, "_", ""))
 }
 
-// decodeAnchorEventFields Borsh-decodes an Anchor event's top-level scalar
-// fields (bool, signed/unsigned integers up to 64 bits, string, publicKey)
-// keyed by normalizeFieldName(field name). Nested structs, vecs, arrays,
-// u128/i128 are not supported — decoding stops with an error if one is
-// encountered before all requested-scope fields are read.
+// decodeAnchorEventFields decodes an Anchor event's top-level fields using
+// chainlink-solana's own Anchor IDL codec (codecv2, the same decoder the
+// Solana log poller uses to decode events off-chain), keyed by
+// normalizeFieldName(field name). Nested structs, vecs, and arrays decode
+// successfully but aren't exposed here — only scalar top-level fields are
+// usable as subkey paths in cre-cli simulate.
 func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map[string]any, error) {
 	if len(idlJSON) == 0 {
 		return nil, fmt.Errorf("filter has no contract IDL JSON")
@@ -101,82 +80,42 @@ func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map
 	if eventName == "" {
 		return nil, fmt.Errorf("filter has no event name")
 	}
-	if len(data) < anchorDiscriminatorLen {
-		return nil, fmt.Errorf("event data too short: expected at least %d bytes, got %d", anchorDiscriminatorLen, len(data))
+
+	entry, err := codecv2.NewEventArgsEntryWrapper(eventName, string(idlJSON), true, nil, codecbinary.LittleEndian())
+	if err != nil {
+		return nil, fmt.Errorf("failed to build event codec from contract IDL: %w", err)
+	}
+	decoded, _, err := entry.Decode(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode event data: %w", err)
 	}
 
-	var doc idlDoc
-	if err := json.Unmarshal(idlJSON, &doc); err != nil {
-		return nil, fmt.Errorf("failed to parse contract IDL JSON: %w", err)
-	}
-	var target *idlTypeDef
-	for i := range doc.Types {
-		if doc.Types[i].Name == eventName {
-			target = &doc.Types[i]
-			break
+	rv := reflect.ValueOf(decoded)
+	for rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil, fmt.Errorf("decoded event %q is nil", eventName)
 		}
+		rv = rv.Elem()
 	}
-	if target == nil {
-		return nil, fmt.Errorf("event %q not found in contract IDL types", eventName)
-	}
-	if target.Type.Kind != "struct" {
-		return nil, fmt.Errorf("event %q is not a struct type", eventName)
+	if rv.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("decoded event %q has unexpected type %s", eventName, rv.Type())
 	}
 
-	dec := gbinary.NewBorshDecoder(data[anchorDiscriminatorLen:])
-	out := make(map[string]any, len(target.Type.Fields))
-	for _, f := range target.Type.Fields {
-		var typeName string
-		if err := json.Unmarshal(f.Type, &typeName); err != nil {
-			return nil, fmt.Errorf("field %q: nested/complex types are not supported in cre-cli simulate", f.Name)
+	out := make(map[string]any, rv.NumField())
+	for i := 0; i < rv.NumField(); i++ {
+		fv := rv.Field(i)
+		for fv.Kind() == reflect.Ptr {
+			if fv.IsNil() {
+				break
+			}
+			fv = fv.Elem()
 		}
-		val, err := decodeScalarField(dec, typeName)
-		if err != nil {
-			return nil, fmt.Errorf("field %q (%s): %w", f.Name, typeName, err)
+		if fv.Kind() == reflect.Ptr {
+			continue // unset Option field
 		}
-		out[normalizeFieldName(f.Name)] = val
+		out[normalizeFieldName(rv.Type().Field(i).Name)] = fv.Interface()
 	}
 	return out, nil
-}
-
-func decodeScalarField(dec *gbinary.Decoder, typeName string) (any, error) {
-	switch typeName {
-	case "bool":
-		var v bool
-		return v, dec.Decode(&v)
-	case "u8":
-		var v uint8
-		return v, dec.Decode(&v)
-	case "u16":
-		var v uint16
-		return v, dec.Decode(&v)
-	case "u32":
-		var v uint32
-		return v, dec.Decode(&v)
-	case "u64":
-		var v uint64
-		return v, dec.Decode(&v)
-	case "i8":
-		var v int8
-		return v, dec.Decode(&v)
-	case "i16":
-		var v int16
-		return v, dec.Decode(&v)
-	case "i32":
-		var v int32
-		return v, dec.Decode(&v)
-	case "i64":
-		var v int64
-		return v, dec.Decode(&v)
-	case "string":
-		var v string
-		return v, dec.Decode(&v)
-	case "publicKey", "pubkey":
-		var v [32]byte
-		return v, dec.Decode(&v)
-	default:
-		return nil, fmt.Errorf("unsupported IDL scalar type %q", typeName)
-	}
 }
 
 // encodeIndexedValue mirrors cre-sdk-go's bindings.EncodeIndexedValue byte for

@@ -3,7 +3,6 @@ package fakes
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	sdk "github.com/smartcontractkit/chainlink-protos/cre/go/sdk"
+
+	commoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
 
 const testChainSelector uint64 = 16423721717087811551 // SOLANA_DEVNET
@@ -44,8 +45,15 @@ func testForwarderStateAccount(t *testing.T) solana.PublicKey {
 
 // testEventIDLJSON mirrors log_read_test's TestEvent type (str_val string,
 // u64_value u64), used to exercise subkey decode/match against a real Anchor
-// event encoding.
+// event encoding. codecv2 requires a full Anchor IDL document (address,
+// metadata, instructions), not just the "types"/"events" sections.
 const testEventIDLJSON = `{
+	"address": "11111111111111111111111111111111",
+	"metadata": {"name": "log_read_test", "version": "0.1.0", "spec": "0.1.0"},
+	"instructions": [],
+	"events": [
+		{"name": "TestEvent", "discriminator": [1, 2, 3, 4, 5, 6, 7, 8]}
+	],
 	"types": [
 		{
 			"name": "TestEvent",
@@ -64,9 +72,8 @@ const testEventIDLJSON = `{
 // Borsh-encoded fields) for testEventIDLJSON's TestEvent.
 func encodeTestEvent(t *testing.T, strVal string, u64Value uint64) []byte {
 	t.Helper()
-	disc := sha256.Sum256([]byte("event:TestEvent"))
 	buf := new(bytes.Buffer)
-	buf.Write(disc[:8])
+	buf.Write(commoncodec.NewDiscriminatorHashPrefix("TestEvent", false))
 	enc := gbinary.NewBorshEncoder(buf)
 	require.NoError(t, enc.Encode(strVal))
 	require.NoError(t, enc.Encode(u64Value))
@@ -280,7 +287,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		})
 		require.NoError(t, fc.ManualTrigger(ctx, triggerID, &solcap.Log{
 			Address:  prog.Bytes(),
-			EventSig: anchorEventDiscriminator("MessageEmitted"),
+			EventSig: commoncodec.NewDiscriminatorHashPrefix("MessageEmitted", false),
 		}))
 		select {
 		case <-ch:
@@ -342,7 +349,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
 		require.Nil(t, cerr)
 
-		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 111)}
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
 		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
 	})
 
@@ -365,7 +372,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
 		require.Nil(t, cerr)
 
-		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 222)}
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 222)}
 		err := fc.ManualTrigger(ctx, triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "subkey filter mismatch")
@@ -383,7 +390,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 			},
 		})
 		require.Nil(t, cerr)
-		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 111)}
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
 		err := fc.ManualTrigger(ctx, triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "only single-level")
