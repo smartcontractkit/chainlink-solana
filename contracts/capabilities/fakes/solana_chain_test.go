@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -181,20 +182,102 @@ func TestFakeSolanaChain_UnimplementedMethods(t *testing.T) {
 		require.NotNil(t, err)
 		assert.Equal(t, caperrors.Unimplemented, err.Code())
 	})
-	t.Run("RegisterLogTrigger", func(t *testing.T) {
-		_, err := fc.RegisterLogTrigger(ctx, "tid", md, nil)
-		require.NotNil(t, err)
-		assert.Equal(t, caperrors.Unimplemented, err.Code())
+}
+
+func TestFakeSolanaChain_LogTrigger(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	md := commonCap.RequestMetadata{}
+	prog := solana.NewWallet().PublicKey()
+	const triggerID = "solana:ChainSelector:16423721717087811551@1.0.0"
+
+	t.Run("registered log is delivered", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		ch, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		require.Nil(t, cerr)
+
+		log := &solcap.Log{Address: prog.Bytes(), Data: []byte("body"), LogIndex: 0}
+		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+
+		select {
+		case got := <-ch:
+			assert.Equal(t, prog.Bytes(), got.Trigger.GetAddress())
+			assert.NotEmpty(t, got.Id)
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected trigger event, got none")
+		}
 	})
-	t.Run("UnregisterLogTrigger", func(t *testing.T) {
-		err := fc.UnregisterLogTrigger(ctx, "tid", md, nil)
-		require.NotNil(t, err)
-		assert.Equal(t, caperrors.Unimplemented, err.Code())
+
+	t.Run("filter rejects wrong program address", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		require.Nil(t, cerr)
+
+		other := solana.NewWallet().PublicKey()
+		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: other.Bytes()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match filter address")
 	})
-	t.Run("AckEvent", func(t *testing.T) {
-		err := fc.AckEvent(ctx, "tid", "eid", "method")
-		require.NotNil(t, err)
-		assert.Equal(t, caperrors.Unimplemented, err.Code())
+
+	t.Run("filter matches anchor event discriminator", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+			Address:   prog.Bytes(),
+			EventName: "MessageEmitted",
+		})
+		require.Nil(t, cerr)
+
+		// Wrong discriminator is rejected.
+		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes(), EventSig: []byte{0, 0, 0, 0, 0, 0, 0, 0}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match discriminator")
+
+		// Correct discriminator is accepted.
+		ch, _ := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+			Address:   prog.Bytes(),
+			EventName: "MessageEmitted",
+		})
+		require.NoError(t, fc.ManualTrigger(ctx, triggerID, &solcap.Log{
+			Address:  prog.Bytes(),
+			EventSig: anchorEventDiscriminator("MessageEmitted"),
+		}))
+		select {
+		case <-ch:
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected trigger event, got none")
+		}
+	})
+
+	t.Run("unregistered trigger errors", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		err := fc.ManualTrigger(ctx, "nope", &solcap.Log{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not registered")
+	})
+
+	t.Run("missing filter address is rejected", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{})
+		require.Nil(t, cerr)
+		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing program address")
+	})
+
+	t.Run("unregister removes the trigger", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		require.Nil(t, cerr)
+		require.Nil(t, fc.UnregisterLogTrigger(ctx, triggerID, md, nil))
+		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not registered")
 	})
 }
 

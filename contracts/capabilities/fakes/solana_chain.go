@@ -4,7 +4,9 @@
 package fakes
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -48,6 +50,10 @@ type FakeSolanaChain struct {
 	forwarderStateAccount solana.PublicKey
 	chainSelector         uint64
 	dryRunWrites          bool
+
+	// log trigger callback channels and their registered filters
+	callbackCh        map[string]chan commonCap.TriggerAndId[*solcap.Log]
+	logTriggerFilters map[string]*solcap.FilterLogTriggerRequest
 }
 
 var (
@@ -91,6 +97,8 @@ func NewFakeSolanaChain(
 		forwarderStateAccount: forwarderStateAccount,
 		chainSelector:         chainSelector,
 		dryRunWrites:          dryRunWrites,
+		callbackCh:            make(map[string]chan commonCap.TriggerAndId[*solcap.Log]),
+		logTriggerFilters:     make(map[string]*solcap.FilterLogTriggerRequest),
 	}
 	fc.Service, fc.eng = services.Config{
 		Name:  fmt.Sprintf("FakeSolanaChain.%d", chainSelector),
@@ -218,16 +226,93 @@ func (fc *FakeSolanaChain) GetProgramAccounts(_ context.Context, _ commonCap.Req
 	return nil, unimplemented("GetProgramAccounts")
 }
 
-// ---------- triggers (no log-trigger support in v1) ----------
+// ---------- triggers ----------
 
-func (fc *FakeSolanaChain) RegisterLogTrigger(_ context.Context, _ string, _ commonCap.RequestMetadata, _ *solcap.FilterLogTriggerRequest) (<-chan commonCap.TriggerAndId[*solcap.Log], caperrors.Error) {
-	return nil, unimplemented("RegisterLogTrigger")
+func (fc *FakeSolanaChain) RegisterLogTrigger(_ context.Context, triggerID string, _ commonCap.RequestMetadata, input *solcap.FilterLogTriggerRequest) (<-chan commonCap.TriggerAndId[*solcap.Log], caperrors.Error) {
+	fc.callbackCh[triggerID] = make(chan commonCap.TriggerAndId[*solcap.Log])
+	fc.logTriggerFilters[triggerID] = input
+	return fc.callbackCh[triggerID], nil
 }
-func (fc *FakeSolanaChain) UnregisterLogTrigger(_ context.Context, _ string, _ commonCap.RequestMetadata, _ *solcap.FilterLogTriggerRequest) caperrors.Error {
-	return unimplemented("UnregisterLogTrigger")
+
+func (fc *FakeSolanaChain) UnregisterLogTrigger(_ context.Context, triggerID string, _ commonCap.RequestMetadata, _ *solcap.FilterLogTriggerRequest) caperrors.Error {
+	delete(fc.logTriggerFilters, triggerID)
+	delete(fc.callbackCh, triggerID)
+	return nil
 }
+
 func (fc *FakeSolanaChain) AckEvent(_ context.Context, _ string, _ string, _ string) caperrors.Error {
-	return unimplemented("AckEvent")
+	return nil
+}
+
+// ManualTrigger validates a caller-supplied log against the registered filter and
+// delivers it to the workflow's trigger callback channel. Counterpart to
+// FakeEVMChain.ManualTrigger; used by cre-cli's `simulate` to replay a known
+// on-chain event.
+func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, log *solcap.Log) error {
+	fc.eng.Debugf("ManualTrigger: %s", log.String())
+
+	ch, ok := fc.callbackCh[triggerID]
+	if !ok {
+		return fmt.Errorf("solana log trigger %q is not registered", triggerID)
+	}
+	if filter, ok := fc.logTriggerFilters[triggerID]; ok && filter != nil {
+		if err := fakeSolanaLogMatchesFilter(log, filter); err != nil {
+			return fmt.Errorf("log does not match registered filter for trigger %s: %w", triggerID, err)
+		}
+	}
+
+	go func() {
+		select {
+		case ch <- fc.createManualTriggerEvent(log):
+			// Successfully sent trigger response
+		case <-ctx.Done():
+			// Context cancelled, cleanup goroutine
+			fc.eng.Debug("ManualTrigger goroutine cancelled due to context cancellation")
+		}
+	}()
+
+	return nil
+}
+
+// fakeSolanaLogMatchesFilter checks whether log satisfies the
+// FilterLogTriggerRequest registered for a trigger. Solana has no EVM-style
+// topics: an event is identified by the emitting program address plus an 8-byte
+// Anchor discriminator (sha256("event:<EventName>")[:8]).
+//
+//   - Address: the emitting program's public key. Required — omitting it would
+//     match events from every program, a common and dangerous mistake.
+//   - EventName: when set, the log's EventSig must equal the Anchor discriminator
+//     derived from the event name.
+func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
+	if len(filter.GetAddress()) == 0 {
+		return errors.New("filter is missing program address: " +
+			"omitting it would match events emitted by every program; " +
+			"set Address to the emitting program's public key")
+	}
+	if !bytes.Equal(log.GetAddress(), filter.GetAddress()) {
+		return fmt.Errorf("log program address %x does not match filter address %x", log.GetAddress(), filter.GetAddress())
+	}
+	if name := filter.GetEventName(); name != "" {
+		want := anchorEventDiscriminator(name)
+		if !bytes.Equal(log.GetEventSig(), want) {
+			return fmt.Errorf("log event signature %x does not match discriminator %x for event %q", log.GetEventSig(), want, name)
+		}
+	}
+	return nil
+}
+
+// anchorEventDiscriminator returns the 8-byte discriminator Anchor prepends to
+// emitted event data: the first 8 bytes of sha256("event:<EventName>").
+func anchorEventDiscriminator(eventName string) []byte {
+	sum := sha256.Sum256([]byte("event:" + eventName))
+	return sum[:8]
+}
+
+func (fc *FakeSolanaChain) createManualTriggerEvent(log *solcap.Log) commonCap.TriggerAndId[*solcap.Log] {
+	return commonCap.TriggerAndId[*solcap.Log]{
+		Trigger: log,
+		Id:      "manual-solana-chain-trigger-id",
+	}
 }
 
 // ---------- writes ----------
