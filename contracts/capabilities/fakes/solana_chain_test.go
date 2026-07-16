@@ -1,11 +1,14 @@
 package fakes
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"strings"
 	"testing"
 	"time"
 
+	gbinary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +40,37 @@ func testForwarderProgramID(t *testing.T) solana.PublicKey {
 func testForwarderStateAccount(t *testing.T) solana.PublicKey {
 	t.Helper()
 	return solana.MustPublicKeyFromBase58("MBUQyaWiZ6TmEr3k7p9nuVnHZWv6KTL1j3tQCUGrJ4r")
+}
+
+// testEventIDLJSON mirrors log_read_test's TestEvent type (str_val string,
+// u64_value u64), used to exercise subkey decode/match against a real Anchor
+// event encoding.
+const testEventIDLJSON = `{
+	"types": [
+		{
+			"name": "TestEvent",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{"name": "str_val", "type": "string"},
+					{"name": "u64_value", "type": "u64"}
+				]
+			}
+		}
+	]
+}`
+
+// encodeTestEvent builds the raw Anchor event log data (8-byte discriminator +
+// Borsh-encoded fields) for testEventIDLJSON's TestEvent.
+func encodeTestEvent(t *testing.T, strVal string, u64Value uint64) []byte {
+	t.Helper()
+	disc := sha256.Sum256([]byte("event:TestEvent"))
+	buf := new(bytes.Buffer)
+	buf.Write(disc[:8])
+	enc := gbinary.NewBorshEncoder(buf)
+	require.NoError(t, enc.Encode(strVal))
+	require.NoError(t, enc.Encode(u64Value))
+	return buf.Bytes()
 }
 
 func newTestSolanaChain(t *testing.T, dryRun bool) *FakeSolanaChain {
@@ -289,19 +323,70 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		assert.Contains(t, err.Error(), "log program address must be 32 bytes")
 	})
 
-	t.Run("unsupported subkey filters fail closed", func(t *testing.T) {
+	t.Run("subkey filter matches decoded event field", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		filter := &solcap.FilterLogTriggerRequest{
+			Address:         prog.Bytes(),
+			EventName:       "TestEvent",
+			ContractIdlJson: []byte(testEventIDLJSON),
+			Subkeys: []*solcap.SubkeyConfig{
+				{
+					Path: []string{"U64Value"},
+					Comparers: []*solcap.ValueComparator{
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: encodeUint(111)},
+					},
+				},
+			},
+		}
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		require.Nil(t, cerr)
+
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 111)}
+		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+	})
+
+	t.Run("subkey filter rejects non-matching decoded event field", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		filter := &solcap.FilterLogTriggerRequest{
+			Address:         prog.Bytes(),
+			EventName:       "TestEvent",
+			ContractIdlJson: []byte(testEventIDLJSON),
+			Subkeys: []*solcap.SubkeyConfig{
+				{
+					Path: []string{"U64Value"},
+					Comparers: []*solcap.ValueComparator{
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: encodeUint(111)},
+					},
+				},
+			},
+		}
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		require.Nil(t, cerr)
+
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 222)}
+		err := fc.ManualTrigger(ctx, triggerID, log)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "subkey filter mismatch")
+	})
+
+	t.Run("subkey filter with nested path is rejected", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
 		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
-			Address: prog.Bytes(),
+			Address:         prog.Bytes(),
+			EventName:       "TestEvent",
+			ContractIdlJson: []byte(testEventIDLJSON),
 			Subkeys: []*solcap.SubkeyConfig{
-				{Path: []string{"message"}},
+				{Path: []string{"nested", "field"}},
 			},
 		})
 		require.Nil(t, cerr)
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: anchorEventDiscriminator("TestEvent"), Data: encodeTestEvent(t, "Hello, World!", 111)}
+		err := fc.ManualTrigger(ctx, triggerID, log)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "subkey log trigger filters are not supported")
+		assert.Contains(t, err.Error(), "only single-level")
 	})
 
 	t.Run("cpi filters validate config and deliver extracted logs", func(t *testing.T) {

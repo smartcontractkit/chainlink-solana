@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 
 	gbinary "github.com/gagliardetto/binary"
@@ -182,8 +181,7 @@ func decodeScalarField(dec *gbinary.Decoder, typeName string) (any, error) {
 
 // encodeIndexedValue mirrors cre-sdk-go's bindings.EncodeIndexedValue byte for
 // byte, so a decoded event field compares equal to a workflow-side
-// PrepareSubkeyValue-encoded filter value. Duplicated (not imported) to avoid
-// a chain-capability -> workflow-SDK dependency edge.
+// PrepareSubkeyValue-encoded filter value.
 func encodeIndexedValue(value any) ([]byte, error) {
 	switch v := value.(type) {
 	case bool:
@@ -252,5 +250,3 @@ func evaluateComparator(value, want []byte, op solcap.ComparisonOperator) (bool,
 		return false, fmt.Errorf("unsupported comparison operator %v", op)
 	}
 }
-
-var _ = math.MaxInt64 // reserved: float subkey support would need the sign-flip trick used by EncodeIndexedValue

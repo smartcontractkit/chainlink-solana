@@ -298,6 +298,8 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 //     match events from every program, a common and dangerous mistake.
 //   - EventName: when set, the log's EventSig must equal the Anchor discriminator
 //     derived from the event name.
+//   - Subkeys: each decodes one top-level scalar event field (via the filter's
+//     IDL JSON) and matches if any of its Comparers evaluates true.
 func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
 	if log == nil {
 		return errors.New("log is nil")
