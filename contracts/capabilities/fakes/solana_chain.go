@@ -291,16 +291,9 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 }
 
 // fakeSolanaLogMatchesFilter checks whether log satisfies the
-// FilterLogTriggerRequest registered for a trigger. Solana has no EVM-style
-// topics: an event is identified by the emitting program address plus an 8-byte
-// Anchor discriminator (sha256("event:<EventName>")[:8]).
-//
-//   - Address: the emitting program's public key. Required — omitting it would
-//     match events from every program, a common and dangerous mistake.
-//   - EventName: when set, the log's EventSig must equal the Anchor discriminator
-//     derived from the event name.
-//   - Subkeys: each decodes one top-level scalar event field (via the filter's
-//     IDL JSON) and matches if any of its Comparers evaluates true.
+// FilterLogTriggerRequest registered for a trigger. Address is required:
+// omitting it would match events from every program, a common and dangerous
+// mistake.
 func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
 	if log == nil {
 		return errors.New("log is nil")
