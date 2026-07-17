@@ -291,9 +291,7 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 }
 
 // fakeSolanaLogMatchesFilter checks whether log satisfies the
-// FilterLogTriggerRequest registered for a trigger. Address is required:
-// omitting it would match events from every program, a common and dangerous
-// mistake.
+// FilterLogTriggerRequest registered for a trigger.
 func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
 	if log == nil {
 		return errors.New("log is nil")

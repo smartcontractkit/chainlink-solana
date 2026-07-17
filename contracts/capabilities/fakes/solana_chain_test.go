@@ -43,10 +43,6 @@ func testForwarderStateAccount(t *testing.T) solana.PublicKey {
 	return solana.MustPublicKeyFromBase58("MBUQyaWiZ6TmEr3k7p9nuVnHZWv6KTL1j3tQCUGrJ4r")
 }
 
-// testEventIDLJSON mirrors log_read_test's TestEvent type (str_val string,
-// u64_value u64), used to exercise subkey decode/match against a real Anchor
-// event encoding. codecv2 requires a full Anchor IDL document (address,
-// metadata, instructions), not just the "types"/"events" sections.
 const testEventIDLJSON = `{
 	"address": "11111111111111111111111111111111",
 	"metadata": {"name": "log_read_test", "version": "0.1.0", "spec": "0.1.0"},
@@ -68,8 +64,6 @@ const testEventIDLJSON = `{
 	]
 }`
 
-// encodeTestEvent builds the raw Anchor event log data (8-byte discriminator +
-// Borsh-encoded fields) for testEventIDLJSON's TestEvent.
 func encodeTestEvent(t *testing.T, strVal string, u64Value uint64) []byte {
 	t.Helper()
 	buf := new(bytes.Buffer)

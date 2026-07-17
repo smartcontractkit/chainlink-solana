@@ -14,9 +14,7 @@ import (
 )
 
 // subkeyFieldMatches reports whether log satisfies every SubkeyConfig in the
-// filter. Each SubkeyConfig decodes one field (by Path) from the Anchor event
-// and matches if ANY of its Comparers evaluates true (OR within a field,
-// AND across fields) — the same convention used for EVM topic slots.
+// filter.
 func subkeyFieldMatches(log *solcap.Log, filter *solcap.FilterLogTriggerRequest) error {
 	subkeys := filter.GetSubkeys()
 	if len(subkeys) == 0 {
@@ -60,19 +58,12 @@ func subkeyFieldMatches(log *solcap.Log, filter *solcap.FilterLogTriggerRequest)
 	return nil
 }
 
-// normalizeFieldName strips underscores and lowercases, so IDL snake_case
-// field names ("u64_value") and codegen'd Go PascalCase subkey paths
-// ("U64Value") compare equal without needing exact case-conversion rules.
 func normalizeFieldName(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, "_", ""))
 }
 
 // decodeAnchorEventFields decodes an Anchor event's top-level fields using
-// chainlink-solana's own Anchor IDL codec (codecv2, the same decoder the
-// Solana log poller uses to decode events off-chain), keyed by
-// normalizeFieldName(field name). Nested structs, vecs, and arrays decode
-// successfully but aren't exposed here — only scalar top-level fields are
-// usable as subkey paths in cre-cli simulate.
+// chainlink-solana's own Anchor IDL codec.
 func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map[string]any, error) {
 	if len(idlJSON) == 0 {
 		return nil, fmt.Errorf("filter has no contract IDL JSON")
@@ -118,9 +109,6 @@ func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map
 	return out, nil
 }
 
-// encodeIndexedValue mirrors cre-sdk-go's bindings.EncodeIndexedValue byte for
-// byte, so a decoded event field compares equal to a workflow-side
-// PrepareSubkeyValue-encoded filter value.
 func encodeIndexedValue(value any) ([]byte, error) {
 	switch v := value.(type) {
 	case bool:
@@ -165,11 +153,6 @@ func encodeInt(v int64) []byte {
 	return buf
 }
 
-// evaluateComparator compares a decoded, encoded field value against a
-// registered comparer value. EQ/NEQ are always exact; ordering operators use
-// unsigned big-endian byte comparison, which is exact for unsigned integer
-// fields (the common case) but not sign-corrected for negative signed values —
-// matching the encoding scheme's own documented scope.
 func evaluateComparator(value, want []byte, op solcap.ComparisonOperator) (bool, error) {
 	cmp := bytes.Compare(value, want)
 	switch op {
