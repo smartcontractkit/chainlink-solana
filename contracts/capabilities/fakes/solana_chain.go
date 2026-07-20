@@ -271,10 +271,11 @@ func (fc *FakeSolanaChain) ManualTrigger(ctx context.Context, triggerID string, 
 	if ch == nil {
 		return fmt.Errorf("solana log trigger %q is not registered", triggerID)
 	}
-	if filter != nil {
-		if err := fakeSolanaLogMatchesFilter(log, filter); err != nil {
-			return fmt.Errorf("log does not match registered filter for trigger %s: %w", triggerID, err)
-		}
+	if filter == nil {
+		return fmt.Errorf("solana log trigger %q has no registered filter", triggerID)
+	}
+	if err := fakeSolanaLogMatchesFilter(log, filter); err != nil {
+		return fmt.Errorf("log does not match registered filter for trigger %s: %w", triggerID, err)
 	}
 
 	go func() {
@@ -321,7 +322,8 @@ func fakeSolanaLogMatchesFilter(log *solcap.Log, filter *solcap.FilterLogTrigger
 		}
 	}
 	if !bytes.Equal(log.GetAddress(), filter.GetAddress()) {
-		return fmt.Errorf("log program address %x does not match filter address %x", log.GetAddress(), filter.GetAddress())
+		return fmt.Errorf("log program address %s does not match filter address %s",
+			solana.PublicKeyFromBytes(log.GetAddress()), solana.PublicKeyFromBytes(filter.GetAddress()))
 	}
 	if name := filter.GetEventName(); name != "" {
 		if len(log.GetEventSig()) != 8 {

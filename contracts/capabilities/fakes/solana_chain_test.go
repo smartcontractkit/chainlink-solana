@@ -2,7 +2,6 @@ package fakes
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -126,7 +125,7 @@ func TestFakeSolanaChain_InterfaceAssertions(t *testing.T) {
 
 func TestFakeSolanaChain_InitialiseStartsService(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	fc := newTestSolanaChain(t, true)
 
 	require.Error(t, fc.Ready(), "service should not be Ready before Initialise")
@@ -137,7 +136,7 @@ func TestFakeSolanaChain_InitialiseStartsService(t *testing.T) {
 
 func TestFakeSolanaChain_WriteReport_InputValidation(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	fc := newTestSolanaChain(t, true)
 	md := commonCap.RequestMetadata{}
 
@@ -188,7 +187,7 @@ func TestFakeSolanaChain_WriteReport_InputValidation(t *testing.T) {
 
 func TestFakeSolanaChain_UnimplementedMethods(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	fc := newTestSolanaChain(t, true)
 	md := commonCap.RequestMetadata{}
 
@@ -221,7 +220,7 @@ func TestFakeSolanaChain_UnimplementedMethods(t *testing.T) {
 
 func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	md := commonCap.RequestMetadata{}
 	prog := solana.NewWallet().PublicKey()
 	const triggerID = "solana:ChainSelector:16423721717087811551@1.0.0"
