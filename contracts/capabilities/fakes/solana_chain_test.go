@@ -32,6 +32,13 @@ func testKey(t *testing.T) solana.PrivateKey {
 	return w.PrivateKey
 }
 
+func mustIndexedUint(t *testing.T, u uint64) []byte {
+	t.Helper()
+	iv, err := commoncodec.NewIndexedValue(u)
+	require.NoError(t, err)
+	return iv
+}
+
 func testForwarderProgramID(t *testing.T) solana.PublicKey {
 	t.Helper()
 	return solana.MustPublicKeyFromBase58("7kuEAA3mSC1Tz8gQjnvH7bKFda9xSPRRin9SZbH49cNK")
@@ -334,7 +341,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				{
 					Path: []string{"U64Value"},
 					Comparers: []*solcap.ValueComparator{
-						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: encodeUint(111)},
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: mustIndexedUint(t, 111)},
 					},
 				},
 			},
@@ -357,7 +364,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				{
 					Path: []string{"U64Value"},
 					Comparers: []*solcap.ValueComparator{
-						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: encodeUint(111)},
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: mustIndexedUint(t, 111)},
 					},
 				},
 			},
@@ -366,6 +373,32 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 222)}
+		err := fc.ManualTrigger(ctx, triggerID, log)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "subkey filter mismatch")
+	})
+
+	t.Run("subkey filter requires ALL comparers on a field to match, not just one", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		filter := &solcap.FilterLogTriggerRequest{
+			Address:         prog.Bytes(),
+			EventName:       "TestEvent",
+			ContractIdlJson: []byte(testEventIDLJSON),
+			Subkeys: []*solcap.SubkeyConfig{
+				{
+					Path: []string{"U64Value"},
+					Comparers: []*solcap.ValueComparator{
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_GT, Value: mustIndexedUint(t, 100)},
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: mustIndexedUint(t, 999)},
+					},
+				},
+			},
+		}
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		require.Nil(t, cerr)
+
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
 		err := fc.ManualTrigger(ctx, triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "subkey filter mismatch")

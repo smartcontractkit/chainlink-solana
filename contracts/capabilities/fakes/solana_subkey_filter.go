@@ -2,7 +2,6 @@ package fakes
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
 	codecbinary "github.com/smartcontractkit/chainlink-common/pkg/codec/encodings/binary"
 
+	solcommoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 	codecv2 "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/v2"
 )
 
@@ -21,7 +21,7 @@ func subkeyFieldMatches(log *solcap.Log, filter *solcap.FilterLogTriggerRequest)
 		return nil
 	}
 
-	fields, err := decodeAnchorEventFields(filter.GetContractIdlJson(), filter.GetEventName(), log.GetData())
+	decoded, err := decodeAnchorEvent(filter.GetContractIdlJson(), filter.GetEventName(), log.GetData())
 	if err != nil {
 		return fmt.Errorf("failed to decode event for subkey filtering: %w", err)
 	}
@@ -30,29 +30,28 @@ func subkeyFieldMatches(log *solcap.Log, filter *solcap.FilterLogTriggerRequest)
 		if len(sk.GetPath()) != 1 {
 			return fmt.Errorf("subkey path %v: only single-level (top-level scalar field) paths are supported in cre-cli simulate", sk.GetPath())
 		}
-		fieldName := sk.GetPath()[0]
-		val, ok := fields[normalizeFieldName(fieldName)]
+		fieldName, ok := resolveTopLevelFieldName(decoded, sk.GetPath()[0])
 		if !ok {
-			return fmt.Errorf("subkey path %q: no such top-level field in event %q", fieldName, filter.GetEventName())
+			return fmt.Errorf("subkey path %q: no such top-level field in event %q", sk.GetPath()[0], filter.GetEventName())
 		}
-		encoded, err := encodeIndexedValue(val)
+
+		val, err := solcommoncodec.ExtractField(decoded, []string{fieldName})
+		if err != nil {
+			return fmt.Errorf("subkey path %q: %w", fieldName, err)
+		}
+		encoded, err := solcommoncodec.NewIndexedValue(val)
 		if err != nil {
 			return fmt.Errorf("subkey path %q: %w", fieldName, err)
 		}
 
-		matched := false
 		for _, cmp := range sk.GetComparers() {
 			ok, err := evaluateComparator(encoded, cmp.GetValue(), cmp.GetOperator())
 			if err != nil {
 				return fmt.Errorf("subkey path %q: %w", fieldName, err)
 			}
-			if ok {
-				matched = true
-				break
+			if !ok {
+				return fmt.Errorf("subkey path %q: value does not satisfy comparer %v %s", fieldName, cmp.GetOperator(), cmp.GetValue())
 			}
-		}
-		if !matched {
-			return fmt.Errorf("subkey path %q: value does not satisfy any comparer", fieldName)
 		}
 	}
 	return nil
@@ -62,9 +61,28 @@ func normalizeFieldName(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, "_", ""))
 }
 
-// decodeAnchorEventFields decodes an Anchor event's top-level fields using
-// chainlink-solana's own Anchor IDL codec.
-func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map[string]any, error) {
+func resolveTopLevelFieldName(decoded any, target string) (string, bool) {
+	rv := reflect.ValueOf(decoded)
+	for rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return "", false
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return "", false
+	}
+
+	want := normalizeFieldName(target)
+	for i := 0; i < rv.NumField(); i++ {
+		if name := rv.Type().Field(i).Name; normalizeFieldName(name) == want {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+func decodeAnchorEvent(idlJSON []byte, eventName string, data []byte) (any, error) {
 	if len(idlJSON) == 0 {
 		return nil, fmt.Errorf("filter has no contract IDL JSON")
 	}
@@ -80,77 +98,7 @@ func decodeAnchorEventFields(idlJSON []byte, eventName string, data []byte) (map
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode event data: %w", err)
 	}
-
-	rv := reflect.ValueOf(decoded)
-	for rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil, fmt.Errorf("decoded event %q is nil", eventName)
-		}
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("decoded event %q has unexpected type %s", eventName, rv.Type())
-	}
-
-	out := make(map[string]any, rv.NumField())
-	for i := 0; i < rv.NumField(); i++ {
-		fv := rv.Field(i)
-		for fv.Kind() == reflect.Ptr {
-			if fv.IsNil() {
-				break
-			}
-			fv = fv.Elem()
-		}
-		if fv.Kind() == reflect.Ptr {
-			continue // unset Option field
-		}
-		out[normalizeFieldName(rv.Type().Field(i).Name)] = fv.Interface()
-	}
-	return out, nil
-}
-
-func encodeIndexedValue(value any) ([]byte, error) {
-	switch v := value.(type) {
-	case bool:
-		if v {
-			return []byte{1}, nil
-		}
-		return []byte{0}, nil
-	case [32]byte:
-		return v[:], nil
-	case string:
-		return []byte(v), nil
-	case uint8:
-		return encodeUint(uint64(v)), nil
-	case uint16:
-		return encodeUint(uint64(v)), nil
-	case uint32:
-		return encodeUint(uint64(v)), nil
-	case uint64:
-		return encodeUint(v), nil
-	case int8:
-		return encodeInt(int64(v)), nil
-	case int16:
-		return encodeInt(int64(v)), nil
-	case int32:
-		return encodeInt(int64(v)), nil
-	case int64:
-		return encodeInt(v), nil
-	default:
-		return nil, fmt.Errorf("unsupported decoded value type %T", value)
-	}
-}
-
-func encodeUint(v uint64) []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, v)
-	return buf
-}
-
-func encodeInt(v int64) []byte {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(v)) //nolint:gosec // two's complement encoding, matches bindings.EncodeIndexedValue
-	return buf
+	return decoded, nil
 }
 
 func evaluateComparator(value, want []byte, op solcap.ComparisonOperator) (bool, error) {
