@@ -120,6 +120,17 @@ func encodeNestedTestEvent(t *testing.T, innerValue uint64) []byte {
 	return buf.Bytes()
 }
 
+func awaitManualTrigger(t *testing.T, ch <-chan commonCap.TriggerAndId[*solcap.Log]) commonCap.TriggerAndId[*solcap.Log] {
+	t.Helper()
+	select {
+	case got := <-ch:
+		return got
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected trigger event, got none")
+		return commonCap.TriggerAndId[*solcap.Log]{}
+	}
+}
+
 func newTestSolanaChain(t *testing.T, dryRun bool) *FakeSolanaChain {
 	t.Helper()
 	fc, err := NewFakeSolanaChain(
@@ -267,7 +278,6 @@ func TestFakeSolanaChain_UnimplementedMethods(t *testing.T) {
 
 func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
 	md := commonCap.RequestMetadata{}
 	prog := solana.NewWallet().PublicKey()
 	const triggerID = "solana:ChainSelector:16423721717087811551@1.0.0"
@@ -275,29 +285,25 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("registered log is delivered", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		ch, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		ch, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), Data: []byte("body"), LogIndex: 0}
-		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+		require.NoError(t, fc.ManualTrigger(t.Context(), triggerID, log))
 
-		select {
-		case got := <-ch:
-			assert.Equal(t, prog.Bytes(), got.Trigger.GetAddress())
-			assert.NotEmpty(t, got.Id)
-		case <-time.After(2 * time.Second):
-			t.Fatal("expected trigger event, got none")
-		}
+		got := awaitManualTrigger(t, ch)
+		assert.Equal(t, prog.Bytes(), got.Trigger.GetAddress())
+		assert.NotEmpty(t, got.Id)
 	})
 
 	t.Run("filter rejects wrong program address", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
 		require.Nil(t, cerr)
 
 		other := solana.NewWallet().PublicKey()
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: other.Bytes()})
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: other.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not match filter address")
 	})
@@ -305,41 +311,37 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("filter matches anchor event discriminator", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address:   prog.Bytes(),
 			EventName: "MessageEmitted",
 		})
 		require.Nil(t, cerr)
 
 		// Wrong discriminator is rejected.
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes(), EventSig: []byte{0, 0, 0, 0, 0, 0, 0, 0}})
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes(), EventSig: []byte{0, 0, 0, 0, 0, 0, 0, 0}})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not match discriminator")
 
-		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes(), EventSig: []byte{0x01}})
+		err = fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes(), EventSig: []byte{0x01}})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "event signature must be 8 bytes")
 
 		// Correct discriminator is accepted.
-		ch, _ := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		ch, _ := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address:   prog.Bytes(),
 			EventName: "MessageEmitted",
 		})
-		require.NoError(t, fc.ManualTrigger(ctx, triggerID, &solcap.Log{
+		require.NoError(t, fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{
 			Address:  prog.Bytes(),
 			EventSig: commoncodec.NewDiscriminatorHashPrefix("MessageEmitted", false),
 		}))
-		select {
-		case <-ch:
-		case <-time.After(2 * time.Second):
-			t.Fatal("expected trigger event, got none")
-		}
+		awaitManualTrigger(t, ch)
 	})
 
 	t.Run("unregistered trigger errors", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		err := fc.ManualTrigger(ctx, "nope", &solcap.Log{})
+		err := fc.ManualTrigger(t.Context(), "nope", &solcap.Log{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not registered")
 	})
@@ -347,9 +349,9 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("missing filter address is rejected", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{})
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{})
 		require.Nil(t, cerr)
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing program address")
 	})
@@ -357,15 +359,15 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("malformed program addresses are rejected", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: []byte{0x01}})
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: []byte{0x01}})
 		require.Nil(t, cerr)
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "filter program address must be 32 bytes")
 
-		_, cerr = fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		_, cerr = fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
 		require.Nil(t, cerr)
-		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: []byte{0x01}})
+		err = fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: []byte{0x01}})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "log program address must be 32 bytes")
 	})
@@ -386,11 +388,12 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				},
 			},
 		}
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		ch, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, filter)
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
-		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+		require.NoError(t, fc.ManualTrigger(t.Context(), triggerID, log))
+		awaitManualTrigger(t, ch)
 	})
 
 	t.Run("subkey filter rejects non-matching decoded event field", func(t *testing.T) {
@@ -409,11 +412,11 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				},
 			},
 		}
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, filter)
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 222)}
-		err := fc.ManualTrigger(ctx, triggerID, log)
+		err := fc.ManualTrigger(t.Context(), triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "subkey filter mismatch")
 	})
@@ -435,11 +438,11 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				},
 			},
 		}
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, filter)
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
-		err := fc.ManualTrigger(ctx, triggerID, log)
+		err := fc.ManualTrigger(t.Context(), triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "subkey filter mismatch")
 	})
@@ -460,17 +463,18 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				},
 			},
 		}
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		ch, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, filter)
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("NestedTestEvent", false), Data: encodeNestedTestEvent(t, 333)}
-		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+		require.NoError(t, fc.ManualTrigger(t.Context(), triggerID, log))
+		awaitManualTrigger(t, ch)
 	})
 
 	t.Run("subkey filter rejects unknown nested field", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address:         prog.Bytes(),
 			EventName:       "NestedTestEvent",
 			ContractIdlJson: []byte(testNestedEventIDLJSON),
@@ -480,7 +484,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		})
 		require.Nil(t, cerr)
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("NestedTestEvent", false), Data: encodeNestedTestEvent(t, 333)}
-		err := fc.ManualTrigger(ctx, triggerID, log)
+		err := fc.ManualTrigger(t.Context(), triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
@@ -501,11 +505,11 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 				},
 			},
 		}
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, filter)
 		require.Nil(t, cerr)
 
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
-		err := fc.ManualTrigger(ctx, triggerID, log)
+		err := fc.ManualTrigger(t.Context(), triggerID, log)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
@@ -513,7 +517,7 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("cpi filters validate config and deliver extracted logs", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address: prog.Bytes(),
 			CpiFilterConfig: &solcap.CPIFilterConfig{
 				DestAddress: []byte{0x01},
@@ -521,22 +525,22 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 			},
 		})
 		require.Nil(t, cerr)
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "CPI filter destination address must be 32 bytes")
 
-		_, cerr = fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		_, cerr = fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address: prog.Bytes(),
 			CpiFilterConfig: &solcap.CPIFilterConfig{
 				DestAddress: prog.Bytes(),
 			},
 		})
 		require.Nil(t, cerr)
-		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		err = fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "CPI filter method name cannot be empty")
 
-		ch, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
+		ch, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address: prog.Bytes(),
 			CpiFilterConfig: &solcap.CPIFilterConfig{
 				DestAddress: prog.Bytes(),
@@ -544,21 +548,17 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 			},
 		})
 		require.Nil(t, cerr)
-		err = fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		err = fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.NoError(t, err)
-		select {
-		case <-ch:
-		case <-time.After(2 * time.Second):
-			t.Fatal("expected trigger event, got none")
-		}
+		awaitManualTrigger(t, ch)
 	})
 
 	t.Run("nil log is rejected", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
 		require.Nil(t, cerr)
-		err := fc.ManualTrigger(ctx, triggerID, nil)
+		err := fc.ManualTrigger(t.Context(), triggerID, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "payload is nil")
 	})
@@ -566,10 +566,10 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 	t.Run("unregister removes the trigger", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
-		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
+		_, cerr := fc.RegisterLogTrigger(t.Context(), triggerID, md, &solcap.FilterLogTriggerRequest{Address: prog.Bytes()})
 		require.Nil(t, cerr)
-		require.Nil(t, fc.UnregisterLogTrigger(ctx, triggerID, md, nil))
-		err := fc.ManualTrigger(ctx, triggerID, &solcap.Log{Address: prog.Bytes()})
+		require.Nil(t, fc.UnregisterLogTrigger(t.Context(), triggerID, md, nil))
+		err := fc.ManualTrigger(t.Context(), triggerID, &solcap.Log{Address: prog.Bytes()})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not registered")
 	})
