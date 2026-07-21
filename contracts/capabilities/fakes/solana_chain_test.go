@@ -80,6 +80,46 @@ func encodeTestEvent(t *testing.T, strVal string, u64Value uint64) []byte {
 	return buf.Bytes()
 }
 
+// testNestedEventIDLJSON declares an event with one level of nesting (inner
+// is a defined struct type), used to exercise multi-segment subkey paths.
+const testNestedEventIDLJSON = `{
+	"address": "11111111111111111111111111111111",
+	"metadata": {"name": "log_read_test", "version": "0.1.0", "spec": "0.1.0"},
+	"instructions": [],
+	"events": [
+		{"name": "NestedTestEvent", "discriminator": [11, 12, 13, 14, 15, 16, 17, 18]}
+	],
+	"types": [
+		{
+			"name": "NestedTestEvent",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{"name": "inner", "type": {"defined": {"name": "Inner"}}}
+				]
+			}
+		},
+		{
+			"name": "Inner",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{"name": "inner_value", "type": "u64"}
+				]
+			}
+		}
+	]
+}`
+
+func encodeNestedTestEvent(t *testing.T, innerValue uint64) []byte {
+	t.Helper()
+	buf := new(bytes.Buffer)
+	buf.Write(commoncodec.NewDiscriminatorHashPrefix("NestedTestEvent", false))
+	enc := gbinary.NewBorshEncoder(buf)
+	require.NoError(t, enc.Encode(innerValue))
+	return buf.Bytes()
+}
+
 func newTestSolanaChain(t *testing.T, dryRun bool) *FakeSolanaChain {
 	t.Helper()
 	fc, err := NewFakeSolanaChain(
@@ -404,22 +444,70 @@ func TestFakeSolanaChain_LogTrigger(t *testing.T) {
 		assert.Contains(t, err.Error(), "subkey filter mismatch")
 	})
 
-	t.Run("subkey filter with nested path is rejected", func(t *testing.T) {
+	t.Run("subkey filter matches nested field path", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		filter := &solcap.FilterLogTriggerRequest{
+			Address:         prog.Bytes(),
+			EventName:       "NestedTestEvent",
+			ContractIdlJson: []byte(testNestedEventIDLJSON),
+			Subkeys: []*solcap.SubkeyConfig{
+				{
+					Path: []string{"Inner", "InnerValue"},
+					Comparers: []*solcap.ValueComparator{
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: mustIndexedUint(t, 333)},
+					},
+				},
+			},
+		}
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		require.Nil(t, cerr)
+
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("NestedTestEvent", false), Data: encodeNestedTestEvent(t, 333)}
+		require.NoError(t, fc.ManualTrigger(ctx, triggerID, log))
+	})
+
+	t.Run("subkey filter rejects unknown nested field", func(t *testing.T) {
 		t.Parallel()
 		fc := newTestSolanaChain(t, true)
 		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, &solcap.FilterLogTriggerRequest{
 			Address:         prog.Bytes(),
-			EventName:       "TestEvent",
-			ContractIdlJson: []byte(testEventIDLJSON),
+			EventName:       "NestedTestEvent",
+			ContractIdlJson: []byte(testNestedEventIDLJSON),
 			Subkeys: []*solcap.SubkeyConfig{
-				{Path: []string{"nested", "field"}},
+				{Path: []string{"Inner", "NoSuchField"}},
 			},
 		})
 		require.Nil(t, cerr)
+		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("NestedTestEvent", false), Data: encodeNestedTestEvent(t, 333)}
+		err := fc.ManualTrigger(ctx, triggerID, log)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not exist")
+	})
+
+	t.Run("subkey filter rejects mismatched case, matching production's exact-match semantics", func(t *testing.T) {
+		t.Parallel()
+		fc := newTestSolanaChain(t, true)
+		filter := &solcap.FilterLogTriggerRequest{
+			Address:         prog.Bytes(),
+			EventName:       "TestEvent",
+			ContractIdlJson: []byte(testEventIDLJSON),
+			Subkeys: []*solcap.SubkeyConfig{
+				{
+					Path: []string{"u64_value"},
+					Comparers: []*solcap.ValueComparator{
+						{Operator: solcap.ComparisonOperator_COMPARISON_OPERATOR_EQ, Value: mustIndexedUint(t, 111)},
+					},
+				},
+			},
+		}
+		_, cerr := fc.RegisterLogTrigger(ctx, triggerID, md, filter)
+		require.Nil(t, cerr)
+
 		log := &solcap.Log{Address: prog.Bytes(), EventSig: commoncodec.NewDiscriminatorHashPrefix("TestEvent", false), Data: encodeTestEvent(t, "Hello, World!", 111)}
 		err := fc.ManualTrigger(ctx, triggerID, log)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "only single-level")
+		assert.Contains(t, err.Error(), "does not exist")
 	})
 
 	t.Run("cpi filters validate config and deliver extracted logs", func(t *testing.T) {
