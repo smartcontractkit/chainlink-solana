@@ -627,7 +627,7 @@ func TestFilters_ExtractField(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			result, err := ExtractField(&testStruct, strings.Split(c.Path, "."))
+			result, err := solcommoncodec.ExtractField(&testStruct, strings.Split(c.Path, "."))
 			if c.Result == nil {
 				assert.Error(t, err)
 				return

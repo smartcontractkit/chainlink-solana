@@ -88,7 +88,7 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 		return nil
 	}
 
-	allAccountKeys := getAllAccountKeys(tx, meta)
+	allAccountKeys := GetAllAccountKeys(tx, meta)
 	if len(allAccountKeys) == 0 {
 		return nil
 	}
@@ -136,9 +136,9 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			var eventData []byte
 			var ok bool
 			if methodSig == types.AnchorCPIEventDiscriminator() {
-				eventData, ok = extractAnchorCPIEventData(e.lggr, ix.Data)
+				eventData, ok = ExtractAnchorCPIEventData(e.lggr, ix.Data)
 			} else {
-				eventData, ok = extractVecCPIEventData(e.lggr, ix.Data, allAccountKeys, ix, programAtStackHeight, outerProgram)
+				eventData, ok = ExtractVecCPIEventData(e.lggr, ix.Data, allAccountKeys, ix, programAtStackHeight, outerProgram)
 			}
 			if !ok || len(eventData) == 0 {
 				continue
@@ -209,9 +209,9 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 	return events
 }
 
-// extractAnchorCPIEventData handles Anchor 0.31+ emit_cpi! format: [method_disc(8)][event_data(N)].
+// ExtractAnchorCPIEventData handles Anchor 0.31+ emit_cpi! format: [method_disc(8)][event_data(N)].
 // Event data directly follows the 8-byte method discriminator with no vec prefix.
-func extractAnchorCPIEventData(lggr logger.SugaredLogger, data []byte) ([]byte, bool) {
+func ExtractAnchorCPIEventData(lggr logger.SugaredLogger, data []byte) ([]byte, bool) {
 	if len(data) <= CPIEventDataOffsetCurrent {
 		lggr.Warnw("anchor CPI event data shorter than method discriminator", "dataLen", len(data), "required", CPIEventDataOffsetCurrent+1)
 		return nil, false
@@ -219,11 +219,11 @@ func extractAnchorCPIEventData(lggr logger.SugaredLogger, data []byte) ([]byte, 
 	return data[CPIEventDataOffsetCurrent:], true
 }
 
-// extractVecCPIEventData handles the Borsh Vec<u8> format used by CCIP's cpi_event and
+// ExtractVecCPIEventData handles the Borsh Vec<u8> format used by CCIP's cpi_event and
 // Anchor <=0.29: [method_disc(8)][vec_len(4)][event_data(N)].
 // Validation is strict: declaredLen must be >0 and must exactly equal the remaining bytes.
 // Returns (nil, false) on any mismatch -- no fallback.
-func extractVecCPIEventData(
+func ExtractVecCPIEventData(
 	lggr logger.SugaredLogger,
 	data []byte,
 	allAccountKeys []solana.PublicKey,
@@ -277,7 +277,7 @@ func resolveSourceForLog(stackHeight uint16, programAtStackHeight map[uint16]typ
 	return programAtStackHeight[stackHeight-1].ToSolana().String()
 }
 
-func getAllAccountKeys(tx *solana.Transaction, meta *rpc.TransactionMeta) []solana.PublicKey {
+func GetAllAccountKeys(tx *solana.Transaction, meta *rpc.TransactionMeta) []solana.PublicKey {
 	if tx == nil {
 		return nil
 	}
