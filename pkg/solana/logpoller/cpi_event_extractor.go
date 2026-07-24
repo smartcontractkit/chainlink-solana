@@ -65,6 +65,7 @@ func (e *CPIEventExtractor) RemoveFilter(filter types.Filter) {
 	}
 
 	key := cpiFilterKey{
+		name:          filter.Name,
 		sourceProgram: filter.Address,
 		destProgram:   filter.ExtraFilterConfig.DestProgram,
 		methodSig:     filter.ExtraFilterConfig.MethodSignature,
