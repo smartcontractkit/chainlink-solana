@@ -22,6 +22,7 @@ const (
 )
 
 type cpiFilterKey struct {
+	name          string
 	sourceProgram types.PublicKey
 	destProgram   types.PublicKey
 	methodSig     types.EventSignature
@@ -46,6 +47,7 @@ func (e *CPIEventExtractor) AddFilter(filter types.Filter) {
 	}
 
 	key := cpiFilterKey{
+		name:          filter.Name,
 		sourceProgram: filter.Address,
 		destProgram:   filter.ExtraFilterConfig.DestProgram,
 		methodSig:     filter.ExtraFilterConfig.MethodSignature,
