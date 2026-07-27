@@ -262,7 +262,10 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
+
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
@@ -272,7 +275,9 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
 }
 
@@ -285,7 +290,10 @@ func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.
 	if opts == nil {
 		opts = &rpc.GetProgramAccountsOpts{}
 	}
-	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
+
 	return c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
 }
 
@@ -563,4 +571,8 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 		return nil, errors.New("GetBlocksWithLimit returned nil result")
 	}
 	return res, err
+}
+
+func isCommitmentSet(c rpc.CommitmentType) bool {
+	return c == rpc.CommitmentConfirmed || c == rpc.CommitmentFinalized || c == rpc.CommitmentProcessed
 }
