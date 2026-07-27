@@ -15,6 +15,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 
 	commonCap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	caperrors "github.com/smartcontractkit/chainlink-common/pkg/capabilities/errors"
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
 	solanaserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana/server"
@@ -35,6 +36,11 @@ const (
 	maxOracles       = 16
 	reportContextLen = 96
 	signatureLen     = 65
+
+	// mock_forwarder parses ForwarderReport at raw_report[METADATA_LENGTH..]
+	// (programs/mock-forwarder/src/internal.rs); account_hash, a sha256 digest,
+	// is its first field.
+	reportMetadataLen = ocr3types.MetadataLen // 109, same constant as the METADATA_LENGTH
 )
 
 const simUnimplementedMsg = "not implemented in cre-cli simulate; raise an issue if your workflow needs this read"
@@ -385,6 +391,53 @@ func (fc *FakeSolanaChain) WriteReport(
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("derive forwarder authority: %w", err), caperrors.Internal)
 	}
 
+	// Collect the receiver CPI accounts from the workflow-supplied remaining
+	// accounts.
+	//
+	// SDK bindings follow the keystone-forwarder account layout: index 0 is the
+	// forwarder state account, index 1 the forwarder authority PDA, index 2+ the
+	// receiver-specific accounts. The real transmitter (forwarder_client.go) maps
+	// indices 0-1 onto the report instruction's named accounts and forwards only
+	// 2+ as remaining accounts; mock_forwarder then rebuilds the hashed list as
+	// [state, authority, ...remaining].
+	remaining := input.RemainingAccounts
+	if len(remaining) >= 2 {
+		remaining = remaining[2:]
+	}
+	receiverAccounts := make([]*solana.AccountMeta, 0, len(remaining))
+	for _, acc := range remaining {
+		if acc == nil {
+			continue
+		}
+		pk, perr := pubkeyFromBytes(acc.GetPublicKey())
+		if perr != nil {
+			return nil, caperrors.NewPublicUserError(fmt.Errorf("remaining account: %w", perr), caperrors.InvalidArgument)
+		}
+		receiverAccounts = append(receiverAccounts, &solana.AccountMeta{
+			PublicKey:  pk,
+			IsWritable: acc.IsWritable,
+		})
+	}
+
+	// The workflow computed the report's account hash over ITS configured
+	// forwarder accounts (normally the real keystone forwarder), but the
+	// simulator always writes through the mock forwarder, whose on-chain hash
+	// check would reject the report (Custom:6002 InvalidAccountHash). The mock
+	// forwarder does not verify DON signatures and the transaction is signed by
+	// our transmitter after this point, so the hash can be rewritten in place
+	// over the account list the mock forwarder will actually see.
+	changed, err := patchReportAccountHash(payload, len(input.Report.Sigs), fc.forwarderStateAccount, authority, receiverAccounts)
+	if err != nil {
+		return nil, caperrors.NewPublicUserError(fmt.Errorf("patch report account hash: %w", err), caperrors.InvalidArgument)
+	}
+	if changed {
+		fc.eng.Infow("rewrote report account hash for the simulator mock forwarder; on-chain writes outside `cre workflow simulate` use the forwarder accounts from the workflow config",
+			"mockForwarderProgram", fc.forwarderProgramID.String(),
+			"mockForwarderState", fc.forwarderStateAccount.String(),
+			"mockForwarderAuthority", authority.String(),
+		)
+	}
+
 	ix, err := mock_forwarder.NewReportInstruction(
 		payload,
 		fc.forwarderStateAccount,
@@ -396,22 +449,8 @@ func (fc *FakeSolanaChain) WriteReport(
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("build report instruction: %w", err), caperrors.Internal)
 	}
-
-	// Append the workflow-supplied remaining accounts to the receiver CPI.
 	if generic, ok := ix.(*solana.GenericInstruction); ok {
-		for _, acc := range input.RemainingAccounts {
-			if acc == nil {
-				continue
-			}
-			pk, perr := pubkeyFromBytes(acc.PublicKey)
-			if perr != nil {
-				return nil, caperrors.NewPublicUserError(fmt.Errorf("remaining account: %w", perr), caperrors.InvalidArgument)
-			}
-			generic.AccountValues = append(generic.AccountValues, &solana.AccountMeta{
-				PublicKey:  pk,
-				IsWritable: acc.IsWritable,
-			})
-		}
+		generic.AccountValues = append(generic.AccountValues, receiverAccounts...)
 	}
 
 	if fc.dryRunWrites {

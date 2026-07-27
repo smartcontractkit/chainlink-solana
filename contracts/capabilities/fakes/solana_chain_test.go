@@ -2,6 +2,8 @@ package fakes
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
 	"strings"
 	"testing"
 	"time"
@@ -647,6 +649,42 @@ func TestBuildReportPayload(t *testing.T) {
 		_, err := buildReportPayload(r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "context length")
+	})
+}
+
+func TestPatchReportAccountHash(t *testing.T) {
+	t.Parallel()
+	state := testForwarderStateAccount(t)
+	authority := solana.NewWallet().PublicKey()
+	receiverAcc := &solana.AccountMeta{PublicKey: solana.NewWallet().PublicKey()}
+
+	expected := sha256.Sum256(append(append(state.Bytes(), authority.Bytes()...), receiverAcc.PublicKey.Bytes()...))
+
+	t.Run("rewrites stale hash in place", func(t *testing.T) {
+		r := mkReportWith(2)
+		r.RawReport = make([]byte, reportMetadataLen+sha256.Size+8)
+		payload, err := buildReportPayload(r)
+		require.NoError(t, err)
+
+		changed, err := patchReportAccountHash(payload, len(r.Sigs), state, authority, []*solana.AccountMeta{receiverAcc})
+		require.NoError(t, err)
+		assert.True(t, changed)
+
+		start := 1 + len(r.Sigs)*signatureLen + reportMetadataLen
+		assert.Equal(t, expected[:], payload[start:start+sha256.Size])
+
+		// Second patch is a no-op: hash already matches.
+		changed, err = patchReportAccountHash(payload, len(r.Sigs), state, authority, []*solana.AccountMeta{receiverAcc})
+		require.NoError(t, err)
+		assert.False(t, changed)
+	})
+	t.Run("raw report too short for a ForwarderReport", func(t *testing.T) {
+		r := mkReport() // 110-byte raw report < METADATA_LENGTH + hash
+		payload, err := buildReportPayload(r)
+		require.NoError(t, err)
+		_, err = patchReportAccountHash(payload, 0, state, authority, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too short")
 	})
 }
 

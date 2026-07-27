@@ -1,8 +1,11 @@
 package fakes
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
@@ -52,4 +55,34 @@ func buildReportPayload(report *sdk.ReportResponse) ([]byte, error) {
 	out = append(out, report.RawReport...)
 	out = append(out, report.ReportContext...)
 	return out, nil
+}
+
+// patchReportAccountHash overwrites ForwarderReport.account_hash inside an
+// assembled report payload with sha256 over the account list the mock
+// forwarder rebuilds on-chain: [state, authority, ...receiverAccounts].
+// The hash sits at raw_report[reportMetadataLen : reportMetadataLen+sha256.Size],
+// and raw_report starts after len_sigs(1) + signatures(numSigs*65).
+// Same digest the SDK bindings produce (cre-sdk-go
+// capabilities/blockchain/solana/bindings CalculateAccountsHash) — keep in sync.
+// Returns whether the hash actually differed from the workflow-computed one.
+func patchReportAccountHash(payload []byte, numSigs int, state, authority solana.PublicKey, receiverAccounts []*solana.AccountMeta) (bool, error) {
+	start := 1 + numSigs*signatureLen + reportMetadataLen
+	end := start + sha256.Size
+	if end > len(payload)-reportContextLen {
+		return false, fmt.Errorf("report payload too short to carry a ForwarderReport account hash (len %d, need raw report >= %d)", len(payload), reportMetadataLen+sha256.Size)
+	}
+
+	h := sha256.New()
+	h.Write(state.Bytes())
+	h.Write(authority.Bytes())
+	for _, acc := range receiverAccounts {
+		h.Write(acc.PublicKey.Bytes())
+	}
+	sum := h.Sum(nil)
+
+	if bytes.Equal(payload[start:end], sum) {
+		return false, nil
+	}
+	copy(payload[start:end], sum)
+	return true, nil
 }
