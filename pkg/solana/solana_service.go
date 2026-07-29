@@ -1024,13 +1024,16 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 	}
 
 	switch pref {
-	case commonsol.EncodingBase64:
+	case commonsol.EncodingBase58, commonsol.EncodingBase64, commonsol.EncodingBase64Zstd:
 		if len(txBytes) != 0 {
 			return &commonsol.DataBytesOrJSON{
-				RawDataEncoding: commonsol.EncodingBase64,
+				RawDataEncoding: pref,
 				AsDecodedBinary: txBytes,
-				AsJSON:          txJSON,
 			}, nil
+		}
+
+		if pref != commonsol.EncodingBase64 {
+			return nil, fmt.Errorf("expected binary account data for encoding %q but got empty bytes: %s", pref, truncateDiag(string(txJSON)))
 		}
 
 		// Fallback: decode ["<base64>", "base64"] manually
@@ -1056,14 +1059,12 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
 			AsDecodedBinary: b,
-			AsJSON:          txJSON,
 		}, nil
 
 	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
-		// Caller explicitly wants JSON. Return it even if bytes exist.
+		// Caller explicitly wants JSON.
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: pref,
-			AsDecodedBinary: txBytes,
 			AsJSON:          txJSON,
 		}, nil
 
@@ -1075,7 +1076,6 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
 			AsDecodedBinary: txBytes,
-			AsJSON:          txJSON,
 		}, nil
 	}
 }
