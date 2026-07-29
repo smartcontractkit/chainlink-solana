@@ -56,6 +56,45 @@ func TestCPIEventExtractor_AddRemoveFilter(t *testing.T) {
 		extractor.AddFilter(filter)
 		require.False(t, extractor.HasCPIFilters())
 	})
+
+	t.Run("matches by source dest and method across distinct filter names", func(t *testing.T) {
+		extractor := NewCPIEventExtractor(logger.Sugared(logger.Test(t)))
+
+		sourceProgram := newRandomPublicKey(t)
+		destProgram := newRandomPublicKey(t)
+		methodSig := newRandomEventSignature(t)
+
+		filterA := types.Filter{
+			ID:       1,
+			Name:     "cpi-filter-a",
+			Address:  sourceProgram,
+			EventSig: newRandomEventSignature(t),
+			ExtraFilterConfig: types.ExtraFilterConfig{
+				DestProgram:     destProgram,
+				MethodSignature: methodSig,
+			},
+		}
+		filterB := filterA
+		filterB.ID = 2
+		filterB.Name = "cpi-filter-b"
+
+		extractor.AddFilter(filterA)
+		extractor.AddFilter(filterB)
+
+		require.True(t, extractor.HasCPIFilters())
+		require.Len(t, extractor.registered, 2)
+		require.Len(t, extractor.matchKeyRefs, 1)
+
+		extractor.RemoveFilter(filterA)
+		require.True(t, extractor.HasCPIFilters())
+		require.Len(t, extractor.registered, 1)
+		require.Len(t, extractor.matchKeyRefs, 1)
+
+		extractor.RemoveFilter(filterB)
+		require.False(t, extractor.HasCPIFilters())
+		require.Empty(t, extractor.registered)
+		require.Empty(t, extractor.matchKeyRefs)
+	})
 }
 
 func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
