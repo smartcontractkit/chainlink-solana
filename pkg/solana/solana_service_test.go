@@ -293,7 +293,7 @@ func Test_Converters(t *testing.T) {
 	})
 
 	t.Run("convertAccountInfoOpts_nil", func(t *testing.T) {
-		require.Nil(t, convertAccountInfoOpts(nil))
+		require.Empty(t, convertAccountInfoOpts(nil))
 	})
 
 	t.Run("convertProgramAccountsOpts_nil", func(t *testing.T) {
