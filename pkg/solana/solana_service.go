@@ -279,13 +279,17 @@ func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol
 		return nil, fmt.Errorf("failed to get signature statuses: %w", err)
 	}
 
-	statuses := make([]commonsol.GetSignatureStatusesResult, 0, len(res))
+	statuses := make([]*commonsol.GetSignatureStatusesResult, 0, len(res))
 	for _, r := range res {
 		var stErr string
+		if r == nil {
+			statuses = append(statuses, nil)
+			continue
+		}
 		if r.Err != nil {
 			stErr = fmt.Sprintf("%v", r.Err)
 		}
-		statuses = append(statuses, commonsol.GetSignatureStatusesResult{
+		statuses = append(statuses, &commonsol.GetSignatureStatusesResult{
 			Slot:               r.Slot,
 			Err:                stErr,
 			Confirmations:      r.Confirmations,
@@ -489,6 +493,10 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 
 	accounts := make([]*commonsol.Account, 0, len(res.Value))
 	for _, acc := range res.Value {
+		if acc == nil {
+			accounts = append(accounts, nil)
+			continue
+		}
 		data, err := convertDataBytesOrJSON(acc.Data, enc)
 		if err != nil {
 			return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)

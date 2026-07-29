@@ -262,6 +262,9 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetAccountInfoOpts{}
+	}
 	if !isCommitmentSet(opts.Commitment) {
 		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	}
@@ -275,6 +278,9 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetMultipleAccountsOpts{}
+	}
 	if !isCommitmentSet(opts.Commitment) {
 		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	}
