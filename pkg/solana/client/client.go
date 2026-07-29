@@ -179,7 +179,7 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s,%s)", addr.String(), commitment), func() (interface{}, error) {
 		return c.rpc.GetBalance(ctx, addr, commitment)
 	})
 
