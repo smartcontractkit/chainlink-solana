@@ -587,7 +587,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
-		assert.NotNil(t, got.AsJSON)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("base64 explicit pref with binary data", func(t *testing.T) {
@@ -599,6 +599,19 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
+	})
+
+	t.Run("base58 explicit pref sets decoded bytes only", func(t *testing.T) {
+		raw := []byte{0x05, 0x06, 0x07}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, commonsol.EncodingBase58)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase58, got.RawDataEncoding)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("JSON fallback with EncodingJSON", func(t *testing.T) {
@@ -610,7 +623,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingJSON, got.RawDataEncoding)
 		assert.NotNil(t, got.AsJSON)
-		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsDecodedBinary)
 	})
 
 	t.Run("JSON fallback with EncodingJSONParsed", func(t *testing.T) {
@@ -622,7 +635,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingJSONParsed, got.RawDataEncoding)
 		assert.NotNil(t, got.AsJSON)
-		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsDecodedBinary)
 	})
 
 	t.Run("base64 fallback parses json array when GetBinary is empty", func(t *testing.T) {
@@ -637,6 +650,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, []byte("hello world"), got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("unknown encoding with binary data falls back to base64", func(t *testing.T) {
@@ -648,6 +662,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 }
 
