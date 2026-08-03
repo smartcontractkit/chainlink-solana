@@ -347,21 +347,33 @@ func (_c *MockORM_InsertFilter_Call) RunAndReturn(run func(context.Context, type
 }
 
 // InsertLogs provides a mock function with given fields: _a0, _a1
-func (_m *MockORM) InsertLogs(_a0 context.Context, _a1 []types.Log) error {
+func (_m *MockORM) InsertLogs(_a0 context.Context, _a1 []types.Log) ([]types.Log, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InsertLogs")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Log) error); ok {
+	var r0 []types.Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Log) ([]types.Log, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Log) []types.Log); ok {
 		r0 = rf(_a0, _a1)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Log)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, []types.Log) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockORM_InsertLogs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertLogs'
@@ -383,12 +395,12 @@ func (_c *MockORM_InsertLogs_Call) Run(run func(_a0 context.Context, _a1 []types
 	return _c
 }
 
-func (_c *MockORM_InsertLogs_Call) Return(err error) *MockORM_InsertLogs_Call {
-	_c.Call.Return(err)
+func (_c *MockORM_InsertLogs_Call) Return(insertedLogs []types.Log, err error) *MockORM_InsertLogs_Call {
+	_c.Call.Return(insertedLogs, err)
 	return _c
 }
 
-func (_c *MockORM_InsertLogs_Call) RunAndReturn(run func(context.Context, []types.Log) error) *MockORM_InsertLogs_Call {
+func (_c *MockORM_InsertLogs_Call) RunAndReturn(run func(context.Context, []types.Log) ([]types.Log, error)) *MockORM_InsertLogs_Call {
 	_c.Call.Return(run)
 	return _c
 }
