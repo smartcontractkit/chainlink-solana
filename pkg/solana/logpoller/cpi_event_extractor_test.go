@@ -161,16 +161,16 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{
-			slotNumber:  100,
-			blockHeight: 99,
-			blockHash:   solana.Hash{1, 2, 3},
-			blockTime:   solana.UnixTimeSeconds(12345),
-			trxIdx:      0,
-			trxSig:      solana.Signature{4, 5, 6},
+		blockData := types.BlockData{
+			SlotNumber:       100,
+			BlockHeight:      99,
+			BlockHash:        solana.Hash{1, 2, 3},
+			BlockTime:        solana.UnixTimeSeconds(12345),
+			TransactionIndex: 0,
+			TransactionHash:  solana.Signature{4, 5, 6},
 		}
 
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 
 		require.Len(t, events, 1)
 		event := events[0]
@@ -178,7 +178,7 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 		require.Equal(t, sourceProgram.ToSolana().String(), event.Program)
 		require.Equal(t, uint64(100), event.SlotNumber)
 		require.Equal(t, uint64(99), event.BlockHeight)
-		require.Equal(t, detail.trxSig, event.TransactionHash)
+		require.Equal(t, blockData.TransactionHash, event.TransactionHash)
 
 		decodedData, err := base64.StdEncoding.DecodeString(event.Data)
 		require.NoError(t, err)
@@ -244,8 +244,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -297,8 +297,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -356,8 +356,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -420,8 +420,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 
 		require.Len(t, events, 1)
 		event := events[0]
@@ -448,9 +448,9 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 		}
 		extractor.AddFilter(filter)
 
-		detail := eventDetail{slotNumber: 100}
+		blockData := types.BlockData{SlotNumber: 100}
 
-		events := extractor.ExtractCPIEvents(nil, nil, detail, 0)
+		events := extractor.ExtractCPIEvents(nil, nil, blockData)
 		require.Empty(t, events)
 
 		tx := &solana.Transaction{
@@ -458,13 +458,13 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 				AccountKeys: []solana.PublicKey{solana.PublicKey(sourceProgram)},
 			},
 		}
-		events = extractor.ExtractCPIEvents(tx, nil, detail, 0)
+		events = extractor.ExtractCPIEvents(tx, nil, blockData)
 		require.Empty(t, events)
 
 		meta := &rpc.TransactionMeta{
 			InnerInstructions: []rpc.InnerInstruction{},
 		}
-		events = extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		events = extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -526,8 +526,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 
 		require.Len(t, events, 1)
 		require.Equal(t, sourceProgram.ToSolana().String(), events[0].Program)
@@ -584,8 +584,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 200}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 200}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 
 		require.Len(t, events, 1)
 		require.True(t, events[0].IsCPI)
@@ -647,8 +647,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -702,8 +702,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 		require.Empty(t, events)
 	})
 
@@ -758,8 +758,8 @@ func TestCPIEventExtractor_ExtractCPIEvents(t *testing.T) {
 			},
 		}
 
-		detail := eventDetail{slotNumber: 100}
-		events := extractor.ExtractCPIEvents(tx, meta, detail, 0)
+		blockData := types.BlockData{SlotNumber: 100}
+		events := extractor.ExtractCPIEvents(tx, meta, blockData)
 
 		require.Len(t, events, 1)
 		require.True(t, events[0].IsCPI)
@@ -775,14 +775,14 @@ func TestExtractAnchorCPIEventData(t *testing.T) {
 		payload := []byte{0x01, 0x02, 0x03, 0x04}
 		data := append(disc[:], payload...)
 
-		result, ok := extractAnchorCPIEventData(lggr, data)
+		result, ok := ExtractAnchorCPIEventData(lggr, data)
 		require.True(t, ok)
 		require.Equal(t, payload, result)
 	})
 
 	t.Run("rejects data too short", func(t *testing.T) {
 		data := make([]byte, MethodDiscriminatorLen)
-		result, ok := extractAnchorCPIEventData(lggr, data)
+		result, ok := ExtractAnchorCPIEventData(lggr, data)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
@@ -812,7 +812,7 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload))) //nolint:gosec
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
+		result, ok := ExtractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
 		require.True(t, ok)
 		require.Equal(t, payload, result)
 	})
@@ -824,7 +824,7 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		binary.LittleEndian.PutUint32(vecLen, uint32(len(payload)+10)) //nolint:gosec
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
+		result, ok := ExtractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
@@ -835,14 +835,14 @@ func TestExtractVecCPIEventData(t *testing.T) {
 		vecLen := []byte{0x00, 0x00, 0x00, 0x00}
 		data := append(disc, append(vecLen, payload...)...)
 
-		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
+		result, ok := ExtractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
 
 	t.Run("rejects data shorter than legacy offset", func(t *testing.T) {
 		data := make([]byte, CPIEventDataOffsetLegacy-1)
-		result, ok := extractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
+		result, ok := ExtractVecCPIEventData(lggr, data, allAccountKeys, ix, programAtStackHeight, sourceProgram)
 		require.False(t, ok)
 		require.Nil(t, result)
 	})
