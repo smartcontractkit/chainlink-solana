@@ -395,8 +395,8 @@ func (_c *MockORM_InsertLogs_Call) Run(run func(_a0 context.Context, _a1 []types
 	return _c
 }
 
-func (_c *MockORM_InsertLogs_Call) Return(insertedLogs []types.Log, err error) *MockORM_InsertLogs_Call {
-	_c.Call.Return(insertedLogs, err)
+func (_c *MockORM_InsertLogs_Call) Return(_a0 []types.Log, _a1 error) *MockORM_InsertLogs_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
