@@ -66,6 +66,101 @@ func TestLogPoller_run(t *testing.T) {
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
+
+	t.Run("Truncated matching option event does not stall progress", func(t *testing.T) {
+		ctx := t.Context()
+
+		orm := mocks.NewMockORM(t)
+		client := mocks.NewRPCClient(t)
+		loader := mocks.NewMockLogsLoader(t)
+
+		lp, err := New(logger.TestSugared(t), orm, client, config.NewDefault(), chainID)
+		require.NoError(t, err)
+		lp.loader = loader
+		lp.lastProcessedSlot = 100
+
+		addr := newRandomPublicKey(t)
+		eventName := "OptionEvent"
+		eventSig := types.NewEventSignatureFromName(eventName)
+
+		var optionI32Type codecv1.IdlType
+		err = json.Unmarshal([]byte(`{"option":"i32"}`), &optionI32Type)
+		require.NoError(t, err)
+
+		filter := types.Filter{
+			ID:        10,
+			Name:      "option filter",
+			Address:   addr,
+			EventName: eventName,
+			EventSig:  eventSig,
+			EventIdl: types.EventIdl{
+				Event: codecv1.IdlEvent{
+					Name: eventName,
+					Fields: []codecv1.IdlEventField{{
+						Name: "MaybeVal",
+						Type: optionI32Type,
+					}},
+				},
+			},
+			SubkeyPaths:  [][]string{{"MaybeVal"}},
+			IsBackfilled: true,
+		}
+
+		orm.EXPECT().ChainID().Return(chainID).Maybe()
+		orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{filter}, nil).Once()
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+
+		client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(102), nil).Once()
+		loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, uint64(101), uint64(102)).RunAndReturn(func(_ context.Context, _ []types.PublicKey, _, _ uint64) (<-chan types.Block, func(), error) {
+			ch := make(chan types.Block, 2)
+			ch <- types.Block{SlotNumber: 101, Events: []types.ProgramEvent{{
+				Program: addr.ToSolana().String(),
+				BlockData: types.BlockData{
+					SlotNumber:          101,
+					BlockTime:           solana.UnixTimeSeconds(1),
+					TransactionHash:     solana.Signature{1},
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Data: base64.StdEncoding.EncodeToString(eventSig[:]),
+			}}}
+			ch <- types.Block{SlotNumber: 102, Events: []types.ProgramEvent{{
+				Program: addr.ToSolana().String(),
+				BlockData: types.BlockData{
+					SlotNumber:          102,
+					BlockTime:           solana.UnixTimeSeconds(2),
+					TransactionHash:     solana.Signature{2},
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Data: base64.StdEncoding.EncodeToString(append(eventSig[:], []byte{1, 42, 0, 0, 0}...)),
+			}}}
+			close(ch)
+			return ch, func() {}, nil
+		}).Once()
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, logs []types.Log) error {
+			require.Len(t, logs, 1)
+			assert.Equal(t, int64(102), logs[0].BlockNumber)
+			assert.Equal(t, int64(1), logs[0].SequenceNum)
+			return nil
+		}).Once()
+
+		err = lp.run(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(102), lp.lastProcessedSlot)
+
+		client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(103), nil).Once()
+		loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, uint64(103), uint64(103)).RunAndReturn(func(_ context.Context, _ []types.PublicKey, _, _ uint64) (<-chan types.Block, func(), error) {
+			ch := make(chan types.Block)
+			close(ch)
+			return ch, func() {}, nil
+		}).Once()
+
+		err = lp.run(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(103), lp.lastProcessedSlot)
+	})
 	t.Run("Aborts backfill if loader fails", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
