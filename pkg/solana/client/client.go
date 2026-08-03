@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/gagliardetto/solana-go/rpc/jsonrpc"
 	"golang.org/x/sync/singleflight"
 
+	commonhttp "github.com/smartcontractkit/chainlink-common/pkg/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
@@ -48,11 +51,12 @@ type ReaderWriter interface {
 type Reader interface {
 	AccountReader
 	Balance(ctx context.Context, addr solana.PublicKey) (uint64, error)
-	BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (uint64, error)
+	BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (*rpc.GetBalanceResult, error)
 	SlotHeight(ctx context.Context) (uint64, error)
 	LatestBlockhash(ctx context.Context) (*rpc.GetLatestBlockhashResult, error)
 	ChainID(ctx context.Context) (mn.StringID, error)
 	GetFeeForMessage(ctx context.Context, msg string) (uint64, error)
+	GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (*rpc.GetFeeForMessageResult, error)
 	GetFirstAvailableBlock(ctx context.Context) (out uint64, err error)
 	GetLatestBlock(ctx context.Context) (*rpc.GetBlockResult, error)
 	// GetLatestBlockHeight returns the latest block height of the node based on the configured commitment type
@@ -70,6 +74,7 @@ type Reader interface {
 type AccountReader interface {
 	GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (*rpc.GetAccountInfoResult, error)
 	GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error)
+	GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error)
 	GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, accountType any) (err error)
 }
 
@@ -115,8 +120,21 @@ func NewTestClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.
 		log:             log,
 		requestGroup:    &singleflight.Group{},
 	}
-	rpcClient.rpc = rpc.New(endpoint)
+	rpcClient.rpc = newRPCClientWithLimitedTransport(endpoint)
 	return &rpcClient, rpcClient.rpc, nil
+}
+
+// newRPCClientWithLimitedTransport constructs a solana-go *rpc.Client whose HTTP transport is
+// wrapped with commonhttp.LimitedTransport. The size cap is opt-in per request via
+// commonhttp.WithResponseSizeLimit on the request context; when no limit is set the wrapper is a
+// no-op. The underlying transport is http.DefaultTransport, so time bounds come from each method's
+// context.WithTimeout(ctx, c.contextDuration) wrapper.
+func newRPCClientWithLimitedTransport(endpoint string) *rpc.Client {
+	httpClient := &http.Client{
+		Transport: &commonhttp.LimitedTransport{RoundTripper: http.DefaultTransport},
+	}
+	jrpc := jsonrpc.NewClientWithOpts(endpoint, &jsonrpc.RPCClientOpts{HTTPClient: httpClient})
+	return rpc.NewWithCustomRPCClient(jrpc)
 }
 
 func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
@@ -154,28 +172,28 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 	return res.Value, err
 }
 
-func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (bal uint64, err error) {
+func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKey, commitment rpc.CommitmentType) (bal *rpc.GetBalanceResult, err error) {
 	done := c.latency("balance")
 	defer func() { done(err) }()
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s,%s)", addr.String(), commitment), func() (interface{}, error) {
 		return c.rpc.GetBalance(ctx, addr, commitment)
 	})
 
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	res, ok := v.(*rpc.GetBalanceResult)
 	if !ok {
-		return 0, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
+		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBalanceResult{})
 	}
 	if res == nil {
-		return 0, errors.New("BalanceWithCommitment returned nil result")
+		return nil, errors.New("BalanceWithCommitment returned nil result")
 	}
-	return res.Value, err
+	return res, err
 }
 
 func (c *Client) SlotHeight(ctx context.Context) (uint64, error) {
@@ -244,7 +262,13 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	if opts == nil {
+		opts = &rpc.GetAccountInfoOpts{}
+	}
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
+
 	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
 }
 
@@ -254,8 +278,29 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	if opts == nil {
+		opts = &rpc.GetMultipleAccountsOpts{}
+	}
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
 	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+}
+
+func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error) {
+	done := c.latency("program_accounts")
+	defer func() { done(err) }()
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	if opts == nil {
+		opts = &rpc.GetProgramAccountsOpts{}
+	}
+	if !isCommitmentSet(opts.Commitment) {
+		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
+	}
+
+	return c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
 }
 
 func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {
@@ -363,6 +408,25 @@ func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (fee uint64, 
 		return 0, errors.New("nil pointer in GetFeeForMessage")
 	}
 	return *res.Value, nil
+}
+
+func (c *Client) GetFeeForMessageWithCommitment(ctx context.Context, msg string, commitment rpc.CommitmentType) (result *rpc.GetFeeForMessageResult, err error) {
+	done := c.latency("fee_for_message")
+	defer func() { done(err) }()
+
+	// msg is base58 encoded data
+
+	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
+	defer cancel()
+	res, err := c.rpc.GetFeeForMessage(ctx, msg, commitment)
+	if err != nil {
+		return nil, fmt.Errorf("error in GetFeeForMessage: %w", err)
+	}
+
+	if res == nil || res.Value == nil {
+		return nil, errors.New("nil pointer in GetFeeForMessage")
+	}
+	return res, nil
 }
 
 // https://docs.solana.com/developing/clients/jsonrpc-api#getsignaturestatuses
@@ -513,4 +577,8 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 		return nil, errors.New("GetBlocksWithLimit returned nil result")
 	}
 	return res, err
+}
+
+func isCommitmentSet(c rpc.CommitmentType) bool {
+	return c == rpc.CommitmentConfirmed || c == rpc.CommitmentFinalized || c == rpc.CommitmentProcessed
 }

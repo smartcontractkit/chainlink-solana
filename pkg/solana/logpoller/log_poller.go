@@ -60,7 +60,8 @@ type filtersI interface {
 	UpdateStartingBlocks(startingBlocks int64)
 	MatchingFiltersForEncodedEvent(event types.ProgramEvent) iter.Seq[types.Filter]
 	DecodeSubKey(ctx context.Context, lggr logger.SugaredLogger, raw []byte, ID int64, subKeyPath []string) (any, error)
-	IncrementSeqNum(filterID int64) int64
+	StageSeqNums(logs []types.Log)
+	CommitSeqNums(logs []types.Log)
 }
 
 type ReplayInfo struct {
@@ -226,6 +227,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		}
 
 		log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
+		skipFilter := false
 		for idx, path := range filter.SubkeyPaths {
 			if len(path) == 0 {
 				continue
@@ -233,18 +235,27 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 
 			subKeyVal, decodeSubKeyErr := lp.filters.DecodeSubKey(ctx, lp.lggr, log.Data, filter.ID, path)
 			if decodeSubKeyErr != nil {
-				return decodeSubKeyErr
+				lp.lggr.Errorw("Failed to decode subkey",
+					"filterID", filter.ID, "filterName", filter.Name, "path", path,
+					"tx", programEvent.TransactionHash, "block", blockData.SlotNumber, "err", decodeSubKeyErr)
+				skipFilter = true
+				break
 			}
 
 			indexedVal, newIndexedValErr := types.NewIndexedValue(subKeyVal)
 			if newIndexedValErr != nil {
-				return newIndexedValErr
+				lp.lggr.Errorw("Failed to index subkey",
+					"filterID", filter.ID, "filterName", filter.Name, "path", path,
+					"tx", programEvent.TransactionHash, "block", blockData.SlotNumber, "err", newIndexedValErr)
+				skipFilter = true
+				break
 			}
 
 			log.SubkeyValues[idx] = indexedVal
 		}
-
-		log.SequenceNum = lp.filters.IncrementSeqNum(filter.ID)
+		if skipFilter {
+			continue
+		}
 
 		if filter.Retention > 0 {
 			expiresAt := time.Now().Add(filter.Retention).UTC()
@@ -259,7 +270,12 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return nil
 	}
 
-	return lp.orm.InsertLogs(ctx, logs)
+	lp.filters.StageSeqNums(logs)
+	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
+		return err
+	}
+	lp.filters.CommitSeqNums(logs)
+	return nil
 }
 
 func (lp *Service) HasFilter(ctx context.Context, name string) bool {

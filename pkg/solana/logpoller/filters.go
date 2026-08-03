@@ -51,13 +51,31 @@ func newFilters(lggr logger.Logger, orm ORM, cpiEventExtractor *CPIEventExtracto
 	}
 }
 
-// IncrementSeqNum increments the sequence number for a filterID and returns the new
-// number. This means the sequence number assigned to the first log matched after registration will be 1.
-func (fl *filters) IncrementSeqNum(filterID int64) int64 {
+// StageSeqNums assigns sequence numbers to logs from the current in-memory state
+// without updating that state. CommitSeqNums must be called after a successful insert.
+func (fl *filters) StageSeqNums(logs []types.Log) {
 	fl.seqNumsMutex.Lock()
 	defer fl.seqNumsMutex.Unlock()
-	fl.seqNums[filterID]++
-	return fl.seqNums[filterID]
+
+	pending := make(map[int64]int64)
+	for i := range logs {
+		filterID := logs[i].FilterID
+		pending[filterID]++
+		logs[i].SequenceNum = fl.seqNums[filterID] + pending[filterID]
+	}
+}
+
+// CommitSeqNums advances in-memory sequence numbers after logs are persisted.
+func (fl *filters) CommitSeqNums(logs []types.Log) {
+	fl.seqNumsMutex.Lock()
+	defer fl.seqNumsMutex.Unlock()
+
+	for i := range logs {
+		filterID := logs[i].FilterID
+		if logs[i].SequenceNum > fl.seqNums[filterID] {
+			fl.seqNums[filterID] = logs[i].SequenceNum
+		}
+	}
 }
 
 // PruneFilters - prunes all filters marked to be deleted from the database and all corresponding logs.
@@ -163,8 +181,10 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	defer fl.filtersMutex.Unlock()
 
 	filter.IsBackfilled = false
+	// persist in memory existingFilter (if it exists) to wait to remove it from memory only if registration succeeds later.
+	var existingFilter *types.Filter
 	if existingFilterID, ok := fl.filtersByName[filter.Name]; ok {
-		existingFilter := fl.filtersByID[existingFilterID]
+		existingFilter = fl.filtersByID[existingFilterID]
 		if !existingFilter.MatchSameLogs(filter) {
 			return ErrFilterNameConflict
 		}
@@ -177,14 +197,16 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 				filter.IsBackfilled = false
 			}
 		}
-
-		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
 	// ensure that the value of IncludeReverted isn't different from any other filters with the same address and event type
 	if contractFilters, okAddr := fl.filtersByAddress[filter.Address]; okAddr {
 		if similarFilters, okEv := contractFilters[filter.EventSig]; okEv {
 			for id := range similarFilters {
+				// ignore existing filter so it doesn't conflict with itself
+				if existingFilter != nil && id == existingFilter.ID {
+					continue
+				}
 				if conflicting := fl.filtersByID[id]; conflicting.IncludeReverted != filter.IncludeReverted {
 					return fmt.Errorf("IncludeReverted=%v for filter %v conflicts with IncludeReverted=%v for filter %v",
 						conflicting.IncludeReverted, conflicting, filter.IncludeReverted, filter)
@@ -201,6 +223,11 @@ func (fl *filters) RegisterFilter(ctx context.Context, filter types.Filter) erro
 	filterID, err := fl.orm.InsertFilter(ctx, filter)
 	if err != nil {
 		return fmt.Errorf("failed to insert filter: %w", err)
+	}
+
+	// only remove existing filter from memory if registration succeeded
+	if existingFilter != nil {
+		fl.removeFilterFromIndexes(*existingFilter)
 	}
 
 	filter.ID = filterID
@@ -293,6 +320,11 @@ func (fl *filters) UnregisterFilter(ctx context.Context, name string) error {
 
 	fl.removeFilterFromIndexes(*filter)
 
+	// only update sequence numbers on Unregister so it doesn't reset to 0 when a filter gets updated.
+	fl.seqNumsMutex.Lock()
+	delete(fl.seqNums, filter.ID)
+	fl.seqNumsMutex.Unlock()
+
 	fl.filtersToDelete[filter.ID] = *filter
 	return nil
 }
@@ -303,9 +335,6 @@ func (fl *filters) removeFilterFromIndexes(filter types.Filter) {
 	delete(fl.filtersByName, filter.Name)
 	delete(fl.filtersToBackfill, filter.ID)
 	delete(fl.filtersByID, filter.ID)
-	fl.seqNumsMutex.Lock()
-	delete(fl.seqNums, filter.ID)
-	fl.seqNumsMutex.Unlock()
 	delete(fl.decoders, filter.ID)
 
 	filtersForAddress, ok := fl.filtersByAddress[filter.Address]

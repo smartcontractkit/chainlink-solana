@@ -26,16 +26,25 @@ type cpiFilterKey struct {
 	methodSig     types.EventSignature
 }
 
+type cpiFilterRegistrationKey struct {
+	name          string
+	sourceProgram types.PublicKey
+	destProgram   types.PublicKey
+	methodSig     types.EventSignature
+}
+
 type CPIEventExtractor struct {
-	mu         sync.RWMutex
-	registered map[cpiFilterKey]struct{}
-	lggr       logger.SugaredLogger
+	mu           sync.RWMutex
+	registered   map[cpiFilterRegistrationKey]struct{}
+	matchKeyRefs map[cpiFilterKey]uint
+	lggr         logger.SugaredLogger
 }
 
 func NewCPIEventExtractor(lggr logger.SugaredLogger) *CPIEventExtractor {
 	return &CPIEventExtractor{
-		registered: make(map[cpiFilterKey]struct{}),
-		lggr:       lggr,
+		registered:   make(map[cpiFilterRegistrationKey]struct{}),
+		matchKeyRefs: make(map[cpiFilterKey]uint),
+		lggr:         lggr,
 	}
 }
 
@@ -44,7 +53,14 @@ func (e *CPIEventExtractor) AddFilter(filter types.Filter) {
 		return
 	}
 
-	key := cpiFilterKey{
+	registrationKey := cpiFilterRegistrationKey{
+		name:          filter.Name,
+		sourceProgram: filter.Address,
+		destProgram:   filter.ExtraFilterConfig.DestProgram,
+		methodSig:     filter.ExtraFilterConfig.MethodSignature,
+	}
+
+	matchKey := cpiFilterKey{
 		sourceProgram: filter.Address,
 		destProgram:   filter.ExtraFilterConfig.DestProgram,
 		methodSig:     filter.ExtraFilterConfig.MethodSignature,
@@ -53,7 +69,12 @@ func (e *CPIEventExtractor) AddFilter(filter types.Filter) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.registered[key] = struct{}{}
+	if _, exists := e.registered[registrationKey]; exists {
+		return
+	}
+
+	e.registered[registrationKey] = struct{}{}
+	e.matchKeyRefs[matchKey]++
 }
 
 func (e *CPIEventExtractor) RemoveFilter(filter types.Filter) {
@@ -61,7 +82,14 @@ func (e *CPIEventExtractor) RemoveFilter(filter types.Filter) {
 		return
 	}
 
-	key := cpiFilterKey{
+	registrationKey := cpiFilterRegistrationKey{
+		name:          filter.Name,
+		sourceProgram: filter.Address,
+		destProgram:   filter.ExtraFilterConfig.DestProgram,
+		methodSig:     filter.ExtraFilterConfig.MethodSignature,
+	}
+
+	matchKey := cpiFilterKey{
 		sourceProgram: filter.Address,
 		destProgram:   filter.ExtraFilterConfig.DestProgram,
 		methodSig:     filter.ExtraFilterConfig.MethodSignature,
@@ -70,13 +98,24 @@ func (e *CPIEventExtractor) RemoveFilter(filter types.Filter) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	delete(e.registered, key)
+	if _, exists := e.registered[registrationKey]; !exists {
+		return
+	}
+
+	delete(e.registered, registrationKey)
+
+	refs := e.matchKeyRefs[matchKey]
+	if refs <= 1 {
+		delete(e.matchKeyRefs, matchKey)
+		return
+	}
+	e.matchKeyRefs[matchKey] = refs - 1
 }
 
 func (e *CPIEventExtractor) HasCPIFilters() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return len(e.registered) > 0
+	return len(e.matchKeyRefs) > 0
 }
 
 func (e *CPIEventExtractor) ExtractCPIEvents(
@@ -172,7 +211,7 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 				methodSig:     methodSig,
 			}
 
-			if _, ok := e.registered[key]; !ok {
+			if _, ok := e.matchKeyRefs[key]; !ok {
 				continue
 			}
 
