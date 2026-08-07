@@ -13,12 +13,14 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"go.opentelemetry.io/otel/attribute"
 
 	commonCap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	caperrors "github.com/smartcontractkit/chainlink-common/pkg/capabilities/errors"
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
 	solanaserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana/server"
+	capmon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/monitoring"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -58,6 +60,7 @@ type FakeSolanaChain struct {
 	forwarderStateAccount solana.PublicKey
 	chainSelector         uint64
 	dryRunWrites          bool
+	lggr                  logger.Logger
 
 	// log trigger callback channels and their registered filters
 	mu                sync.RWMutex
@@ -106,6 +109,7 @@ func NewFakeSolanaChain(
 		forwarderStateAccount: forwarderStateAccount,
 		chainSelector:         chainSelector,
 		dryRunWrites:          dryRunWrites,
+		lggr:                  lggr,
 		callbackCh:            make(map[string]chan commonCap.TriggerAndId[*solcap.Log]),
 		logTriggerFilters:     make(map[string]*solcap.FilterLogTriggerRequest),
 	}
@@ -120,6 +124,16 @@ func NewFakeSolanaChain(
 func (fc *FakeSolanaChain) start(_ context.Context) error {
 	fc.eng.Debugw("Solana Chain started")
 	return nil
+}
+
+// MonitoringContext satisfies the generated solanaserver.ClientCapability
+// interface. Simulation does not emit OTel metrics, so MetricsAttributes is a
+// no-op; the logger is wired through for capability lifecycle logging.
+func (fc *FakeSolanaChain) MonitoringContext() capmon.MonitoringContext {
+	return capmon.MonitoringContext{
+		Logger:            fc.lggr,
+		MetricsAttributes: func() []attribute.KeyValue { return nil },
+	}
 }
 
 func (fc *FakeSolanaChain) close() error {
