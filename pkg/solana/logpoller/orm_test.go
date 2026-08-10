@@ -269,13 +269,13 @@ func TestLogPollerLogs(t *testing.T) {
 	// insert of the same Log should not produce two instances
 	inserted, err = orm.InsertLogs(ctx, []types.Log{log})
 	require.NoError(t, err)
-	require.Len(t, inserted, 0)
+	require.Empty(t, inserted)
 
 	t.Run("InsertLogs returns only newly inserted rows", func(t *testing.T) {
 		// Duplicate-only batch should return no inserted rows.
-		insertedRows, err := orm.InsertLogs(t.Context(), []types.Log{log, log2})
-		require.NoError(t, err)
-		require.Len(t, insertedRows, 0)
+		insertedRows, err2 := orm.InsertLogs(t.Context(), []types.Log{log, log2})
+		require.NoError(t, err2)
+		require.Empty(t, insertedRows)
 
 		// Mixed batch should return only the newly inserted row.
 		log3 := newRandomLog(t, filterID, chainID, "My Event")
