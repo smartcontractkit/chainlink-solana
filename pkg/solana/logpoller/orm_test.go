@@ -427,6 +427,38 @@ func TestFilteredLogs(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("filters by transaction signature equality", func(t *testing.T) {
+		matchingSig, err := solana.SignatureFromBase58("4VJEi7D9ia2R4L6xgPE7bKTtNAtJ2KGHTtq1VEztEMtpcevGPzGpyvnm6EgkMCPhSQTAQ9XwdyqVYzqbf35zJyF")
+		require.NoError(t, err)
+		nonMatchingSig, err := solana.SignatureFromBase58("2VAFRt4n5Vrr2h6AfNFS9R5r2f8MNDoAuCEiBzYawVW7Zx2drXrDo7EQo1gChX2NDSSSXWMQZnQXtNCmieYw9eCQ")
+		require.NoError(t, err)
+
+		baseLog := newRandomLog(t, filterID, chainID, "My Event")
+		baseLog.BlockTimestamp = blockTimestamp
+		baseLog.Data = []byte("non-null data")
+		baseLog.BlockNumber = 10
+		baseLog.LogIndex = 0
+		baseLog.TxHash = types.Signature(matchingSig)
+
+		otherLog := newRandomLog(t, filterID, chainID, "My Event")
+		otherLog.BlockTimestamp = blockTimestamp
+		otherLog.Data = []byte("non-null data")
+		otherLog.BlockNumber = 11
+		otherLog.LogIndex = 0
+		otherLog.TxHash = types.Signature(nonMatchingSig)
+		_, err = orm.InsertLogs(ctx, []types.Log{baseLog, otherLog})
+		require.NoError(t, err)
+
+		logs, err := orm.FilteredLogs(ctx, []query.Expression{query.TxHash(matchingSig.String())}, query.LimitAndSort{}, "")
+		require.NoError(t, err)
+		require.Len(t, logs, 1)
+
+		sanitize(&baseLog, &logs[0])
+		require.Equal(t, baseLog.TxHash, logs[0].TxHash)
+		require.Equal(t, baseLog.BlockNumber, logs[0].BlockNumber)
+		require.Equal(t, baseLog.LogIndex, logs[0].LogIndex)
+	})
 }
 
 func TestPruneLogsForFilter(t *testing.T) {

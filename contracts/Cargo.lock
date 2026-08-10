@@ -1084,6 +1084,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-forwarder"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "blake3",
+ "indexmap",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

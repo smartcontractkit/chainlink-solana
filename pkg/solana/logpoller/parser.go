@@ -119,7 +119,7 @@ func (v *pgDSLParser) Timestamp(prim primitives.Timestamp) {
 }
 
 func (v *pgDSLParser) TxHash(prim primitives.TxHash) {
-	txHash, err := solana.PublicKeyFromBase58(prim.TxHash)
+	txHash, err := solana.SignatureFromBase58(prim.TxHash)
 	if err != nil {
 		v.err = err
 
@@ -129,7 +129,7 @@ func (v *pgDSLParser) TxHash(prim primitives.TxHash) {
 	v.expression = fmt.Sprintf(
 		"%s = :%s",
 		txHashFieldName,
-		v.args.withIndexedField(txHashFieldName, types.PublicKey(txHash)),
+		v.args.withIndexedField(txHashFieldName, types.Signature(txHash)),
 	)
 }
 

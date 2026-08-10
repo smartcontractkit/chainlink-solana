@@ -48,10 +48,11 @@ func TestBalanceMonitor(t *testing.T) {
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
 	cfg := &config{balancePollPeriod: time.Second}
-	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, nil)
+	b, err := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, nil)
+	require.NoError(t, err)
 	var got []update
 	done := make(chan struct{})
-	b.updateFn = func(acc solana.PublicKey, lamports uint64) {
+	b.updateFn = func(_ context.Context, acc solana.PublicKey, lamports uint64) {
 		select {
 		case <-done:
 			return
