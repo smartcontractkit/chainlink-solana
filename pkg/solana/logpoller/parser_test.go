@@ -17,7 +17,7 @@ import (
 
 var (
 	chainID = "chain"
-	txHash  = "J1zQwrBNBngz26jRPNWsUSZMHJwBwpkoDitXRV95LdK4"
+	txHash  = "4VJEi7D9ia2R4L6xgPE7bKTtNAtJ2KGHTtq1VEztEMtpcevGPzGpyvnm6EgkMCPhSQTAQ9XwdyqVYzqbf35zJyF"
 )
 
 func assertArgs(t *testing.T, args *queryArgs, numVals int) {

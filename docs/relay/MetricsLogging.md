@@ -39,10 +39,17 @@ The relay exports metrics and chain-specific errors. This document identifies co
 
 ## Metrics
 
-[`solana_balance`](https://github.com/smartcontractkit/chainlink-solana/blob/4ca9bcc8264d89c7527897e729281e13f37852f1/pkg/solana/monitor/prom.go#L14)
+[`node_balance`](https://github.com/smartcontractkit/chainlink-framework/blob/main/metrics/balance.go)
 
-* provides the SOL balance for keys in the keystore
+* preferred metric for keystore account balances (emitted via [balance monitor](../../pkg/solana/monitor/prom.go))
+* labels: `account`, `chainID`, `chainFamily` (`solana`), value is SOL
 * low SOL balance will lead to the CL node stop transmitting
+
+[`solana_balance`](../../pkg/solana/monitor/prom.go) (deprecated)
+
+* legacy Solana-specific balance metric, still emitted for backward compatibility
+* labels: `account`, `chainID`, `chainSet`, `denomination`, value is SOL
+* prefer `node_balance` for new dashboards and alerts
 
 [`solana_cache_last_update_unix`](https://github.com/smartcontractkit/chainlink-solana/blob/4ca9bcc8264d89c7527897e729281e13f37852f1/pkg/solana/monitor/prom.go#L18)
 
