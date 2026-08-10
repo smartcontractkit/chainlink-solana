@@ -746,10 +746,10 @@ func TestProcess(t *testing.T) {
 		want := expectedLog
 		want.SequenceNum = nextSeqNum
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			assert.Equal(t, want, logs[0])
-			return nil
+			return logs, nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
@@ -759,10 +759,10 @@ func TestProcess(t *testing.T) {
 		fl := lp.filters.(*filters)
 
 		insertErr := errors.New("insert failed")
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			assert.Equal(t, nextSeqNum+1, logs[0].SequenceNum, "insert should still receive the staged sequence number")
-			return insertErr
+			return nil, insertErr
 		}).Once()
 		err = lp.Process(ctx, ev)
 		require.ErrorIs(t, err, insertErr)
@@ -772,10 +772,35 @@ func TestProcess(t *testing.T) {
 		want := expectedLog
 		want.SequenceNum = nextSeqNum
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			assert.Equal(t, want, logs[0])
-			return nil
+			return logs, nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not advance sequence number when insert is a no-op duplicate", func(t *testing.T) {
+		fl := lp.filters.(*filters)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, nextSeqNum+1, logs[0].SequenceNum, "staged sequence number should still increment")
+			return []types.Log{}, nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		require.NoError(t, err)
+		assert.Equal(t, nextSeqNum, fl.seqNums[filterID], "in-memory counter must not advance when DB inserts no rows")
+
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, want, logs[0])
+			return logs, nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
@@ -790,14 +815,14 @@ func TestProcess(t *testing.T) {
 		err = lp.RegisterFilter(ctx, filter)
 		require.NoError(t, err)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			log := logs[0]
 			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
 			assert.Greater(t, time.Until(*log.ExpiresAt), 29*time.Minute)
 			nextSeqNum++
 			assert.Equal(t, nextSeqNum, log.SequenceNum)
-			return nil
+			return logs, nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
@@ -829,10 +854,10 @@ func TestProcess(t *testing.T) {
 		want.Error = new(string)
 		*want.Error = string(jsonErr)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			assert.Equal(t, want, logs[0])
-			return nil
+			return logs, nil
 		}).Once()
 
 		err = lp.Process(ctx, ev)
@@ -946,10 +971,10 @@ func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
 	want := expectedLog
 	want.SequenceNum = 1
 
-	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 		require.Len(t, logs, 1)
 		assert.Equal(t, want, logs[0])
-		return nil
+		return logs, nil
 	}).Once()
 
 	require.NoError(t, lp.Process(ctx, ev))
