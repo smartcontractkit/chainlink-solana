@@ -1,6 +1,7 @@
 package commoncodec
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -30,6 +31,10 @@ func (d *option) Encode(value any, into []byte) ([]byte, error) {
 }
 
 func (d *option) Decode(encoded []byte) (any, []byte, error) {
+	if len(encoded) == 0 {
+		return nil, encoded, errors.New("cannot decode option: empty input")
+	}
+
 	prefix := encoded[0]
 	bytes := encoded[1:]
 
