@@ -36,7 +36,7 @@ type ORM interface {
 	MarkFilterDeleted(ctx context.Context, id int64) (err error)
 	MarkFilterBackfilled(ctx context.Context, id int64) (err error)
 	GetLatestBlock(ctx context.Context) (int64, error)
-	InsertLogs(context.Context, []types.Log) (err error)
+	InsertLogs(context.Context, []types.Log) ([]types.Log, error)
 	SelectSeqNums(ctx context.Context) (map[int64]int64, error)
 	FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]types.Log, error)
 	PruneLogsForFilter(ctx context.Context, filter types.Filter) (int64, error)
@@ -271,10 +271,11 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 	}
 
 	lp.filters.StageSeqNums(logs)
-	if err := lp.orm.InsertLogs(ctx, logs); err != nil {
+	insertedLogs, err := lp.orm.InsertLogs(ctx, logs)
+	if err != nil {
 		return err
 	}
-	lp.filters.CommitSeqNums(logs)
+	lp.filters.CommitSeqNums(insertedLogs)
 	return nil
 }
 

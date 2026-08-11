@@ -160,17 +160,27 @@ func (o *DSORM) SelectFilters(ctx context.Context) ([]types.Filter, error) {
 }
 
 // InsertLogs is idempotent to support replays.
-func (o *DSORM) InsertLogs(ctx context.Context, logs []types.Log) error {
+func (o *DSORM) InsertLogs(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 	if err := o.validateLogs(logs); err != nil {
-		return err
+		return nil, err
 	}
-	return o.Transact(ctx, func(orm *DSORM) error {
-		return orm.insertLogsWithinTx(ctx, logs, orm.ds)
+
+	var insertedLogs []types.Log
+	err := o.Transact(ctx, func(orm *DSORM) error {
+		var txErr error
+		insertedLogs, txErr = orm.insertLogsWithinTx(ctx, logs, orm.ds)
+		return txErr
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return insertedLogs, nil
 }
 
-func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sqlutil.DataSource) error {
+func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sqlutil.DataSource) ([]types.Log, error) {
 	batchInsertSize := 4000
+	insertedLogs := make([]types.Log, 0, len(logs))
 	for i := 0; i < len(logs); i += batchInsertSize {
 		start, end := i, i+batchInsertSize
 		if end > len(logs) {
@@ -181,9 +191,21 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sql
 					(filter_id, chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, subkey_values, tx_hash, data, created_at, expires_at, sequence_num, error)
 				VALUES
 					(:filter_id, :chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :subkey_values, :tx_hash, :data, NOW(), :expires_at, :sequence_num, :error)
-				ON CONFLICT DO NOTHING`
+				ON CONFLICT DO NOTHING
+				RETURNING filter_id, sequence_num`
 
-		res, err := tx.NamedExecContext(ctx, query, logs[start:end])
+		batchInserted := int64(0)
+		err := sqlutil.NamedQueryContext(ctx, tx, query, logs[start:end], func(rs sqlutil.RowScanner) error {
+			batchInserted++
+
+			row := types.Log{}
+			if scanErr := rs.StructScan(&row); scanErr != nil {
+				return scanErr
+			}
+
+			insertedLogs = append(insertedLogs, types.Log{FilterID: row.FilterID, SequenceNum: row.SequenceNum})
+			return nil
+		})
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) && batchInsertSize > 500 {
 				// In case of DB timeouts, try to insert again with a smaller batch upto a limit
@@ -191,18 +213,15 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []types.Log, tx sql
 				i -= batchInsertSize // counteract +=batchInsertSize on next loop iteration
 				continue
 			}
-			return err
+			return nil, err
 		}
-		numRows, err := res.RowsAffected()
-		if err == nil {
-			if numRows != int64(len(logs)) {
-				// This probably just means we're trying to insert the same log twice, but could also be an indication
-				// of other constraint violations
-				o.lggr.Debugf("attempted to insert %d logs, but could only insert %d", end-start, numRows)
-			}
+
+		if batchInserted != int64(end-start) {
+			// Most commonly this means replay attempted duplicate rows that were ignored by ON CONFLICT DO NOTHING.
+			o.lggr.Debugf("attempted to insert %d logs, but could only insert %d", end-start, batchInserted)
 		}
 	}
-	return nil
+	return insertedLogs, nil
 }
 
 func (o *DSORM) validateLogs(logs []types.Log) error {

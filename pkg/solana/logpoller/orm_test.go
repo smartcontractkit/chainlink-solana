@@ -193,7 +193,7 @@ func TestLogPollerFilters(t *testing.T) {
 		require.NoError(t, err)
 		log := newRandomLog(t, filterID, chainID, "My Event")
 
-		err = orm.InsertLogs(ctx, []types.Log{log})
+		_, err = orm.InsertLogs(ctx, []types.Log{log})
 		require.NoError(t, err)
 		logs, err := orm.SelectLogs(ctx, 0, log.BlockNumber, log.Address, log.EventSig)
 		require.NoError(t, err)
@@ -263,11 +263,29 @@ func TestLogPollerLogs(t *testing.T) {
 	require.NoError(t, err)
 	log := newRandomLog(t, filterID, chainID, "My Event")
 	log2 := newRandomLog(t, filterID2, chainID, "My Event")
-	err = orm.InsertLogs(ctx, []types.Log{log, log2})
+	inserted, err := orm.InsertLogs(ctx, []types.Log{log, log2})
 	require.NoError(t, err)
+	require.Len(t, inserted, 2)
 	// insert of the same Log should not produce two instances
-	err = orm.InsertLogs(ctx, []types.Log{log})
+	inserted, err = orm.InsertLogs(ctx, []types.Log{log})
 	require.NoError(t, err)
+	require.Empty(t, inserted)
+
+	t.Run("InsertLogs returns only newly inserted rows", func(t *testing.T) {
+		// Duplicate-only batch should return no inserted rows.
+		insertedRows, err2 := orm.InsertLogs(t.Context(), []types.Log{log, log2})
+		require.NoError(t, err2)
+		require.Empty(t, insertedRows)
+
+		// Mixed batch should return only the newly inserted row.
+		log3 := newRandomLog(t, filterID, chainID, "My Event")
+		log3.SequenceNum = 3
+		insertedRows, err = orm.InsertLogs(t.Context(), []types.Log{log, log3})
+		require.NoError(t, err)
+		require.Len(t, insertedRows, 1)
+		assert.Equal(t, log3.FilterID, insertedRows[0].FilterID)
+		assert.Equal(t, log3.SequenceNum, insertedRows[0].SequenceNum)
+	})
 
 	dbLogs, err := orm.SelectLogs(ctx, 0, 1000000, log.Address, log.EventSig)
 	require.NoError(t, err)
@@ -300,7 +318,7 @@ func TestLogPoller_GetLatestBlock(t *testing.T) {
 		for _, block := range blocks {
 			log := newRandomLog(t, filterID, orm.chainID, "My Event")
 			log.BlockNumber = block
-			err = orm.InsertLogs(ctx, []types.Log{log})
+			_, err = orm.InsertLogs(ctx, []types.Log{log})
 			require.NoError(t, err)
 		}
 	}
@@ -398,7 +416,8 @@ func TestFilteredLogs(t *testing.T) {
 			l.Data = data
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, orm.InsertLogs(ctx, tt.input))
+			_, err := orm.InsertLogs(ctx, tt.input)
+			require.NoError(t, err)
 			logs, err := orm.FilteredLogs(ctx, nil, query.LimitAndSort{}, "")
 			require.NoError(t, err)
 			require.Len(t, logs, len(tt.expected))
@@ -428,8 +447,8 @@ func TestFilteredLogs(t *testing.T) {
 		otherLog.BlockNumber = 11
 		otherLog.LogIndex = 0
 		otherLog.TxHash = types.Signature(nonMatchingSig)
-
-		require.NoError(t, orm.InsertLogs(ctx, []types.Log{baseLog, otherLog}))
+		_, err = orm.InsertLogs(ctx, []types.Log{baseLog, otherLog})
+		require.NoError(t, err)
 
 		logs, err := orm.FilteredLogs(ctx, []query.Expression{query.TxHash(matchingSig.String())}, query.LimitAndSort{}, "")
 		require.NoError(t, err)
@@ -472,7 +491,7 @@ func TestPruneLogsForFilter(t *testing.T) {
 	moreLogs := logs[5:]
 	logs = logs[:5]
 
-	err = orm.InsertLogs(ctx, logs)
+	_, err = orm.InsertLogs(ctx, logs)
 	require.NoError(t, err)
 
 	t.Run("default setting is permanent retention", func(t *testing.T) {
@@ -517,7 +536,7 @@ func TestPruneLogsForFilter(t *testing.T) {
 		future := time.Now().Add(40 * time.Minute).UTC()
 		moreLogs[1].ExpiresAt = &future
 
-		err = orm.InsertLogs(ctx, moreLogs)
+		_, err = orm.InsertLogs(ctx, moreLogs)
 		require.NoError(t, err)
 
 		deleted, err := orm.PruneLogsForFilter(ctx, filter)
