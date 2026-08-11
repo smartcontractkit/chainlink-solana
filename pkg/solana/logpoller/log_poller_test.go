@@ -139,11 +139,11 @@ func TestLogPoller_run(t *testing.T) {
 			return ch, func() {}, nil
 		}).Once()
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			assert.Equal(t, int64(102), logs[0].BlockNumber)
 			assert.Equal(t, int64(1), logs[0].SequenceNum)
-			return nil
+			return nil, nil
 		}).Once()
 
 		err = lp.run(ctx)
