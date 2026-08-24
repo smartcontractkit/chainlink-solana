@@ -66,6 +66,101 @@ func TestLogPoller_run(t *testing.T) {
 		err := lp.LogPoller.run(t.Context())
 		require.ErrorIs(t, err, expectedErr)
 	})
+
+	t.Run("Truncated matching option event does not stall progress", func(t *testing.T) {
+		ctx := t.Context()
+
+		orm := mocks.NewMockORM(t)
+		client := mocks.NewRPCClient(t)
+		loader := mocks.NewMockLogsLoader(t)
+
+		lp, err := New(logger.TestSugared(t), orm, client, config.NewDefault(), chainID)
+		require.NoError(t, err)
+		lp.loader = loader
+		lp.lastProcessedSlot = 100
+
+		addr := newRandomPublicKey(t)
+		eventName := "OptionEvent"
+		eventSig := types.NewEventSignatureFromName(eventName)
+
+		var optionI32Type codecv1.IdlType
+		err = json.Unmarshal([]byte(`{"option":"i32"}`), &optionI32Type)
+		require.NoError(t, err)
+
+		filter := types.Filter{
+			ID:        10,
+			Name:      "option filter",
+			Address:   addr,
+			EventName: eventName,
+			EventSig:  eventSig,
+			EventIdl: types.EventIdl{
+				Event: codecv1.IdlEvent{
+					Name: eventName,
+					Fields: []codecv1.IdlEventField{{
+						Name: "MaybeVal",
+						Type: optionI32Type,
+					}},
+				},
+			},
+			SubkeyPaths:  [][]string{{"MaybeVal"}},
+			IsBackfilled: true,
+		}
+
+		orm.EXPECT().ChainID().Return(chainID).Maybe()
+		orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{filter}, nil).Once()
+		orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+
+		client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(102), nil).Once()
+		loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, uint64(101), uint64(102)).RunAndReturn(func(_ context.Context, _ []types.PublicKey, _, _ uint64) (<-chan types.Block, func(), error) {
+			ch := make(chan types.Block, 2)
+			ch <- types.Block{SlotNumber: 101, Events: []types.ProgramEvent{{
+				Program: addr.ToSolana().String(),
+				BlockData: types.BlockData{
+					SlotNumber:          101,
+					BlockTime:           solana.UnixTimeSeconds(1),
+					TransactionHash:     solana.Signature{1},
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Data: base64.StdEncoding.EncodeToString(eventSig[:]),
+			}}}
+			ch <- types.Block{SlotNumber: 102, Events: []types.ProgramEvent{{
+				Program: addr.ToSolana().String(),
+				BlockData: types.BlockData{
+					SlotNumber:          102,
+					BlockTime:           solana.UnixTimeSeconds(2),
+					TransactionHash:     solana.Signature{2},
+					TransactionIndex:    0,
+					TransactionLogIndex: 0,
+				},
+				Data: base64.StdEncoding.EncodeToString(append(eventSig[:], []byte{1, 42, 0, 0, 0}...)),
+			}}}
+			close(ch)
+			return ch, func() {}, nil
+		}).Once()
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, int64(102), logs[0].BlockNumber)
+			assert.Equal(t, int64(1), logs[0].SequenceNum)
+			return nil, nil
+		}).Once()
+
+		err = lp.run(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(102), lp.lastProcessedSlot)
+
+		client.EXPECT().SlotHeightWithCommitment(mock.Anything, rpc.CommitmentFinalized).Return(uint64(103), nil).Once()
+		loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, uint64(103), uint64(103)).RunAndReturn(func(_ context.Context, _ []types.PublicKey, _, _ uint64) (<-chan types.Block, func(), error) {
+			ch := make(chan types.Block)
+			close(ch)
+			return ch, func() {}, nil
+		}).Once()
+
+		err = lp.run(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(103), lp.lastProcessedSlot)
+	})
 	t.Run("Aborts backfill if loader fails", func(t *testing.T) {
 		lp := newMockedLP(t)
 		lp.LogPoller.lastProcessedSlot = 128
@@ -671,7 +766,6 @@ func TestProcess(t *testing.T) {
 	expectedLog.Address = addr
 	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
 	require.NoError(t, err)
-	expectedLog.SequenceNum = 1
 	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA, subKeyValB}
 
 	expectedLog.Data, err = bin.MarshalBorsh(&event)
@@ -740,12 +834,68 @@ func TestProcess(t *testing.T) {
 	err = lp.RegisterFilter(ctx, filter)
 	require.NoError(t, err)
 
+	var nextSeqNum int64
+
 	t.Run("accepts matching log", func(t *testing.T) {
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
-			log := logs[0]
-			assert.Equal(t, expectedLog, log)
-			return nil
+			assert.Equal(t, want, logs[0])
+			return logs, nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not advance sequence number when insert fails", func(t *testing.T) {
+		fl := lp.filters.(*filters)
+
+		insertErr := errors.New("insert failed")
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, nextSeqNum+1, logs[0].SequenceNum, "insert should still receive the staged sequence number")
+			return nil, insertErr
+		}).Once()
+		err = lp.Process(ctx, ev)
+		require.ErrorIs(t, err, insertErr)
+		assert.Equal(t, nextSeqNum, fl.seqNums[filterID], "in-memory counter must not advance after failed insert")
+
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, want, logs[0])
+			return logs, nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		assert.NoError(t, err)
+	})
+
+	t.Run("does not advance sequence number when insert is a no-op duplicate", func(t *testing.T) {
+		fl := lp.filters.(*filters)
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, nextSeqNum+1, logs[0].SequenceNum, "staged sequence number should still increment")
+			return []types.Log{}, nil
+		}).Once()
+		err = lp.Process(ctx, ev)
+		require.NoError(t, err)
+		assert.Equal(t, nextSeqNum, fl.seqNums[filterID], "in-memory counter must not advance when DB inserts no rows")
+
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+			require.Len(t, logs, 1)
+			assert.Equal(t, want, logs[0])
+			return logs, nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
@@ -760,12 +910,14 @@ func TestProcess(t *testing.T) {
 		err = lp.RegisterFilter(ctx, filter)
 		require.NoError(t, err)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
 			log := logs[0]
 			assert.Less(t, time.Until(*log.ExpiresAt), 30*time.Minute) // should be slightly less than 30 minutes from now
 			assert.Greater(t, time.Until(*log.ExpiresAt), 29*time.Minute)
-			return nil
+			nextSeqNum++
+			assert.Equal(t, nextSeqNum, log.SequenceNum)
+			return logs, nil
 		}).Once()
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
@@ -791,14 +943,16 @@ func TestProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("accepts reverted log when IncludeReverted = true", func(t *testing.T) {
-		expectedLog.Error = new(string)
-		*expectedLog.Error = string(jsonErr)
+		nextSeqNum++
+		want := expectedLog
+		want.SequenceNum = nextSeqNum
+		want.Error = new(string)
+		*want.Error = string(jsonErr)
 
-		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) error {
+		orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
 			require.Len(t, logs, 1)
-			log := logs[0]
-			assert.Equal(t, expectedLog, log)
-			return nil
+			assert.Equal(t, want, logs[0])
+			return logs, nil
 		}).Once()
 
 		err = lp.Process(ctx, ev)
@@ -817,6 +971,108 @@ func TestProcess(t *testing.T) {
 		err = lp.Process(ctx, ev)
 		assert.NoError(t, err)
 	})
+}
+
+func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
+	ctx := t.Context()
+
+	addr := newRandomPublicKey(t)
+	eventName := "myEvent"
+	eventSig := types.NewEventSignatureFromName(eventName)
+	event := struct {
+		A int64
+		B string
+	}{55, "hello"}
+	subKeyValA, err := types.NewIndexedValue(event.A)
+	require.NoError(t, err)
+
+	goodFilterID := rand.Int63()
+	badFilterID := goodFilterID + 1
+
+	txIndex := int(rand.Int31())
+	txLogIndex := uint(rand.Uint32())
+
+	expectedLog := newRandomLog(t, goodFilterID, chainID, eventName)
+	expectedLog.Address = addr
+	expectedLog.LogIndex, err = makeLogIndex(txIndex, txLogIndex)
+	require.NoError(t, err)
+	expectedLog.SubkeyValues = []types.IndexedValue{subKeyValA}
+
+	expectedLog.Data, err = bin.MarshalBorsh(&event)
+	require.NoError(t, err)
+	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
+
+	ev := types.ProgramEvent{
+		Program: addr.ToSolana().String(),
+		BlockData: types.BlockData{
+			SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec
+			BlockHash:           expectedLog.BlockHash.ToSolana(),
+			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+			TransactionHash:     expectedLog.TxHash.ToSolana(),
+			TransactionIndex:    txIndex,
+			TransactionLogIndex: txLogIndex,
+		},
+		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
+	}
+
+	orm := mocks.NewMockORM(t)
+	cl := mocks.NewRPCClient(t)
+	lggr := logger.Sugared(logger.Test(t))
+	lp, err := New(lggr, orm, cl, config.NewDefault(), chainID)
+	require.NoError(t, err)
+
+	var idlTypeInt64 codecv1.IdlType
+	err = json.Unmarshal([]byte("\"i64\""), &idlTypeInt64)
+	require.NoError(t, err)
+
+	idl := types.EventIdl{
+		Event: codecv1.IdlEvent{
+			Name: "myEvent",
+			Fields: []codecv1.IdlEventField{{
+				Name: "A",
+				Type: idlTypeInt64,
+			}},
+		},
+	}
+
+	goodFilter := types.Filter{
+		Name:        "good filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"A"}},
+	}
+	badFilter := types.Filter{
+		Name:        "bad filter",
+		EventName:   eventName,
+		Address:     addr,
+		EventSig:    eventSig,
+		EventIdl:    idl,
+		SubkeyPaths: [][]string{{"MissingField"}},
+	}
+
+	orm.EXPECT().ChainID().Return(chainID).Maybe()
+	orm.EXPECT().SelectFilters(mock.Anything).Return([]types.Filter{}, nil).Once()
+	orm.EXPECT().SelectSeqNums(mock.Anything).Return(map[int64]int64{}, nil).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.MatchedBy(func(f types.Filter) bool { return f.Name == goodFilter.Name })).
+		RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) { return goodFilterID, nil }).Once()
+	orm.EXPECT().InsertFilter(mock.Anything, mock.MatchedBy(func(f types.Filter) bool { return f.Name == badFilter.Name })).
+		RunAndReturn(func(ctx context.Context, f types.Filter) (int64, error) { return badFilterID, nil }).Once()
+
+	require.NoError(t, lp.RegisterFilter(ctx, goodFilter))
+	require.NoError(t, lp.RegisterFilter(ctx, badFilter))
+
+	want := expectedLog
+	want.SequenceNum = 1
+
+	orm.EXPECT().InsertLogs(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+		require.Len(t, logs, 1)
+		assert.Equal(t, want, logs[0])
+		return logs, nil
+	}).Once()
+
+	require.NoError(t, lp.Process(ctx, ev))
 }
 
 func Test_LogPoller_Replay(t *testing.T) {

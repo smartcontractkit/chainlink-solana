@@ -46,12 +46,15 @@ func NewObservedORM(chainID string, chainFamily string, ds sqlutil.DataSource, l
 	}, nil
 }
 
-func (o *ObservedORM) InsertLogs(ctx context.Context, logs []types.Log) error {
+func (o *ObservedORM) InsertLogs(ctx context.Context, logs []types.Log) ([]types.Log, error) {
+	var insertedLogs []types.Log
 	err := withObservedExec(o, "InsertLogs", metrics.Create, func() error {
-		return o.ORM.InsertLogs(ctx, logs)
+		var insertErr error
+		insertedLogs, insertErr = o.ORM.InsertLogs(ctx, logs)
+		return insertErr
 	})
-	trackInsertedLogs(o, logs, err)
-	return err
+	trackInsertedLogs(o, insertedLogs, err)
+	return insertedLogs, err
 }
 
 func (o *ObservedORM) InsertFilter(ctx context.Context, filter types.Filter) (id int64, err error) {
@@ -152,11 +155,11 @@ func withObservedExecAndRowsAffected(o *ObservedORM, queryName string, queryType
 	return rowsAffected, err
 }
 
-func trackInsertedLogs(o *ObservedORM, logs []types.Log, err error) {
+func trackInsertedLogs(o *ObservedORM, insertedLogs []types.Log, err error) {
 	if err != nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	o.metrics.IncrementLogsInserted(ctx, int64(len(logs)))
+	o.metrics.IncrementLogsInserted(ctx, int64(len(insertedLogs)))
 }

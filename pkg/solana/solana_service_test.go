@@ -284,6 +284,77 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, tx.Message.Header.NumReadonlyUnsignedAccounts, got.Message.Header.NumReadonlyUnsignedAccounts)
 		require.Equal(t, tx.Message.Header.NumRequiredSignatures, got.Message.Header.NumRequiredSignatures)
 	})
+
+	t.Run("convertSimulateTXOpts_nil", func(t *testing.T) {
+		opts := convertSimulateTXOpts(nil)
+		require.NotNil(t, opts)
+		require.Equal(t, rpc.CommitmentFinalized, opts.Commitment)
+		require.Nil(t, opts.Accounts)
+	})
+
+	t.Run("convertAccountInfoOpts_nil", func(t *testing.T) {
+		require.Empty(t, convertAccountInfoOpts(nil))
+	})
+
+	t.Run("convertProgramAccountsOpts_nil", func(t *testing.T) {
+		opts, enc := convertProgramAccountsOpts(nil)
+		require.Nil(t, opts)
+		require.Equal(t, commonsol.EncodingType(""), enc)
+	})
+
+	t.Run("convertProgramAccountsOpts_full", func(t *testing.T) {
+		offset := uint64(13)
+		length := uint64(30)
+		filterKey := pk(7)
+		opts, enc := convertProgramAccountsOpts(&commonsol.GetProgramAccountsOpts{
+			Encoding:   commonsol.EncodingBase64,
+			Commitment: commonsol.CommitmentConfirmed,
+			DataSlice:  &commonsol.DataSlice{Offset: &offset, Length: &length},
+			Filters: []commonsol.RPCFilter{
+				{DataSize: 165},
+				{Memcmp: &commonsol.RPCFilterMemcmp{Offset: 0, Bytes: filterKey[:]}},
+			},
+		})
+		require.Equal(t, commonsol.EncodingBase64, enc)
+		require.NotNil(t, opts)
+		require.Equal(t, solanago.EncodingBase64, opts.Encoding)
+		require.Equal(t, rpc.CommitmentConfirmed, opts.Commitment)
+		require.NotNil(t, opts.DataSlice)
+		require.Equal(t, &offset, opts.DataSlice.Offset)
+		require.Equal(t, &length, opts.DataSlice.Length)
+		require.Len(t, opts.Filters, 2)
+		require.Equal(t, uint64(165), opts.Filters[0].DataSize)
+		require.NotNil(t, opts.Filters[1].Memcmp)
+		require.Equal(t, uint64(0), opts.Filters[1].Memcmp.Offset)
+		require.Equal(t, solanago.Base58(filterKey[:]), opts.Filters[1].Memcmp.Bytes)
+	})
+
+	t.Run("convertRPCFilters_empty", func(t *testing.T) {
+		require.Nil(t, convertRPCFilters(nil))
+	})
+
+	t.Run("convertProgramAccountsReply", func(t *testing.T) {
+		data := rpc.DataBytesOrJSONFromBytes([]byte{0xca, 0xfe})
+		got, err := convertProgramAccountsReply(rpc.GetProgramAccountsResult{
+			{
+				Pubkey: pk(3),
+				Account: &rpc.Account{
+					Lamports:   500,
+					Owner:      pk(4),
+					Data:       data,
+					Executable: false,
+					Space:      32,
+				},
+			},
+			nil,
+		}, commonsol.EncodingBase64)
+		require.NoError(t, err)
+		require.Len(t, got.Value, 1)
+		require.Equal(t, cpk(3), got.Value[0].Pubkey)
+		require.Equal(t, uint64(500), got.Value[0].Account.Lamports)
+		require.Equal(t, cpk(4), got.Value[0].Account.Owner)
+		require.Equal(t, []byte{0xca, 0xfe}, got.Value[0].Account.Data.AsDecodedBinary)
+	})
 }
 
 func Test_getPublicKeyWithHighestLamports(t *testing.T) {
@@ -305,8 +376,8 @@ func Test_getPublicKeyWithHighestLamports(t *testing.T) {
 		require.NoError(t, err)
 
 		mockR := clientmocks.NewReaderWriter(t)
-		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(100), nil).Once()
-		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(uint64(9000), nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kLow.PublicKey(), rpc.CommitmentConfirmed).Return(&rpc.GetBalanceResult{Value: 100}, nil).Once()
+		mockR.On("BalanceWithCommitment", mock.Anything, kHigh.PublicKey(), rpc.CommitmentConfirmed).Return(&rpc.GetBalanceResult{Value: 9000}, nil).Once()
 
 		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{kLow.PublicKey().String(), kHigh.PublicKey().String()})
 		require.NoError(t, err)
@@ -320,7 +391,7 @@ func Test_getPublicKeyWithHighestLamports(t *testing.T) {
 		require.NoError(t, err)
 
 		mockR := clientmocks.NewReaderWriter(t)
-		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return(uint64(0), errors.New("rpc down")).Twice()
+		mockR.On("BalanceWithCommitment", mock.Anything, mock.Anything, rpc.CommitmentConfirmed).Return((*rpc.GetBalanceResult)(nil), errors.New("rpc down")).Twice()
 
 		got, err := ss.getPublicKeyWithHighestLamports(ctx, mockR, []string{k0.PublicKey().String(), k1.PublicKey().String()})
 		require.NoError(t, err)
@@ -386,6 +457,7 @@ func (w *stubWorkflow) ForwarderState() *solanago.PublicKey               { retu
 func (w *stubWorkflow) GasLimitDefault() *uint64                          { return nil }
 func (w *stubWorkflow) TxAcceptanceState() *commontypes.TransactionStatus { return nil }
 func (w *stubWorkflow) Local() bool                                       { return false }
+func (w *stubWorkflow) RequestSizeLimit() uint32                          { return 0 }
 
 type stubTxManager struct {
 	mock.Mock
@@ -515,7 +587,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
-		assert.NotNil(t, got.AsJSON)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("base64 explicit pref with binary data", func(t *testing.T) {
@@ -527,6 +599,19 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
+	})
+
+	t.Run("base58 explicit pref sets decoded bytes only", func(t *testing.T) {
+		raw := []byte{0x05, 0x06, 0x07}
+		obj := rpc.DataBytesOrJSONFromBytes(raw)
+
+		got, err := convertDataBytesOrJSON(obj, commonsol.EncodingBase58)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, commonsol.EncodingBase58, got.RawDataEncoding)
+		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("JSON fallback with EncodingJSON", func(t *testing.T) {
@@ -538,7 +623,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingJSON, got.RawDataEncoding)
 		assert.NotNil(t, got.AsJSON)
-		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsDecodedBinary)
 	})
 
 	t.Run("JSON fallback with EncodingJSONParsed", func(t *testing.T) {
@@ -550,7 +635,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingJSONParsed, got.RawDataEncoding)
 		assert.NotNil(t, got.AsJSON)
-		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsDecodedBinary)
 	})
 
 	t.Run("base64 fallback parses json array when GetBinary is empty", func(t *testing.T) {
@@ -565,6 +650,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, []byte("hello world"), got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 
 	t.Run("unknown encoding with binary data falls back to base64", func(t *testing.T) {
@@ -576,6 +662,7 @@ func TestConvertDataBytesOrJSON(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, commonsol.EncodingBase64, got.RawDataEncoding)
 		assert.Equal(t, raw, got.AsDecodedBinary)
+		assert.Nil(t, got.AsJSON)
 	})
 }
 
@@ -776,6 +863,112 @@ func TestSubmitTransaction_NilCfg(t *testing.T) {
 	require.NotNil(t, reply)
 	assert.Equal(t, commonsol.TxSuccess, reply.Status)
 	assert.Nil(t, capturedCfgs, "no tx configs should be set when Cfg is nil")
+}
+
+func newGetProgramAccountsTestHarness(t *testing.T) (*solanaService, *clientmocks.ReaderWriter) {
+	t.Helper()
+
+	mockReader := clientmocks.NewReaderWriter(t)
+	mockCfg := configmocks.NewConfig(t)
+	mockCfg.EXPECT().WF().Return(&stubWorkflow{}).Maybe()
+
+	chain := &submitStubChain{
+		reader: mockReader,
+		cfg:    mockCfg,
+	}
+
+	return &solanaService{
+		chain:  chain,
+		logger: logger.Nop(),
+	}, mockReader
+}
+
+func TestGetProgramAccounts(t *testing.T) {
+	ctx := t.Context()
+	program := cpk(9)
+
+	t.Run("success with opts", func(t *testing.T) {
+		ss, mockReader := newGetProgramAccountsTestHarness(t)
+		offset := uint64(0)
+		length := uint64(32)
+		req := commonsol.GetProgramAccountsRequest{
+			Program: program,
+			Opts: &commonsol.GetProgramAccountsOpts{
+				Encoding:   commonsol.EncodingBase64,
+				Commitment: commonsol.CommitmentConfirmed,
+				DataSlice:  &commonsol.DataSlice{Offset: &offset, Length: &length},
+				Filters:    []commonsol.RPCFilter{{DataSize: 165}},
+			},
+		}
+
+		rpcResult := rpc.GetProgramAccountsResult{
+			{
+				Pubkey: pk(1),
+				Account: &rpc.Account{
+					Lamports: 1000,
+					Owner:    solanago.PublicKey(program),
+					Data:     rpc.DataBytesOrJSONFromBytes([]byte{0x01, 0x02}),
+					Space:    165,
+				},
+			},
+		}
+		mockReader.EXPECT().
+			GetProgramAccountsWithOpts(mock.Anything, solanago.PublicKey(program), mock.MatchedBy(func(opts *rpc.GetProgramAccountsOpts) bool {
+				return opts != nil &&
+					opts.Encoding == solanago.EncodingBase64 &&
+					opts.Commitment == rpc.CommitmentConfirmed &&
+					opts.DataSlice != nil &&
+					*opts.DataSlice.Offset == offset &&
+					*opts.DataSlice.Length == length &&
+					len(opts.Filters) == 1 &&
+					opts.Filters[0].DataSize == 165
+			})).
+			Return(rpcResult, nil)
+
+		reply, err := ss.GetProgramAccounts(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, reply.Value, 1)
+		require.Equal(t, cpk(1), reply.Value[0].Pubkey)
+		require.Equal(t, uint64(1000), reply.Value[0].Account.Lamports)
+		require.Equal(t, program, reply.Value[0].Account.Owner)
+		require.Equal(t, []byte{0x01, 0x02}, reply.Value[0].Account.Data.AsDecodedBinary)
+	})
+
+	t.Run("success with nil opts", func(t *testing.T) {
+		ss, mockReader := newGetProgramAccountsTestHarness(t)
+		req := commonsol.GetProgramAccountsRequest{Program: program}
+
+		mockReader.EXPECT().
+			GetProgramAccountsWithOpts(mock.Anything, solanago.PublicKey(program), (*rpc.GetProgramAccountsOpts)(nil)).
+			Return(rpc.GetProgramAccountsResult{}, nil)
+
+		reply, err := ss.GetProgramAccounts(ctx, req)
+		require.NoError(t, err)
+		require.Empty(t, reply.Value)
+	})
+
+	t.Run("reader error", func(t *testing.T) {
+		ss, mockReader := newGetProgramAccountsTestHarness(t)
+		req := commonsol.GetProgramAccountsRequest{Program: program}
+
+		mockReader.EXPECT().
+			GetProgramAccountsWithOpts(mock.Anything, solanago.PublicKey(program), (*rpc.GetProgramAccountsOpts)(nil)).
+			Return(rpc.GetProgramAccountsResult(nil), errors.New("rpc unavailable"))
+
+		_, err := ss.GetProgramAccounts(ctx, req)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get program accounts")
+		assert.Contains(t, err.Error(), "rpc unavailable")
+	})
+
+	t.Run("chain reader error", func(t *testing.T) {
+		ss := &solanaService{
+			chain: &submitStubChain{readerErr: errors.New("no reader")},
+		}
+		_, err := ss.GetProgramAccounts(ctx, commonsol.GetProgramAccountsRequest{Program: program})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get reader")
+	})
 }
 
 // mockLogPoller is a minimal LogPoller implementation for testing readiness guards.

@@ -12,6 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonsol "github.com/smartcontractkit/chainlink-common/pkg/types/chains/solana"
@@ -50,9 +51,11 @@ func (ss *solanaService) GetBlock(ctx context.Context, req commonsol.GetBlockReq
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 
-	result, err := reader.GetBlockWithOpts(ctx, req.Slot, &rpc.GetBlockOpts{
-		Commitment: rpc.CommitmentType(req.Opts.Commitment),
-	})
+	commitment := commonsol.CommitmentFinalized
+	if req.Opts != nil {
+		commitment = req.Opts.Commitment
+	}
+	result, err := reader.GetBlockWithOpts(ctx, req.Slot, client.HeadMetadataGetBlockOpts(rpc.CommitmentType(commitment)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block: %w", err)
 	}
@@ -77,17 +80,24 @@ func (ss *solanaService) GetLatestLPBlock(ctx context.Context) (*commonsol.LPBlo
 }
 
 func (ss *solanaService) GetAccountInfoWithOpts(ctx context.Context, req commonsol.GetAccountInfoRequest) (*commonsol.GetAccountInfoReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
+
 	reader, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
 	}
 	opts := convertAccountInfoOpts(req.Opts)
+
 	account, err := reader.GetAccountInfoWithOpts(ctx, solana.PublicKey(req.Account), opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account info: %w", err)
 	}
 
-	return convertAccountResult(account, req.Opts.Encoding)
+	enc := commonsol.EncodingType("")
+	if req.Opts != nil {
+		enc = req.Opts.Encoding
+	}
+	return convertAccountResult(account, enc)
 }
 
 func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanceRequest) (*commonsol.GetBalanceReply, error) {
@@ -102,29 +112,18 @@ func (ss *solanaService) GetBalance(ctx context.Context, req commonsol.GetBalanc
 	}
 
 	return &commonsol.GetBalanceReply{
-		Value: balance,
+		Value: balance.Value,
+		Slot:  balance.Context.Slot,
 	}, nil
 }
 
 func (ss *solanaService) SimulateTX(ctx context.Context, req commonsol.SimulateTXRequest) (*commonsol.SimulateTXReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	tx, err := solana.TransactionFromBase64(req.EncodedTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode transaction: %w", err)
 	}
-	accounts := &rpc.SimulateTransactionAccountsOpts{
-		Encoding:  solana.EncodingType(req.Opts.Accounts.Encoding),
-		Addresses: make([]solana.PublicKey, 0, len(req.Opts.Accounts.Addresses)),
-	}
-	for _, addr := range req.Opts.Accounts.Addresses {
-		accounts.Addresses = append(accounts.Addresses, solana.PublicKey(addr))
-	}
-
-	res, err := ss.chain.MultiClient().SimulateTx(ctx, tx, &rpc.SimulateTransactionOpts{
-		SigVerify:              req.Opts.SigVerify,
-		Commitment:             rpc.CommitmentType(req.Opts.Commitment),
-		ReplaceRecentBlockhash: req.Opts.ReplaceRecentBlockhash,
-		Accounts:               accounts,
-	})
+	res, err := ss.chain.MultiClient().SimulateTx(ctx, tx, convertSimulateTXOpts(req.Opts))
 	if err != nil {
 		return nil, fmt.Errorf("simulate tx failed: %w", err)
 	}
@@ -280,13 +279,17 @@ func (ss *solanaService) GetSignatureStatuses(ctx context.Context, req commonsol
 		return nil, fmt.Errorf("failed to get signature statuses: %w", err)
 	}
 
-	statuses := make([]commonsol.GetSignatureStatusesResult, 0, len(res))
+	statuses := make([]*commonsol.GetSignatureStatusesResult, 0, len(res))
 	for _, r := range res {
 		var stErr string
+		if r == nil {
+			statuses = append(statuses, nil)
+			continue
+		}
 		if r.Err != nil {
 			stErr = fmt.Sprintf("%v", r.Err)
 		}
-		statuses = append(statuses, commonsol.GetSignatureStatusesResult{
+		statuses = append(statuses, &commonsol.GetSignatureStatusesResult{
 			Slot:               r.Slot,
 			Err:                stErr,
 			Confirmations:      r.Confirmations,
@@ -435,8 +438,9 @@ func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r 
 			ss.logger.Warnw("failed to get balance for account, skipping", "account", acct, "err", err)
 			continue
 		}
-		if !haveAnyBalance || balance > highestLamports {
-			highestLamports = balance
+		val := balance.Value
+		if !haveAnyBalance || val > highestLamports {
+			highestLamports = val
 			selected = pk
 			haveAnyBalance = true
 		}
@@ -459,6 +463,7 @@ func (ss *solanaService) getPublicKeyWithHighestLamports(ctx context.Context, r 
 }
 
 func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req commonsol.GetMultipleAccountsRequest) (*commonsol.GetMultipleAccountsReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
@@ -488,6 +493,10 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 
 	accounts := make([]*commonsol.Account, 0, len(res.Value))
 	for _, acc := range res.Value {
+		if acc == nil {
+			accounts = append(accounts, nil)
+			continue
+		}
 		data, err := convertDataBytesOrJSON(acc.Data, enc)
 		if err != nil {
 			return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)
@@ -510,7 +519,77 @@ func (ss *solanaService) GetMultipleAccountsWithOpts(ctx context.Context, req co
 	}, nil
 }
 
+func convertProgramAccountsOpts(opts *commonsol.GetProgramAccountsOpts) (*rpc.GetProgramAccountsOpts, commonsol.EncodingType) {
+	if opts == nil {
+		return nil, ""
+	}
+	var ds *rpc.DataSlice
+	if opts.DataSlice != nil {
+		ds = &rpc.DataSlice{
+			Offset: opts.DataSlice.Offset,
+			Length: opts.DataSlice.Length,
+		}
+	}
+	return &rpc.GetProgramAccountsOpts{
+		Encoding:   solana.EncodingType(opts.Encoding),
+		Commitment: rpc.CommitmentType(opts.Commitment),
+		DataSlice:  ds,
+		Filters:    convertRPCFilters(opts.Filters),
+	}, opts.Encoding
+}
+
+func convertRPCFilters(filters []commonsol.RPCFilter) []rpc.RPCFilter {
+	if len(filters) == 0 {
+		return nil
+	}
+	out := make([]rpc.RPCFilter, 0, len(filters))
+	for _, f := range filters {
+		var memcmp *rpc.RPCFilterMemcmp
+		if f.Memcmp != nil {
+			memcmp = &rpc.RPCFilterMemcmp{
+				Offset: f.Memcmp.Offset,
+				Bytes:  solana.Base58(f.Memcmp.Bytes),
+			}
+		}
+		out = append(out, rpc.RPCFilter{
+			Memcmp:   memcmp,
+			DataSize: f.DataSize,
+		})
+	}
+	return out
+}
+
+func convertProgramAccountsReply(res rpc.GetProgramAccountsResult, enc commonsol.EncodingType) (*commonsol.GetProgramAccountsReply, error) {
+	accounts := make([]*commonsol.KeyedAccount, 0, len(res))
+	for _, ka := range res {
+		if ka == nil {
+			continue
+		}
+		var acc *commonsol.Account
+		if ka.Account != nil {
+			data, err := convertDataBytesOrJSON(ka.Account.Data, enc)
+			if err != nil {
+				return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)
+			}
+			acc = &commonsol.Account{
+				Lamports:   ka.Account.Lamports,
+				Owner:      commonsol.PublicKey(ka.Account.Owner),
+				Data:       data,
+				Executable: ka.Account.Executable,
+				RentEpoch:  ka.Account.RentEpoch,
+				Space:      ka.Account.Space,
+			}
+		}
+		accounts = append(accounts, &commonsol.KeyedAccount{
+			Pubkey:  commonsol.PublicKey(ka.Pubkey),
+			Account: acc,
+		})
+	}
+	return &commonsol.GetProgramAccountsReply{Value: accounts}, nil
+}
+
 func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTransactionRequest) (*commonsol.GetTransactionReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
 	r, err := ss.chain.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reader: %w", err)
@@ -540,14 +619,40 @@ func (ss *solanaService) GetTransaction(ctx context.Context, req commonsol.GetTr
 }
 
 func (ss *solanaService) GetFeeForMessage(ctx context.Context, req commonsol.GetFeeForMessageRequest) (*commonsol.GetFeeForMessageReply, error) {
-	fee, err := ss.chain.MultiClient().GetFeeForMessage(ctx, req.Message)
+	res, err := ss.chain.MultiClient().GetFeeForMessageWithCommitment(ctx, req.Message, rpc.CommitmentType(req.Commitment))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fee for message: %w", err)
 	}
 
 	return &commonsol.GetFeeForMessageReply{
-		Fee: fee,
+		Fee:  *res.Value,
+		Slot: res.Context.Slot,
 	}, nil
+}
+
+func (ss *solanaService) GetProgramAccounts(ctx context.Context, req commonsol.GetProgramAccountsRequest) (*commonsol.GetProgramAccountsReply, error) {
+	ctx = ss.wrapCtx(ctx, req.IsExternal)
+
+	r, err := ss.chain.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reader: %w", err)
+	}
+
+	opts, enc := convertProgramAccountsOpts(req.Opts)
+	res, err := r.GetProgramAccountsWithOpts(ctx, solana.PublicKey(req.Program), opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get program accounts: %w", err)
+	}
+
+	return convertProgramAccountsReply(res, enc)
+}
+
+func (ss *solanaService) wrapCtx(ctx context.Context, isExternal bool) context.Context {
+	if isExternal {
+		ctx = http.WithResponseSizeLimit(ctx, ss.chain.Config().WF().RequestSizeLimit())
+	}
+
+	return ctx
 }
 
 // converters
@@ -850,7 +955,35 @@ func convertAccountResult(acc *rpc.GetAccountInfoResult, enc commonsol.EncodingT
 	}, nil
 }
 
+func convertSimulateTXOpts(opts *commonsol.SimulateTXOpts) *rpc.SimulateTransactionOpts {
+	commitment := rpc.CommitmentFinalized
+	if opts != nil {
+		commitment = rpc.CommitmentType(opts.Commitment)
+	}
+	out := &rpc.SimulateTransactionOpts{
+		Commitment: commitment,
+	}
+	if opts == nil {
+		return out
+	}
+	out.SigVerify = opts.SigVerify
+	out.ReplaceRecentBlockhash = opts.ReplaceRecentBlockhash
+	if opts.Accounts != nil {
+		out.Accounts = &rpc.SimulateTransactionAccountsOpts{
+			Encoding:  solana.EncodingType(opts.Accounts.Encoding),
+			Addresses: make([]solana.PublicKey, 0, len(opts.Accounts.Addresses)),
+		}
+		for _, addr := range opts.Accounts.Addresses {
+			out.Accounts.Addresses = append(out.Accounts.Addresses, solana.PublicKey(addr))
+		}
+	}
+	return out
+}
+
 func convertAccountInfoOpts(opts *commonsol.GetAccountInfoOpts) *rpc.GetAccountInfoOpts {
+	if opts == nil {
+		return &rpc.GetAccountInfoOpts{}
+	}
 	var ds *rpc.DataSlice
 	if opts.DataSlice != nil {
 		ds = &rpc.DataSlice{}
@@ -891,13 +1024,16 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 	}
 
 	switch pref {
-	case commonsol.EncodingBase64:
+	case commonsol.EncodingBase58, commonsol.EncodingBase64, commonsol.EncodingBase64Zstd:
 		if len(txBytes) != 0 {
 			return &commonsol.DataBytesOrJSON{
-				RawDataEncoding: commonsol.EncodingBase64,
+				RawDataEncoding: pref,
 				AsDecodedBinary: txBytes,
-				AsJSON:          txJSON,
 			}, nil
+		}
+
+		if pref != commonsol.EncodingBase64 {
+			return nil, fmt.Errorf("expected binary account data for encoding %q but got empty bytes: %s", pref, truncateDiag(string(txJSON)))
 		}
 
 		// Fallback: decode ["<base64>", "base64"] manually
@@ -923,14 +1059,12 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
 			AsDecodedBinary: b,
-			AsJSON:          txJSON,
 		}, nil
 
 	case commonsol.EncodingJSON, commonsol.EncodingJSONParsed:
-		// Caller explicitly wants JSON. Return it even if bytes exist.
+		// Caller explicitly wants JSON.
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: pref,
-			AsDecodedBinary: txBytes,
 			AsJSON:          txJSON,
 		}, nil
 
@@ -942,7 +1076,6 @@ func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref commonsol.EncodingTyp
 		return &commonsol.DataBytesOrJSON{
 			RawDataEncoding: commonsol.EncodingBase64,
 			AsDecodedBinary: txBytes,
-			AsJSON:          txJSON,
 		}, nil
 	}
 }

@@ -56,6 +56,7 @@ type Workflow interface {
 	PollPeriod() time.Duration
 	GasLimitDefault() *uint64
 	TxAcceptanceState() *commontypes.TransactionStatus
+	RequestSizeLimit() uint32
 	Local() bool // shows if workflow is run against local network
 }
 
@@ -77,6 +78,10 @@ type WorkflowConfig struct {
 	Local             *bool
 	PollPeriod        *config.Duration
 	TxAcceptanceState *commontypes.TransactionStatus
+	// RequestSizeLimit caps the size in bytes of HTTP responses from Solana RPC for requests
+	// originated by workflow capabilities (external requests). Applied per request via
+	// commonhttp.WithResponseSizeLimit on the request context. Zero disables the cap.
+	RequestSizeLimit *uint32
 }
 
 // IsEnabled reports whether workflow-style settings are configured: both AcceptanceTimeout and
@@ -112,6 +117,9 @@ func (w *WorkflowConfig) SetFrom(f *WorkflowConfig) {
 	}
 	if f.TxAcceptanceState != nil {
 		w.TxAcceptanceState = f.TxAcceptanceState
+	}
+	if f.RequestSizeLimit != nil {
+		w.RequestSizeLimit = f.RequestSizeLimit
 	}
 }
 
