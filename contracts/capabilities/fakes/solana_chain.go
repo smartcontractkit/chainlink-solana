@@ -21,7 +21,6 @@ import (
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
 	capmon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/monitoring"
 	solanaserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana/server"
-	capmon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/monitoring"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -145,9 +144,6 @@ func (fc *FakeSolanaChain) close() error {
 func (fc *FakeSolanaChain) ChainSelector() uint64 { return fc.chainSelector }
 func (fc *FakeSolanaChain) Description() string   { return fc.CapabilityInfo.Description }
 func (fc *FakeSolanaChain) Name() string          { return fc.ID }
-func (fc *FakeSolanaChain) MonitoringContext() capmon.MonitoringContext {
-	return capmon.MonitoringContext{}
-}
 func (fc *FakeSolanaChain) Initialise(ctx context.Context, _ core.StandardCapabilitiesDependencies) error {
 	return fc.Start(ctx)
 }
