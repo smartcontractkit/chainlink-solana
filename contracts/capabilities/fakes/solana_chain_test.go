@@ -26,6 +26,7 @@ import (
 )
 
 const testChainSelector uint64 = 16423721717087811551 // SOLANA_DEVNET
+const testKvStoreAccount = "7d1kczQb6B2fMcnyCECyLitjvEHt6jLpEc8swPvscQSr"
 
 func testKey(t *testing.T) solana.PrivateKey {
 	t.Helper()
@@ -191,6 +192,76 @@ func TestFakeSolanaChain_InitialiseStartsService(t *testing.T) {
 	require.NoError(t, fc.Initialise(ctx, core.StandardCapabilitiesDependencies{}))
 	require.NoError(t, fc.Ready())
 	require.NoError(t, fc.Close())
+}
+
+func TestFakeSolanaChain_GetAccountInfoWithOpts_ReturnsAccountData(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	fc := newTestSolanaChain(t, true)
+
+	account := solana.MustPublicKeyFromBase58(testKvStoreAccount)
+	resp, err := fc.GetAccountInfoWithOpts(ctx, commonCap.RequestMetadata{}, &solcap.GetAccountInfoWithOptsRequest{
+		Account: account.Bytes(),
+		Opts: &solcap.GetAccountInfoOpts{
+			Encoding:   solcap.EncodingType_ENCODING_TYPE_BASE64,
+			Commitment: solcap.CommitmentType_COMMITMENT_TYPE_CONFIRMED,
+		},
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.Response)
+	require.NotNil(t, resp.Response.Value)
+
+	assert.Greater(t, resp.Response.Value.GetLamports(), uint64(0))
+	assert.Len(t, resp.Response.Value.GetOwner(), solana.PublicKeyLength)
+	require.NotNil(t, resp.Response.Value.GetData())
+	assert.NotEmpty(t, resp.Response.Value.GetData().GetRaw())
+	assert.Nil(t, resp.Response.Value.GetData().GetJson())
+}
+
+func TestFakeSolanaChain_GetAccountInfoWithOpts_Errors(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	fc := newTestSolanaChain(t, true)
+
+	t.Run("nil input", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := fc.GetAccountInfoWithOpts(ctx, commonCap.RequestMetadata{}, nil)
+		require.Nil(t, resp)
+		require.NotNil(t, err)
+		assert.Equal(t, caperrors.InvalidArgument, err.Code())
+		assert.Contains(t, err.Error(), "getAccountInfoWithOptsRequest is nil")
+	})
+
+	t.Run("invalid account bytes", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := fc.GetAccountInfoWithOpts(ctx, commonCap.RequestMetadata{}, &solcap.GetAccountInfoWithOptsRequest{
+			Account: []byte{0x01, 0x02},
+		})
+		require.Nil(t, resp)
+		require.NotNil(t, err)
+		assert.Equal(t, caperrors.InvalidArgument, err.Code())
+		assert.Contains(t, err.Error(), "account")
+	})
+
+	t.Run("missing account on rpc", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := fc.GetAccountInfoWithOpts(ctx, commonCap.RequestMetadata{}, &solcap.GetAccountInfoWithOptsRequest{
+			Account: solana.NewWallet().PublicKey().Bytes(),
+			Opts: &solcap.GetAccountInfoOpts{
+				Encoding: solcap.EncodingType_ENCODING_TYPE_BASE64,
+			},
+		})
+		require.Nil(t, resp)
+		require.NotNil(t, err)
+		assert.Equal(t, caperrors.Unavailable, err.Code())
+		assert.Contains(t, err.Error(), "solana GetAccountInfo")
+	})
 }
 
 func TestFakeSolanaChain_WriteReport_InputValidation(t *testing.T) {
