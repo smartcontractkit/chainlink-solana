@@ -177,15 +177,22 @@ func (fc *FakeSolanaChain) GetAccountInfoWithOpts(
 	if err != nil {
 		return nil, caperrors.NewPublicUserError(fmt.Errorf("account: %w", err), caperrors.InvalidArgument)
 	}
+	opts, err := convertGetAccountInfoOpts(input.GetOpts())
+	if err != nil {
+		return nil, caperrors.NewPublicUserError(fmt.Errorf("opts: %w", err), caperrors.InvalidArgument)
+	}
 
-	out, err := fc.client.GetAccountInfo(ctx, pk)
+	out, err := fc.client.GetAccountInfoWithOpts(ctx, pk, opts)
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("solana GetAccountInfo: %w", err), caperrors.Unavailable)
 	}
 
 	reply := &solcap.GetAccountInfoWithOptsReply{}
 	if out != nil && out.Value != nil {
-		reply.Value = accountToProto(out.Value)
+		reply.Value, err = accountToProto(out.Value, opts.Encoding)
+		if err != nil {
+			return nil, caperrors.NewPublicSystemError(fmt.Errorf("convert account: %w", err), caperrors.Internal)
+		}
 	}
 	return &commonCap.ResponseAndMetadata[*solcap.GetAccountInfoWithOptsReply]{Response: reply}, nil
 }
