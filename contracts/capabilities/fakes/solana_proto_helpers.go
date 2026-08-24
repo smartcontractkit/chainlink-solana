@@ -3,6 +3,8 @@ package fakes
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
@@ -13,22 +15,166 @@ import (
 	valuespb "github.com/smartcontractkit/chainlink-protos/cre/go/values/pb"
 )
 
-// accountToProto maps a solana-go *rpc.Account into the chain-capability proto Account.
-// Subset of fields — only what GetAccountInfoWithOptsReply consumers commonly read.
-// Skips Data because the proto's DataBytesOrJSON requires encoding-type negotiation
-// that no current cre-cli simulation consumer needs (canary doesn't call reads).
-// Backfill the Data field when a workflow exercises it.
-func accountToProto(a *rpc.Account) *solcap.Account {
+// accountToProto maps a solana-go *rpc.Account into the chain-capability proto
+// Account and mirrors production's account-data conversion behavior closely.
+func accountToProto(a *rpc.Account, pref solana.EncodingType) (*solcap.Account, error) {
 	if a == nil {
-		return nil
+		return nil, nil
+	}
+	data, err := convertDataBytesOrJSON(a.Data, pref)
+	if err != nil {
+		return nil, err
 	}
 	return &solcap.Account{
 		Lamports:   a.Lamports,
 		Owner:      a.Owner[:],
+		Data:       data,
 		Executable: a.Executable,
 		RentEpoch:  valuespb.NewBigIntFromInt(a.RentEpoch),
 		Space:      a.Space,
+	}, nil
+}
+
+func convertGetAccountInfoOpts(opts *solcap.GetAccountInfoOpts) (*rpc.GetAccountInfoOpts, error) {
+	if opts == nil {
+		return &rpc.GetAccountInfoOpts{}, nil
 	}
+
+	out := &rpc.GetAccountInfoOpts{
+		Encoding:       solana.EncodingType(defaultEncoding(opts.GetEncoding())),
+		Commitment:     rpc.CommitmentType(defaultCommitment(opts.GetCommitment())),
+		MinContextSlot: uint64Ptr(opts.GetMinContextSlot()),
+	}
+	if ds := opts.GetDataSlice(); ds != nil {
+		out.DataSlice = &rpc.DataSlice{
+			Offset: uint64Ptr(ds.GetOffset()),
+			Length: uint64Ptr(ds.GetLength()),
+		}
+	}
+
+	return out, nil
+}
+
+func convertDataBytesOrJSON(obj *rpc.DataBytesOrJSON, pref solana.EncodingType) (*solcap.DataBytesOrJSON, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	if pref == "" {
+		pref = solana.EncodingBase64
+	}
+
+	txBytes := obj.GetBinary()
+	txJSON, jsonErr := json.Marshal(obj)
+	if jsonErr != nil && len(txBytes) == 0 {
+		return nil, fmt.Errorf("failed to marshal account data: %w", jsonErr)
+	}
+
+	switch pref {
+	case solana.EncodingBase58, solana.EncodingBase64, solana.EncodingBase64Zstd:
+		if len(txBytes) != 0 {
+			return &solcap.DataBytesOrJSON{
+				Encoding: encodingTypeToProto(pref),
+				Body:     &solcap.DataBytesOrJSON_Raw{Raw: txBytes},
+			}, nil
+		}
+
+		if pref != solana.EncodingBase64 {
+			return nil, fmt.Errorf("expected binary account data for encoding %q but got empty bytes: %s", pref, truncateDiag(string(txJSON)))
+		}
+
+		var arr []string
+		if err := json.Unmarshal(txJSON, &arr); err != nil {
+			return nil, fmt.Errorf("expected base64 bytes but GetBinary() empty; also failed to parse json: %w json=%s", err, truncateDiag(string(txJSON)))
+		}
+		if len(arr) != 2 {
+			return nil, fmt.Errorf("expected [data,encoding] json array, got len=%d json=%s", len(arr), truncateDiag(string(txJSON)))
+		}
+		if arr[1] != "base64" {
+			return nil, fmt.Errorf("expected encoding base64, got %q json=%s", arr[1], truncateDiag(string(txJSON)))
+		}
+
+		b, err := base64.StdEncoding.DecodeString(arr[0])
+		if err != nil {
+			return nil, fmt.Errorf("base64 decode failed: %w", err)
+		}
+		return &solcap.DataBytesOrJSON{
+			Encoding: solcap.EncodingType_ENCODING_TYPE_BASE64,
+			Body:     &solcap.DataBytesOrJSON_Raw{Raw: b},
+		}, nil
+
+	case solana.EncodingJSON, solana.EncodingJSONParsed:
+		return &solcap.DataBytesOrJSON{
+			Encoding: encodingTypeToProto(pref),
+			Body:     &solcap.DataBytesOrJSON_Json{Json: txJSON},
+		}, nil
+
+	default:
+		if len(txBytes) == 0 {
+			return nil, fmt.Errorf("expected binary account data but got empty bytes: %s", truncateDiag(string(txJSON)))
+		}
+		return &solcap.DataBytesOrJSON{
+			Encoding: solcap.EncodingType_ENCODING_TYPE_BASE64,
+			Body:     &solcap.DataBytesOrJSON_Raw{Raw: txBytes},
+		}, nil
+	}
+}
+
+func defaultEncoding(enc solcap.EncodingType) solana.EncodingType {
+	switch enc {
+	case solcap.EncodingType_ENCODING_TYPE_BASE58:
+		return solana.EncodingBase58
+	case solcap.EncodingType_ENCODING_TYPE_BASE64:
+		return solana.EncodingBase64
+	case solcap.EncodingType_ENCODING_TYPE_BASE64_ZSTD:
+		return solana.EncodingBase64Zstd
+	case solcap.EncodingType_ENCODING_TYPE_JSON_PARSED:
+		return solana.EncodingJSONParsed
+	case solcap.EncodingType_ENCODING_TYPE_JSON:
+		return solana.EncodingJSON
+	default:
+		return solana.EncodingBase64
+	}
+}
+
+func defaultCommitment(commitment solcap.CommitmentType) rpc.CommitmentType {
+	switch commitment {
+	case solcap.CommitmentType_COMMITMENT_TYPE_PROCESSED:
+		return rpc.CommitmentProcessed
+	case solcap.CommitmentType_COMMITMENT_TYPE_CONFIRMED:
+		return rpc.CommitmentConfirmed
+	default:
+		return rpc.CommitmentFinalized
+	}
+}
+
+func encodingTypeToProto(enc solana.EncodingType) solcap.EncodingType {
+	switch enc {
+	case solana.EncodingBase58:
+		return solcap.EncodingType_ENCODING_TYPE_BASE58
+	case solana.EncodingBase64:
+		return solcap.EncodingType_ENCODING_TYPE_BASE64
+	case solana.EncodingBase64Zstd:
+		return solcap.EncodingType_ENCODING_TYPE_BASE64_ZSTD
+	case solana.EncodingJSONParsed:
+		return solcap.EncodingType_ENCODING_TYPE_JSON_PARSED
+	case solana.EncodingJSON:
+		return solcap.EncodingType_ENCODING_TYPE_JSON
+	default:
+		return solcap.EncodingType_ENCODING_TYPE_NONE
+	}
+}
+
+func uint64Ptr(v uint64) *uint64 {
+	return &v
+}
+
+const maxDiagPayloadLen = 1024
+
+func truncateDiag(s string) string {
+	if len(s) <= maxDiagPayloadLen {
+		return s
+	}
+	return s[:maxDiagPayloadLen] + "...(truncated)"
 }
 
 // buildReportPayload assembles the forwarder `data` arg:

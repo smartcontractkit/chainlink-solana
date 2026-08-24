@@ -2,7 +2,6 @@ package fakes
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"strings"
 	"testing"

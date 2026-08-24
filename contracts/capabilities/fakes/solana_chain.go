@@ -18,6 +18,7 @@ import (
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	caperrors "github.com/smartcontractkit/chainlink-common/pkg/capabilities/errors"
 	solcap "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana"
+	capmon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/monitoring"
 	solanaserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/solana/server"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -130,6 +131,9 @@ func (fc *FakeSolanaChain) close() error {
 func (fc *FakeSolanaChain) ChainSelector() uint64 { return fc.chainSelector }
 func (fc *FakeSolanaChain) Description() string   { return fc.CapabilityInfo.Description }
 func (fc *FakeSolanaChain) Name() string          { return fc.ID }
+func (fc *FakeSolanaChain) MonitoringContext() capmon.MonitoringContext {
+	return capmon.MonitoringContext{}
+}
 func (fc *FakeSolanaChain) Initialise(ctx context.Context, _ core.StandardCapabilitiesDependencies) error {
 	return fc.Start(ctx)
 }
@@ -163,15 +167,22 @@ func (fc *FakeSolanaChain) GetAccountInfoWithOpts(
 	if err != nil {
 		return nil, caperrors.NewPublicUserError(fmt.Errorf("account: %w", err), caperrors.InvalidArgument)
 	}
+	opts, err := convertGetAccountInfoOpts(input.GetOpts())
+	if err != nil {
+		return nil, caperrors.NewPublicUserError(fmt.Errorf("opts: %w", err), caperrors.InvalidArgument)
+	}
 
-	out, err := fc.client.GetAccountInfo(ctx, pk)
+	out, err := fc.client.GetAccountInfoWithOpts(ctx, pk, opts)
 	if err != nil {
 		return nil, caperrors.NewPublicSystemError(fmt.Errorf("solana GetAccountInfo: %w", err), caperrors.Unavailable)
 	}
 
 	reply := &solcap.GetAccountInfoWithOptsReply{}
 	if out != nil && out.Value != nil {
-		reply.Value = accountToProto(out.Value)
+		reply.Value, err = accountToProto(out.Value, opts.Encoding)
+		if err != nil {
+			return nil, caperrors.NewPublicSystemError(fmt.Errorf("convert account: %w", err), caperrors.Internal)
+		}
 	}
 	return &commonCap.ResponseAndMetadata[*solcap.GetAccountInfoWithOptsReply]{Response: reply}, nil
 }
