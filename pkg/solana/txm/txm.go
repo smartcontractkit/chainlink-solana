@@ -232,7 +232,7 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 // buildTx builds and signs the transaction with the appropriate compute unit price.
 func (txm *Txm) buildTx(ctx context.Context, msg pendingTx, retryCount int) (solanaGo.Transaction, error) {
 	// work with a copy
-	newTx := msg.tx
+	newTx := utils.DeepCopyTx(msg.tx)
 
 	// Set compute unit limit if specified
 	if msg.cfg.ComputeUnitLimit != 0 {
