@@ -150,7 +150,11 @@ func (ss *solanaService) RegisterLogTracking(ctx context.Context, req commonsol.
 		return err
 	}
 
-	if lp.HasFilter(ctx, req.Name) {
+	exists, err := lp.HasFilter(ctx, req.Name)
+	if err != nil {
+		return fmt.Errorf("failed to check filter existence: %w", err)
+	}
+	if exists {
 		return nil
 	}
 
@@ -173,7 +177,11 @@ func (ss *solanaService) UnregisterLogTracking(ctx context.Context, filterName s
 		return err
 	}
 
-	if !lp.HasFilter(ctx, filterName) {
+	exists, err := lp.HasFilter(ctx, filterName)
+	if err != nil {
+		return fmt.Errorf("failed to check filter existence: %w", err)
+	}
+	if !exists {
 		return nil
 	}
 

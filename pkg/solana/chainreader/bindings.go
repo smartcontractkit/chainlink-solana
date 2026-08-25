@@ -18,7 +18,7 @@ import (
 )
 
 type filterRegistrar interface {
-	HasFilter(context.Context, string) bool
+	HasFilter(context.Context, string) (bool, error)
 	RegisterFilter(context.Context, logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 }

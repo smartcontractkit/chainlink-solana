@@ -976,10 +976,10 @@ type mockLogPoller struct {
 	ready error
 }
 
-func (m *mockLogPoller) Start(context.Context) error            { return nil }
-func (m *mockLogPoller) Ready() error                           { return m.ready }
-func (m *mockLogPoller) Close() error                           { return nil }
-func (m *mockLogPoller) HasFilter(context.Context, string) bool { return false }
+func (m *mockLogPoller) Start(context.Context) error                     { return nil }
+func (m *mockLogPoller) Ready() error                                    { return m.ready }
+func (m *mockLogPoller) Close() error                                    { return nil }
+func (m *mockLogPoller) HasFilter(context.Context, string) (bool, error) { return false, nil }
 func (m *mockLogPoller) RegisterFilter(context.Context, logpollertypes.Filter) error {
 	return nil
 }

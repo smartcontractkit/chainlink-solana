@@ -42,7 +42,7 @@ type LogPoller interface {
 	Start(context.Context) error
 	Ready() error
 	Close() error
-	HasFilter(context.Context, string) bool
+	HasFilter(context.Context, string) (bool, error)
 	RegisterFilter(ctx context.Context, filter logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	GetFilters(context.Context) (map[string]logpollertypes.Filter, error)

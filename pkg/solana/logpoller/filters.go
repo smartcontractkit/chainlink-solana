@@ -151,13 +151,13 @@ func (fl *filters) PruneLogs(ctx context.Context) error {
 	return nil
 }
 
-func (fl *filters) HasFilter(ctx context.Context, name string) bool {
+func (fl *filters) HasFilter(ctx context.Context, name string) (bool, error) {
 	exists, err := fl.orm.HasFilter(ctx, name)
 	if err != nil {
-		return false
+		return false, err
 	}
 
-	return exists
+	return exists, nil
 }
 
 // RegisterFilter persists provided filter and ensures that any log emitted by a contract with filter.Address

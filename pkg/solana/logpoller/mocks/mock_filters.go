@@ -295,7 +295,7 @@ func (_c *MockFilters_GetFiltersToBackfill_Call) RunAndReturn(run func(int64) ([
 }
 
 // HasFilter provides a mock function with given fields: ctx, name
-func (_m *MockFilters) HasFilter(ctx context.Context, name string) bool {
+func (_m *MockFilters) HasFilter(ctx context.Context, name string) (bool, error) {
 	ret := _m.Called(ctx, name)
 
 	if len(ret) == 0 {
@@ -303,13 +303,23 @@ func (_m *MockFilters) HasFilter(ctx context.Context, name string) bool {
 	}
 
 	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, name)
+	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
 		r0 = rf(ctx, name)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockFilters_HasFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasFilter'
@@ -331,12 +341,12 @@ func (_c *MockFilters_HasFilter_Call) Run(run func(ctx context.Context, name str
 	return _c
 }
 
-func (_c *MockFilters_HasFilter_Call) Return(_a0 bool) *MockFilters_HasFilter_Call {
-	_c.Call.Return(_a0)
+func (_c *MockFilters_HasFilter_Call) Return(_a0 bool, _a1 error) *MockFilters_HasFilter_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockFilters_HasFilter_Call) RunAndReturn(run func(context.Context, string) bool) *MockFilters_HasFilter_Call {
+func (_c *MockFilters_HasFilter_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockFilters_HasFilter_Call {
 	_c.Call.Return(run)
 	return _c
 }
