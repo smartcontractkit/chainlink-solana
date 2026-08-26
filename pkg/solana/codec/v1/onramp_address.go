@@ -40,6 +40,10 @@ func (d *onRampAddress) Encode(value any, into []byte) ([]byte, error) {
 }
 
 func (d *onRampAddress) Decode(encoded []byte) (any, []byte, error) {
+	if len(encoded) < 64 {
+		return nil, nil, fmt.Errorf("%w: expected at least 64 bytes, got %d", types.ErrInvalidEncoding, len(encoded))
+	}
+
 	buf := encoded[0:64]
 	encoded = encoded[64:]
 
@@ -52,6 +56,10 @@ func (d *onRampAddress) Decode(encoded []byte) (any, []byte, error) {
 	length, ok := l.(uint32)
 	if !ok {
 		return nil, bytes, fmt.Errorf("expected uint32, got %T", l)
+	}
+
+	if length > 64 {
+		return nil, bytes, fmt.Errorf("%w: invalid length %d, max 64", types.ErrInvalidEncoding, length)
 	}
 
 	return buf[:length], bytes, nil
