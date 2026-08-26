@@ -29,6 +29,13 @@ func Test_decodeExtraArgs(t *testing.T) {
 		require.Equal(t, destGasAmount, decoded)
 	})
 
+	t.Run("decode dest exec data errors on short input", func(t *testing.T) {
+		for _, encoded := range [][]byte{nil, {}, {0x1}, {0x1, 0x2, 0x3}} {
+			_, err := extraDataDecoder.DecodeDestExecDataToMap(encoded)
+			require.Error(t, err)
+		}
+	})
+
 	t.Run("decode extra args into map svm", func(t *testing.T) {
 		destGasAmount := uint32(10000)
 		bitmap := uint64(0)
