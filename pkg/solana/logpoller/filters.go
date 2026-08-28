@@ -154,6 +154,7 @@ func (fl *filters) PruneLogs(ctx context.Context) error {
 func (fl *filters) HasFilter(ctx context.Context, name string) (bool, error) {
 	exists, err := fl.orm.HasFilter(ctx, name)
 	if err != nil {
+		fl.lggr.Errorw("HasFilter query failed on orm", "name", name, "err", err)
 		return false, err
 	}
 
