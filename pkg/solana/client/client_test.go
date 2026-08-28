@@ -423,7 +423,7 @@ func TestClientLatency(t *testing.T) {
 	labels := prometheus.Labels{
 		"chainFamily": metrics.Solana,
 		"chainID":     c.chainID,
-		"rpcUrl":      c.url,
+		"rpcUrl":      metrics.SanitizeRPCURL(c.url),
 		"isSendOnly":  "false",
 		"success":     "true",
 		"rpcCallName": n,
