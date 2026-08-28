@@ -355,6 +355,21 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, cpk(4), got.Value[0].Account.Owner)
 		require.Equal(t, []byte{0xca, 0xfe}, got.Value[0].Account.Data.AsDecodedBinary)
 	})
+
+	t.Run("convertAccounts", func(t *testing.T) {
+		data := rpc.DataBytesOrJSONFromBytes([]byte{0xca, 0xfe})
+		got, err := convertAccounts([]*rpc.Account{
+			nil, // nonexistent account comes back as a nil element
+			{Lamports: 500, Owner: pk(4), Data: data, Space: 32},
+		})
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		require.Nil(t, got[0])
+		require.NotNil(t, got[1])
+		require.Equal(t, uint64(500), got[1].Lamports)
+		require.Equal(t, cpk(4), got[1].Owner)
+		require.Equal(t, []byte{0xca, 0xfe}, got[1].Data.AsDecodedBinary)
+	})
 }
 
 func Test_getPublicKeyWithHighestLamports(t *testing.T) {
