@@ -91,9 +91,9 @@ func CCIPExecuteArgsTransformV2(
 
 	var messageAccounts []ccip_offramp_v0_1_1.CcipAccountMeta
 	if !message.Receiver.IsZeroOrEmpty() {
-		logicReceiver, err := pubkeyFromBytes(message.Receiver)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("invalid message receiver: %w", err)
+		logicReceiver, pubkeyerr := pubkeyFromBytes(message.Receiver)
+		if pubkeyerr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("invalid message receiver: %w", pubkeyerr)
 		}
 		// Append logic receiver as the first messaging account for derivation
 		messageAccounts = append(messageAccounts, ccip_offramp_v0_1_1.CcipAccountMeta{
@@ -132,9 +132,9 @@ func CCIPExecuteArgsTransformV2(
 		}
 		messageTokenData = report.OffchainTokenData[0]
 		for i, tokenAmount := range message.TokenAmounts {
-			destTokenAddress, err := pubkeyFromBytes(tokenAmount.DestTokenAddress)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("invalid dest token address for token transfer %d: %w", i, err)
+			destTokenAddress, pubkeyerr := pubkeyFromBytes(tokenAmount.DestTokenAddress)
+			if pubkeyerr != nil {
+				return nil, nil, nil, nil, fmt.Errorf("invalid dest token address for token transfer %d: %w", i, pubkeyerr)
 			}
 			destGasAmount, extractErr := extractDestGasAmount(argsTransformed.ExtraData.DestExecDataDecoded[i])
 			if extractErr != nil {

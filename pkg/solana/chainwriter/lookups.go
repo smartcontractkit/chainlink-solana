@@ -189,9 +189,9 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 		// Resolve isWritable for this particular pubkey
 		isWritable := writerIndexes[i]
 
-		pubkey, err := pubkeyFromBytes(address)
-		if err != nil {
-			return nil, lookupErrWithName(al.Name, fmt.Errorf("error converting address at location %q to public key: %w", al.Location, err))
+		pubkey, pubkeyerr := pubkeyFromBytes(address)
+		if pubkeyerr != nil {
+			return nil, lookupErrWithName(al.Name, fmt.Errorf("error converting address at location %q to public key: %w", al.Location, pubkeyerr))
 		}
 
 		metas = append(metas, &solana.AccountMeta{
@@ -329,9 +329,9 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("expected 1 value at location %s, got %d", pda.InternalField.Location, len(value)))
 		}
 
-		pubkey, err := pubkeyFromBytes(value[0])
-		if err != nil {
-			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error converting value at location %q to public key: %w", pda.InternalField.Location, err))
+		pubkey, pubkeyerr := pubkeyFromBytes(value[0])
+		if pubkeyerr != nil {
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error converting value at location %q to public key: %w", pda.InternalField.Location, pubkeyerr))
 		}
 
 		result = append(result, &solana.AccountMeta{
