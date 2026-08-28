@@ -128,8 +128,11 @@ func (p *blocksSorter) readNextReadyBlock() *types.Block {
 func (p *blocksSorter) flushReadyBlocks(ctx context.Context) {
 	for {
 		block := p.readNextReadyBlock()
-		if block == nil || block.Aborted {
+		if block == nil {
 			return
+		}
+		if block.Aborted {
+			continue // drop it, keep flushing the rest
 		}
 
 		select {
