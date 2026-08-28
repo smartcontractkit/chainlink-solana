@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1073,6 +1074,52 @@ func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
 	}).Once()
 
 	require.NoError(t, lp.Process(ctx, ev))
+}
+
+func TestProcessBlocksImpl(t *testing.T) {
+	ctx := t.Context()
+
+	malformedEvent := types.ProgramEvent{
+		Program: newRandomPublicKey(t).ToSolana().String(),
+		BlockData: types.BlockData{
+			SlotNumber:       1,
+			TransactionIndex: -1, // out of range -> makeLogIndex fails -> malformed event
+		},
+		Data: "!!!not-base64!!!",
+	}
+
+	t.Run("skips malformed event and continues processing", func(t *testing.T) {
+		lp := newMockedLP(t)
+
+		// Return a matching filter so Process proceeds past filter matching and reaches
+		// the malformed-data checks (makeLogIndex fails on TransactionIndex=-1).
+		matching := slices.Values([]types.Filter{{ID: 1, Name: "f"}})
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(nil).Twice()
+		lp.Filters.EXPECT().MatchingFiltersForEncodedEvent(mock.Anything).Return(matching).Twice()
+
+		blocks := []types.Block{
+			{SlotNumber: 1, Events: []types.ProgramEvent{malformedEvent}},
+			{SlotNumber: 2, Events: []types.ProgramEvent{malformedEvent}},
+		}
+
+		err := lp.LogPoller.processBlocksImpl(ctx, blocks)
+		require.NoError(t, err, "malformed events must be skipped, not stall the chain")
+	})
+
+	t.Run("propagates infra errors for retry", func(t *testing.T) {
+		lp := newMockedLP(t)
+
+		infraErr := errors.New("failed to load filters")
+		lp.Filters.EXPECT().LoadFilters(mock.Anything).Return(infraErr).Once()
+
+		blocks := []types.Block{
+			{SlotNumber: 1, Events: []types.ProgramEvent{malformedEvent}},
+		}
+
+		err := lp.LogPoller.processBlocksImpl(ctx, blocks)
+		require.ErrorIs(t, err, infraErr, "infra errors must propagate so the slot is retried")
+		require.NotErrorIs(t, err, errMalformedEvent)
+	})
 }
 
 func Test_LogPoller_Replay(t *testing.T) {
