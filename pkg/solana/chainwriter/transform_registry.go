@@ -91,7 +91,10 @@ func CCIPExecuteArgsTransformV2(
 
 	var messageAccounts []ccip_offramp_v0_1_1.CcipAccountMeta
 	if !message.Receiver.IsZeroOrEmpty() {
-		logicReceiver := solana.PublicKeyFromBytes(message.Receiver)
+		logicReceiver, err := pubkeyFromBytes(message.Receiver)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("invalid message receiver: %w", err)
+		}
 		// Append logic receiver as the first messaging account for derivation
 		messageAccounts = append(messageAccounts, ccip_offramp_v0_1_1.CcipAccountMeta{
 			Pubkey:     logicReceiver,
@@ -129,7 +132,10 @@ func CCIPExecuteArgsTransformV2(
 		}
 		messageTokenData = report.OffchainTokenData[0]
 		for i, tokenAmount := range message.TokenAmounts {
-			destTokenAddress := solana.PublicKeyFromBytes(tokenAmount.DestTokenAddress)
+			destTokenAddress, err := pubkeyFromBytes(tokenAmount.DestTokenAddress)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("invalid dest token address for token transfer %d: %w", i, err)
+			}
 			destGasAmount, extractErr := extractDestGasAmount(argsTransformed.ExtraData.DestExecDataDecoded[i])
 			if extractErr != nil {
 				return nil, nil, nil, nil, fmt.Errorf("failed to extract destGasAmount for %s token transfer: %w", destTokenAddress.String(), extractErr)

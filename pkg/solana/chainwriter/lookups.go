@@ -20,6 +20,15 @@ var (
 	ErrGettingSeedAtLocation    = fmt.Errorf("error getting address seed for location")
 )
 
+// pubkeyFromBytes converts a byte slice to a solana.PublicKey, returning an error
+// instead of panicking when the input is not exactly solana.PublicKeyLength bytes.
+func pubkeyFromBytes(b []byte) (solana.PublicKey, error) {
+	if len(b) != solana.PublicKeyLength {
+		return solana.PublicKey{}, fmt.Errorf("invalid public key length: expected %d bytes, got %d", solana.PublicKeyLength, len(b))
+	}
+	return solana.PublicKeyFromBytes(b), nil
+}
+
 type Lookup struct {
 	Optional                bool
 	AccountConstant         *AccountConstant         `json:"accountConstant,omitempty"`
@@ -180,8 +189,13 @@ func (al AccountLookup) Resolve(args any) ([]*solana.AccountMeta, error) {
 		// Resolve isWritable for this particular pubkey
 		isWritable := writerIndexes[i]
 
+		pubkey, err := pubkeyFromBytes(address)
+		if err != nil {
+			return nil, lookupErrWithName(al.Name, fmt.Errorf("error converting address at location %q to public key: %w", al.Location, err))
+		}
+
 		metas = append(metas, &solana.AccountMeta{
-			PublicKey:  solana.PublicKeyFromBytes(address),
+			PublicKey:  pubkey,
 			IsSigner:   isSigner,
 			IsWritable: isWritable,
 		})
@@ -315,8 +329,13 @@ func (pda PDALookups) Resolve(ctx context.Context, args any, derivedTableMap map
 			return nil, lookupErrWithName(pda.Name, fmt.Errorf("expected 1 value at location %s, got %d", pda.InternalField.Location, len(value)))
 		}
 
+		pubkey, err := pubkeyFromBytes(value[0])
+		if err != nil {
+			return nil, lookupErrWithName(pda.Name, fmt.Errorf("error converting value at location %q to public key: %w", pda.InternalField.Location, err))
+		}
+
 		result = append(result, &solana.AccountMeta{
-			PublicKey:  solana.PublicKeyFromBytes(value[0]),
+			PublicKey:  pubkey,
 			IsSigner:   accountMeta.IsSigner,
 			IsWritable: accountMeta.IsWritable,
 		})
