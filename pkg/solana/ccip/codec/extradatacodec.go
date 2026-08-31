@@ -99,6 +99,10 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs ccipocr3.Bytes) (map[st
 
 // DecodeDestExecDataToMap is a helper function for converting dest exec data bytes into map[string]any
 func (d ExtraDataDecoder) DecodeDestExecDataToMap(destExecData ccipocr3.Bytes) (map[string]any, error) {
+	if len(destExecData) < 4 {
+		return nil, fmt.Errorf("dest exec data too short: %d, should be at least 4 bytes", len(destExecData))
+	}
+
 	return map[string]any{
 		svmDestExecDataKey: binary.BigEndian.Uint32(destExecData),
 	}, nil
