@@ -856,15 +856,15 @@ func (txm *Txm) handleDependencyTxs(msg pendingTx) {
 }
 
 func (txm *Txm) waitForDependencyTxs(ctx context.Context, depMeta txmutils.DependencyTxMeta) error {
-	waitCtx := ctx
-	var cancel context.CancelFunc
 	// Merge context with TxConfirmTimeout if non-zero. Transactions are dropped if they aren't confirmed within TxConfirmTimeout.
 	// No need to continue to poll for status if that timeout is reached.
 	// If TxConfirmTimeout is set to 0, transactions are never dropped so using the parent context (TXM stop channel) is valid.
+	waitCtx := ctx
 	if txm.cfg.TxConfirmTimeout() > 0 {
+		var cancel context.CancelFunc
 		waitCtx, cancel = context.WithTimeout(ctx, txm.cfg.TxConfirmTimeout())
+		defer cancel()
 	}
-	defer cancel()
 
 	backoff := 1 * time.Second
 	maxBackoff := 8 * time.Second
