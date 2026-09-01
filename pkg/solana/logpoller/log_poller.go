@@ -165,6 +165,12 @@ func makeLogIndex(txIndex int, txLogIndex uint) (int64, error) {
 	return 0, fmt.Errorf("txIndex or txLogIndex out of range: txIndex=%d, txLogIndex=%d", txIndex, txLogIndex)
 }
 
+// errMalformedEvent marks an event whose data is malformed (bad base64, out-of-range
+// log index/slot, or undecodable subkey). Such events are skipped rather than retried,
+// so a single bad event cannot stall ingestion for the whole chain. Infra errors
+// (filter loading, DB inserts) are returned separately and still propagate.
+var errMalformedEvent = errors.New("malformed event data")
+
 // Process - process stream of events coming from log ingester
 func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent) (err error) {
 	// This should never happen, since the log collector isn't started until after the filters
@@ -173,39 +179,45 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 		return err
 	}
 
-	blockData := programEvent.BlockData
-
 	matchingFilters := lp.filters.MatchingFiltersForEncodedEvent(programEvent)
 	if matchingFilters == nil {
 		return nil
 	}
 
+	blockData := programEvent.BlockData
+
+	var revertErr *string
+	if blockData.Error != nil {
+		revertErr = new(string)
+		if j, err2 := json.Marshal(blockData.Error); err2 != nil {
+			*revertErr = fmt.Sprintf("%v", blockData.Error)
+			lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
+		} else {
+			*revertErr = string(j)
+		}
+	}
+
+	logIndex, err := makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
+	if err != nil {
+		lp.lggr.Errorw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
+		return fmt.Errorf("%w: %w", errMalformedEvent, err)
+	}
+	if blockData.SlotNumber > math.MaxInt64 {
+		err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
+		lp.lggr.Errorw("slot number out of range", "err", err, "tx", programEvent.TransactionHash)
+		return fmt.Errorf("%w: %w", errMalformedEvent, err)
+	}
+
+	programEventData, err := base64.StdEncoding.DecodeString(programEvent.Data)
+	if err != nil {
+		lp.lggr.Errorw("failed to base64-decode event data", "err", err, "tx", programEvent.TransactionHash)
+		return fmt.Errorf("%w: %w", errMalformedEvent, err)
+	}
+
 	var logs []types.Log
 	for filter := range matchingFilters {
-		var revertErr *string
-		if blockData.Error != nil {
-			if !filter.IncludeReverted {
-				continue
-			}
-			revertErr = new(string)
-			if j, err2 := json.Marshal(blockData.Error); err2 != nil {
-				*revertErr = fmt.Sprintf("%v", blockData.Error)
-				lp.lggr.Errorw("failed to marshal revert error", "revertErr", blockData.Error, "err", err2)
-			} else {
-				*revertErr = string(j)
-			}
-		}
-
-		var logIndex int64
-		logIndex, err = makeLogIndex(blockData.TransactionIndex, blockData.TransactionLogIndex)
-		if err != nil {
-			lp.lggr.Criticalw("failed to make log index", "err", err, "tx", programEvent.TransactionHash)
-			return err
-		}
-		if blockData.SlotNumber > math.MaxInt64 {
-			err = fmt.Errorf("slot number %d out of range", blockData.SlotNumber)
-			lp.lggr.Critical(err.Error())
-			return err
+		if blockData.Error != nil && !filter.IncludeReverted {
+			continue
 		}
 
 		log := types.Log{
@@ -219,11 +231,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 			EventSig:       filter.EventSig,
 			TxHash:         types.Signature(blockData.TransactionHash),
 			Error:          revertErr,
-		}
-
-		log.Data, err = base64.StdEncoding.DecodeString(programEvent.Data)
-		if err != nil {
-			return err
+			Data:           programEventData,
 		}
 
 		log.SubkeyValues = make([]types.IndexedValue, len(filter.SubkeyPaths))
@@ -499,9 +507,19 @@ func (lp *Service) processBlocksImpl(ctx context.Context, blocks []types.Block) 
 	for _, block := range blocks {
 		for _, event := range block.Events {
 			err := lp.Process(ctx, event)
-			if err != nil {
-				return fmt.Errorf("error processing event for tx %s in block %d: %w", event.TransactionHash, block.SlotNumber, err)
+			if err == nil {
+				continue
 			}
+			if errors.Is(err, errMalformedEvent) {
+				// A single malformed event must not stall ingestion for the whole chain.
+				// Skip it and keep processing; the slot is still marked as processed.
+				lp.lggr.Errorw("skipping malformed event", "tx", event.TransactionHash, "block", block.SlotNumber, "err", err)
+				lp.metrics.IncrementEventsSkipped(ctx)
+				continue
+			}
+			// Infra errors (filter loading, DB insert) are transient: propagate so the
+			// slot is retried rather than silently dropping the event.
+			return fmt.Errorf("error processing event for tx %s in block %d: %w", event.TransactionHash, block.SlotNumber, err)
 		}
 	}
 
