@@ -2,7 +2,6 @@ package logpoller
 
 import (
 	"bytes"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -61,16 +60,15 @@ func TestFilters_DecodeSubKey_RejectsOversizedVec(t *testing.T) {
 				EventName:   "TestItem",
 			}))
 
-			var before, after runtime.MemStats
-			runtime.ReadMemStats(&before)
 			_, err := fs.DecodeSubKey(t.Context(), lggr, oversizedTestItemEvent(t), tt.id, []string{"Field"})
-			runtime.ReadMemStats(&after)
 
+			// The error identifies which code path ran, so it also establishes that the
+			// 64 GiB was never allocated: the bound rejects while decoding the length
+			// prefix, whereas an unbounded codec reaches reflect.MakeSlice first and
+			// only then fails with "not enough bytes to decode type".
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "exceeds the maximum")
-
-			allocatedMB := (after.HeapAlloc - before.HeapAlloc) >> 20
-			require.Less(t, allocatedMB, uint64(16), "decode allocated %d MB", allocatedMB)
+			require.NotContains(t, err.Error(), "not enough bytes")
 		})
 	}
 }

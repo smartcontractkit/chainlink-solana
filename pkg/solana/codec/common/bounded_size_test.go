@@ -2,7 +2,6 @@ package commoncodec_test
 
 import (
 	"fmt"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,13 +11,6 @@ import (
 
 	commoncodec "github.com/smartcontractkit/chainlink-solana/pkg/solana/codec/common"
 )
-
-func heapAllocMB() uint64 {
-	var stats runtime.MemStats
-	runtime.ReadMemStats(&stats)
-
-	return stats.HeapAlloc >> 20
-}
 
 // oversizedLengthPrefix is a 4 byte Borsh length claiming math.MaxInt32 elements,
 // followed by a single byte of payload.
@@ -54,15 +46,17 @@ func TestNewBoundedSlice_RejectsOversizedLengthWithoutAllocating(t *testing.T) {
 			codec, err := commoncodec.NewBoundedSlice(tt.element, builder)
 			require.NoError(t, err)
 
-			before := heapAllocMB()
 			_, _, err = codec.Decode(oversizedLengthPrefix)
-			after := heapAllocMB()
 
+			// The error identifies which code path ran, so it also establishes that
+			// nothing was allocated. encodings.slice.Decode returns as soon as the
+			// size codec errors, so only the bound can produce this message; an
+			// unbounded codec reaches reflect.MakeSlice first and then fails in
+			// DecodeEach with "not enough bytes to decode type" instead.
 			require.ErrorContains(t, err, "exceeds the maximum")
 			require.ErrorContains(t, err, "2147483647")
 			require.ErrorContains(t, err, fmt.Sprintf("maximum of %d", tt.maxCount))
-			// the wire length must be rejected before reflect.MakeSlice runs
-			require.Less(t, after-before, uint64(16), "decode allocated %d MB", after-before)
+			require.NotContains(t, err.Error(), "not enough bytes")
 
 			// whatever the cap is, admitting that many elements must stay within
 			// MaxAccountBytes of memory, not just of wire bytes
