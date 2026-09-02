@@ -380,7 +380,7 @@ func asArray(parentTypeName string, idlArray *idltype.Array, refs *codecRefs) (c
 	// log poller path, and encodings.array.Decode materialises the whole array. Bound
 	// it by the Solana account limit so an oversized IDL cannot force a huge allocation.
 	if err = solcommoncodec.CheckElementCount(lenInt, codec); err != nil {
-		return nil, fmt.Errorf("array length defined in IDL type is excessively large: %w", err)
+		return nil, err
 	}
 
 	return commonencodings.NewArray(lenInt, codec)

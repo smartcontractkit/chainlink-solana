@@ -99,8 +99,10 @@ func (b *boundedSize) Decode(encoded []byte) (any, []byte, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("%w: %T is not an int indicating the size", types.ErrInternal, value)
 	}
-
-	if count < 0 || count > b.maxCount {
+	if count < 0 {
+		return nil, nil, fmt.Errorf("%w: element count %d cannot be less than zero", types.ErrInvalidConfig, count)
+	}
+	if count > b.maxCount {
 		return nil, nil, fmt.Errorf("%w: element count %d exceeds the maximum of %d for solana data", types.ErrInvalidEncoding, count, b.maxCount)
 	}
 
