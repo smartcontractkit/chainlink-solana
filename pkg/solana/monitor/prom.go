@@ -46,10 +46,13 @@ func SetCacheTimestamp(t time.Time, cacheType, chainID, account string) {
 }
 
 func SetClientLatency(chainID string, d time.Duration, request, url string, err error) {
+	// Sanitize the URL to avoid leaking credentials (e.g. API keys embedded in
+	// the path/query or userinfo of managed RPC endpoints) into metric labels.
+	safeURL := metrics.SanitizeRPCURL(url)
 	metrics.RPCCallLatency.WithLabelValues(
 		metrics.Solana,
 		chainID,
-		url,
+		safeURL,
 		"false",                        // is send only
 		strconv.FormatBool(err == nil), // is successful
 		request,                        // rpc call name
@@ -58,6 +61,6 @@ func SetClientLatency(chainID string, d time.Duration, request, url string, err 
 	// TODO: Remove deprecated metric
 	promClientReq.With(prometheus.Labels{
 		"request": request,
-		"url":     url,
+		"url":     safeURL,
 	}).Set(float64(d.Milliseconds()))
 }

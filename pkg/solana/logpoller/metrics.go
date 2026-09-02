@@ -34,6 +34,11 @@ var promLpBlocksSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of blocks skipped due to max retry exhaustion",
 }, []string{"chainID"})
 
+var promLpEventsSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "solana_log_poller_events_skipped",
+	Help: "Number of events skipped due to malformed event data",
+}, []string{"chainID"})
+
 type solLpMetrics struct {
 	metrics.Labeler
 	chainID string
@@ -43,6 +48,7 @@ type solLpMetrics struct {
 	txsLogParsingError outcomeDependantMetric
 	lastProcessedSlot  metric.Int64Gauge
 	blocksSkipped      metric.Int64Counter
+	eventsSkipped      metric.Int64Counter
 }
 
 func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
@@ -68,6 +74,11 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		return nil, fmt.Errorf("failed to register solana_log_poller_blocks_skipped: %w", err)
 	}
 
+	eventsSkipped, err := meter.Int64Counter("solana_log_poller_events_skipped")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register solana_log_poller_events_skipped: %w", err)
+	}
+
 	return &solLpMetrics{
 		chainID: chainID,
 		Labeler: metrics.NewLabeler().With("chainID", chainID),
@@ -76,6 +87,7 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		txsLogParsingError: *txLogParsingError,
 		lastProcessedSlot:  lastProcessedSlot,
 		blocksSkipped:      blocksSkipped,
+		eventsSkipped:      eventsSkipped,
 	}, nil
 }
 
@@ -99,6 +111,11 @@ func (m *solLpMetrics) SetLatestProcessedSlot(ctx context.Context, slot int64) {
 func (m *solLpMetrics) IncrementBlocksSkipped(ctx context.Context) {
 	promLpBlocksSkipped.WithLabelValues(m.chainID).Inc()
 	m.blocksSkipped.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
+}
+
+func (m *solLpMetrics) IncrementEventsSkipped(ctx context.Context) {
+	promLpEventsSkipped.WithLabelValues(m.chainID).Inc()
+	m.eventsSkipped.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {

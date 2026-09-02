@@ -913,6 +913,11 @@ func convertFilter(f commonsol.LPFilterQuery) (logpollertypes.Filter, error) {
 func convertAccounts(accs []*rpc.Account) ([]*commonsol.Account, error) {
 	ret := make([]*commonsol.Account, 0, len(accs))
 	for _, acc := range accs {
+		// RPC returns nil elements for accounts that do not exist on chain.
+		if acc == nil {
+			ret = append(ret, nil)
+			continue
+		}
 		data, err := convertDataBytesOrJSON(acc.Data, "")
 		if err != nil {
 			return nil, fmt.Errorf("conversion data bytes or json failed: %w", err)

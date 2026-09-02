@@ -168,6 +168,9 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 	if err != nil {
 		return nil, err
 	}
+	if result == nil || result.Value == nil {
+		return nil, errors.New("GetLatestBlockhash returned nil result")
+	}
 
 	head := &Head{
 		SlotNumber: &slot,
@@ -193,6 +196,9 @@ func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, erro
 	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
+	}
+	if result == nil || result.Value == nil {
+		return nil, errors.New("GetLatestBlockhash returned nil result")
 	}
 
 	head := &Head{
