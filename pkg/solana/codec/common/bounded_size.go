@@ -48,8 +48,12 @@ func CheckElementCount(count int, element encodings.TypeCodec) error {
 		return fmt.Errorf("%w: element codec must be non-nil", types.ErrInvalidConfig)
 	}
 
-	if limit := maxElementCount(element); count < 0 || count > limit {
+	limit := maxElementCount(element)
+	if count > limit {
 		return fmt.Errorf("%w: element count %d exceeds the maximum of %d for solana data", types.ErrInvalidConfig, count, limit)
+	}
+	if count < 0 {
+		return fmt.Errorf("%w: element count %d cannot be less than zero", types.ErrInvalidConfig, count)
 	}
 
 	return nil

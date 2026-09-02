@@ -122,6 +122,6 @@ func TestCheckElementCount(t *testing.T) {
 
 	require.ErrorContains(t, commoncodec.CheckElementCount(commoncodec.MaxAccountBytes+1, builder.Uint8()), "exceeds the maximum")
 	require.ErrorContains(t, commoncodec.CheckElementCount(commoncodec.MaxAccountBytes, uint64Codec), "exceeds the maximum")
-	require.ErrorContains(t, commoncodec.CheckElementCount(-1, builder.Uint8()), "exceeds the maximum")
+	require.ErrorContains(t, commoncodec.CheckElementCount(-1, builder.Uint8()), "less than zero")
 	require.ErrorContains(t, commoncodec.CheckElementCount(1, nil), "must be non-nil")
 }
