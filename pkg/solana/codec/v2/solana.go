@@ -278,11 +278,7 @@ func processFieldType(parentTypeName string, idlType idltype.IdlType, refs *code
 	case *idltype.U128:
 		return refs.builder.BigInt(16, false)
 	case *idltype.Bytes:
-		b, err := refs.builder.Int(4)
-		if err != nil {
-			return nil, err
-		}
-		return commonencodings.NewSlice(refs.builder.Uint8(), b)
+		return solcommoncodec.NewBoundedSlice(refs.builder.Uint8(), refs.builder)
 	case *idltype.Pubkey:
 		return commonencodings.NewArray(DefaultHashBitLength, refs.builder.Uint8())
 	case *idltype.Defined:
@@ -380,6 +376,13 @@ func asArray(parentTypeName string, idlArray *idltype.Array, refs *codecRefs) (c
 		return nil, err
 	}
 
+	// The array length comes straight from the IDL, which is caller supplied on the
+	// log poller path, and encodings.array.Decode materialises the whole array. Bound
+	// it by the Solana account limit so an oversized IDL cannot force a huge allocation.
+	if err = solcommoncodec.CheckElementCount(lenInt, codec); err != nil {
+		return nil, fmt.Errorf("array length defined in IDL type is excessively large: %w", err)
+	}
+
 	return commonencodings.NewArray(lenInt, codec)
 }
 
@@ -389,12 +392,7 @@ func asVec(parentTypeName string, idlVec *idltype.Vec, refs *codecRefs) (commone
 		return nil, err
 	}
 
-	b, err := refs.builder.Int(4)
-	if err != nil {
-		return nil, err
-	}
-
-	return commonencodings.NewSlice(codec, b)
+	return solcommoncodec.NewBoundedSlice(codec, refs.builder)
 }
 
 func validDependency(refs *codecRefs, parent, child string) bool {
