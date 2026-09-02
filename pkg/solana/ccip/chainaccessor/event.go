@@ -261,7 +261,11 @@ func (a *SolanaAccessor) registerFilterIfNotExists(
 	}
 
 	// Filter already registered so return early
-	if hasFilter := a.logPoller.HasFilter(ctx, filterName); hasFilter {
+	exists, err := a.logPoller.HasFilter(ctx, filterName)
+	if err != nil {
+		return fmt.Errorf("failed to check filter existence: %w", err)
+	}
+	if exists {
 		return nil
 	}
 
