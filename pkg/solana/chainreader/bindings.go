@@ -414,13 +414,13 @@ func (b *namespaceBinding) UnregisterReaders(ctx context.Context) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
+	var err error
+
 	for _, reader := range b.readers {
-		if err := reader.Unregister(ctx); err != nil {
-			return err
-		}
+		err = errors.Join(err, reader.Unregister(ctx))
 	}
 
-	return nil
+	return err
 }
 
 func (b *namespaceBinding) isBound() bool {
