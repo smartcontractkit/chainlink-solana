@@ -18,7 +18,7 @@ runs:
   using: composite
   steps:
     - name: Checkout solana
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         repository: smartcontractkit/chainlink-solana
         ref: ${{ inputs.ref }}
@@ -32,7 +32,7 @@ runs:
 
     - name: cache docker build image
       id: cache-image
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: contracts/docker-build.tar
         key: ${{ inputs.runner-os }}-docker-pnpm-build-v2-${{ steps.get-version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
@@ -74,7 +74,7 @@ runs:
 
     #save the contracts artifacts
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: artifacts
         path: contracts/target/deploy

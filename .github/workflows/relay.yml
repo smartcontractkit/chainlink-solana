@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest-8cores-32GB
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.mod"
           check-latest: true
@@ -58,7 +58,7 @@ jobs:
         run: GORACE="log_path=$PWD/race" go test ./pkg/... -race -count=5 -timeout=15m -covermode=atomic -coverpkg=./... -coverprofile=race_coverage.txt
       - name: Upload Go test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: go-relay-test-results
           path: |

@@ -43,7 +43,7 @@ jobs:
           echo "$WIKI" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "wikirange=$WIKIRANGE" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.updates.outputs.open || steps.updates.outputs.closed || steps.updates.outputs.wiki
       - name: Open Issue
         if: steps.updates.outputs.open || steps.updates.outputs.closed || steps.updates.outputs.wiki

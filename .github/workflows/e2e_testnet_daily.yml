@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.mod"
           check-latest: true
@@ -46,7 +46,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -64,7 +64,7 @@ jobs:
     needs: [ get_projectserum_version ]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -85,7 +85,7 @@ jobs:
     steps:
       - name: Check if image exists in ECR
         id: check-image-exists
-        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/0.0.1
+        uses: smartcontractkit/.github/actions/ecr-image-exists@ecr-image-exists/v1
         with:
           repository: "chainlink"
           tag: solana.${{ github.sha }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Checkout Chainlink repo
         if: ${{ steps.check-image-exists.outputs.exists != 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ github.event.inputs.cl_branch_ref }}
@@ -151,10 +151,10 @@ jobs:
       SOLANA_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-region: ${{ secrets.QA_AWS_REGION }}
           role-to-assume: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -162,7 +162,7 @@ jobs:
           mask-aws-account-id: true
 
       - name: Authenticate to ECR
-        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
         with:
           registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
         env:
@@ -175,7 +175,7 @@ jobs:
         uses: ./.github/actions/build-gauntlet
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: integration-tests/go.mod
           cache: true
@@ -186,7 +186,7 @@ jobs:
         run: go mod download
 
       - name: Download contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: artifacts
           path: ${{ env.CONTRACT_ARTIFACTS_PATH }}
@@ -220,7 +220,7 @@ jobs:
 
       - name: Upload Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-test-logs-${{ matrix.variant }}
           path: |

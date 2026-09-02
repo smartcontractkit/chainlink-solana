@@ -17,7 +17,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: build image
         uses: ./.github/actions/build-wrapped-anchor-image
         with:
@@ -41,20 +41,20 @@ jobs:
     steps:
       - name: Free Disk Space
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cache cargo target dir
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/target
           key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: Cache hello-world target dir
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/examples/hello-world/target
           key: ${{ runner.os }}-v2-cargo-build-target-hello-world-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: cache docker build image
         id: cache-image
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/docker-build.tar
           key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
@@ -88,15 +88,15 @@ jobs:
     steps:
       - name: Free Disk Space
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cache cargo target dir
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/target
           key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: cache docker build image
         id: cache-image
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/docker-build.tar
           key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
@@ -133,17 +133,17 @@ jobs:
       - name: Free Disk Space
         uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache cargo target dir
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/target
           key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
 
       - name: cache docker build image
         id: cache-image
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           fail-on-cache-miss: true
           path: contracts/docker-build.tar
@@ -154,7 +154,7 @@ jobs:
           docker load --input docker-build.tar
 
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: "./integration-tests/go.mod"
           check-latest: true
@@ -164,7 +164,7 @@ jobs:
         run: ../scripts/install-solana-ci.sh
 
       - name: Setup Postgres
-        uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
+        uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/v1
         with:
           tmpfs: "true"
 
@@ -202,15 +202,15 @@ jobs:
     runs-on: ubuntu-latest-8cores-32GB
     needs: [get_projectserum_version, build_wrapped_anchor_image]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cache cargo target dir
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/target
           key: ${{ runner.os }}-v2-cargo-build-target-${{ hashFiles('contracts/**/Cargo.lock') }}
       - name: cache docker build image
         id: cache-image
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: contracts/docker-build.tar
           key: ${{ runner.os }}-docker-pnpm-build-v2-${{ needs.get_projectserum_version.outputs.projectserum_version }}-${{ hashFiles('contracts/**/Cargo.lock') }}
@@ -218,7 +218,7 @@ jobs:
         run: |
           docker load --input docker-build.tar
       - name: Setup go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: "./go.mod"
           check-latest: true

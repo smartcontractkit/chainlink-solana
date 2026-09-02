@@ -16,7 +16,7 @@ jobs:
       modules-json: ${{ steps.changed-modules.outputs.modules-json }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -45,12 +45,12 @@ jobs:
         module: ${{ fromJson(needs.changed-modules.outputs.modules-json) }}
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.module }}/go.mod
           cache: false

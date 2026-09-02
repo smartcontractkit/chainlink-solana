@@ -24,7 +24,7 @@ jobs:
       projectserum_version: ${{ steps.psversion.outputs.projectserum_version }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Get ProjectSerum Version
         id: psversion
         uses: ./.github/actions/projectserum_version
@@ -42,7 +42,7 @@ jobs:
     needs: [ get-projectserum-version ]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Build contracts
         uses: ./.github/actions/build_contract_artifacts
         with:
@@ -63,7 +63,7 @@ jobs:
     needs: [ e2e-custom-build-artifacts ]
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Build Image

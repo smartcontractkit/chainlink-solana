@@ -36,7 +36,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Get core ref
         id: get-core-ref
@@ -67,19 +67,19 @@ jobs:
             loopp: true
     steps:
       - name: Checkout chainlink-solana
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: chainlink-solana
 
       - name: Checkout chainlink
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: smartcontractkit/chainlink
           ref: ${{ needs.get-core-ref.outputs.core-ref }}
           path: chainlink
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: chainlink/go.mod
           check-latest: true
@@ -137,7 +137,7 @@ jobs:
 
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ccip-messaging-${{ matrix.test.slug }}-${{ github.run_id }}
           path: ccip-test-artifacts/

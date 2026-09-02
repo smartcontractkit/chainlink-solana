@@ -12,7 +12,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -38,7 +38,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
             --output.checkstyle.path=${{ github.workspace }}/pkg/golangci-lint-report.xml --output.text.path=stdout
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golangci-lint-relay-report
           path: ${{ github.workspace }}/pkg/golangci-lint-report.xml
