@@ -39,6 +39,11 @@ var promLpEventsSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of events skipped due to malformed event data",
 }, []string{"chainID"})
 
+var promLpTxsUnsupportedVersion = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "solana_log_poller_txs_unsupported_version",
+	Help: "Number of transactions skipped because their version cannot be decoded. Events in these transactions are not indexed",
+}, []string{"chainID"})
+
 type solLpMetrics struct {
 	metrics.Labeler
 	chainID string
@@ -49,6 +54,7 @@ type solLpMetrics struct {
 	lastProcessedSlot  metric.Int64Gauge
 	blocksSkipped      metric.Int64Counter
 	eventsSkipped      metric.Int64Counter
+	txsUnsupportedVer  metric.Int64Counter
 }
 
 func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
@@ -79,6 +85,11 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		return nil, fmt.Errorf("failed to register solana_log_poller_events_skipped: %w", err)
 	}
 
+	txsUnsupportedVer, err := meter.Int64Counter("solana_log_poller_txs_unsupported_version")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register solana_log_poller_txs_unsupported_version: %w", err)
+	}
+
 	return &solLpMetrics{
 		chainID: chainID,
 		Labeler: metrics.NewLabeler().With("chainID", chainID),
@@ -88,6 +99,7 @@ func NewSolLpMetrics(chainID string) (*solLpMetrics, error) {
 		lastProcessedSlot:  lastProcessedSlot,
 		blocksSkipped:      blocksSkipped,
 		eventsSkipped:      eventsSkipped,
+		txsUnsupportedVer:  txsUnsupportedVer,
 	}, nil
 }
 
@@ -116,6 +128,13 @@ func (m *solLpMetrics) IncrementBlocksSkipped(ctx context.Context) {
 func (m *solLpMetrics) IncrementEventsSkipped(ctx context.Context) {
 	promLpEventsSkipped.WithLabelValues(m.chainID).Inc()
 	m.eventsSkipped.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
+}
+
+// IncrementTxsUnsupportedVersion counts transactions dropped because their version is
+// newer than this client can decode. Any events they contain are not indexed.
+func (m *solLpMetrics) IncrementTxsUnsupportedVersion(ctx context.Context) {
+	promLpTxsUnsupportedVersion.WithLabelValues(m.chainID).Inc()
+	m.txsUnsupportedVer.Add(ctx, 1, metric.WithAttributes(m.GetOtelAttributes()...))
 }
 
 func (m *solLpMetrics) incrementForOutcome(ctx context.Context, prom outcomeDependantProm, me outcomeDependantMetric, outcome txOutcome) {
