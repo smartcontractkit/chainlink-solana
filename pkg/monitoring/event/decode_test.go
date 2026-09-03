@@ -158,6 +158,19 @@ func TestExtractEvents(t *testing.T) {
 			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny consumed 3461 of 1212284 compute units",
 			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny success",
 		},
+		{ // The execution trace is not correct, log data appears before any invocation.
+			"Program data: gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA=",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 invoke [1]",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 success",
+		},
+		{ // Two top-level instructions, with stray log data in between. The second instruction's data should still be recorded.
+			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny invoke [1]",
+			"Program HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny success",
+			"Program log: Instruction: Submit",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 invoke [1]",
+			"Program data: gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA=",
+			"Program STGhiM1ZaLjDLZDGcVFp3ppdetggLAs6MXezw5DXXH3 success",
+		},
 	}
 	expectedEvents := [][]string{
 		{"gjbLTR5rT6iaSQcAAAMQumV5CqMwMWjU5bBudJS4G7Kr1YGm1javi5Tpf4Y3dOLMJAAAAAAAAAAAAAAAAigtRmIQCAEOCQ8EBgcFAwoLDA0CAAAAAADKmjsAAAAAiBMAAAAAAAA="},
@@ -175,6 +188,8 @@ func TestExtractEvents(t *testing.T) {
 		{"gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA="},
 		{"gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA="},
 		{"jbLbTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFBBBBBBBBBBBBBBBBDW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA="},
+		{}, // no event found
+		{"gjbLTR5rT6j9IRcAAAM0cArd3JbxinfsblA0z3qwRRlKQpralO0xSE8aPrh4zfUFAAAAAAAAAAAAAAAADW77smIPAwkHCgQPBgAMCw4BBQ0CAAAAAMxmujUBAAAAfWUAAAAAAAA="},
 	}
 	require.Equal(t, len(expectedEvents), len(groupsOfLogs))
 	for i, logs := range groupsOfLogs {

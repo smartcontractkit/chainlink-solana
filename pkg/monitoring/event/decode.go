@@ -22,6 +22,9 @@ func ExtractEvents(logs []string, programIDBase58 string) []string {
 			continue
 		}
 		if matches := programLogEvent.FindStringSubmatch(log); matches != nil {
+			if len(invocationStack) == 0 {
+				continue
+			}
 			currentProgramID := invocationStack[len(invocationStack)-1]
 			if programIDBase58 == currentProgramID {
 				output = append(output, matches[1])
