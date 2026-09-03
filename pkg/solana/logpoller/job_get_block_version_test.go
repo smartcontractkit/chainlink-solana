@@ -114,7 +114,7 @@ func TestGetBlockJob_SkipsUndecodableTransactionVersion(t *testing.T) {
 	txIndexes := make([]int, 0, len(result.Events))
 	for _, e := range result.Events {
 		data = append(data, e.Data)
-		txIndexes = append(txIndexes, e.BlockData.TransactionIndex)
+		txIndexes = append(txIndexes, e.TransactionIndex)
 	}
 
 	require.Equal(t, []string{"legacy-log", "v0-log"}, data, "only decodable transactions should yield events")
