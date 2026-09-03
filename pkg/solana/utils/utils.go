@@ -3,6 +3,7 @@ package utils
 import (
 	"path/filepath"
 	"runtime"
+	"slices"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -40,42 +41,41 @@ func InjectAddressModifier(inputModifications, outputModifications commoncodec.M
 	}
 }
 
+// DeepCopyTx clones tx without aliasing any slices; nil slices stay nil.
 func DeepCopyTx(tx solana.Transaction) solana.Transaction {
 	// Clone the signatures.
-	sigs := make([]solana.Signature, len(tx.Signatures))
-	copy(sigs, tx.Signatures)
+	sigs := slices.Clone(tx.Signatures)
 
 	// Clone the message.
 	msg := tx.Message
 
 	// Deep-copy AccountKeys.
-	accountKeys := make([]solana.PublicKey, len(msg.AccountKeys))
-	copy(accountKeys, msg.AccountKeys)
+	accountKeys := slices.Clone(msg.AccountKeys)
 
 	// Deep-copy Instructions.
-	instructions := make([]solana.CompiledInstruction, len(msg.Instructions))
-	for i, instr := range msg.Instructions {
-		newInstr := solana.CompiledInstruction{
-			ProgramIDIndex: instr.ProgramIDIndex,
-			Accounts:       make([]uint16, len(instr.Accounts)),
-			Data:           make([]byte, len(instr.Data)),
+	var instructions []solana.CompiledInstruction
+	if msg.Instructions != nil {
+		instructions = make([]solana.CompiledInstruction, len(msg.Instructions))
+		for i, instr := range msg.Instructions {
+			instructions[i] = solana.CompiledInstruction{
+				ProgramIDIndex: instr.ProgramIDIndex,
+				Accounts:       slices.Clone(instr.Accounts),
+				Data:           slices.Clone(instr.Data),
+			}
 		}
-		copy(newInstr.Accounts, instr.Accounts)
-		copy(newInstr.Data, instr.Data)
-		instructions[i] = newInstr
 	}
 
 	// Deep-copy AddressTableLookups.
-	lookups := make([]solana.MessageAddressTableLookup, len(msg.AddressTableLookups))
-	for i, lookup := range msg.AddressTableLookups {
-		newLookup := solana.MessageAddressTableLookup{
-			AccountKey:      lookup.AccountKey,
-			WritableIndexes: make(solana.Uint8SliceAsNum, len(lookup.WritableIndexes)),
-			ReadonlyIndexes: make(solana.Uint8SliceAsNum, len(lookup.ReadonlyIndexes)),
+	var lookups []solana.MessageAddressTableLookup
+	if msg.AddressTableLookups != nil {
+		lookups = make([]solana.MessageAddressTableLookup, len(msg.AddressTableLookups))
+		for i, lookup := range msg.AddressTableLookups {
+			lookups[i] = solana.MessageAddressTableLookup{
+				AccountKey:      lookup.AccountKey,
+				WritableIndexes: slices.Clone(lookup.WritableIndexes),
+				ReadonlyIndexes: slices.Clone(lookup.ReadonlyIndexes),
+			}
 		}
-		copy(newLookup.WritableIndexes, lookup.WritableIndexes)
-		copy(newLookup.ReadonlyIndexes, lookup.ReadonlyIndexes)
-		lookups[i] = newLookup
 	}
 
 	// Reassemble the cloned message.
