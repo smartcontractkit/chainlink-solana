@@ -352,12 +352,7 @@ func asVec(parentTypeName string, idlVec *IdlTypeVec, refs *codecRefs) (commonen
 		return nil, err
 	}
 
-	b, err := refs.builder.Int(4)
-	if err != nil {
-		return nil, err
-	}
-
-	return commonencodings.NewSlice(codec, b)
+	return solcommoncodec.NewBoundedSlice(codec, refs.builder)
 }
 
 func getCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
@@ -427,12 +422,7 @@ func getTimeCodecByStringType(curType IdlTypeAsString, builder commonencodings.B
 func getByteCodecByStringType(curType IdlTypeAsString, builder commonencodings.Builder) (commonencodings.TypeCodec, error) {
 	switch curType {
 	case IdlTypeBytes:
-		b, err := builder.Int(4)
-		if err != nil {
-			return nil, err
-		}
-
-		return commonencodings.NewSlice(builder.Uint8(), b)
+		return solcommoncodec.NewBoundedSlice(builder.Uint8(), builder)
 	case IdlTypePublicKey, IdlTypeHash:
 		return commonencodings.NewArray(DefaultHashBitLength, builder.Uint8())
 	default:
