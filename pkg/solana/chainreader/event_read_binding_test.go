@@ -43,7 +43,7 @@ func TestBind(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 
-		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false)
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false, nil)
 		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Twice() // 1 per address 1 and 1 per address2
 
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
@@ -63,7 +63,7 @@ func TestBind(t *testing.T) {
 
 		lpSource := new(mocks.EventsReader)
 
-		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false)
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).Return(false, nil)
 		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Twice() // 1 per address 1 and 1 per address2
 
 		reader := newEventReadBinding(namespace, genericName, subkeys, lpSource, readDef, pollerConf)
@@ -110,8 +110,8 @@ func TestBind(t *testing.T) {
 		require.NoError(t, reader.Register(ctx))
 
 		var ret bool
-		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, str string) bool {
-			return ret
+		lpSource.EXPECT().HasFilter(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, str string) (bool, error) {
+			return ret, nil
 		})
 
 		lpSource.EXPECT().RegisterFilter(mock.Anything, mock.Anything).Return(nil).Once()

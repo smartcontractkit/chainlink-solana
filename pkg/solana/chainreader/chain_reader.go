@@ -36,7 +36,7 @@ import (
 type EventsReader interface {
 	Start(ctx context.Context) error
 	Ready() error
-	HasFilter(context.Context, string) bool
+	HasFilter(context.Context, string) (bool, error)
 	RegisterFilter(context.Context, logpollertypes.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)

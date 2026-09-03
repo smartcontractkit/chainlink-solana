@@ -47,7 +47,7 @@ type logsLoader interface {
 }
 
 type filtersI interface {
-	HasFilter(ctx context.Context, name string) bool
+	HasFilter(ctx context.Context, name string) (bool, error)
 	RegisterFilter(ctx context.Context, filter types.Filter) error
 	UnregisterFilter(ctx context.Context, name string) error
 	LoadFilters(ctx context.Context) error
@@ -287,7 +287,7 @@ func (lp *Service) Process(ctx context.Context, programEvent types.ProgramEvent)
 	return nil
 }
 
-func (lp *Service) HasFilter(ctx context.Context, name string) bool {
+func (lp *Service) HasFilter(ctx context.Context, name string) (bool, error) {
 	ctx, cancel := lp.eng.Ctx(ctx)
 	defer cancel()
 

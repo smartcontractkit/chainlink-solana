@@ -83,7 +83,15 @@ func (r *syncedFilter) Unregister(ctx context.Context, registrar filterRegistrar
 }
 
 func (r *syncedFilter) unregister(ctx context.Context, registrar filterRegistrar, name string) error {
-	if !registrar.HasFilter(ctx, name) {
+	exists, err := registrar.HasFilter(ctx, name)
+	if err != nil {
+		return FilterError{
+			Err:    fmt.Errorf("%w: %s", types.ErrInternal, err.Error()),
+			Action: "check existence",
+			Filter: r.filter,
+		}
+	}
+	if !exists {
 		return nil
 	}
 

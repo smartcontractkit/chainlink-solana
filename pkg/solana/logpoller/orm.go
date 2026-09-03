@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -58,6 +59,9 @@ func (o *DSORM) HasFilter(ctx context.Context, name string) (bool, error) {
 
 	var id int64
 	if err = o.ds.GetContext(ctx, &id, query, sqlArgs...); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
 

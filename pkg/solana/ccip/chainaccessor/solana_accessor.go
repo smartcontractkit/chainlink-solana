@@ -40,7 +40,7 @@ var getMultipleAccountsLimit = 100
 type AccessorLogPoller interface {
 	Start(ctx context.Context) error
 	Ready() error
-	HasFilter(context.Context, string) bool
+	HasFilter(context.Context, string) (bool, error)
 	RegisterFilter(context.Context, logpollertypes.Filter) error
 	FilteredLogs(context.Context, []query.Expression, query.LimitAndSort, string) ([]logpollertypes.Log, error)
 	CPIEventsEnabled() bool
