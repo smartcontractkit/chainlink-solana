@@ -30,6 +30,19 @@ const (
 // If the requested block contains a transaction with a higher version, an error will be returned.
 const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
 
+// MaxRequestedTransactionVersion is the max transaction version the log poller asks getBlock
+// for. It is deliberately higher than MaxSupportTransactionVersion because the RPC applies
+// the limit to the whole call: a single newer transaction makes getBlock fail with -32015
+// rather than omitting that transaction, which stalls the poller on that slot until the job
+// exhausts its retries. Requesting a higher version returns the block in full; transactions
+// this repo cannot decode are then skipped individually.
+//
+// This is a stopgap. The vendored solana-go only understands legacy and v0 messages: its
+// Message.UnmarshalWithDecoder routes anything with the version bit set to UnmarshalV0, so a
+// newer transaction would be parsed with the v0 layout rather than rejected. Until that gains
+// real support, decoding stays capped at MaxSupportTransactionVersion.
+const MaxRequestedTransactionVersion = uint64(1)
+
 // HeadMetadataGetBlockOpts returns options for getBlock that omit transaction bodies and rewards,
 // leaving only metadata (e.g. blockhash, block height, block time) for head reporting.
 func HeadMetadataGetBlockOpts(commitment rpc.CommitmentType) *rpc.GetBlockOpts {
