@@ -18,7 +18,7 @@ import (
 )
 
 // TestClient_ResponseSizeLimit_FromContext exercises the full path from NewClient through
-// jsonrpc.NewClientWithOpts to the commonhttp.LimitedTransport wrapper. It proves three things:
+// jsonrpc.NewClientWithOpts to the sizeLimitedTransport wrapper. It proves three things:
 //   - The transport is actually wired into the underlying solana-go *rpc.Client (otherwise the
 //     context limit would have no effect).
 //   - commonhttp.WithResponseSizeLimit propagates through Client.requestGroup.Do(...) into the

@@ -15,18 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 )
 
-// isDecodableTransactionVersion reports whether this client can decode a transaction of the
-// given version. rpc.TransactionVersion is -1 for legacy and the version number otherwise,
-// so anything at or below MaxSupportTransactionVersion is safe.
-//
-// The check is needed because solana-go does not reject newer versions: its
-// Message.UnmarshalWithDecoder routes any message with the version bit set to UnmarshalV0,
-// which would parse a newer transaction with the v0 layout and yield garbage rather than an
-// error. Skipping is the conservative choice until solana-go gains real support.
-func isDecodableTransactionVersion(version rpc.TransactionVersion) bool {
-	return version <= rpc.TransactionVersion(client.MaxSupportTransactionVersion)
-}
-
 // getBlockJob is a job that fetches a block with transactions, converts logs into ProgramEvents and writes them into blocks channel
 type getBlockJob struct {
 	slotNumber        uint64
@@ -86,9 +74,7 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		return ctx.Err()
 	}
 	var excludeRewards bool
-	// request above what we can decode so one newer transaction does not fail the whole
-	// block; undecodable transactions are skipped below. See MaxRequestedTransactionVersion.
-	version := client.MaxRequestedTransactionVersion
+	version := client.MaxSupportTransactionVersion
 	block, err := j.client.GetBlockWithOpts(
 		ctx,
 		j.slotNumber,
@@ -146,16 +132,6 @@ func (j *getBlockJob) Run(ctx context.Context) error {
 		blockData.TransactionIndex = idx
 		if txWithMeta.Transaction == nil {
 			return fmt.Errorf("failed to parse transaction %d in slot %d: %w", idx, j.slotNumber, errors.New("missing transaction field"))
-		}
-		// Skip transactions newer than we can decode. solana-go would parse them with the
-		// v0 layout instead of failing, so this must happen before GetTransaction.
-		// NOTE: events in skipped transactions are not indexed.
-		if !isDecodableTransactionVersion(txWithMeta.Version) {
-			j.lggr.Errorw("skipping transaction with an unsupported version; its events will not be indexed",
-				"version", int(txWithMeta.Version), "maxDecodableVersion", client.MaxSupportTransactionVersion,
-				"slot", j.slotNumber, "txIndex", idx)
-			j.metrics.IncrementTxsUnsupportedVersion(ctx)
-			continue
 		}
 		tx, err := txWithMeta.GetTransaction()
 		if err != nil {
