@@ -23,9 +23,13 @@ const (
 	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 )
 
+// ErrInvalidSignatures is returned by SendTx when a transaction fails Transaction.VerifySignatures,
+// checked so classification does not depend on matching this client-side error against an RPC error string.
+var ErrInvalidSignatures = errors.New("transaction has invalid or missing signatures")
+
 // MaxSupportTransactionVersion defines max transaction version to return in responses.
 // If the requested block contains a transaction with a higher version, an error will be returned.
-const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
+const MaxSupportTransactionVersion = uint64(1) // (legacy + v0 + v1)
 
 // HeadMetadataGetBlockOpts returns options for getBlock that omit transaction bodies and rewards,
 // leaving only metadata (e.g. blockhash, block height, block time) for head reporting.
@@ -416,6 +420,14 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (sig solana.Signature, err error) {
 	done := c.latency("send_tx")
 	defer func() { done(err) }()
+
+	// solana-go's MarshalBinary pads any missing signatures with zero bytes rather than
+	// erroring, so an under-signed transaction would otherwise wire-encode as if it were
+	// fully signed and only fail asynchronously once the cluster processes it.
+	if verr := tx.VerifySignatures(); verr != nil {
+		err = fmt.Errorf("%w: %w", ErrInvalidSignatures, verr)
+		return solana.Signature{}, err
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()

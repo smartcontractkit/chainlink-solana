@@ -789,20 +789,12 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 		rw.On("LatestBlockhash", mock.Anything).Return(&rpc.GetLatestBlockhashResult{Value: &rpc.LatestBlockhashResult{Blockhash: recentBlockHash, LastValidBlockHeight: uint64(100)}}, nil).Once()
 		txID := uuid.NewString()
 
+		// capture the built transaction and assert on it after SubmitTransaction returns, instead of
+		// inside the mock matcher: a require failure there would abandon the mock's internal lock mid-call
+		// (via t.FailNow -> runtime.Goexit) and deadlock later on AssertExpectations.
+		var capturedTx *solana.Transaction
 		txm.On("Enqueue", mock.Anything, admin.String(), mock.MatchedBy(func(tx *solana.Transaction) bool {
-			// match transaction fields to ensure it was built as expected
-			require.Equal(t, recentBlockHash, tx.Message.RecentBlockhash)
-			require.Len(t, tx.Message.Instructions, 1)
-			require.Len(t, tx.Message.AccountKeys, 6)                           // fee payer + derived accounts
-			require.Equal(t, admin, tx.Message.AccountKeys[0])                  // fee payer
-			require.Equal(t, account1, tx.Message.AccountKeys[1])               // account constant
-			require.Equal(t, account2, tx.Message.AccountKeys[2])               // account lookup
-			require.Equal(t, account3, tx.Message.AccountKeys[3])               // pda lookup
-			require.Equal(t, solana.SystemProgramID, tx.Message.AccountKeys[4]) // system program ID
-			require.Equal(t, programID, tx.Message.AccountKeys[5])              // instruction program ID
-			// instruction program ID
-			require.Len(t, tx.Message.AddressTableLookups, 1)                                        // address table look contains entry
-			require.Equal(t, derivedLookupTablePubkey, tx.Message.AddressTableLookups[0].AccountKey) // address table
+			capturedTx = tx
 			return true
 		}), &txID, mock.Anything).Return(nil).Once()
 
@@ -814,6 +806,28 @@ func TestChainWriter_SubmitTransaction(t *testing.T) {
 
 		submitErr := cw.SubmitTransaction(ctx, "contract_reader_interface", "initializeLookupTable", args, txID, programID.String(), nil, nil)
 		require.NoError(t, submitErr)
+
+		// match transaction fields to ensure it was built as expected
+		require.NotNil(t, capturedTx)
+		require.Equal(t, recentBlockHash, capturedTx.Message.RecentBlockhash)
+		require.Len(t, capturedTx.Message.Instructions, 1)
+		require.Len(t, capturedTx.Message.AccountKeys, 6) // fee payer + derived accounts
+		require.Equal(t, admin, capturedTx.Message.AccountKeys[0])
+		// solana.NewTransaction only guarantees the fee payer sits at index 0; accounts sharing the same
+		// signer/writable tier are otherwise ordered by raw pubkey bytes rather than insertion order.
+		require.ElementsMatch(t, []solana.PublicKey{admin, account1, account2, account3, solana.SystemProgramID, programID}, capturedTx.Message.AccountKeys)
+		require.Len(t, capturedTx.Message.AddressTableLookups, 1) // address table lookup contains entry
+		require.Equal(t, derivedLookupTablePubkey, capturedTx.Message.AddressTableLookups[0].AccountKey)
+
+		// what actually matters for on-chain execution: the instruction's own account order, resolved
+		// through the compiled indices (which stay correct regardless of AccountKeys ordering)
+		require.NoError(t, capturedTx.Message.ResolveLookups())
+		ix := capturedTx.Message.Instructions[0]
+		gotOrder := make([]solana.PublicKey, len(ix.Accounts))
+		for i, idx := range ix.Accounts {
+			gotOrder[i] = capturedTx.Message.AccountKeys[idx]
+		}
+		require.Equal(t, []solana.PublicKey{admin, account1, account2, account3, derivedLookupKeys[0], solana.SystemProgramID}, gotOrder)
 	})
 
 	t.Run("invalid buffer methods", func(t *testing.T) {
