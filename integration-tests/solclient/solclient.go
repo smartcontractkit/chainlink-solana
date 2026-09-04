@@ -138,7 +138,7 @@ func (c *Client) CreateAccInstr(acc solana.PublicKey, accSize uint64, ownerPubKe
 
 // TXSync executes tx synchronously with specified commitment (defaults to finalized)
 func (c *Client) TXSync(name string, commitment rpc.CommitmentType, instr []solana.Instruction, signerFunc func(key solana.PublicKey) *solana.PrivateKey, payer solana.PublicKey) error {
-	recent, err := c.RPC.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized)
+	recent, err := c.RPC.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func (c *Client) queueTX(sig solana.Signature, commitment rpc.CommitmentType) {
 
 // TXAsync executes tx async, need to block on WaitForEvents after
 func (c *Client) TXAsync(name string, instr []solana.Instruction, signerFunc func(key solana.PublicKey) *solana.PrivateKey, payer solana.PublicKey) error {
-	recent, err := c.RPC.GetRecentBlockhash(context.Background(), rpc.CommitmentFinalized)
+	recent, err := c.RPC.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return err
 	}
