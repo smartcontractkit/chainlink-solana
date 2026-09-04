@@ -428,6 +428,38 @@ func TestGetBlockJob(t *testing.T) {
 	})
 }
 
+func Test_V1_LegacyAssertion(t *testing.T) {
+	var (
+		legacySig = solana.MustSignatureFromBase58("5J7Ux7kbYVs5Yccnf616XSyJqSz7X2iBn53kXsgWTwXUP8PJVgsUAkQF85WF3taALpD8Wi1fhsNDVrAvYEesNJUz")
+		V1Sig     = solana.MustSignatureFromBase58("2kxgiLQzv6cPVENTw7uxViGGz6DWWPPrLv6aRzyj8AEkMUBv7tBqTWuS4DbANqXZq7pYvSC1zYfxyTbGAs5KW7cL")
+	)
+	client := rpc.New("https://api.devnet.solana.com")
+
+	legacy, err := client.GetTransaction(t.Context(), legacySig, &rpc.GetTransactionOpts{
+		MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion1,
+	})
+	require.NoError(t, err)
+	legacyData := make([]solana.Base58, 0)
+	for _, ix := range legacy.Meta.InnerInstructions {
+		for _, ci := range ix.Instructions {
+			legacyData = append(legacyData, ci.Data)
+		}
+	}
+
+	v1, err := client.GetTransaction(t.Context(), V1Sig, &rpc.GetTransactionOpts{
+		MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion1,
+	})
+
+	require.NoError(t, err)
+	v1Data := make([]solana.Base58, 0)
+	for _, ix := range v1.Meta.InnerInstructions {
+		for _, ci := range ix.Instructions {
+			v1Data = append(v1Data, ci.Data)
+		}
+	}
+	require.ElementsMatch(t, legacyData, v1Data)
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }
