@@ -58,7 +58,9 @@ runs:
         docker run -d -v $(pwd):/repo --name build-container chainlink-solana:build tail -f /dev/null
         # generate go bindings
         docker exec build-container bash -c "/repo/scripts/build-contract-artifacts-action.sh"
-        # check go bindings
+        # check go bindings; print the full diff first so a failure shows what drifted
+        # rather than only a file/line count
+        git diff || true
         git diff --stat --exit-code
         # build with keys
         docker exec build-container bash -c "\
