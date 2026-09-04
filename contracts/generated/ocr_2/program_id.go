@@ -5,4 +5,4 @@ package ocr_2
 
 import solanago "github.com/gagliardetto/solana-go"
 
-var ProgramID = solanago.MustPublicKeyFromBase58("ComputeBudget111111111111111111111111111111")
+var ProgramID = solanago.MustPublicKeyFromBase58("E3j24rx12SyVsG6quKuZPbQqZPkhAUCh8Uek4XrKYD2x")
