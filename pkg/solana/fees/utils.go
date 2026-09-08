@@ -73,7 +73,7 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		case solana.MessageVersionV1:
 			price = parsePriceFromTransactionV1(baseTx)
 		default:
-			return out, fmt.Errorf("unkown message version %d", baseTx.Message.GetVersion())
+			return out, fmt.Errorf("unknown message version %d", baseTx.Message.GetVersion())
 		}
 
 		out.Prices = append(out.Prices, price)
