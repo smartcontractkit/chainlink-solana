@@ -1,9 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -26,22 +28,13 @@ const (
 	MainnetGenesisHash = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 )
 
+// ErrInvalidSignatures is returned by SendTx when a transaction fails Transaction.VerifySignatures,
+// checked so classification does not depend on matching this client-side error against an RPC error string.
+var ErrInvalidSignatures = errors.New("transaction has invalid or missing signatures")
+
 // MaxSupportTransactionVersion defines max transaction version to return in responses.
 // If the requested block contains a transaction with a higher version, an error will be returned.
-const MaxSupportTransactionVersion = uint64(0) // (legacy + v0)
-
-// MaxRequestedTransactionVersion is the max transaction version the log poller asks getBlock
-// for. It is deliberately higher than MaxSupportTransactionVersion because the RPC applies
-// the limit to the whole call: a single newer transaction makes getBlock fail with -32015
-// rather than omitting that transaction, which stalls the poller on that slot until the job
-// exhausts its retries. Requesting a higher version returns the block in full; transactions
-// this repo cannot decode are then skipped individually.
-//
-// This is a stopgap. The vendored solana-go only understands legacy and v0 messages: its
-// Message.UnmarshalWithDecoder routes anything with the version bit set to UnmarshalV0, so a
-// newer transaction would be parsed with the v0 layout rather than rejected. Until that gains
-// real support, decoding stays capped at MaxSupportTransactionVersion.
-const MaxRequestedTransactionVersion = uint64(1)
+const MaxSupportTransactionVersion = uint64(1) // (legacy + v0 + v1)
 
 // HeadMetadataGetBlockOpts returns options for getBlock that omit transaction bodies and rewards,
 // leaving only metadata (e.g. blockhash, block height, block time) for head reporting.
@@ -138,16 +131,57 @@ func NewTestClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.
 }
 
 // newRPCClientWithLimitedTransport constructs a solana-go *rpc.Client whose HTTP transport is
-// wrapped with commonhttp.LimitedTransport. The size cap is opt-in per request via
+// wrapped with sizeLimitedTransport. The size cap is opt-in per request via
 // commonhttp.WithResponseSizeLimit on the request context; when no limit is set the wrapper is a
 // no-op. The underlying transport is http.DefaultTransport, so time bounds come from each method's
 // context.WithTimeout(ctx, c.contextDuration) wrapper.
 func newRPCClientWithLimitedTransport(endpoint string) *rpc.Client {
 	httpClient := &http.Client{
-		Transport: &commonhttp.LimitedTransport{RoundTripper: http.DefaultTransport},
+		Transport: &sizeLimitedTransport{RoundTripper: http.DefaultTransport},
 	}
 	jrpc := jsonrpc.NewClientWithOpts(endpoint, &jsonrpc.RPCClientOpts{HTTPClient: httpClient})
 	return rpc.NewWithCustomRPCClient(jrpc)
+}
+
+// errResponseTooLarge is returned when a response body exceeds the limit set via
+// commonhttp.WithResponseSizeLimit.
+var errResponseTooLarge = errors.New("response is too large")
+
+// sizeLimitedTransport enforces commonhttp's per-request response size cap eagerly in RoundTrip,
+// unlike commonhttp.LimitedTransport which enforces it lazily while the body is read. solana-go's
+// JSON-RPC client decodes with goccy/go-json, whose stream reader discards any non-EOF error from
+// the underlying io.Reader (see internal/decoder.Stream.read), so a cap enforced during Read never
+// reaches the caller. Enforcing it here means http.Client.Do itself returns the error, before any
+// JSON decoding starts, so it survives intact regardless of which JSON decoder is used.
+type sizeLimitedTransport struct {
+	RoundTripper http.RoundTripper
+}
+
+func (t *sizeLimitedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.RoundTripper.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := commonhttp.GetResponseSizeLimit(req.Context())
+	if resp.Body == nil || limit == 0 {
+		return resp, nil
+	}
+
+	// Read at most limit+1 bytes: enough to detect an oversized body without buffering it in full.
+	data, readErr := io.ReadAll(io.LimitReader(resp.Body, int64(limit)+1))
+	if closeErr := resp.Body.Close(); closeErr != nil && readErr == nil {
+		readErr = closeErr
+	}
+	if readErr != nil {
+		return nil, fmt.Errorf("reading response body: %w", readErr)
+	}
+	if int64(len(data)) > int64(limit) {
+		return nil, fmt.Errorf("reached read limit of %d bytes: %w", limit, errResponseTooLarge)
+	}
+
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+	return resp, nil
 }
 
 func NewClient(endpoint string, cfg *config.TOMLConfig, requestTimeout time.Duration, log logger.Logger) (*Client, error) {
@@ -493,6 +527,14 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (sig solana.Signature, err error) {
 	done := c.latency("send_tx")
 	defer func() { done(err) }()
+
+	// solana-go's MarshalBinary pads any missing signatures with zero bytes rather than
+	// erroring, so an under-signed transaction would otherwise wire-encode as if it were
+	// fully signed and only fail asynchronously once the cluster processes it.
+	if verr := tx.VerifySignatures(); verr != nil {
+		err = fmt.Errorf("%w: %w", ErrInvalidSignatures, verr)
+		return solana.Signature{}, err
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()

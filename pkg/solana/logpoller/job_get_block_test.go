@@ -2,6 +2,7 @@ package logpoller
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"testing"
@@ -368,6 +369,56 @@ func TestGetBlockJob(t *testing.T) {
 			txsLogParsingError: outcomeDependantTestMetric{succeeded: 1}, // the tx whose logs failed to parse had succeeded onchain
 		}
 		expectedMetrics.assertEqual(t)
+
+		select {
+		case <-job.Done():
+		default:
+			t.Fatal("expected job to be done")
+		}
+	})
+
+	t.Run("Can parse a real v1 transaction fetched from devnet", func(t *testing.T) {
+		// signature 2TYJx5SUdDk16F79XtzYnPN9xJdZGE3uV2Sdyx4B6qDNcJr5sCmAfvanR1iJYRPN9NvgmPJFjWC48L74UjAdtf4i,
+		// fetched from devnet via getTransaction with maxSupportedTransactionVersion=1 and encoding=base64.
+		const rawTxBase64 = "gQIACgwAAACq2gUre9xa2z/ldC51RithZ9L9aAc+p+sJ6V2MJwe1PAEQAawPKl/5X+e2HmZvgahqRpI32z+068bN1nZXs7QyQnWBrTHEzH6EYXLYouw55rgM6q1dotGE6vsp7CW4gQCyQM+aWYngH1KqcdSSnbSmnC+KD5TvPjXeIxZ1txpehF2rB26u7rNdg35WuF+8qDNV3qMUG5z9W5Cz6MbufAo0lC9eg6nVMcg4+XXkBHoyjS05fVyKshMxQKvtHJFOqaNM1TtELLORIVfxOpM9ATQoLQMrX/7NAaLb8bd5BgjfAC6npl/IHQ/vqIYMs7g/CJsCJL6KZoe3rkn1lMC5tNfpOJMtx71r2jruWGPiFgQi7ixv89aruYChuVkAhwQ4h3atSSe80KmkZRziYm6y2Xn9E0qlwIRiCYWZJIDDOm1AKuwhjmtqMVIduprQivBrbYzpqqz6gh6ncSy7S5JpSm8DNvs1TXS2FccMV1tw/ADXFrs+B7UxAFPod5lElck702jpzsFO0/6/8xuJScnUESApvF0+/1Dasy9BZIvWE5NzM+G/pl/IHOGe3NLSw0CwL6Yb4dW63eFZKDPd+SAJ2M9oVFUG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUQAz/MeAA/Df1b5nUHSbhLn0gjucyDtstU8a2wzuIG7EwwAA+TcWAAYSYAAAAAcCCAMJCgsEBQEMBg0ODwbXPD0ucjeAsGQAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAIcA6cqOUPozdZqMCTD6UklcRr+oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANAHAABX7S9XKzeT0qrCRPX4NK5jObwzeDzAtgjPb7GC1JECggynP++sGNHD7BRaJE6K7VUIPzBYfJN1sPLTI6K73KEBJmKK9PTj/28qHhL1vi2moHKDklrkvL18HpVhIkLzOqzmrVFZo7E3Bg9Ta3/T9hskJA5h9BTQLhfUNJWmnXxfAQ=="
+
+		rawTx, err := base64.StdEncoding.DecodeString(rawTxBase64)
+		require.NoError(t, err)
+
+		// sanity check the fixture actually decodes to a v1 message, so a future regression in
+		// solana-go's decoder can't hide behind an unrelated job.Run error
+		txWithMeta := rpc.TransactionWithMeta{Transaction: rpc.DataBytesOrJSONFromBytes(rawTx)}
+		decodedTx, decodeErr := txWithMeta.GetTransaction()
+		require.NoError(t, decodeErr)
+		require.Equal(t, solana.MessageVersionV1, decodedTx.Message.GetVersion())
+		require.Equal(t, "2kxgiLQzv6cPVENTw7uxViGGz6DWWPPrLv6aRzyj8AEkMUBv7tBqTWuS4DbANqXZq7pYvSC1zYfxyTbGAs5KW7cL", decodedTx.Signatures[0].String())
+		require.Len(t, decodedTx.Message.Instructions, 1)
+		client := mocks.NewRPCClient(t)
+		lggr := logger.Sugared(logger.Test(t))
+		txWithMeta.Meta = &rpc.TransactionMeta{
+			LogMessages: []string{
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [1]",
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 76 of 200000 compute units",
+				"Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+				"Program ComputeBudget111111111111111111111111111111 invoke [1]",
+				"Program ComputeBudget111111111111111111111111111111 success",
+			},
+		}
+		height := uint64(492551830)
+		blockTime := solana.UnixTimeSeconds(1788447393)
+		block := rpc.GetBlockResult{BlockHeight: &height, BlockTime: ptr(blockTime), Blockhash: solana.Hash{1, 2, 3}, Transactions: []rpc.TransactionWithMeta{txWithMeta}}
+		client.EXPECT().GetBlockWithOpts(mock.Anything, slotNumber, mock.Anything).Return(&block, nil).Once()
+		metrics, err := NewSolLpMetrics(t.Name())
+		require.NoError(t, err)
+		job := newGetBlockJob(nil, client, make(chan types.Block, 1), lggr, slotNumber, metrics, nil)
+
+		err = job.Run(t.Context())
+		require.NoError(t, err)
+
+		result := <-job.blocks
+		require.Equal(t, slotNumber, result.SlotNumber)
+		require.Equal(t, &block.Blockhash, result.BlockHash)
+		require.Empty(t, result.Events) // no "Program log:"/"Program data:" lines in this tx, so no events expected
 
 		select {
 		case <-job.Done():

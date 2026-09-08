@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"regexp"
 
 	"github.com/gagliardetto/solana-go"
@@ -63,6 +64,10 @@ var errCodes = map[*regexp.Regexp]mn.SendTxReturnCode{
 func ClassifySendError(_ *solana.Transaction, err error) mn.SendTxReturnCode {
 	if err == nil {
 		return mn.Successful
+	}
+
+	if errors.Is(err, ErrInvalidSignatures) {
+		return mn.Fatal
 	}
 
 	errMsg := err.Error()
