@@ -95,7 +95,7 @@ func isConsensusVoteTX(baseTx *solana.Transaction) bool {
 	return false
 }
 
-func parsePriceFromTransactionV0(baseTx *solana.Transaction) (price ComputeUnitPrice) {
+func parsePriceFromTransactionV0(baseTx *solana.Transaction) ComputeUnitPrice {
 	for _, instruction := range baseTx.Message.Instructions {
 		// find instructions for compute budget program
 		// validate AccountKeys has enough elements to index into ProgramIDIndex
@@ -106,21 +106,19 @@ func parsePriceFromTransactionV0(baseTx *solana.Transaction) (price ComputeUnitP
 			// only one compute unit price tx is allowed
 			// err returned if not SetComputeUnitPrice instruction
 			if parseErr == nil {
-				price = parsed
-				break
+				return parsed
 			}
 		}
 	}
 
-	return
+	return ComputeUnitPrice(0)
 }
-func parsePriceFromTransactionV1(baseTx *solana.Transaction) (price ComputeUnitPrice) {
+func parsePriceFromTransactionV1(baseTx *solana.Transaction) ComputeUnitPrice {
 	computeUnitLimit := baseTx.Message.TransactionConfig.ComputeUnitLimit
 	priorityFee := baseTx.Message.TransactionConfig.PriorityFee
 	if computeUnitLimit == nil || *computeUnitLimit == 0 || priorityFee == nil {
-		return price
+		return ComputeUnitPrice(0)
 	}
 
-	price = ComputeUnitPrice(*priorityFee * 1_000_000 / uint64(*computeUnitLimit))
-	return
+	return ComputeUnitPrice(*priorityFee * 1_000_000 / uint64(*computeUnitLimit))
 }
