@@ -68,7 +68,7 @@ func (c *chainReader) GetLatestBlock(ctx context.Context, commitment rpc.Commitm
 	}
 
 	// get block based on slot
-	version := uint64(0) // pull all tx types (legacy + v0)
+	version := client.MaxSupportTransactionVersion // pull all tx types (legacy + v0 + v1)
 	return c.client.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 		Commitment:                     commitment,
 		MaxSupportedTransactionVersion: &version,
