@@ -68,7 +68,6 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 		var price ComputeUnitPrice
 		switch baseTx.Message.GetVersion() {
 		case solana.MessageVersionLegacy, solana.MessageVersionV0:
-			//handle here
 			price = parsePriceFromTransactionV0(baseTx)
 		case solana.MessageVersionV1:
 			price = parsePriceFromTransactionV1(baseTx)
@@ -86,13 +85,9 @@ func isConsensusVoteTX(baseTx *solana.Transaction) bool {
 	// filter out consensus vote transactions
 	// consensus messages are included as txs within blocks
 	// validate AccountKeys has enough elements to index into ProgramIDIndex
-	if len(baseTx.Message.Instructions) == 1 &&
+	return len(baseTx.Message.Instructions) == 1 &&
 		len(baseTx.Message.AccountKeys) > int(baseTx.Message.Instructions[0].ProgramIDIndex) &&
-		baseTx.Message.AccountKeys[baseTx.Message.Instructions[0].ProgramIDIndex] == solana.VoteProgramID {
-		return true
-	}
-
-	return false
+		baseTx.Message.AccountKeys[baseTx.Message.Instructions[0].ProgramIDIndex] == solana.VoteProgramID
 }
 
 func parsePriceFromTransactionV0(baseTx *solana.Transaction) ComputeUnitPrice {
