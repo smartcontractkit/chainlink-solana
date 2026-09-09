@@ -61,33 +61,59 @@ func ParseBlock(res *rpc.GetBlockResult) (out BlockData, err error) {
 			continue
 		}
 
-		// filter out consensus vote transactions
-		// consensus messages are included as txs within blocks
-		// validate AccountKeys has enough elements to index into ProgramIDIndex
-		if len(baseTx.Message.Instructions) == 1 &&
-			len(baseTx.Message.AccountKeys) > int(baseTx.Message.Instructions[0].ProgramIDIndex) &&
-			baseTx.Message.AccountKeys[baseTx.Message.Instructions[0].ProgramIDIndex] == solana.VoteProgramID {
+		if isConsensusVoteTX(baseTx) {
 			continue
 		}
 
-		var price ComputeUnitPrice // default 0
-		for _, instruction := range baseTx.Message.Instructions {
-			// find instructions for compute budget program
-			// validate AccountKeys has enough elements to index into ProgramIDIndex
-			if len(baseTx.Message.AccountKeys) > int(instruction.ProgramIDIndex) &&
-				baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == ComputeBudgetProgram {
-				parsed, parseErr := ParseComputeUnitPrice(instruction.Data)
-				// if compute unit price found, break instruction loop
-				// only one compute unit price tx is allowed
-				// err returned if not SetComputeUnitPrice instruction
-				if parseErr == nil {
-					price = parsed
-					break
-				}
-			}
+		var price ComputeUnitPrice
+		switch baseTx.Message.GetVersion() {
+		case solana.MessageVersionLegacy, solana.MessageVersionV0:
+			price = parsePriceFromTransactionV0(baseTx)
+		case solana.MessageVersionV1:
+			price = parsePriceFromTransactionV1(baseTx)
+		default:
+			return out, fmt.Errorf("unknown message version %d", baseTx.Message.GetVersion())
 		}
+
 		out.Prices = append(out.Prices, price)
 		out.Fees = append(out.Fees, tx.Meta.Fee)
 	}
 	return out, nil
+}
+
+func isConsensusVoteTX(baseTx *solana.Transaction) bool {
+	// filter out consensus vote transactions
+	// consensus messages are included as txs within blocks
+	// validate AccountKeys has enough elements to index into ProgramIDIndex
+	return len(baseTx.Message.Instructions) == 1 &&
+		len(baseTx.Message.AccountKeys) > int(baseTx.Message.Instructions[0].ProgramIDIndex) &&
+		baseTx.Message.AccountKeys[baseTx.Message.Instructions[0].ProgramIDIndex] == solana.VoteProgramID
+}
+
+func parsePriceFromTransactionV0(baseTx *solana.Transaction) ComputeUnitPrice {
+	for _, instruction := range baseTx.Message.Instructions {
+		// find instructions for compute budget program
+		// validate AccountKeys has enough elements to index into ProgramIDIndex
+		if len(baseTx.Message.AccountKeys) > int(instruction.ProgramIDIndex) &&
+			baseTx.Message.AccountKeys[instruction.ProgramIDIndex] == ComputeBudgetProgram {
+			parsed, parseErr := ParseComputeUnitPrice(instruction.Data)
+			// if compute unit price found, break instruction loop
+			// only one compute unit price tx is allowed
+			// err returned if not SetComputeUnitPrice instruction
+			if parseErr == nil {
+				return parsed
+			}
+		}
+	}
+
+	return ComputeUnitPrice(0)
+}
+func parsePriceFromTransactionV1(baseTx *solana.Transaction) ComputeUnitPrice {
+	computeUnitLimit := baseTx.Message.TransactionConfig.ComputeUnitLimit
+	priorityFee := baseTx.Message.TransactionConfig.PriorityFee
+	if computeUnitLimit == nil || *computeUnitLimit == 0 || priorityFee == nil {
+		return ComputeUnitPrice(0)
+	}
+
+	return ComputeUnitPrice(*priorityFee * 1_000_000 / uint64(*computeUnitLimit))
 }
