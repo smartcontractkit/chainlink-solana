@@ -207,6 +207,10 @@ func (s *envelopeSource) getJuelsPerLamport(ctx context.Context) (*big.Int, erro
 			s.log.Infow("no transaction found for signature", "txSig", txSig.Signature)
 			continue
 		}
+		if txRes.Meta == nil {
+			s.log.Infow("transaction metadata not found for signature", "txSig", txSig.Signature)
+			continue
+		}
 		events := event.ExtractEvents(txRes.Meta.LogMessages, s.feedConfig.ContractAddressBase58)
 		for _, rawEvent := range events {
 			decodedEvent, err := event.Decode(rawEvent)

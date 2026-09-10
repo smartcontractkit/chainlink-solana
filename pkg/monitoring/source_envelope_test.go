@@ -244,6 +244,38 @@ func TestEnvelopeSource(t *testing.T) {
 	})
 }
 
+func TestEnvelopeSourceGetJuelsPerLamportSkipsNilMeta(t *testing.T) {
+	feedConfig := testutils.GenerateFeedConfig()
+	chainReader := mocks.NewChainReader(t)
+	lgr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+	source := &envelopeSource{
+		client:     chainReader,
+		feedConfig: feedConfig,
+		log:        lgr,
+	}
+
+	chainReader.On("GetSignaturesForAddressWithOpts",
+		mock.Anything,
+		feedConfig.StateAccount,
+		mock.Anything,
+	).Return(fakeTxSignatures, nil).Once()
+	chainReader.On("GetTransaction",
+		mock.Anything,
+		fakeTxSignatures[0].Signature,
+		&rpc.GetTransactionOpts{
+			Commitment: rpc.CommitmentConfirmed,
+			Encoding:   solana.EncodingBase64,
+		},
+	).Return(&rpc.GetTransactionResult{}, nil).Once()
+
+	var err error
+	require.NotPanics(t, func() {
+		_, err = source.getJuelsPerLamport(t.Context())
+	})
+	require.ErrorContains(t, err, "no correct NewTransmission event found")
+	tests.AssertLogEventually(t, logs.FilterLevelExact(zapcore.InfoLevel), "transaction metadata not found for signature")
+}
+
 func TestGetLinkAvailableForPayment(t *testing.T) {
 	t.Parallel()
 
