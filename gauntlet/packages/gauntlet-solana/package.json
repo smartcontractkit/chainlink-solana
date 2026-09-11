@@ -1,6 +1,9 @@
 {
   "name": "@chainlink/gauntlet-solana",
   "version": "0.0.1",
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Gauntlet Solana",
   "keywords": [
     "typescript",
