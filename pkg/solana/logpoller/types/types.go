@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -149,8 +150,11 @@ func (s *EventSignature) Scan(src interface{}) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
 }
 
+// String returns the hex encoding of the discriminator. The raw bytes are
+// arbitrary binary data, so converting them directly to a string will often result in
+// invalid UTF-8 errors which can break downstream logging
 func (s EventSignature) String() string {
-	return string(s[:])
+	return hex.EncodeToString(s[:])
 }
 
 // Value implements valuer for database/sql.
