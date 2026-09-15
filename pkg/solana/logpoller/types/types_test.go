@@ -2,6 +2,7 @@ package types //nolint:revive // package name matches existing convention
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,5 +117,22 @@ func TestDiscriminatorStability(t *testing.T) {
 
 	t.Run("AnchorCPIEventDiscriminator differs from cpiEvent method signature", func(t *testing.T) {
 		require.NotEqual(t, AnchorCPIEventDiscriminator(), NewMethodSignatureFromName("cpiEvent"))
+	})
+}
+
+func TestEventSignatureString(t *testing.T) {
+	t.Run("returns hex encoding of the CCIPMessageSent discriminator", func(t *testing.T) {
+		sig := NewEventSignatureFromName("CCIPMessageSent")
+		require.Equal(t, EventSignature{0x17, 0x4d, 0x49, 0xb7, 0x7b, 0xb9, 0x73, 0x39}, sig)
+		assert.Equal(t, "174d49b77bb97339", sig.String())
+	})
+
+	t.Run("output is always valid UTF-8", func(t *testing.T) {
+		for b0 := 0; b0 < 256; b0++ {
+			for b1 := 0; b1 < 256; b1++ {
+				sig := EventSignature{byte(b0), byte(b1), 0x00, 0x7f, 0x80, 0xbf, 0xc0, 0xff}
+				require.True(t, utf8.ValidString(sig.String()), "sig %x produced invalid UTF-8", [8]byte(sig))
+			}
+		}
 	})
 }
