@@ -2,6 +2,7 @@ package testing
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,8 +22,14 @@ import (
 
 const (
 	fundingTimestep   = 500 * time.Millisecond
+	fundingTimeout    = 30 * time.Second
 	fundingMaxRetries = 5
+	fundingAmount     = 100 * solana.LAMPORTS_PER_SOL
 )
+
+// Funder receives the genesis token supply (--mint) on validators started by
+// SetupLocalSolNodeWithFlags.
+var Funder = solana.NewWallet()
 
 func SetupLocalSolNode(t *testing.T) string {
 	t.Helper()
@@ -50,6 +58,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--rpc-port", portStr,
 		"--faucet-port", strconv.Itoa(faucetPort),
 		"--ledger", t.TempDir(),
+		"--mint", Funder.PublicKey().String(),
 		// Configurations to make the local cluster faster
 		"--ticks-per-slot", "8", // value in mainnet: 64
 	}, flags...)
@@ -94,42 +103,101 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	return url, wsURL
 }
 
-func FundTestAccountsWithRetry(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
+// Transfer sends lamports from the funder to the recipient.
+func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey, recipient solana.PublicKey, lamports uint64) (solana.Signature, error) {
+	recent, err := client.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to get latest blockhash: %w", err)
+	}
+
+	tx, err := solana.NewTransaction(
+		[]solana.Instruction{
+			system.NewTransferInstruction(lamports, funder.PublicKey(), recipient).Build(),
+		},
+		recent.Value.Blockhash,
+		solana.TransactionPayer(funder.PublicKey()),
+	)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to build fund transaction: %w", err)
+	}
+
+	if _, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+		if funder.PublicKey().Equals(key) {
+			return &funder
+		}
+		return nil
+	}); err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to sign fund transaction: %w", err)
+	}
+
+	return client.SendTransaction(ctx, tx)
+}
+
+func fundTestAccounts(t *testing.T, funder solana.PrivateKey, keys []solana.PublicKey, url string, attempts int) error {
 	t.Helper()
+	ctx := t.Context()
+	client := rpc.New(url)
 
 	var errKeys []solana.PublicKey
-	for i, key := range keys {
-		account := keys[i].String()
-		_, err := exec.Command("solana", "airdrop", "100",
-			account,
-			"--url", url,
-		).Output()
+	var sentKeys []solana.PublicKey
+	var sigs []solana.Signature
+	for _, key := range keys {
+		sig, err := Transfer(ctx, client, funder, key, fundingAmount)
 		if err != nil {
 			if attempts <= 0 {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					return fmt.Errorf("failed to fund solana account: %w; stderr: %s", err, string(exitErr.Stderr))
-				}
-				return err
+				return fmt.Errorf("failed to fund solana account %s: %w", key, err)
 			}
 			errKeys = append(errKeys, key)
+			continue
 		}
+		sentKeys = append(sentKeys, key)
+		sigs = append(sigs, sig)
 	}
-	// call FundTestAccountsWithRetry recursively with keys that errored, decrement attempts to cap the number of retries
+
+	// wait for the transfers to finalize so later transactions don't fail
+	for deadline := time.Now().Add(fundingTimeout); len(sigs) > 0 && time.Now().Before(deadline); {
+		time.Sleep(fundingTimestep)
+
+		statusRes, err := client.GetSignatureStatuses(ctx, true, sigs...)
+		if err != nil || statusRes == nil {
+			continue
+		}
+
+		var pendingKeys []solana.PublicKey
+		var pendingSigs []solana.Signature
+		for i, res := range statusRes.Value {
+			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
+				pendingKeys = append(pendingKeys, sentKeys[i])
+				pendingSigs = append(pendingSigs, sigs[i])
+			}
+		}
+		sentKeys, sigs = pendingKeys, pendingSigs
+	}
+	errKeys = append(errKeys, sentKeys...)
+
+	// call fundTestAccounts recursively with keys that errored, decrement attempts to cap the number of retries
 	if len(errKeys) > 0 {
 		if attempts <= 0 {
 			return fmt.Errorf("failed to fund solana accounts")
 		}
 		time.Sleep(fundingTimestep)
-		return FundTestAccountsWithRetry(t, errKeys, url, attempts-1)
+		return fundTestAccounts(t, funder, errKeys, url, attempts-1)
 	}
 
 	return nil
 }
 
+// FundTestAccounts funds each key from Funder; only works against validators
+// started by SetupLocalSolNodeWithFlags.
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	err := FundTestAccountsWithRetry(t, keys, url, fundingMaxRetries)
+	FundTestAccountsFromKey(t, Funder.PrivateKey, keys, url)
+}
+
+// FundTestAccountsFromKey funds each key from the given funder (e.g. the validator's --mint keypair).
+func FundTestAccountsFromKey(t *testing.T, funder solana.PrivateKey, keys []solana.PublicKey, url string) {
+	t.Helper()
+	err := fundTestAccounts(t, funder, keys, url, fundingMaxRetries)
 	require.NoError(t, err)
 }
 
