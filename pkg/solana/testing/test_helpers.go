@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
 	"github.com/smartcontractkit/freeport"
 )
 
 const (
-	fundingTimestep   = 500 * time.Millisecond
-	fundingTimeout    = 30 * time.Second
-	fundingMaxRetries = 5
-	fundingAmount     = 100 * solana.LAMPORTS_PER_SOL
+	fundingTimeout = 30 * time.Second
+	fundingAmount  = 100 * solana.LAMPORTS_PER_SOL
 )
 
 // Funder receives the genesis token supply (--mint) on validators started by
@@ -134,65 +134,47 @@ func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey,
 	return client.SendTransaction(ctx, tx)
 }
 
-func fundTestAccounts(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
-	t.Helper()
-	ctx := t.Context()
-	client := rpc.New(url)
-
-	var errKeys []solana.PublicKey
-	var sentKeys []solana.PublicKey
-	var sigs []solana.Signature
-	for _, key := range keys {
-		sig, err := Transfer(ctx, client, Funder, key, fundingAmount)
-		if err != nil {
-			if attempts <= 0 {
-				return fmt.Errorf("failed to fund solana account %s from Funder %s (is the validator running with --mint?): %w", key, Funder.PublicKey(), err)
-			}
-			errKeys = append(errKeys, key)
-			continue
-		}
-		sentKeys = append(sentKeys, key)
-		sigs = append(sigs, sig)
-	}
-
-	// wait for the transfers to finalize so later transactions don't fail
-	for deadline := time.Now().Add(fundingTimeout); len(sigs) > 0 && time.Now().Before(deadline); {
-		time.Sleep(fundingTimestep)
-
-		statusRes, err := client.GetSignatureStatuses(ctx, true, sigs...)
-		if err != nil || statusRes == nil {
-			continue
-		}
-
-		var pendingKeys []solana.PublicKey
-		var pendingSigs []solana.Signature
-		for i, res := range statusRes.Value {
-			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
-				pendingKeys = append(pendingKeys, sentKeys[i])
-				pendingSigs = append(pendingSigs, sigs[i])
-			}
-		}
-		sentKeys, sigs = pendingKeys, pendingSigs
-	}
-	errKeys = append(errKeys, sentKeys...)
-
-	// call fundTestAccounts recursively with keys that errored, decrement attempts to cap the number of retries
-	if len(errKeys) > 0 {
-		if attempts <= 0 {
-			return fmt.Errorf("failed to fund solana accounts")
-		}
-		time.Sleep(fundingTimestep)
-		return fundTestAccounts(t, errKeys, url, attempts-1)
-	}
-
-	return nil
-}
-
 // FundTestAccounts funds each key with 100 SOL from Funder and waits for finalization.
 // The validator must mint its genesis supply to Funder (SetupLocalSolNodeWithFlags does).
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	err := fundTestAccounts(t, keys, url, fundingMaxRetries)
+	ctx, cancel := context.WithTimeout(t.Context(), fundingTimeout)
+	defer cancel()
+	client := rpc.New(url)
+
+	// track sent transfers so retries only resend for keys that failed to send
+	sigs := make(map[solana.PublicKey]solana.Signature, len(keys))
+	_, err := retry.Do(ctx, logger.Test(t), func(ctx context.Context) (any, error) {
+		for _, key := range keys {
+			if _, sent := sigs[key]; sent {
+				continue
+			}
+			sig, err := Transfer(ctx, client, Funder, key, fundingAmount)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fund solana account %s from Funder %s (is the validator running with --mint?): %w", key, Funder.PublicKey(), err)
+			}
+			sigs[key] = sig
+		}
+
+		sigList := make([]solana.Signature, 0, len(sigs))
+		for _, sig := range sigs {
+			sigList = append(sigList, sig)
+		}
+		statusRes, err := client.GetSignatureStatuses(ctx, true, sigList...)
+		if err != nil {
+			return nil, err
+		}
+		pending := 0
+		for _, res := range statusRes.Value {
+			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
+				pending++
+			}
+		}
+		if pending > 0 {
+			return nil, fmt.Errorf("waiting for %d of %d funding transactions to finalize", pending, len(sigs))
+		}
+		return nil, nil
+	})
 	require.NoError(t, err)
 }
 
