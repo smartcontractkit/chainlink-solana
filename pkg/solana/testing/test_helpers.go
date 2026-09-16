@@ -134,16 +134,27 @@ func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey,
 	return client.SendTransaction(ctx, tx)
 }
 
-func fundTestAccounts(t *testing.T, funder solana.PrivateKey, keys []solana.PublicKey, url string, attempts int) error {
+func fundTestAccounts(t *testing.T, keys []solana.PublicKey, url string, attempts int) error {
 	t.Helper()
 	ctx := t.Context()
 	client := rpc.New(url)
+
+	// transfer from Funder when it holds the genesis supply (validators started by
+	// SetupLocalSolNodeWithFlags); otherwise fall back to a faucet airdrop
+	bal, balErr := client.GetBalance(ctx, Funder.PublicKey(), rpc.CommitmentConfirmed)
+	useFunder := balErr == nil && bal.Value > uint64(len(keys))*fundingAmount
 
 	var errKeys []solana.PublicKey
 	var sentKeys []solana.PublicKey
 	var sigs []solana.Signature
 	for _, key := range keys {
-		sig, err := Transfer(ctx, client, funder, key, fundingAmount)
+		var sig solana.Signature
+		var err error
+		if useFunder {
+			sig, err = Transfer(ctx, client, Funder, key, fundingAmount)
+		} else {
+			sig, err = client.RequestAirdrop(ctx, key, fundingAmount, rpc.CommitmentFinalized)
+		}
 		if err != nil {
 			if attempts <= 0 {
 				return fmt.Errorf("failed to fund solana account %s: %w", key, err)
@@ -182,23 +193,16 @@ func fundTestAccounts(t *testing.T, funder solana.PrivateKey, keys []solana.Publ
 			return fmt.Errorf("failed to fund solana accounts")
 		}
 		time.Sleep(fundingTimestep)
-		return fundTestAccounts(t, funder, errKeys, url, attempts-1)
+		return fundTestAccounts(t, errKeys, url, attempts-1)
 	}
 
 	return nil
 }
 
-// FundTestAccounts funds each key from Funder; only works against validators
-// started by SetupLocalSolNodeWithFlags.
+// FundTestAccounts funds each key with 100 SOL and waits for finalization.
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	FundTestAccountsFromKey(t, Funder, keys, url)
-}
-
-// FundTestAccountsFromKey funds each key from the given funder (e.g. the validator's --mint keypair).
-func FundTestAccountsFromKey(t *testing.T, funder solana.PrivateKey, keys []solana.PublicKey, url string) {
-	t.Helper()
-	err := fundTestAccounts(t, funder, keys, url, fundingMaxRetries)
+	err := fundTestAccounts(t, keys, url, fundingMaxRetries)
 	require.NoError(t, err)
 }
 

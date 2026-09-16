@@ -149,7 +149,7 @@ func TestKeystoneForwarder(t *testing.T) {
 	t.Run("Initialize Forwarder", func(t *testing.T) {
 		ix, err := keystone_forwarder.NewInitializeInstruction(forwarderStateAddress, deployerKey.PublicKey(), solana.SystemProgramID)
 		require.NoError(t, err)
-		soltesting.FundTestAccountsFromKey(t, *solanaChain.DeployerKey, []solana.PublicKey{forwarderStateKey.PublicKey(), deployerKey.PublicKey(), proposedOwner.PublicKey()}, solanaChain.URL)
+		soltesting.FundTestAccounts(t, []solana.PublicKey{forwarderStateKey.PublicKey(), deployerKey.PublicKey(), proposedOwner.PublicKey()}, solanaChain.URL)
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{ix}, deployerKey, rpc.CommitmentConfirmed, common.AddSigners(forwarderStateKey))
@@ -541,7 +541,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		dataBytes, _ := getDataBytes(t, accountHash, payload, diffTransmitterReportId, signers)
 
 		diffTransmitter := defaultTransmitters[1]
-		soltesting.FundTestAccountsFromKey(t, *solanaChain.DeployerKey, []solana.PublicKey{diffTransmitter.privKey.PublicKey()}, solanaChain.URL)
+		soltesting.FundTestAccounts(t, []solana.PublicKey{diffTransmitter.privKey.PublicKey()}, solanaChain.URL)
 
 		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
@@ -599,7 +599,7 @@ func TestKeystoneForwarder(t *testing.T) {
 
 		randomTransmitter, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
-		soltesting.FundTestAccountsFromKey(t, *solanaChain.DeployerKey, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
+		soltesting.FundTestAccounts(t, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
 
 		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
