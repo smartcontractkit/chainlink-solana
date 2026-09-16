@@ -139,25 +139,14 @@ func fundTestAccounts(t *testing.T, keys []solana.PublicKey, url string, attempt
 	ctx := t.Context()
 	client := rpc.New(url)
 
-	// transfer from Funder when it holds the genesis supply (validators started by
-	// SetupLocalSolNodeWithFlags); otherwise fall back to a faucet airdrop
-	bal, balErr := client.GetBalance(ctx, Funder.PublicKey(), rpc.CommitmentConfirmed)
-	useFunder := balErr == nil && bal.Value > uint64(len(keys))*fundingAmount
-
 	var errKeys []solana.PublicKey
 	var sentKeys []solana.PublicKey
 	var sigs []solana.Signature
 	for _, key := range keys {
-		var sig solana.Signature
-		var err error
-		if useFunder {
-			sig, err = Transfer(ctx, client, Funder, key, fundingAmount)
-		} else {
-			sig, err = client.RequestAirdrop(ctx, key, fundingAmount, rpc.CommitmentFinalized)
-		}
+		sig, err := Transfer(ctx, client, Funder, key, fundingAmount)
 		if err != nil {
 			if attempts <= 0 {
-				return fmt.Errorf("failed to fund solana account %s: %w", key, err)
+				return fmt.Errorf("failed to fund solana account %s from Funder %s (is the validator running with --mint?): %w", key, Funder.PublicKey(), err)
 			}
 			errKeys = append(errKeys, key)
 			continue
@@ -199,7 +188,8 @@ func fundTestAccounts(t *testing.T, keys []solana.PublicKey, url string, attempt
 	return nil
 }
 
-// FundTestAccounts funds each key with 100 SOL and waits for finalization.
+// FundTestAccounts funds each key with 100 SOL from Funder and waits for finalization.
+// The validator must mint its genesis supply to Funder (SetupLocalSolNodeWithFlags does).
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
 	err := fundTestAccounts(t, keys, url, fundingMaxRetries)

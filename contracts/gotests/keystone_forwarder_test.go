@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
@@ -26,7 +27,6 @@ import (
 
 	receiver_program "github.com/smartcontractkit/chainlink-solana/contracts/generated/dummy_receiver"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
-	soltesting "github.com/smartcontractkit/chainlink-solana/pkg/solana/testing"
 )
 
 var (
@@ -149,7 +149,7 @@ func TestKeystoneForwarder(t *testing.T) {
 	t.Run("Initialize Forwarder", func(t *testing.T) {
 		ix, err := keystone_forwarder.NewInitializeInstruction(forwarderStateAddress, deployerKey.PublicKey(), solana.SystemProgramID)
 		require.NoError(t, err)
-		soltesting.FundTestAccounts(t, []solana.PublicKey{forwarderStateKey.PublicKey(), deployerKey.PublicKey(), proposedOwner.PublicKey()}, solanaChain.URL)
+		fundAccounts(t, solanaClient, deployerKey, forwarderStateKey.PublicKey(), proposedOwner.PublicKey())
 		res, err := common.SendAndConfirm(
 			t.Context(),
 			solanaClient, []solana.Instruction{ix}, deployerKey, rpc.CommitmentConfirmed, common.AddSigners(forwarderStateKey))
@@ -541,7 +541,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		dataBytes, _ := getDataBytes(t, accountHash, payload, diffTransmitterReportId, signers)
 
 		diffTransmitter := defaultTransmitters[1]
-		soltesting.FundTestAccounts(t, []solana.PublicKey{diffTransmitter.privKey.PublicKey()}, solanaChain.URL)
+		fundAccounts(t, solanaClient, deployerKey, diffTransmitter.privKey.PublicKey())
 
 		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
@@ -599,7 +599,7 @@ func TestKeystoneForwarder(t *testing.T) {
 
 		randomTransmitter, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
-		soltesting.FundTestAccounts(t, []solana.PublicKey{randomTransmitter.PublicKey()}, solanaChain.URL)
+		fundAccounts(t, solanaClient, deployerKey, randomTransmitter.PublicKey())
 
 		fwdOnReportIxGeneric, err := keystone_forwarder.NewReportInstruction(
 			dataBytes,
@@ -740,6 +740,17 @@ func generateTransmitters(t *testing.T, deployerKey solana.PrivateKey, n int) []
 
 func getFSigners(t *testing.T, signers []Signer, f uint8) []Signer {
 	return signers[:f+1]
+}
+
+// fundAccounts transfers SOL from the funder (the validator's genesis mint key) to each recipient
+func fundAccounts(t *testing.T, client *rpc.Client, funder solana.PrivateKey, recipients ...solana.PublicKey) {
+	t.Helper()
+	ixs := make([]solana.Instruction, 0, len(recipients))
+	for _, r := range recipients {
+		ixs = append(ixs, system.NewTransferInstruction(100*solana.LAMPORTS_PER_SOL, funder.PublicKey(), r).Build())
+	}
+	_, err := common.SendAndConfirm(t.Context(), client, ixs, funder, rpc.CommitmentConfirmed)
+	require.NoError(t, err)
 }
 
 func initializeReceiverProgram(t *testing.T, reportState solana.PrivateKey, deployerKey solana.PrivateKey, forwarderAuthorityStorage solana.PublicKey, solanaClient *rpc.Client) {
