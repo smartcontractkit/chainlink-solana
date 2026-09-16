@@ -115,7 +115,7 @@ func fundAccounts(t *testing.T, accounts []solana.PrivateKey, solanaGoClient *rp
 	ctx := t.Context()
 	sigs := []solana.Signature{}
 	for _, v := range accounts {
-		sig, err := solanatesting.Transfer(ctx, solanaGoClient, solanatesting.Funder.PrivateKey, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL)
+		sig, err := solanatesting.Transfer(ctx, solanaGoClient, solanatesting.Funder, v.PublicKey(), 1000*solana.LAMPORTS_PER_SOL)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 	}

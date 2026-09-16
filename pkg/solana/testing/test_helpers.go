@@ -28,8 +28,9 @@ const (
 )
 
 // Funder receives the genesis token supply (--mint) on validators started by
-// SetupLocalSolNodeWithFlags.
-var Funder = solana.NewWallet()
+// SetupLocalSolNodeWithFlags. It is the same well-known test key as
+// chainlink-testing-framework's blockchain.DefaultSolanaPrivateKey.
+var Funder = solana.MustPrivateKeyFromBase58("DmPfeHBC8Brf8s5qQXi25bmJ996v6BHRtaLc6AH51yFGSqQpUMy1oHkbbXobPNBdgGH2F29PAmoq9ZZua4K9vCc")
 
 func SetupLocalSolNode(t *testing.T) string {
 	t.Helper()
@@ -191,7 +192,7 @@ func fundTestAccounts(t *testing.T, funder solana.PrivateKey, keys []solana.Publ
 // started by SetupLocalSolNodeWithFlags.
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
-	FundTestAccountsFromKey(t, Funder.PrivateKey, keys, url)
+	FundTestAccountsFromKey(t, Funder, keys, url)
 }
 
 // FundTestAccountsFromKey funds each key from the given funder (e.g. the validator's --mint keypair).
