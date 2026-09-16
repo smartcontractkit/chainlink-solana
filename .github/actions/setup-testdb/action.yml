@@ -17,6 +17,7 @@ runs:
       uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
       with:
         tmpfs: 'true'
+        image-tag: '16-alpine'
     # This is considered untrusted code from the POV of chainlink-solana, but this is safe as long as we:
     # - Only call this from workflows with read-only git permissions set
     # and

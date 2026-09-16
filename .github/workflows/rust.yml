@@ -167,6 +167,7 @@ jobs:
         uses: smartcontractkit/.github/actions/setup-postgres@13b05e8b4e11a8c4402f8034daaf9a4332032dc7 # v1.0.0
         with:
           tmpfs: "true"
+          image-tag: "16-alpine"
 
       - name: Get core ref
         id: get-core-ref
