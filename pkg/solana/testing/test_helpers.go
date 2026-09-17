@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +35,25 @@ const (
 // SetupLocalSolNodeWithFlags. It is the same well-known test key as
 // chainlink-testing-framework's blockchain.DefaultSolanaPrivateKey.
 var Funder = solana.MustPrivateKeyFromBase58("DmPfeHBC8Brf8s5qQXi25bmJ996v6BHRtaLc6AH51yFGSqQpUMy1oHkbbXobPNBdgGH2F29PAmoq9ZZua4K9vCc")
+
+// syncBuffer is a goroutine-safe bytes.Buffer: os/exec writes to it from its
+// pipe-copier goroutine while the validator boot loop reads String().
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 func SetupLocalSolNode(t *testing.T) string {
 	t.Helper()
@@ -76,9 +96,9 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	// Prevent macOS from creating metadata files (._*) that interfere with validator startup
 	cmd.Env = append(os.Environ(), "COPYFILE_DISABLE=1")
 
-	var stdErr bytes.Buffer
+	var stdErr syncBuffer
 	cmd.Stderr = &stdErr
-	var stdOut bytes.Buffer
+	var stdOut syncBuffer
 	cmd.Stdout = &stdOut
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
