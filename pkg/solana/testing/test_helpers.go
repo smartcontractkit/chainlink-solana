@@ -227,17 +227,19 @@ const gossipPortWindow = 32
 // ports, verified by binding each one (TCP and UDP) like freeport does.
 func findContiguousFreePorts(t *testing.T, n int) int {
 	t.Helper()
+	ctx := t.Context()
+	var lc net.ListenConfig
 	for attempt := 0; attempt < 50; attempt++ {
 		base := 20000 + mrand.Intn(40000-n)
 		free := true
 		for p := base; p < base+n; p++ {
-			l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+			l, err := lc.Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", p))
 			if err != nil {
 				free = false
 				break
 			}
 			_ = l.Close()
-			pc, err := net.ListenPacket("udp", fmt.Sprintf("127.0.0.1:%d", p))
+			pc, err := lc.ListenPacket(ctx, "udp", fmt.Sprintf("127.0.0.1:%d", p))
 			if err != nil {
 				free = false
 				break
