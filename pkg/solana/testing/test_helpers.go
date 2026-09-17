@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,9 +107,18 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 
 // Transfer sends lamports from the funder to the recipient.
 func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey, recipient solana.PublicKey, lamports uint64) (solana.Signature, error) {
+	tx, err := buildTransfer(ctx, client, funder, recipient, lamports)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	return client.SendTransaction(ctx, tx)
+}
+
+// buildTransfer returns a signed transfer transaction, ready to send.
+func buildTransfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey, recipient solana.PublicKey, lamports uint64) (*solana.Transaction, error) {
 	recent, err := client.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("failed to get latest blockhash: %w", err)
+		return nil, fmt.Errorf("failed to get latest blockhash: %w", err)
 	}
 
 	tx, err := solana.NewTransaction(
@@ -119,7 +129,7 @@ func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey,
 		solana.TransactionPayer(funder.PublicKey()),
 	)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("failed to build fund transaction: %w", err)
+		return nil, fmt.Errorf("failed to build fund transaction: %w", err)
 	}
 
 	if _, err = tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
@@ -128,10 +138,10 @@ func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey,
 		}
 		return nil
 	}); err != nil {
-		return solana.Signature{}, fmt.Errorf("failed to sign fund transaction: %w", err)
+		return nil, fmt.Errorf("failed to sign fund transaction: %w", err)
 	}
 
-	return client.SendTransaction(ctx, tx)
+	return tx, nil
 }
 
 // FundTestAccounts funds each key with 100 SOL from Funder and waits for confirmation.
@@ -141,38 +151,62 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	ctx, cancel := context.WithTimeout(t.Context(), fundingTimeout)
 	defer cancel()
 	client := rpc.New(url)
+	lggr := logger.Test(t)
 
-	// track sent transfers so retries only resend for keys that failed to send
-	sigs := make(map[solana.PublicKey]solana.Signature, len(keys))
-	_, err := retry.Do(ctx, logger.Test(t), func(ctx context.Context) (any, error) {
+	// signed transfers by recipient, kept so unconfirmed txs re-broadcast the
+	// identical tx (same signature) rather than double-funding with a new one
+	txs := make(map[solana.PublicKey]*solana.Transaction, len(keys))
+	_, err := retry.Do(ctx, lggr, func(ctx context.Context) (any, error) {
 		for _, key := range keys {
-			if _, sent := sigs[key]; sent {
+			if _, sent := txs[key]; sent {
 				continue
 			}
-			sig, err := Transfer(ctx, client, Funder, key, fundingAmount)
+			tx, err := buildTransfer(ctx, client, Funder, key, fundingAmount)
 			if err != nil {
+				return nil, fmt.Errorf("failed to build funding transfer for %s: %w", key, err)
+			}
+			if _, err = client.SendTransaction(ctx, tx); err != nil {
 				return nil, fmt.Errorf("failed to fund solana account %s from Funder %s (is the validator running with --mint?): %w", key, Funder.PublicKey(), err)
 			}
-			sigs[key] = sig
+			lggr.Infow("Sent funding transfer", "recipient", key, "sig", tx.Signatures[0])
+			txs[key] = tx
 		}
 
-		sigList := make([]solana.Signature, 0, len(sigs))
-		for _, sig := range sigs {
-			sigList = append(sigList, sig)
+		keyList := make([]solana.PublicKey, 0, len(txs))
+		sigList := make([]solana.Signature, 0, len(txs))
+		for key, tx := range txs {
+			keyList = append(keyList, key)
+			sigList = append(sigList, tx.Signatures[0])
 		}
 		statusRes, err := client.GetSignatureStatuses(ctx, true, sigList...)
 		if err != nil {
 			return nil, err
 		}
 		pending := 0
-		for _, res := range statusRes.Value {
-			if res == nil || (res.ConfirmationStatus != rpc.ConfirmationStatusConfirmed && res.ConfirmationStatus != rpc.ConfirmationStatusFinalized) {
+		for i, res := range statusRes.Value {
+			switch {
+			case res == nil:
+				// not on-chain yet: still propagating, or dropped (e.g. sent while the
+				// validator was warming up); re-broadcasting is safe and covers both
+				pending++
+				key := keyList[i]
+				lggr.Warnw("Funding transfer not yet on-chain, re-broadcasting", "recipient", key, "sig", sigList[i])
+				if _, err = client.SendTransaction(ctx, txs[key]); err != nil && strings.Contains(err.Error(), "Blockhash not found") {
+					// the tx expired and can never land, so a fresh one cannot double-fund
+					lggr.Warnw("Funding transfer expired, will re-send with a fresh blockhash", "recipient", key, "sig", sigList[i])
+					delete(txs, key)
+				}
+			case res.ConfirmationStatus == rpc.ConfirmationStatusConfirmed || res.ConfirmationStatus == rpc.ConfirmationStatusFinalized:
+				// confirmed is sufficient on a single-node local validator; finalization
+				// takes ~31 more slots, which times out on slow CI runners
+			default:
 				pending++
 			}
 		}
 		if pending > 0 {
-			return nil, fmt.Errorf("waiting for %d of %d funding transactions to confirm", pending, len(sigs))
+			return nil, fmt.Errorf("waiting for %d of %d funding transfers to confirm", pending, len(keys))
 		}
+		lggr.Infow("All funding transfers confirmed", "accounts", len(keys))
 		return nil, nil
 	})
 	require.NoError(t, err)
