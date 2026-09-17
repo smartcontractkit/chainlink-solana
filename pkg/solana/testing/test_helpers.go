@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	mrand "math/rand"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -243,35 +244,61 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 // the dynamic TPU/TVU port range (agave needs ~13; extra is headroom).
 const gossipPortWindow = 32
 
-// findContiguousFreePorts returns the first port of a contiguous range of n free
-// ports, verified by binding each one (TCP and UDP) like freeport does.
+// Port windows are handed out from [portWindowStart, portWindowStart+portWindowSpan)
+// via a counter persisted in a lock file, so concurrent test processes reserve
+// disjoint windows even before their validators bind any ports.
+const (
+	portWindowStart = 20000
+	portWindowSpan  = 40000
+)
+
+// findContiguousFreePorts reserves a contiguous range of n free ports and returns
+// its first port. Reservation is coordinated across processes through a shared
+// lock file; each candidate window is also bind-verified (TCP and UDP) to skip
+// ports held by non-cooperating processes.
 func findContiguousFreePorts(t *testing.T, n int) int {
 	t.Helper()
-	ctx := t.Context()
-	var lc net.ListenConfig
-	for attempt := 0; attempt < 50; attempt++ {
-		base := 20000 + mrand.Intn(40000-n)
-		free := true
-		for p := base; p < base+n; p++ {
-			l, err := lc.Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", p))
-			if err != nil {
-				free = false
-				break
-			}
-			_ = l.Close()
-			pc, err := lc.ListenPacket(ctx, "udp", fmt.Sprintf("127.0.0.1:%d", p))
-			if err != nil {
-				free = false
-				break
-			}
-			_ = pc.Close()
-		}
-		if free {
+
+	lockFile, err := os.OpenFile(filepath.Join(os.TempDir(), "solana-test-validator-ports.lock"), os.O_CREATE|os.O_RDWR, 0o666)
+	require.NoError(t, err)
+	defer lockFile.Close() // also releases the flock
+	require.NoError(t, syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX))
+
+	buf := make([]byte, 16)
+	readN, _ := lockFile.ReadAt(buf, 0)
+	idx, _ := strconv.Atoi(strings.TrimSpace(string(buf[:readN])))
+
+	windows := portWindowSpan / n
+	for attempt := 0; attempt < windows; attempt++ {
+		window := (idx + attempt) % windows
+		base := portWindowStart + window*n
+		if portsFree(t.Context(), base, n) {
+			require.NoError(t, lockFile.Truncate(0))
+			_, err = lockFile.WriteAt([]byte(strconv.Itoa((window+1)%windows)), 0)
+			require.NoError(t, err)
 			return base
 		}
 	}
 	require.Fail(t, "failed to find a contiguous free port range")
 	return 0
+}
+
+// portsFree reports whether all n ports starting at base are bindable (TCP and UDP).
+func portsFree(ctx context.Context, base, n int) bool {
+	var lc net.ListenConfig
+	for p := base; p < base+n; p++ {
+		l, err := lc.Listen(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", p))
+		if err != nil {
+			return false
+		}
+		_ = l.Close()
+		pc, err := lc.ListenPacket(ctx, "udp", fmt.Sprintf("127.0.0.1:%d", p))
+		if err != nil {
+			return false
+		}
+		_ = pc.Close()
+	}
+	return true
 }
 
 func TwoConsecutiveFreeports(t *testing.T) ([]int, error) {
