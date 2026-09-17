@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mrand "math/rand"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -53,12 +55,17 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 	url := "http://127.0.0.1:" + portStr
 	wsURL := "ws://127.0.0.1:" + strconv.Itoa(ports[1]) //there is no way to define ws port on Solana validation. It must be +1 from rpc port.
 
-	// args1 := []string{"--version"}
+	// Each validator needs its own gossip/TPU ports: the defaults (gossip 8000,
+	// dynamic range next to it) collide when several validators share a host, and
+	// SO_REUSEPORT then silently routes transactions to the wrong validator's TPU.
+	gossipBase := findContiguousFreePorts(t, gossipPortWindow)
 
 	args := append([]string{
 		"--reset",
 		"--rpc-port", portStr,
 		"--faucet-port", strconv.Itoa(faucetPort),
+		"--gossip-port", strconv.Itoa(gossipBase),
+		"--dynamic-port-range", fmt.Sprintf("%d-%d", gossipBase+1, gossipBase+gossipPortWindow-1),
 		"--ledger", t.TempDir(),
 		"--mint", Funder.PublicKey().String(),
 		// Configurations to make the local cluster faster
@@ -210,6 +217,39 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 		return nil, nil
 	})
 	require.NoError(t, err)
+}
+
+// gossipPortWindow is the number of ports reserved per validator for gossip plus
+// the dynamic TPU/TVU port range (agave needs ~13; extra is headroom).
+const gossipPortWindow = 32
+
+// findContiguousFreePorts returns the first port of a contiguous range of n free
+// ports, verified by binding each one (TCP and UDP) like freeport does.
+func findContiguousFreePorts(t *testing.T, n int) int {
+	t.Helper()
+	for attempt := 0; attempt < 50; attempt++ {
+		base := 20000 + mrand.Intn(40000-n)
+		free := true
+		for p := base; p < base+n; p++ {
+			l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+			if err != nil {
+				free = false
+				break
+			}
+			_ = l.Close()
+			pc, err := net.ListenPacket("udp", fmt.Sprintf("127.0.0.1:%d", p))
+			if err != nil {
+				free = false
+				break
+			}
+			_ = pc.Close()
+		}
+		if free {
+			return base
+		}
+	}
+	require.Fail(t, "failed to find a contiguous free port range")
+	return 0
 }
 
 func TwoConsecutiveFreeports(t *testing.T) ([]int, error) {
