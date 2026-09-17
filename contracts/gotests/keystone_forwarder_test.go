@@ -117,7 +117,7 @@ func TestKeystoneForwarder(t *testing.T) {
 
 	provider := cldf_solana_provider.NewCTFChainProvider(t, 16423721717087811551,
 		cldf_solana_provider.CTFChainProviderConfig{
-			DeployerKeyGen:               cldf_solana_provider.PrivateKeyRandom(),
+			DeployerKeyGen:               cldf_solana_provider.PrivateKeyFromRaw(soltesting.Funder.String()),
 			ProgramsPath:                 ProgramsPath,
 			ProgramIDs:                   SolanaProgramIDs,
 			WaitDelayAfterContainerStart: 5 * time.Second, // we have slot errors that force retries if the chain is not given enough time to boot
