@@ -134,7 +134,7 @@ func Transfer(ctx context.Context, client *rpc.Client, funder solana.PrivateKey,
 	return client.SendTransaction(ctx, tx)
 }
 
-// FundTestAccounts funds each key with 100 SOL from Funder and waits for finalization.
+// FundTestAccounts funds each key with 100 SOL from Funder and waits for confirmation.
 // The validator must mint its genesis supply to Funder (SetupLocalSolNodeWithFlags does).
 func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 	t.Helper()
@@ -166,12 +166,12 @@ func FundTestAccounts(t *testing.T, keys []solana.PublicKey, url string) {
 		}
 		pending := 0
 		for _, res := range statusRes.Value {
-			if res == nil || res.ConfirmationStatus != rpc.ConfirmationStatusFinalized {
+			if res == nil || (res.ConfirmationStatus != rpc.ConfirmationStatusConfirmed && res.ConfirmationStatus != rpc.ConfirmationStatusFinalized) {
 				pending++
 			}
 		}
 		if pending > 0 {
-			return nil, fmt.Errorf("waiting for %d of %d funding transactions to finalize", pending, len(sigs))
+			return nil, fmt.Errorf("waiting for %d of %d funding transactions to confirm", pending, len(sigs))
 		}
 		return nil, nil
 	})
