@@ -256,7 +256,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -280,3 +280,5 @@ replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
 )
+
+exclude google.golang.org/grpc v1.84.0 // CVE-2026-84445

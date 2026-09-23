@@ -107,7 +107,7 @@ jobs:
         with:
           dockerfile: core/chainlink.Dockerfile
           image-tag: solana.${{ github.sha }}
-          go-get-overrides: |
+          plugin-manifest-overrides: |
             chainlink-solana=${{ github.event.pull_request.head.sha }}
           # registry inputs
           aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}

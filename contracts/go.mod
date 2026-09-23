@@ -207,7 +207,7 @@ require (
 	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -216,3 +216,5 @@ require (
 replace github.com/smartcontractkit/chainlink-solana => ../
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
+
+exclude google.golang.org/grpc v1.84.0 // CVE-2026-84445
