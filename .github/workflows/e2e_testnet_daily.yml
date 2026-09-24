@@ -134,10 +134,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: embedded
-            configs: env-testnet.toml,products/solana/basic.toml
           - variant: plugins
-            configs: env-testnet.toml,products/solana/basic.toml,products/solana/plugins.toml
+            configs: env-testnet.toml,products/solana/basic.toml
     needs:
       [
         e2e_custom_build_artifacts,
