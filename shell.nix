@@ -4,7 +4,7 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
     # lld_11
-    llvm_12
+    llvm_18
     stdenv.cc.cc.lib
     pkg-config
     openssl
@@ -16,20 +16,19 @@ pkgs.mkShell {
 
     # Golang
     # Keep this golang version in sync with the version in .tool-versions please
-    go_1_24
+    go_1_27
     gopls
     delve
     golangci-lint
     gotools
 
     # NodeJS + TS
-    nodePackages.typescript
-    nodePackages.typescript-language-server
-    nodePackages.npm
-    nodePackages.pnpm
+    pkgs.typescript
+    pkgs.typescript-language-server
+    pkgs.pnpm
     # Keep this nodejs version in sync with the version in .tool-versions please
-    nodejs_20
-    (yarn.override { nodejs = nodejs_20; })
+    nodejs_26
+    (yarn.override { nodejs = nodejs_26; })
     python3
     ] ++ lib.optionals stdenv.isLinux [
       # ledger specific packages

@@ -18,34 +18,3 @@ jobs:
         echo "prBody=Latest Solana mainnet release is [$image](https://github.com/anza-xyz/agave/releases/latest)" >> "$GITHUB_OUTPUT"
         echo "commitString=[automated] bump solana dependencies" >> "$GITHUB_OUTPUT"
     secrets: inherit
-  E2E-Testing-Dependencies:
-    uses: ./.github/workflows/open-pr.yml
-    with:
-      run: |
-
-        # get CTF version in core
-        git clone https://github.com/smartcontractkit/chainlink.git temp-chainlink
-        cd temp-chainlink/integration-tests
-        coreVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework/lib | awk '{print $NF}')
-        cd ../../
-        rm -rf temp-chainlink
-        echo "chainlink/integration-tests CTF/lib: $coreVersion"
-
-        # get CTF version in solana
-        cd integration-tests
-        solVersion=$(go list -m github.com/smartcontractkit/chainlink-testing-framework/lib | awk '{print $NF}')
-        echo "chainlink-solana/integration-tests CTF/lib: $solVersion"
-        cd ../
-        
-        # compare versions
-        if [[ $coreVersion != $solVersion ]]; then
-          make upgrade-e2e-core-deps
-          make gomodtidy
-        fi
-
-        # outputs
-        echo "name=bump/e2e-deps-$coreVersion" >> "$GITHUB_OUTPUT"
-        echo "prTitle=[automated] bump e2e test deps to match chainlink/integration-tests" >> "$GITHUB_OUTPUT"
-        echo "prBody=chainlink/integration-tests uses chainlink-testing-framework@$coreVersion" >> "$GITHUB_OUTPUT"
-        echo "commitString=[automated] bump e2e <> core/integration-tests dependencies" >> "$GITHUB_OUTPUT"
-    secrets: inherit

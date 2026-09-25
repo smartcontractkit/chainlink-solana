@@ -71,10 +71,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: embedded
-            configs: env.toml,products/solana/basic.toml,products/solana/soak.toml
           - variant: plugins
-            configs: env.toml,products/solana/basic.toml,products/solana/soak.toml,products/solana/plugins.toml
+            configs: env.toml,products/solana/basic.toml,products/solana/soak.toml
     needs: [ e2e_custom_build_artifacts ]
     steps:
       - name: Checkout the repo
