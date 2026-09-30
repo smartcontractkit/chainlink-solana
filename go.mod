@@ -3,7 +3,6 @@ module github.com/smartcontractkit/chainlink-solana
 go 1.27.1
 
 require (
-	github.com/cometbft/cometbft v1.0.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/ethereum/go-ethereum v1.17.6
 	github.com/gagliardetto/anchor-go v1.0.0
@@ -73,8 +72,6 @@ require (
 	github.com/gagliardetto/metaplex-go v0.2.1 // indirect
 	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -141,6 +138,7 @@ require (
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/riferrei/srclient v0.7.4 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
+	github.com/rs/cors v1.11.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
