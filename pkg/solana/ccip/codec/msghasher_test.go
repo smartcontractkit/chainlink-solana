@@ -2,14 +2,11 @@ package codec
 
 import (
 	cryptorand "crypto/rand"
-	"fmt"
+	"encoding/binary"
 	"math/big"
 	"math/rand"
-	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -141,8 +138,7 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 	}
 	abiEncodedExtraArgs := []byte{31, 59, 58, 186, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 230, 105, 156, 244, 184, 196, 235, 30, 58, 209, 82, 8, 202, 25, 73, 167, 169, 34, 150, 141, 129, 169, 150, 219, 160, 186, 44, 72, 156, 50, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44, 230, 105, 156, 244, 184, 196, 235, 30, 58, 209, 82, 8, 202, 25, 73, 167, 169, 34, 150, 141, 129, 169, 150, 219, 160, 186, 44, 72, 156, 50, 170}
 	tokenAmount := ccipocr3.NewBigInt(big.NewInt(rand.Int63()))
-	destGasAmount, err := abiEncodeUint32(10)
-	require.NoError(t, err)
+	destGasAmount := abiEncodeUint32(10)
 
 	ccipTokenAmounts := make([]ccipocr3.RampTokenAmount, 5)
 	for z := range 5 {
@@ -200,14 +196,21 @@ func createEVM2SolanaMessages(t *testing.T) (ccipocr3.Message, ccip_offramp.Any2
 	return any2AnyMsg, any2SolanaMsg, msgAccounts
 }
 
+// abiEncodedAddress returns a random EVM address ABI-encoded as a 32-byte word
+// (12 zero bytes of left padding followed by the 20-byte address).
 func abiEncodedAddress(t *testing.T) []byte {
-	encoded, err := abiEncode(`[{"type": "address"}]`, randomAddress())
+	t.Helper()
+	encoded := make([]byte, 32)
+	_, err := cryptorand.Read(encoded[12:])
 	require.NoError(t, err)
 	return encoded
 }
 
-func abiEncodeUint32(data uint32) ([]byte, error) {
-	return abiEncode(`[{ "type": "uint32" }]`, data)
+// abiEncodeUint32 is the equivalent of abi.encode(uint32).
+func abiEncodeUint32(data uint32) []byte {
+	encoded := make([]byte, 32)
+	binary.BigEndian.PutUint32(encoded[28:], data)
+	return encoded
 }
 
 func TestToLittleEndian(t *testing.T) {
@@ -239,28 +242,6 @@ func TestToLittleEndian(t *testing.T) {
 			assert.Equal(t, test.expected, result, "expected %x, got %x", test.expected, result)
 		})
 	}
-}
-
-func randomAddress() common.Address {
-	b := make([]byte, 20)
-	_, _ = cryptorand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
-	return common.BytesToAddress(b)
-}
-
-// abiEncode is the equivalent of abi.encode.
-// See a full set of examples https://github.com/ethereum/go-ethereum/blob/420b78659bef661a83c5c442121b13f13288c09f/accounts/abi/packing_test.go#L31
-func abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
-	// Create a dummy method with arguments
-	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "inputs": %s}]`, abiStr)
-	inAbi, err := abi.JSON(strings.NewReader(inDef))
-	if err != nil {
-		return nil, err
-	}
-	res, err := inAbi.Pack("method", values...)
-	if err != nil {
-		return nil, err
-	}
-	return res[4:], nil
 }
 
 func getRandomPubKey(t *testing.T) solana.PublicKey {

@@ -2,10 +2,9 @@ package codec
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
@@ -94,7 +93,7 @@ func (h *MessageHasherV1) Hash(_ context.Context, msg ccipocr3.Message) (ccipocr
 }
 
 func SerializeExtraArgs(tag []byte, data any) ([]byte, error) {
-	return ccip.SerializeExtraArgs(data, strings.TrimPrefix(hexutil.Encode(tag), "0x"))
+	return ccip.SerializeExtraArgs(data, hex.EncodeToString(tag))
 }
 
 // Interface compliance check
