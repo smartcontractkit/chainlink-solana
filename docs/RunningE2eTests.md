@@ -7,8 +7,7 @@
 Environment setup and test configuration live under `integration-tests/devenv`. Configs are composed from:
 
 - `integration-tests/devenv/env.toml` for base environment settings
-- `integration-tests/devenv/products/solana/basic.toml` for the embedded OCR2 setup
-- `integration-tests/devenv/products/solana/plugins.toml` to run with plugin binaries
+- `integration-tests/devenv/products/solana/basic.toml` for the basic OCR2 setup
 - `integration-tests/devenv/products/solana/soak.toml` to extend the smoke config for soak
 
 Important: environment startup is decoupled from test logic. Tests no longer start the environment. You must run the environment setup (`go run ./cmd u ...`) before running any tests. This generates `integration-tests/devenv/env-out.toml`, which the tests read.
