@@ -3,7 +3,6 @@ package keystone_forwarder_test
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -13,13 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/sha3"
 
 	ctf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
@@ -69,7 +70,7 @@ type ReportProcessedEvent struct {
 }
 
 type Signer struct {
-	privKeys *ecdsa.PrivateKey
+	privKeys *secp256k1.PrivateKey
 	address  [20]uint8
 }
 
@@ -634,12 +635,10 @@ func packDataWithSignatures(rawReportBytes, msgHash32, reportContext96 []byte, s
 		if s.privKeys == nil {
 			return nil, fmt.Errorf("signer %d has nil private key", i)
 		}
-		sig65, err := crypto.Sign(msgHash32, s.privKeys) // 65 bytes: R(32)||S(32)||V(1)
-		if err != nil {
-			return nil, fmt.Errorf("signer %d: %w", i, err)
-		}
-		sigBlob.Write(sig65[:64])    // signature (R||S)
-		sigBlob.WriteByte(sig65[64]) // recovery id (V)
+		// 65 bytes: V(1)||R(32)||S(32), where V = 27 + recid for uncompressed keys
+		compact := ecdsa.SignCompact(s.privKeys, msgHash32, false)
+		sigBlob.Write(compact[1:])         // signature (R||S)
+		sigBlob.WriteByte(compact[0] - 27) // recovery id (0 or 1)
 	}
 
 	// 2) Prefix with len(signers) as a single byte (u8)
@@ -695,11 +694,9 @@ func buildMessageHash(rawReportBytes []byte) (msgHash32 []byte, reportContext96 
 func generateSigners(t *testing.T, n int) []Signer {
 	signers := make([]Signer, n)
 	for i := 0; i < n; i++ {
-		privKey, err := crypto.GenerateKey()
+		privKey, err := secp256k1.GeneratePrivateKey()
 		require.NoError(t, err)
-		address := crypto.PubkeyToAddress(privKey.PublicKey).Bytes()
-		uint8Address := [20]uint8{}
-		copy(uint8Address[:], address)
+		uint8Address := ethAddress(privKey.PubKey())
 		signers[i] = Signer{
 			privKeys: privKey,
 			address:  uint8Address,
@@ -709,6 +706,15 @@ func generateSigners(t *testing.T, n int) []Signer {
 		return bytes.Compare(signers[i].address[:], signers[j].address[:]) < 0
 	})
 	return signers
+}
+
+// ethAddress derives the Ethereum-style address: last 20 bytes of keccak256(X||Y)
+func ethAddress(pub *secp256k1.PublicKey) [20]uint8 {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(pub.SerializeUncompressed()[1:]) // drop 0x04 prefix
+	var addr [20]uint8
+	copy(addr[:], h.Sum(nil)[12:])
+	return addr
 }
 
 func generateTransmitters(t *testing.T, deployerKey solana.PrivateKey, n int) []Transmitter {
