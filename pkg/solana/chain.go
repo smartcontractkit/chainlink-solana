@@ -145,7 +145,7 @@ type verifiedCachedClient struct {
 	skipVerification bool
 	chainID          string
 	expectedChainID  string
-	nodeURL          string
+	nodeName         string
 
 	chainIDVerified     bool
 	chainIDVerifiedLock sync.RWMutex
@@ -179,7 +179,7 @@ func (v *verifiedCachedClient) verifyChainID(ctx context.Context) (bool, error) 
 		if err == nil {
 			if v.chainID != v.expectedChainID {
 				v.chainIDVerified = false
-				return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeURL)
+				return v.chainIDVerified, fmt.Errorf("client returned mismatched chain id (expected: %s, got: %s): %s", v.expectedChainID, v.chainID, v.nodeName)
 			}
 		}
 	}
@@ -308,8 +308,9 @@ func newChain(id string, cfg *config.TOMLConfig, ks core.Keystore, lggr logger.L
 			}
 			rpcClient, err := client.NewMultiNodeClient(nodeInfo.URL.String(), cfg, DefaultRequestTimeout, logger.Named(lggr, "Client."+*nodeInfo.Name))
 			if err != nil {
-				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "solana-url", nodeInfo.URL.String(), "err", err.Error())
-				return nil, fmt.Errorf("failed to create client: %w", err)
+				err = fmt.Errorf("failed to create client: %w", mn.SanitizeRPCError(err))
+				lggr.Warnw("failed to create client", "name", *nodeInfo.Name, "err", err)
+				return nil, err
 			}
 
 			if nodeInfo.SendOnly {
@@ -592,7 +593,7 @@ func (c *chain) getClient(ctx context.Context) (client.ReaderWriter, error) {
 		client, err = c.verifiedClient(node)
 		// if error, try another node
 		if err != nil {
-			c.lggr.Warnw("failed to create node", "name", node.Name, "solana-url", node.URL, "err", err.Error())
+			c.lggr.Warnw("failed to create node", "name", node.Name, "err", mn.SanitizeRPCError(err))
 			continue
 		}
 		// if all checks passed, mark found and break loop
@@ -602,7 +603,7 @@ func (c *chain) getClient(ctx context.Context) (client.ReaderWriter, error) {
 	if client == nil {
 		return nil, errors.New("no node valid nodes available")
 	}
-	c.lggr.Debugw("Created client", "name", node.Name, "solana-url", node.URL)
+	c.lggr.Debugw("Created client", "name", node.Name)
 	return client, nil
 }
 
@@ -634,7 +635,7 @@ func (c *chain) verifiedClient(node *config.Node) (client.ReaderWriter, error) {
 
 	if !exists {
 		cl = &verifiedCachedClient{
-			nodeURL:          url,
+			nodeName:         *node.Name,
 			expectedChainID:  c.id,
 			skipVerification: skipVerification,
 		}

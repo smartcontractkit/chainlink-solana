@@ -207,7 +207,7 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 		return c.rpc.GetBalance(ctx, addr, c.commitment)
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("Balance failed: %w", mn.SanitizeRPCError(err))
 	}
 	res, ok := v.(*rpc.GetBalanceResult)
 	if !ok {
@@ -231,7 +231,7 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("BalanceWithCommitment failed: %w", mn.SanitizeRPCError(err))
 	}
 	res, ok := v.(*rpc.GetBalanceResult)
 	if !ok {
@@ -240,7 +240,7 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	if res == nil {
 		return nil, errors.New("BalanceWithCommitment returned nil result")
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) SlotHeight(ctx context.Context) (uint64, error) {
@@ -259,11 +259,14 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetSlot(ctx, commitment)
 	})
+	if err != nil {
+		return 0, fmt.Errorf("SlotHeightWithCommitment failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(uint64)
 	if !ok {
 		return 0, fmt.Errorf("result is unexpected type %T, expected uint64", v)
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (sigs []*rpc.TransactionSignature, err error) {
@@ -278,7 +281,8 @@ func (c *Client) GetSignaturesForAddressWithOpts(ctx context.Context, addr solan
 	if opts.Commitment == "" {
 		opts.Commitment = c.commitment
 	}
-	return c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
+	sigs, err = c.rpc.GetSignaturesForAddressWithOpts(ctx, addr, opts)
+	return sigs, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (tx *rpc.GetTransactionResult, err error) {
@@ -293,6 +297,9 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (t
 		version := MaxSupportTransactionVersion
 		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment, MaxSupportedTransactionVersion: &version})
 	})
+	if err != nil {
+		return nil, fmt.Errorf("GetTransaction failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(*rpc.GetTransactionResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetTransactionResult{})
@@ -300,7 +307,7 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (t
 	if res == nil {
 		return nil, errors.New("GetTransaction returned nil result")
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicKey, opts *rpc.GetAccountInfoOpts) (result *rpc.GetAccountInfoResult, err error) {
@@ -316,7 +323,8 @@ func (c *Client) GetAccountInfoWithOpts(ctx context.Context, addr solana.PublicK
 		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	}
 
-	return c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
+	result, err = c.rpc.GetAccountInfoWithOpts(ctx, addr, opts)
+	return result, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []solana.PublicKey, opts *rpc.GetMultipleAccountsOpts) (out *rpc.GetMultipleAccountsResult, err error) {
@@ -331,7 +339,8 @@ func (c *Client) GetMultipleAccountsWithOpts(ctx context.Context, accounts []sol
 	if !isCommitmentSet(opts.Commitment) {
 		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	}
-	return c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+	out, err = c.rpc.GetMultipleAccountsWithOpts(ctx, accounts, opts)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.PublicKey, opts *rpc.GetProgramAccountsOpts) (out rpc.GetProgramAccountsResult, err error) {
@@ -347,7 +356,8 @@ func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.
 		opts.Commitment = c.commitment // overrides passed in value - use defined client commitment type
 	}
 
-	return c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
+	out, err = c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {
@@ -359,7 +369,7 @@ func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.Public
 
 	err = c.rpc.GetAccountDataBorshInto(ctx, addr, &inVar)
 	if err != nil {
-		return fmt.Errorf("failed to get account data: %w", err)
+		return fmt.Errorf("failed to get account data: %w", mn.SanitizeRPCError(err))
 	}
 
 	return nil
@@ -371,7 +381,8 @@ func (c *Client) GetFirstAvailableBlock(ctx context.Context) (out uint64, err er
 
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
-	return c.rpc.GetFirstAvailableBlock(ctx)
+	out, err = c.rpc.GetFirstAvailableBlock(ctx)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint64) (out rpc.BlocksResult, err error) {
@@ -390,11 +401,14 @@ func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint6
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetBlocks(ctx, startSlot, endSlot, c.commitment)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("GetBlocks failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(rpc.BlocksResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, rpc.BlocksResult{})
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBlockhashResult, err error) {
@@ -407,6 +421,9 @@ func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBloc
 	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (interface{}, error) {
 		return c.rpc.GetLatestBlockhash(ctx, c.commitment)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("LatestBlockhash failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(*rpc.GetLatestBlockhashResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetLatestBlockhashResult{})
@@ -414,7 +431,7 @@ func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBloc
 	if res == nil || res.Value == nil {
 		return nil, errors.New("LatestBlockhash returned nil result")
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) ChainID(ctx context.Context) (chainID mn.StringID, err error) {
@@ -428,7 +445,7 @@ func (c *Client) ChainID(ctx context.Context) (chainID mn.StringID, err error) {
 		return c.rpc.GetGenesisHash(ctx)
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("ChainID failed: %w", mn.SanitizeRPCError(err))
 	}
 
 	res, ok := v.(solana.Hash)
@@ -448,7 +465,7 @@ func (c *Client) GetFeeForMessage(ctx context.Context, msg string) (fee uint64, 
 	defer cancel()
 	res, err := c.rpc.GetFeeForMessage(ctx, msg, c.commitment)
 	if err != nil {
-		return 0, fmt.Errorf("error in GetFeeForMessage: %w", err)
+		return 0, fmt.Errorf("error in GetFeeForMessage: %w", mn.SanitizeRPCError(err))
 	}
 
 	if res == nil || res.Value == nil {
@@ -467,7 +484,7 @@ func (c *Client) GetFeeForMessageWithCommitment(ctx context.Context, msg string,
 	defer cancel()
 	res, err := c.rpc.GetFeeForMessage(ctx, msg, commitment)
 	if err != nil {
-		return nil, fmt.Errorf("error in GetFeeForMessage: %w", err)
+		return nil, fmt.Errorf("error in GetFeeForMessage: %w", mn.SanitizeRPCError(err))
 	}
 
 	if res == nil || res.Value == nil {
@@ -487,7 +504,7 @@ func (c *Client) SignatureStatuses(ctx context.Context, sigs []solana.Signature)
 	// searchTransactionHistory = false
 	res, err := c.rpc.GetSignatureStatuses(ctx, false, sigs...)
 	if err != nil {
-		return nil, fmt.Errorf("error in GetSignatureStatuses: %w", err)
+		return nil, fmt.Errorf("error in GetSignatureStatuses: %w", mn.SanitizeRPCError(err))
 	}
 
 	if res == nil || res.Value == nil {
@@ -514,7 +531,7 @@ func (c *Client) SimulateTx(ctx context.Context, tx *solana.Transaction, opts *r
 
 	res, err := c.rpc.SimulateTransactionWithOpts(ctx, tx, opts)
 	if err != nil {
-		return nil, fmt.Errorf("error in SimulateTransactionWithOpts: %w", err)
+		return nil, fmt.Errorf("error in SimulateTransactionWithOpts: %w", mn.SanitizeRPCError(err))
 	}
 
 	if res == nil || res.Value == nil {
@@ -545,7 +562,8 @@ func (c *Client) SendTx(ctx context.Context, tx *solana.Transaction) (sig solana
 		MaxRetries:          c.maxRetries,
 	}
 
-	return c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+	sig, err = c.rpc.SendTransactionWithOpts(ctx, tx, opts)
+	return sig, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetLatestBlock(ctx context.Context) (result *rpc.GetBlockResult, err error) {
@@ -571,11 +589,14 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (height uint64, err e
 	v, err, _ := c.requestGroup.Do("GetBlockHeight", func() (interface{}, error) {
 		return c.rpc.GetBlockHeight(ctx, c.commitment)
 	})
+	if err != nil {
+		return 0, fmt.Errorf("GetLatestBlockHeight failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(uint64)
 	if !ok {
 		return 0, fmt.Errorf("result is unexpected type %T, expected uint64", v)
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.GetBlockOpts) (result *rpc.GetBlockResult, err error) {
@@ -584,7 +605,8 @@ func (c *Client) GetBlockWithOpts(ctx context.Context, slot uint64, opts *rpc.Ge
 	defer func() { done(err) }()
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
-	return c.rpc.GetBlockWithOpts(ctx, slot, opts)
+	result, err = c.rpc.GetBlockWithOpts(ctx, slot, opts)
+	return result, mn.SanitizeRPCError(err)
 }
 
 func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBlockResult, err error) {
@@ -602,6 +624,9 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 			MaxSupportedTransactionVersion: &version,
 		})
 	})
+	if err != nil {
+		return nil, fmt.Errorf("GetBlock failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(*rpc.GetBlockResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBlockResult{})
@@ -609,7 +634,7 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 	if res == nil {
 		return nil, errors.New("GetBlock returned nil result")
 	}
-	return res, err
+	return res, nil
 }
 
 func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit uint64) (result *rpc.BlocksResult, err error) {
@@ -624,6 +649,9 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetBlocksWithLimit(ctx, startSlot, limit, c.commitment)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("GetBlocksWithLimit failed: %w", mn.SanitizeRPCError(err))
+	}
 	res, ok := v.(*rpc.BlocksResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.BlocksResult{})
@@ -631,7 +659,7 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 	if res == nil {
 		return nil, errors.New("GetBlocksWithLimit returned nil result")
 	}
-	return res, err
+	return res, nil
 }
 
 func isCommitmentSet(c rpc.CommitmentType) bool {
