@@ -161,12 +161,12 @@ func (m *MultiNodeClient) LatestBlock(ctx context.Context) (*Head, error) {
 
 	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LatestBlock: failed to get slot: %w", mn.SanitizeRPCError(err))
 	}
 
 	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LatestBlock: failed to get latest blockhash: %w", mn.SanitizeRPCError(err))
 	}
 	if result == nil || result.Value == nil {
 		return nil, errors.New("GetLatestBlockhash returned nil result")
@@ -190,12 +190,12 @@ func (m *MultiNodeClient) LatestFinalizedBlock(ctx context.Context) (*Head, erro
 
 	slot, err := rawRPC.GetSlot(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LatestFinalizedBlock: failed to get slot: %w", mn.SanitizeRPCError(err))
 	}
 
 	result, err := rawRPC.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("LatestFinalizedBlock: failed to get latest blockhash: %w", mn.SanitizeRPCError(err))
 	}
 	if result == nil || result.Value == nil {
 		return nil, errors.New("GetLatestBlockhash returned nil result")
@@ -278,7 +278,7 @@ func (m *MultiNodeClient) acquireQueryCtx(parentCtx context.Context, timeout tim
 func (m *MultiNodeClient) ClientVersion(ctx context.Context) (string, error) {
 	version, err := m.rpc.GetVersion(ctx)
 	if err != nil {
-		return "", fmt.Errorf("ping failed: %v", err)
+		return "", fmt.Errorf("ping failed: %w", mn.SanitizeRPCError(err))
 	}
 	m.log.Debugf("ping client version: %s", version.SolanaCore)
 	return version.SolanaCore, nil
@@ -318,7 +318,7 @@ func (m *MultiNodeClient) Close() {
 	defer func() {
 		err := m.rpc.Close()
 		if err != nil {
-			m.log.Errorf("error closing rpc: %v", err)
+			m.log.Errorw("error closing rpc", "err", mn.SanitizeRPCError(err))
 		}
 	}()
 	m.cancelInflightRequests()

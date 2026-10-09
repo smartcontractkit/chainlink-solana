@@ -62,7 +62,7 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 		for j, n := range c.Nodes {
 			u := (*url.URL)(n.URL)
 			if urls.IsDupeFmt(u) {
-				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
+				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), "[REDACTED URL]"))
 			}
 		}
 	}
@@ -456,7 +456,7 @@ func NewDecodedTOMLConfig(rawConfig string) (*TOMLConfig, error) {
 	var cfg TOMLConfig
 
 	if err := d.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, rawConfig)
+		return nil, fmt.Errorf("failed to decode config toml: %w", err)
 	}
 
 	cfg.SetDefaults()

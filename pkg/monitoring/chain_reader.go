@@ -2,9 +2,12 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+
+	mn "github.com/smartcontractkit/chainlink-framework/multinode"
 
 	pkgSolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
@@ -32,45 +35,53 @@ type chainReader struct {
 
 func (c *chainReader) GetState(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (state pkgSolana.State, blockHeight uint64, err error) {
 	getReader := func() (client.AccountReader, error) { return c.client, nil }
-	return pkgSolana.GetState(ctx, getReader, account, commitment)
+	state, blockHeight, err = pkgSolana.GetState(ctx, getReader, account, commitment)
+	return state, blockHeight, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetLatestTransmission(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (answer pkgSolana.Answer, blockHeight uint64, err error) {
 	getReader := func() (client.AccountReader, error) { return c.client, nil }
-	return pkgSolana.GetLatestTransmission(ctx, getReader, account, commitment)
+	answer, blockHeight, err = pkgSolana.GetLatestTransmission(ctx, getReader, account, commitment)
+	return answer, blockHeight, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetTokenAccountBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetTokenAccountBalanceResult, err error) {
-	return c.client.GetTokenAccountBalance(ctx, account, commitment)
+	out, err = c.client.GetTokenAccountBalance(ctx, account, commitment)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetBalance(ctx context.Context, account solana.PublicKey, commitment rpc.CommitmentType) (out *rpc.GetBalanceResult, err error) {
-	return c.client.GetBalance(ctx, account, commitment)
+	out, err = c.client.GetBalance(ctx, account, commitment)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetSignaturesForAddressWithOpts(ctx context.Context, account solana.PublicKey, opts *rpc.GetSignaturesForAddressOpts) (out []*rpc.TransactionSignature, err error) {
-	return c.client.GetSignaturesForAddressWithOpts(ctx, account, opts)
+	out, err = c.client.GetSignaturesForAddressWithOpts(ctx, account, opts)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetTransaction(ctx context.Context, txSig solana.Signature, opts *rpc.GetTransactionOpts) (out *rpc.GetTransactionResult, err error) {
-	return c.client.GetTransaction(ctx, txSig, opts)
+	out, err = c.client.GetTransaction(ctx, txSig, opts)
+	return out, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetSlot(ctx context.Context) (uint64, error) {
-	return c.client.GetSlot(ctx, rpc.CommitmentProcessed) // get latest height
+	slot, err := c.client.GetSlot(ctx, rpc.CommitmentProcessed) // get latest height
+	return slot, mn.SanitizeRPCError(err)
 }
 
 func (c *chainReader) GetLatestBlock(ctx context.Context, commitment rpc.CommitmentType) (*rpc.GetBlockResult, error) {
 	// get slot based on confirmation
 	slot, err := c.client.GetSlot(ctx, commitment)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetSlot failed: %w", mn.SanitizeRPCError(err))
 	}
 
 	// get block based on slot
 	version := client.MaxSupportTransactionVersion // pull all tx types (legacy + v0 + v1)
-	return c.client.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
+	block, err := c.client.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 		Commitment:                     commitment,
 		MaxSupportedTransactionVersion: &version,
 	})
+	return block, mn.SanitizeRPCError(err)
 }
