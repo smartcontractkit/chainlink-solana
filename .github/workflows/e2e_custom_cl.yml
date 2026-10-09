@@ -232,7 +232,7 @@ jobs:
         with:
           dockerfile: core/chainlink.Dockerfile
           image-tag: solana.${{ github.sha }}
-          go-get-overrides: |
+          plugin-manifest-overrides: |
             chainlink-solana=${{ github.event.pull_request.head.sha }}
           # registry inputs
           aws-role-arn: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
@@ -259,10 +259,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: embedded
-            configs: env.toml,products/solana/basic.toml
           - variant: plugins
-            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
+            configs: env.toml,products/solana/basic.toml
     needs:
       [
         e2e_custom_build_artifacts,
@@ -396,7 +394,7 @@ jobs:
       matrix:
         include:
           - variant: plugins
-            configs: env.toml,products/solana/basic.toml,products/solana/plugins.toml
+            configs: env.toml,products/solana/basic.toml
     needs:
       [
         contract-changes,
