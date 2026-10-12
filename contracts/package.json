@@ -29,7 +29,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@babel/traverse": "7.23.2"
+      "@babel/traverse": "7.23.2",
+      "brace-expansion@2": "2.1.7"
     }
   }
 }

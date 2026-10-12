@@ -48,5 +48,11 @@
     "tslib": "^2.3.1",
     "typedoc": "^0.22.10",
     "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@1": "1.1.21",
+      "brace-expansion@2": "2.1.7"
+    }
   }
 }
