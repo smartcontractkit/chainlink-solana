@@ -29,7 +29,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@babel/traverse": "7.23.2"
+      "@babel/traverse": "7.23.2",
+      "js-yaml@4": "4.3.2"
     }
   }
 }
