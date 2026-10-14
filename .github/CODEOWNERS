@@ -22,7 +22,7 @@
 /gauntlet @smartcontractkit/data-feeds
 
 # monitoring ownership
-/pkg/monitoring @smartcontractkit/realtime @smartcontractkit/data-feeds
+/pkg/monitoring @smartcontractkit/data-feeds
 
 # LOOP Plugin commands
 /pkg/solana/cmd/chainlink-solana @smartcontractkit/foundations @smartcontractkit/data-feeds @smartcontractkit/bix-build
