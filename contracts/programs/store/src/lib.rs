@@ -6,7 +6,9 @@ use access_controller::AccessController;
 mod state;
 
 use crate::state::with_store;
-pub use crate::state::{NewTransmission, Store as State, Transmission, Transmissions};
+pub use crate::state::{
+    NewTransmission, OnReportCallbackArgs, Store as State, Transmission, Transmissions,
+};
 
 declare_id!("9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC");
 
@@ -41,6 +43,39 @@ pub struct Round {
     pub slot: u64,
     pub timestamp: u32,
     pub answer: i128,
+}
+
+/// Why `on_report_callback` left a feed untouched.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CacheSkipReason {
+    /// Not a store-owned `Transmissions` account.
+    InvalidFeedAccount,
+    /// Feed account was not passed as writable.
+    NotWritable,
+    /// Feed version does not match `FEED_VERSION`.
+    InvalidVersion,
+    /// The feed's writer is not the signing data feeds store authority (e.g. still OCR2).
+    UnauthorizedWriter,
+    /// The round came through an SVR path or was only adopted, legacy feeds take non-SVR rounds.
+    NotPrimary,
+    /// Round is not newer than the feed's latest round.
+    StaleTimestamp,
+    /// Answer does not fit once rescaled to the feed's decimals.
+    AnswerOverflow,
+}
+
+#[event]
+pub struct CacheRoundSubmitted {
+    pub feed: Pubkey,
+    pub round_id: u32,
+    pub answer: i128,
+    pub timestamp: u32,
+}
+
+#[event]
+pub struct CacheRoundSkipped {
+    pub feed: Pubkey,
+    pub reason: CacheSkipReason,
 }
 
 #[program]
@@ -163,26 +198,59 @@ pub mod store {
             ..Default::default()
         };
 
-        let previous_round = with_store(&mut ctx.accounts.feed, |store| {
-            let previous = store.latest();
-            store.insert(round);
-            previous
-        })?;
+        apply_round(&mut ctx.accounts.feed, round)
+    }
 
-        let flagging_threshold = ctx.accounts.feed.flagging_threshold;
-
-        let is_valid = if let Some(previous_round) = previous_round {
-            is_valid(flagging_threshold, previous_round.answer, round.answer)
-        } else {
-            true
+    /// Report callback of the data feeds store (CRE), configured on the non-SVR data ID backing
+    /// this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the
+    /// signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is
+    /// skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
+    pub fn on_report_callback(
+        ctx: Context<OnReportCallback>,
+        args: OnReportCallbackArgs,
+    ) -> Result<bool> {
+        let feed_info = ctx.accounts.feed.to_account_info();
+        let skip = |reason| {
+            emit!(CacheRoundSkipped {
+                feed: feed_info.key(),
+                reason,
+            });
+            Ok(true)
         };
 
-        if !is_valid {
-            // raise flag
-            ctx.accounts.feed.state = Transmissions::FLAGGED;
+        // legacy feeds are non-SVR readers, SVR-exclusive rounds must not reach them
+        if args.svr_path_id != [0, 0] || !args.is_freshest {
+            return skip(CacheSkipReason::NotPrimary);
+        }
+        if !feed_info.is_writable {
+            return skip(CacheSkipReason::NotWritable);
         }
 
-        Ok(())
+        let feed_account: std::result::Result<Account<Transmissions>, _> =
+            try_from!(Account<Transmissions>, &ctx.accounts.feed);
+        let mut feed = match feed_account {
+            Ok(feed) => feed,
+            Err(_) => return skip(CacheSkipReason::InvalidFeedAccount),
+        };
+
+        let slot = Clock::get()?.slot;
+        let authority = ctx.accounts.authority.key();
+        let transmission = match prepare_cache_round(&mut feed, &authority, &args, slot)? {
+            Ok(transmission) => transmission,
+            Err(reason) => return skip(reason),
+        };
+
+        apply_round(&mut feed, transmission)?;
+        // the feed is not a typed account of this context, persist explicitly
+        feed.exit(&crate::ID)?;
+
+        emit!(CacheRoundSubmitted {
+            feed: feed_info.key(),
+            round_id: feed.latest_round_id,
+            answer: transmission.answer,
+            timestamp: transmission.timestamp,
+        });
+        Ok(true)
     }
 
     // Store methods
@@ -281,6 +349,80 @@ pub mod store {
 
         anchor_lang::solana_program::program::set_return_data(buf.get_ref());
         Ok(())
+    }
+}
+
+/// Insert a round into the feed and raise the flag if it deviates past the flagging threshold.
+fn apply_round(feed: &mut Account<Transmissions>, round: Transmission) -> Result<()> {
+    let previous_round = with_store(feed, |store| {
+        let previous = store.latest();
+        store.insert(round);
+        previous
+    })?;
+
+    let is_valid = if let Some(previous_round) = previous_round {
+        is_valid(feed.flagging_threshold, previous_round.answer, round.answer)
+    } else {
+        true
+    };
+
+    if !is_valid {
+        // raise flag
+        feed.state = Transmissions::FLAGGED;
+    }
+
+    Ok(())
+}
+
+/// Validate a cache round against the feed and convert it to the feed's decimals.
+/// The inner `Err` is a skip reason, the outer one a hard failure.
+fn prepare_cache_round(
+    feed: &mut Account<Transmissions>,
+    authority: &Pubkey,
+    round: &OnReportCallbackArgs,
+    slot: u64,
+) -> Result<std::result::Result<Transmission, CacheSkipReason>> {
+    if feed.version != FEED_VERSION {
+        return Ok(Err(CacheSkipReason::InvalidVersion));
+    }
+
+    if feed.writer != *authority {
+        return Ok(Err(CacheSkipReason::UnauthorizedWriter));
+    }
+
+    let latest = with_store(feed, |store| store.latest())?;
+    if let Some(latest) = latest {
+        if round.observations_timestamp <= latest.timestamp {
+            return Ok(Err(CacheSkipReason::StaleTimestamp));
+        }
+    }
+
+    let Some(answer) = rescale(round.answer, round.decimals, feed.decimals) else {
+        return Ok(Err(CacheSkipReason::AnswerOverflow));
+    };
+
+    Ok(Ok(Transmission {
+        slot,
+        answer,
+        timestamp: round.observations_timestamp,
+        ..Default::default()
+    }))
+}
+
+/// Convert `answer` from `from` to `to` decimals. Downscaling truncates toward zero.
+fn rescale(answer: i128, from: u8, to: u8) -> Option<i128> {
+    use std::cmp::Ordering;
+
+    match from.cmp(&to) {
+        Ordering::Equal => Some(answer),
+        Ordering::Greater => match 10i128.checked_pow(u32::from(from - to)) {
+            Some(divisor) => Some(answer / divisor),
+            // the divisor exceeds any i128 answer
+            None => Some(0),
+        },
+        Ordering::Less => 10i128
+            .checked_pow(u32::from(to - from))
+            .and_then(|multiplier| answer.checked_mul(multiplier)),
     }
 }
 
@@ -525,6 +667,14 @@ pub struct Submit<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct OnReportCallback<'info> {
+    /// The data feeds store authority. Each feed only accepts rounds if this is its writer.
+    pub authority: Signer<'info>,
+    /// CHECK: the legacy feed, validated in the handler so a bad feed is skipped, not failed
+    pub feed: UncheckedAccount<'info>,
+}
+
 // Store methods
 
 #[derive(Accounts)]
@@ -563,4 +713,145 @@ pub struct SetAccessController<'info> {
 #[derive(Accounts)]
 pub struct Query<'info> {
     pub feed: Account<'info, Transmissions>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::size_of;
+
+    const LIVE_LENGTH: usize = 2;
+    const FEED_LEN: usize = 8 + state::HEADER_SIZE + LIVE_LENGTH * size_of::<Transmission>();
+
+    fn write_feed(data: &mut [u8], writer: Pubkey, decimals: u8) {
+        let mut cursor = std::io::Cursor::new(&mut data[..8 + state::HEADER_SIZE]);
+        Transmissions {
+            version: FEED_VERSION,
+            state: Transmissions::NORMAL,
+            owner: Pubkey::default(),
+            proposed_owner: Pubkey::default(),
+            writer,
+            description: [0; 32],
+            decimals,
+            flagging_threshold: 1000,
+            latest_round_id: 0,
+            granularity: 1,
+            live_length: LIVE_LENGTH as u32,
+            live_cursor: 0,
+            historical_cursor: 0,
+        }
+        .try_serialize(&mut cursor)
+        .unwrap();
+    }
+
+    fn cache_round(timestamp: u32, answer: i128) -> OnReportCallbackArgs {
+        OnReportCallbackArgs {
+            data_id: [1; 16],
+            svr_path_id: [0, 0],
+            round_id: 1,
+            answer,
+            decimals: 18,
+            observations_timestamp: timestamp,
+            recorded_timestamp: timestamp,
+            is_freshest: true,
+        }
+    }
+
+    #[test]
+    fn rescale_converts_between_decimals() {
+        // 18 -> 8 truncates toward zero, like the EVM DataFeedsStore downscale
+        assert_eq!(
+            rescale(123_456_789_999_999_999_999, 18, 8),
+            Some(12_345_678_999)
+        );
+        assert_eq!(
+            rescale(-123_456_789_999_999_999_999, 18, 8),
+            Some(-12_345_678_999)
+        );
+        assert_eq!(rescale(42, 8, 8), Some(42));
+        assert_eq!(rescale(42, 6, 8), Some(4_200));
+        assert_eq!(rescale(i128::MAX, 0, 18), None);
+        assert_eq!(rescale(i128::MAX, 255, 0), Some(0));
+    }
+
+    #[test]
+    fn prepare_cache_round_validates_feed() {
+        let key = Pubkey::new_unique();
+        let writer = Pubkey::new_unique();
+        let owner = crate::ID;
+        let mut lamports = 0u64;
+        let mut backing = Vec::new();
+        let data = state::aligned_account_data(&mut backing, FEED_LEN);
+        write_feed(data, writer, 8);
+        let info = AccountInfo::new(&key, false, true, &mut lamports, data, &owner, false, 0);
+        let mut feed = Account::<Transmissions>::try_from(&info).unwrap();
+
+        // not the writer, e.g. the feed still points at OCR2
+        let other = Pubkey::new_unique();
+        assert_eq!(
+            prepare_cache_round(&mut feed, &other, &cache_round(10, 1), 1).unwrap(),
+            Err(CacheSkipReason::UnauthorizedWriter)
+        );
+
+        // rescaled to the feed's decimals
+        let round =
+            prepare_cache_round(&mut feed, &writer, &cache_round(10, 2 * 10i128.pow(18)), 7)
+                .unwrap()
+                .unwrap();
+        assert_eq!(round.answer, 2 * 10i128.pow(8));
+        assert_eq!(round.timestamp, 10);
+        assert_eq!(round.slot, 7);
+        apply_round(&mut feed, round).unwrap();
+        assert_eq!(feed.latest_round_id, 1);
+
+        // not newer than the latest round
+        assert_eq!(
+            prepare_cache_round(&mut feed, &writer, &cache_round(10, 1), 8).unwrap(),
+            Err(CacheSkipReason::StaleTimestamp)
+        );
+
+        // does not fit once upscaled
+        let overflow = OnReportCallbackArgs {
+            answer: i128::MAX,
+            decimals: 0,
+            ..cache_round(11, 0)
+        };
+        assert_eq!(
+            prepare_cache_round(&mut feed, &writer, &overflow, 8).unwrap(),
+            Err(CacheSkipReason::AnswerOverflow)
+        );
+
+        feed.version = FEED_VERSION - 1;
+        assert_eq!(
+            prepare_cache_round(&mut feed, &writer, &cache_round(11, 1), 8).unwrap(),
+            Err(CacheSkipReason::InvalidVersion)
+        );
+    }
+
+    #[test]
+    fn apply_round_flags_deviation() {
+        let key = Pubkey::new_unique();
+        let owner = crate::ID;
+        let mut lamports = 0u64;
+        let mut backing = Vec::new();
+        let data = state::aligned_account_data(&mut backing, FEED_LEN);
+        write_feed(data, Pubkey::default(), 8);
+        let info = AccountInfo::new(&key, false, true, &mut lamports, data, &owner, false, 0);
+        let mut feed = Account::<Transmissions>::try_from(&info).unwrap();
+
+        let round = |timestamp, answer| Transmission {
+            slot: 1,
+            timestamp,
+            answer,
+            ..Default::default()
+        };
+
+        // 1% threshold (1000 / 100000)
+        apply_round(&mut feed, round(1, 100_000)).unwrap();
+        apply_round(&mut feed, round(2, 100_500)).unwrap();
+        assert_eq!(feed.state, Transmissions::NORMAL);
+        apply_round(&mut feed, round(3, 200_000)).unwrap();
+        assert_eq!(feed.state, Transmissions::FLAGGED);
+        assert_eq!(feed.latest_round_id, 3);
+    }
 }

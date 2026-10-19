@@ -244,6 +244,50 @@ func NewLowerFlagInstruction(
 	), nil
 }
 
+// Builds a "on_report_callback" instruction.
+// Report callback of the data feeds store (CRE), configured on the non-SVR data ID backing // this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the // signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is // skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
+func NewOnReportCallbackInstruction(
+	// Params:
+	argsParam OnReportCallbackArgs,
+
+	// Accounts:
+	authorityAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_OnReportCallback[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `argsParam`:
+		err = enc__.Encode(argsParam)
+		if err != nil {
+			return nil, errors.NewField("argsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "authority": Read-only, Signer, Required
+		// The data feeds store authority. Each feed only accepts rounds if this is its writer.
+		accounts__.Append(solanago.NewAccountMeta(authorityAccount, false, true))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
 // Builds a "query" instruction.
 // The query instruction takes a `Query` and serializes the response in a fixed format. That way queries // are not bound to the underlying layout.
 func NewQueryInstruction(
@@ -1244,6 +1288,110 @@ func UnmarshalLowerFlagInstruction(buf []byte) (*LowerFlagInstruction, error) {
 	return obj, nil
 }
 
+type OnReportCallbackInstruction struct {
+	Args OnReportCallbackArgs `json:"args"`
+
+	// Accounts:
+	Authority       solanago.PublicKey `json:"authority"`
+	AuthoritySigner bool               `json:"authority_signer"`
+	Feed            solanago.PublicKey `json:"feed"`
+}
+
+func (obj *OnReportCallbackInstruction) GetDiscriminator() []byte {
+	return Instruction_OnReportCallback[:]
+}
+
+// UnmarshalWithDecoder unmarshals the OnReportCallbackInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *OnReportCallbackInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "OnReportCallbackInstruction", err)
+	}
+	if discriminator != Instruction_OnReportCallback {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "OnReportCallbackInstruction", Instruction_OnReportCallback, discriminator)
+	}
+	// Deserialize `Args`:
+	err = decoder.Decode(&obj.Args)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *OnReportCallbackInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from feed account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *OnReportCallbackInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "authority", len(accountKeys)-1)
+	}
+	obj.Authority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set feed account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
+	}
+	obj.Feed = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *OnReportCallbackInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Authority)
+	keys = append(keys, obj.Feed)
+	return keys
+}
+
+// Unmarshal unmarshals the OnReportCallbackInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *OnReportCallbackInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling OnReportCallbackInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalOnReportCallbackInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalOnReportCallbackInstruction(buf []byte) (*OnReportCallbackInstruction, error) {
+	obj := new(OnReportCallbackInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type QueryInstruction struct {
 	Scope Scope `json:"scope"`
 
@@ -2136,6 +2284,24 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as LowerFlagInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_OnReportCallback:
+		instruction := new(OnReportCallbackInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as OnReportCallbackInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)

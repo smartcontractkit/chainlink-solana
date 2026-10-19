@@ -18,6 +18,23 @@ pub struct NewTransmission {
     pub answer: i128,
 }
 
+/// Arguments of `on_report_callback`, the report callback interface of the data feeds store.
+/// Must stay Borsh-identical to `data_feeds_store::state::OnReportCallbackArgs`.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OnReportCallbackArgs {
+    pub data_id: [u8; 16],
+    /// SVR path the report arrived through, zero for the non-SVR path
+    pub svr_path_id: [u8; 2],
+    pub round_id: u64,
+    pub answer: i128,
+    /// Decimals `answer` is expressed in, rescaled to the feed's decimals on write
+    pub decimals: u8,
+    pub observations_timestamp: u32,
+    pub recorded_timestamp: u32,
+    /// False when an SVR path only adopted an already stored round
+    pub is_freshest: bool,
+}
+
 #[repr(C)]
 #[derive(
     Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, bytemuck::Pod, bytemuck::Zeroable,
@@ -57,8 +74,8 @@ pub struct Transmissions {
     pub latest_round_id: u32,
     pub granularity: u8,
     pub live_length: u32,
-    live_cursor: u32,
-    historical_cursor: u32,
+    pub(crate) live_cursor: u32,
+    pub(crate) historical_cursor: u32,
 }
 
 impl Transmissions {
@@ -192,6 +209,14 @@ impl Feed<'_> {
     }
 }
 
+/// Zeroed account data of `len` bytes laid out like onchain account data: the ring buffer starts
+/// at `8 + HEADER_SIZE`, which is only 8-byte aligned, while `i128` needs 16 on some hosts.
+#[cfg(test)]
+pub(crate) fn aligned_account_data(backing: &mut Vec<u128>, len: usize) -> &mut [u8] {
+    *backing = vec![0u128; len / 16 + 2];
+    &mut bytemuck::cast_slice_mut::<u128, u8>(backing)[8..8 + len]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,11 +225,11 @@ mod tests {
     fn transmissions() {
         let live_length = 2;
         let historical_length = 3;
-        let mut data = vec![
-            0;
-            8 + HEADER_SIZE
-                + (live_length + historical_length) * size_of::<Transmission>()
-        ];
+        let mut backing = Vec::new();
+        let data = aligned_account_data(
+            &mut backing,
+            8 + HEADER_SIZE + (live_length + historical_length) * size_of::<Transmission>(),
+        );
         let header = &mut data[..8 + HEADER_SIZE]; // use a subslice to ensure the header fits into HEADER_SIZE bytes
         let mut cursor = std::io::Cursor::new(header);
 
@@ -231,16 +256,7 @@ mod tests {
 
         let pubkey = Pubkey::default();
         let owner = Transmissions::owner();
-        let info = AccountInfo::new(
-            &pubkey,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &owner,
-            false,
-            0,
-        );
+        let info = AccountInfo::new(&pubkey, false, false, &mut lamports, data, &owner, false, 0);
         let mut account = Account::try_from(&info).unwrap();
 
         with_store(&mut account, |store| {

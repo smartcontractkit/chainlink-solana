@@ -1,0 +1,20 @@
+[package]
+name = "chainlink_solana_data_feeds_store"
+description = "CPI accessors for the Chainlink Data Feeds store on Solana"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "chainlink_solana_data_feeds_store"
+
+[features]
+default = []
+
+[dependencies]
+anchor-lang = "0.31.0"
+data-feeds-store = { path = "../../programs/data-feeds-store", features = ["cpi"] }
+
+[lints]
+workspace = true

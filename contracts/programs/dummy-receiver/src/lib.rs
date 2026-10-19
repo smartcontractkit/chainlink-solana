@@ -57,6 +57,20 @@ pub mod dummy_receiver {
     //     Ok(())
     // }
 
+    // as a mock data feeds store report callback, rejects negative answers
+    pub fn on_report_callback(
+        _ctx: Context<OnReportCallback>,
+        args: OnReportCallbackArgs,
+    ) -> Result<bool> {
+        emit!(CallbackCalled {
+            data_id: args.data_id,
+            round_id: args.round_id,
+            answer: args.answer,
+            is_freshest: args.is_freshest,
+        });
+        Ok(args.answer >= 0)
+    }
+
     // as a mock legacy store
     pub fn cache_submit(ctx: Context<CacheSubmit>, rounds: Vec<CacheTransmission>) -> Result<()> {
         // // just assume that ctx.remaining_accounts[0] is the LatestCacheSubmission account
@@ -170,4 +184,30 @@ pub struct Submit {
 pub struct CacheTransmission {
     pub timestamp: u32,
     pub answer: u128,
+}
+
+#[derive(Accounts)]
+pub struct OnReportCallback<'info> {
+    pub authority: Signer<'info>,
+}
+
+// mirrors data_feeds_store::state::OnReportCallbackArgs
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct OnReportCallbackArgs {
+    pub data_id: [u8; 16],
+    pub svr_path_id: [u8; 2],
+    pub round_id: u64,
+    pub answer: i128,
+    pub decimals: u8,
+    pub observations_timestamp: u32,
+    pub recorded_timestamp: u32,
+    pub is_freshest: bool,
+}
+
+#[event]
+pub struct CallbackCalled {
+    pub data_id: [u8; 16],
+    pub round_id: u64,
+    pub answer: i128,
+    pub is_freshest: bool,
 }

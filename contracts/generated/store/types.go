@@ -142,6 +142,182 @@ func UnmarshalAccessList(buf []byte) (*AccessList, error) {
 	return obj, nil
 }
 
+type CacheRoundSkipped struct {
+	Feed   solanago.PublicKey `json:"feed"`
+	Reason CacheSkipReason    `json:"reason"`
+}
+
+func (obj CacheRoundSkipped) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Feed`:
+	err = encoder.Encode(obj.Feed)
+	if err != nil {
+		return errors.NewField("Feed", err)
+	}
+	// Serialize `Reason`:
+	err = encoder.Encode(obj.Reason)
+	if err != nil {
+		return errors.NewField("Reason", err)
+	}
+	return nil
+}
+
+func (obj CacheRoundSkipped) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding CacheRoundSkipped: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *CacheRoundSkipped) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Feed`:
+	err = decoder.Decode(&obj.Feed)
+	if err != nil {
+		return errors.NewField("Feed", err)
+	}
+	// Deserialize `Reason`:
+	err = decoder.Decode(&obj.Reason)
+	if err != nil {
+		return errors.NewField("Reason", err)
+	}
+	return nil
+}
+
+func (obj *CacheRoundSkipped) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling CacheRoundSkipped: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalCacheRoundSkipped(buf []byte) (*CacheRoundSkipped, error) {
+	obj := new(CacheRoundSkipped)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type CacheRoundSubmitted struct {
+	Feed      solanago.PublicKey `json:"feed"`
+	RoundId   uint32             `json:"round_id"`
+	Answer    binary.Int128      `json:"answer"`
+	Timestamp uint32             `json:"timestamp"`
+}
+
+func (obj CacheRoundSubmitted) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Feed`:
+	err = encoder.Encode(obj.Feed)
+	if err != nil {
+		return errors.NewField("Feed", err)
+	}
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Serialize `Answer`:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Serialize `Timestamp`:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return errors.NewField("Timestamp", err)
+	}
+	return nil
+}
+
+func (obj CacheRoundSubmitted) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding CacheRoundSubmitted: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *CacheRoundSubmitted) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Feed`:
+	err = decoder.Decode(&obj.Feed)
+	if err != nil {
+		return errors.NewField("Feed", err)
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return errors.NewField("Timestamp", err)
+	}
+	return nil
+}
+
+func (obj *CacheRoundSubmitted) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling CacheRoundSubmitted: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalCacheRoundSubmitted(buf []byte) (*CacheRoundSubmitted, error) {
+	obj := new(CacheRoundSubmitted)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// Why `on_report_callback` left a feed untouched.
+type CacheSkipReason binary.BorshEnum
+
+const (
+	CacheSkipReason_InvalidFeedAccount CacheSkipReason = iota
+	CacheSkipReason_NotWritable
+	CacheSkipReason_InvalidVersion
+	CacheSkipReason_UnauthorizedWriter
+	CacheSkipReason_NotPrimary
+	CacheSkipReason_StaleTimestamp
+	CacheSkipReason_AnswerOverflow
+)
+
+func (value CacheSkipReason) String() string {
+	switch value {
+	case CacheSkipReason_InvalidFeedAccount:
+		return "InvalidFeedAccount"
+	case CacheSkipReason_NotWritable:
+		return "NotWritable"
+	case CacheSkipReason_InvalidVersion:
+		return "InvalidVersion"
+	case CacheSkipReason_UnauthorizedWriter:
+		return "UnauthorizedWriter"
+	case CacheSkipReason_NotPrimary:
+		return "NotPrimary"
+	case CacheSkipReason_StaleTimestamp:
+		return "StaleTimestamp"
+	case CacheSkipReason_AnswerOverflow:
+		return "AnswerOverflow"
+	default:
+		return ""
+	}
+}
+
 type NewTransmission struct {
 	Timestamp uint64        `json:"timestamp"`
 	Answer    binary.Int128 `json:"answer"`
@@ -195,6 +371,140 @@ func (obj *NewTransmission) Unmarshal(buf []byte) error {
 
 func UnmarshalNewTransmission(buf []byte) (*NewTransmission, error) {
 	obj := new(NewTransmission)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// Arguments of `on_report_callback`, the report callback interface of the data feeds store.
+// Must stay Borsh-identical to `data_feeds_store::state::OnReportCallbackArgs`.
+type OnReportCallbackArgs struct {
+	DataId [16]uint8 `json:"data_id"`
+
+	// SVR path the report arrived through, zero for the non-SVR path
+	SvrPathId [2]uint8      `json:"svr_path_id"`
+	RoundId   uint64        `json:"round_id"`
+	Answer    binary.Int128 `json:"answer"`
+
+	// Decimals `answer` is expressed in, rescaled to the feed's decimals on write
+	Decimals              uint8  `json:"decimals"`
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+	RecordedTimestamp     uint32 `json:"recorded_timestamp"`
+
+	// False when an SVR path only adopted an already stored round
+	IsFreshest bool `json:"is_freshest"`
+}
+
+func (obj OnReportCallbackArgs) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Serialize `SvrPathId`:
+	err = encoder.Encode(obj.SvrPathId)
+	if err != nil {
+		return errors.NewField("SvrPathId", err)
+	}
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Serialize `Answer`:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Serialize `Decimals`:
+	err = encoder.Encode(obj.Decimals)
+	if err != nil {
+		return errors.NewField("Decimals", err)
+	}
+	// Serialize `ObservationsTimestamp`:
+	err = encoder.Encode(obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Serialize `RecordedTimestamp`:
+	err = encoder.Encode(obj.RecordedTimestamp)
+	if err != nil {
+		return errors.NewField("RecordedTimestamp", err)
+	}
+	// Serialize `IsFreshest`:
+	err = encoder.Encode(obj.IsFreshest)
+	if err != nil {
+		return errors.NewField("IsFreshest", err)
+	}
+	return nil
+}
+
+func (obj OnReportCallbackArgs) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding OnReportCallbackArgs: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *OnReportCallbackArgs) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Deserialize `SvrPathId`:
+	err = decoder.Decode(&obj.SvrPathId)
+	if err != nil {
+		return errors.NewField("SvrPathId", err)
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return errors.NewField("Decimals", err)
+	}
+	// Deserialize `ObservationsTimestamp`:
+	err = decoder.Decode(&obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Deserialize `RecordedTimestamp`:
+	err = decoder.Decode(&obj.RecordedTimestamp)
+	if err != nil {
+		return errors.NewField("RecordedTimestamp", err)
+	}
+	// Deserialize `IsFreshest`:
+	err = decoder.Decode(&obj.IsFreshest)
+	if err != nil {
+		return errors.NewField("IsFreshest", err)
+	}
+	return nil
+}
+
+func (obj *OnReportCallbackArgs) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling OnReportCallbackArgs: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalOnReportCallbackArgs(buf []byte) (*OnReportCallbackArgs, error) {
+	obj := new(OnReportCallbackArgs)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
