@@ -99,7 +99,7 @@ func TestDataFeedsStore(t *testing.T) {
 
 	send([]solana.Instruction{
 		build(data_feeds_store.NewInitializeInstruction([]solana.PublicKey{deployer.PublicKey()}, 16, 3600,
-			deployer.PublicKey(), storeState.PublicKey(), keystone_forwarder.ProgramID, solana.SystemProgramID)),
+			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID)),
 		build(data_feeds_store.NewSetDefaultFeedMetadataInstruction([]data_feeds_store.WorkflowMetadata{
 			{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
 			{AllowedSender: mainnetAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},

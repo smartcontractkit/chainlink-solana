@@ -26,8 +26,6 @@ pub struct StoreState {
     pub default_max_stored_reports: u64,
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
-    /// Program id of the keystone forwarder whose authority PDA may call `on_report`
-    pub forwarder_id: Pubkey,
     pub feed_admins: AccountList,
     /// Workflows allowed to write any data ID without feed-specific metadata
     pub default_workflow_metadata: WorkflowMetadataList,
@@ -208,7 +206,7 @@ pub struct WorkflowMetadata {
     pub allowed_workflow_name: [u8; 10],
 }
 
-const_assert_eq!(size_of::<StoreState>(), 3232);
+const_assert_eq!(size_of::<StoreState>(), 3200);
 const_assert_eq!(size_of::<DataIdSettings>(), 1168);
 const_assert_eq!(size_of::<FeedData>(), 1376);
 const_assert_eq!(size_of::<StoredReport>(), 32);

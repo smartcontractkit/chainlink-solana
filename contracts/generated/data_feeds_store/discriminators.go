@@ -24,7 +24,6 @@ var (
 	Event_FeedDescriptionSet                          = [8]byte{204, 4, 197, 215, 180, 77, 137, 82}
 	Event_FeedInitialized                             = [8]byte{112, 111, 89, 0, 44, 197, 88, 78}
 	Event_FeedUpdated                                 = [8]byte{200, 60, 190, 86, 247, 9, 50, 81}
-	Event_ForwarderUpdated                            = [8]byte{91, 195, 248, 117, 50, 125, 217, 251}
 	Event_FutureReportIgnored                         = [8]byte{208, 131, 78, 5, 205, 229, 248, 183}
 	Event_InvalidUpdatePermission                     = [8]byte{140, 196, 100, 239, 180, 175, 183, 154}
 	Event_MaxObservationForwardDurationSecondsUpdated = [8]byte{21, 34, 81, 2, 208, 208, 147, 222}
@@ -88,6 +87,5 @@ var (
 	Instruction_SetSvrPathDescriptions           = [8]byte{211, 58, 107, 215, 77, 65, 104, 84}
 	Instruction_TransferOwnership                = [8]byte{65, 177, 215, 73, 53, 45, 99, 47}
 	Instruction_UpdateConfigsForProxies          = [8]byte{67, 146, 179, 178, 65, 106, 153, 64}
-	Instruction_UpdateForwarderId                = [8]byte{171, 157, 65, 47, 251, 113, 255, 46}
 	Instruction_Version                          = [8]byte{118, 65, 195, 198, 129, 216, 252, 192}
 )

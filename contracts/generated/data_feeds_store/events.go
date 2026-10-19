@@ -78,13 +78,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedUpdated: %w", err)
 		}
 		return value, nil
-	case Event_ForwarderUpdated:
-		value := new(ForwarderUpdated)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as ForwarderUpdated: %w", err)
-		}
-		return value, nil
 	case Event_FutureReportIgnored:
 		value := new(FutureReportIgnored)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -386,23 +379,6 @@ func ParseEvent_FeedUpdated(eventData []byte) (*FeedUpdated, error) {
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type FeedUpdated: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_ForwarderUpdated(eventData []byte) (*ForwarderUpdated, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_ForwarderUpdated {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_ForwarderUpdated, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(ForwarderUpdated)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type ForwarderUpdated: %w", err)
 	}
 	return event, nil
 }

@@ -809,7 +809,6 @@ func NewInitializeInstruction(
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	forwarderProgramAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
@@ -845,9 +844,7 @@ func NewInitializeInstruction(
 		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
 		// Account 1 "state": Writable, Signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, true))
-		// Account 2 "forwarder_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(forwarderProgramAccount, false, false))
-		// Account 3 "system_program": Read-only, Non-signer, Required
+		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 	}
 
@@ -1065,9 +1062,11 @@ func NewOnReportInstruction(
 	// Add the accounts to the instruction.
 	{
 		// Account 0 "forwarder_state": Read-only, Non-signer, Required
-		// forwarder state and this receiver, which the forwarder only does for verified reports
 		accounts__.Append(solanago.NewAccountMeta(forwarderStateAccount, false, false))
 		// Account 1 "forwarder_authority": Read-only, Signer, Required
+		// The sender: reports are only applied when it is the allowed sender of a workflow permitted
+		// for the data ID, a forwarder authority PDA that its forwarder only signs with for reports it
+		// verified. Any number of forwarders, e.g. one per zone, is just more workflow metadata.
 		accounts__.Append(solanago.NewAccountMeta(forwarderAuthorityAccount, false, true))
 		// Account 2 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
@@ -1875,41 +1874,6 @@ func NewUpdateConfigsForProxiesInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
-	}
-
-	// Create the instruction.
-	return solanago.NewInstruction(
-		ProgramID,
-		accounts__,
-		buf__.Bytes(),
-	), nil
-}
-
-// Builds a "update_forwarder_id" instruction.
-// Point the store at another forwarder program.
-func NewUpdateForwarderIdInstruction(
-	ownerAccount solanago.PublicKey,
-	stateAccount solanago.PublicKey,
-	forwarderProgramAccount solanago.PublicKey,
-) (solanago.Instruction, error) {
-	buf__ := new(bytes.Buffer)
-	enc__ := binary.NewBorshEncoder(buf__)
-
-	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_UpdateForwarderId[:], false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
-	}
-	accounts__ := solanago.AccountMetaSlice{}
-
-	// Add the accounts to the instruction.
-	{
-		// Account 0 "owner": Read-only, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
-		// Account 1 "state": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
-		// Account 2 "forwarder_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(forwarderProgramAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -4042,14 +4006,13 @@ type InitializeInstruction struct {
 	MaxObservationForwardSecs uint32               `json:"max_observation_forward_secs"`
 
 	// Accounts:
-	Owner            solanago.PublicKey `json:"owner"`
-	OwnerWritable    bool               `json:"owner_writable"`
-	OwnerSigner      bool               `json:"owner_signer"`
-	State            solanago.PublicKey `json:"state"`
-	StateWritable    bool               `json:"state_writable"`
-	StateSigner      bool               `json:"state_signer"`
-	ForwarderProgram solanago.PublicKey `json:"forwarder_program"`
-	SystemProgram    solanago.PublicKey `json:"system_program"`
+	Owner         solanago.PublicKey `json:"owner"`
+	OwnerWritable bool               `json:"owner_writable"`
+	OwnerSigner   bool               `json:"owner_signer"`
+	State         solanago.PublicKey `json:"state"`
+	StateWritable bool               `json:"state_writable"`
+	StateSigner   bool               `json:"state_signer"`
+	SystemProgram solanago.PublicKey `json:"system_program"`
 }
 
 func (obj *InitializeInstruction) GetDiscriminator() []byte {
@@ -4105,13 +4068,6 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from forwarder_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "forwarder_program", err)
-	}
-	indices = append(indices, index)
 	// Decode from system_program account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -4124,8 +4080,8 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 
 func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 4 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
+	if len(indices) != 3 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -4140,12 +4096,6 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set forwarder_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "forwarder_program", len(accountKeys)-1)
-	}
-	obj.ForwarderProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
 	// Set system_program account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
@@ -4159,7 +4109,6 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.ForwarderProgram)
 	keys = append(keys, obj.SystemProgram)
 	return keys
 }
@@ -6913,119 +6862,6 @@ func UnmarshalUpdateConfigsForProxiesInstruction(buf []byte) (*UpdateConfigsForP
 	return obj, nil
 }
 
-type UpdateForwarderIdInstruction struct {
-
-	// Accounts:
-	Owner            solanago.PublicKey `json:"owner"`
-	OwnerSigner      bool               `json:"owner_signer"`
-	State            solanago.PublicKey `json:"state"`
-	StateWritable    bool               `json:"state_writable"`
-	ForwarderProgram solanago.PublicKey `json:"forwarder_program"`
-}
-
-func (obj *UpdateForwarderIdInstruction) GetDiscriminator() []byte {
-	return Instruction_UpdateForwarderId[:]
-}
-
-// UnmarshalWithDecoder unmarshals the UpdateForwarderIdInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *UpdateForwarderIdInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
-	// Read the discriminator and check it against the expected value:
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "UpdateForwarderIdInstruction", err)
-	}
-	if discriminator != Instruction_UpdateForwarderId {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "UpdateForwarderIdInstruction", Instruction_UpdateForwarderId, discriminator)
-	}
-	return nil
-}
-
-func (obj *UpdateForwarderIdInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
-	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
-	decoder := binary.NewBorshDecoder(buf)
-	indices := make([]uint8, 0)
-	index := uint8(0)
-	var err error
-	// Decode from owner account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "owner", err)
-	}
-	indices = append(indices, index)
-	// Decode from state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from forwarder_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "forwarder_program", err)
-	}
-	indices = append(indices, index)
-	return indices, nil
-}
-
-func (obj *UpdateForwarderIdInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
-	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
-	}
-	indexOffset := 0
-	// Set owner account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "owner", len(accountKeys)-1)
-	}
-	obj.Owner = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
-	}
-	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set forwarder_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "forwarder_program", len(accountKeys)-1)
-	}
-	obj.ForwarderProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	return nil
-}
-
-func (obj *UpdateForwarderIdInstruction) GetAccountKeys() []solanago.PublicKey {
-	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.Owner)
-	keys = append(keys, obj.State)
-	keys = append(keys, obj.ForwarderProgram)
-	return keys
-}
-
-// Unmarshal unmarshals the UpdateForwarderIdInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *UpdateForwarderIdInstruction) Unmarshal(buf []byte) error {
-	var err error
-	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling UpdateForwarderIdInstruction: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalUpdateForwarderIdInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalUpdateForwarderIdInstruction(buf []byte) (*UpdateForwarderIdInstruction, error) {
-	obj := new(UpdateForwarderIdInstruction)
-	var err error
-	err = obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type VersionInstruction struct {
 
 	// Accounts:
@@ -7867,24 +7703,6 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as UpdateConfigsForProxiesInstruction: %w", err)
-		}
-		if accountIndicesData != nil && len(accountIndicesData) > 0 {
-			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
-			}
-			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
-			if err != nil {
-				return nil, fmt.Errorf("failed to populate accounts: %w", err)
-			}
-		}
-		return instruction, nil
-	case Instruction_UpdateForwarderId:
-		instruction := new(UpdateForwarderIdInstruction)
-		decoder := binary.NewBorshDecoder(instructionData)
-		err := instruction.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as UpdateForwarderIdInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)

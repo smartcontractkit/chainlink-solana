@@ -112,7 +112,6 @@ describe("data feeds store", function () {
       .accountsStrict({
         owner: provider.publicKey,
         state: state.publicKey,
-        forwarderProgram: forwarderProgram.programId,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([state])
@@ -199,7 +198,8 @@ describe("data feeds store", function () {
   // if configured
   const report = async (
     reports: Report[],
-    callbackAccounts: Map<string, AccountMeta[]> = new Map()
+    callbackAccounts: Map<string, AccountMeta[]> = new Map(),
+    via: Forwarder = forwarder
   ) => {
     const accounts: AccountMeta[] = [
       meta(state.publicKey, false),
@@ -210,7 +210,7 @@ describe("data feeds store", function () {
       accounts.push(meta(feedPda(r.dataId)));
       accounts.push(...(callbackAccounts.get(r.dataId.toString("hex")) ?? []));
     }
-    const { result } = await forwarder.report(
+    const { result } = await via.report(
       program.programId,
       encodeReports(reports),
       workflowName,
@@ -278,7 +278,6 @@ describe("data feeds store", function () {
     it("initializes", async () => {
       const s = await program.account.storeState.fetch(state.publicKey);
       assert.isTrue(s.owner.equals(provider.publicKey));
-      assert.isTrue(s.forwarderId.equals(forwarderProgram.programId));
       assert.equal(s.defaultMaxStoredReports.toNumber(), 8);
       assert.equal(s.maxObservationForwardSecs, 3600);
       assert.equal(s.feedAdmins.len.toNumber(), 1);
@@ -529,6 +528,58 @@ describe("data feeds store", function () {
         (await latestAnswer(id)).eq(new BN(50)),
         "default metadata again"
       );
+    });
+
+    it("accepts any forwarder in the allowed workflows, e.g. one per zone", async () => {
+      const id = newDataId();
+      await setupFeed(id);
+      const zoneB = new Forwarder(forwarderProgram, provider)
+        .withState(Keypair.generate())
+        .withOracles(1, 21, 1);
+      await zoneB.initialize();
+      await zoneB.initOraclesConfig();
+      const zoneBAuthority = calculateForwarderAuthorityBump(
+        zoneB.state.publicKey,
+        program.programId,
+        forwarderProgram.programId
+      )[0];
+
+      await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(7) }],
+        new Map(),
+        zoneB
+      );
+      assert.isTrue(
+        (await latestAnswer(id)).eq(new BN(0)),
+        "a forwarder outside the allowed workflows is skipped"
+      );
+
+      const workflow = (allowedSender: PublicKey) => ({
+        allowedSender,
+        allowedWorkflowOwner: Array.from(workflowOwner),
+        allowedWorkflowName: Array.from(workflowName),
+      });
+      await program.methods
+        .setDefaultFeedMetadata([
+          workflow(forwarderAuthority),
+          workflow(zoneBAuthority),
+        ])
+        .accountsStrict({
+          feedAdmin: feedAdmin.keypair.publicKey,
+          state: state.publicKey,
+        })
+        .signers([feedAdmin.keypair])
+        .rpc();
+      await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(8) }],
+        new Map(),
+        zoneB
+      );
+      assert.isTrue((await latestAnswer(id)).eq(new BN(8)), "zone B");
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(9) },
+      ]);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(9)), "zone A");
     });
 
     it("grows the ring before it wraps", async () => {

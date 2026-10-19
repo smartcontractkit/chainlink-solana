@@ -7,7 +7,6 @@ use crate::state::{CallbackAccount, WorkflowMetadata};
 #[event]
 pub struct StoreInitialized {
     pub state: Pubkey,
-    pub forwarder_id: Pubkey,
     pub default_max_stored_reports: u64,
     pub max_observation_forward_secs: u32,
 }
@@ -24,13 +23,6 @@ pub struct OwnershipTransferred {
     pub state: Pubkey,
     pub from: Pubkey,
     pub to: Pubkey,
-}
-
-#[event]
-pub struct ForwarderUpdated {
-    pub state: Pubkey,
-    pub previous_forwarder: Pubkey,
-    pub new_forwarder: Pubkey,
 }
 
 #[event]

@@ -65,11 +65,6 @@ pub mod data_feeds_store {
         admin::set_feed_admin(ctx, feed_admin, is_admin)
     }
 
-    /// Point the store at another forwarder program.
-    pub fn update_forwarder_id(ctx: Context<UpdateForwarder>) -> Result<()> {
-        admin::update_forwarder_id(ctx)
-    }
-
     /// Recover SPL tokens held by token accounts of the store authority PDA.
     pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
         admin::recover_tokens(ctx, amount)

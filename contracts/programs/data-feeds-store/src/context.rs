@@ -15,10 +15,6 @@ pub struct Initialize<'info> {
     #[account(init, payer = owner, space = ANCHOR_DISCRIMINATOR + StoreState::INIT_SPACE)]
     pub state: AccountLoader<'info, StoreState>,
 
-    /// CHECK: the forwarder program id can differ per environment, executable is enough
-    #[account(executable)]
-    pub forwarder_program: UncheckedAccount<'info>,
-
     pub system_program: Program<'info, System>,
 }
 
@@ -38,19 +34,6 @@ pub struct AcceptOwnership<'info> {
 
     #[account(mut)]
     pub state: AccountLoader<'info, StoreState>,
-}
-
-#[derive(Accounts)]
-pub struct UpdateForwarder<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
-    pub owner: Signer<'info>,
-
-    #[account(mut)]
-    pub state: AccountLoader<'info, StoreState>,
-
-    /// CHECK: the forwarder program id can differ per environment, executable is enough
-    #[account(executable)]
-    pub forwarder_program: UncheckedAccount<'info>,
 }
 
 /// Feed admin changes to the store state itself.
@@ -76,15 +59,12 @@ pub struct FeedAdminAccounts<'info> {
 
 #[derive(Accounts)]
 pub struct OnReport<'info> {
-    /// CHECK: the forwarder authority below can only be signed by the forwarder program for this
-    /// forwarder state and this receiver, which the forwarder only does for verified reports
+    /// CHECK: passed by the forwarder, not read
     pub forwarder_state: UncheckedAccount<'info>,
 
-    #[account(
-        seeds = [b"forwarder", forwarder_state.key().as_ref(), crate::ID.as_ref()],
-        bump,
-        seeds::program = state.load()?.forwarder_id,
-    )]
+    /// The sender: reports are only applied when it is the allowed sender of a workflow permitted
+    /// for the data ID, a forwarder authority PDA that its forwarder only signs with for reports it
+    /// verified. Any number of forwarders, e.g. one per zone, is just more workflow metadata.
     pub forwarder_authority: Signer<'info>,
 
     pub state: AccountLoader<'info, StoreState>,

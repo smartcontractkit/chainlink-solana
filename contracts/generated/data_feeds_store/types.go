@@ -1492,77 +1492,6 @@ func UnmarshalFeedUpdated(buf []byte) (*FeedUpdated, error) {
 	return obj, nil
 }
 
-type ForwarderUpdated struct {
-	State             solanago.PublicKey `json:"state"`
-	PreviousForwarder solanago.PublicKey `json:"previous_forwarder"`
-	NewForwarder      solanago.PublicKey `json:"new_forwarder"`
-}
-
-func (obj ForwarderUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `PreviousForwarder`:
-	err = encoder.Encode(obj.PreviousForwarder)
-	if err != nil {
-		return errors.NewField("PreviousForwarder", err)
-	}
-	// Serialize `NewForwarder`:
-	err = encoder.Encode(obj.NewForwarder)
-	if err != nil {
-		return errors.NewField("NewForwarder", err)
-	}
-	return nil
-}
-
-func (obj ForwarderUpdated) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding ForwarderUpdated: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *ForwarderUpdated) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `PreviousForwarder`:
-	err = decoder.Decode(&obj.PreviousForwarder)
-	if err != nil {
-		return errors.NewField("PreviousForwarder", err)
-	}
-	// Deserialize `NewForwarder`:
-	err = decoder.Decode(&obj.NewForwarder)
-	if err != nil {
-		return errors.NewField("NewForwarder", err)
-	}
-	return nil
-}
-
-func (obj *ForwarderUpdated) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ForwarderUpdated: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalForwarderUpdated(buf []byte) (*ForwarderUpdated, error) {
-	obj := new(ForwarderUpdated)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type FutureReportIgnored struct {
 	State                 solanago.PublicKey `json:"state"`
 	DataId                [16]uint8          `json:"data_id"`
@@ -3089,7 +3018,6 @@ func UnmarshalStaleSvrReport(buf []byte) (*StaleSvrReport, error) {
 
 type StoreInitialized struct {
 	State                     solanago.PublicKey `json:"state"`
-	ForwarderId               solanago.PublicKey `json:"forwarder_id"`
 	DefaultMaxStoredReports   uint64             `json:"default_max_stored_reports"`
 	MaxObservationForwardSecs uint32             `json:"max_observation_forward_secs"`
 }
@@ -3099,11 +3027,6 @@ func (obj StoreInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err err
 	err = encoder.Encode(obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
-	}
-	// Serialize `ForwarderId`:
-	err = encoder.Encode(obj.ForwarderId)
-	if err != nil {
-		return errors.NewField("ForwarderId", err)
 	}
 	// Serialize `DefaultMaxStoredReports`:
 	err = encoder.Encode(obj.DefaultMaxStoredReports)
@@ -3133,11 +3056,6 @@ func (obj *StoreInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err 
 	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
-	}
-	// Deserialize `ForwarderId`:
-	err = decoder.Decode(&obj.ForwarderId)
-	if err != nil {
-		return errors.NewField("ForwarderId", err)
 	}
 	// Deserialize `DefaultMaxStoredReports`:
 	err = decoder.Decode(&obj.DefaultMaxStoredReports)
@@ -3184,10 +3102,7 @@ type StoreState struct {
 	DefaultMaxStoredReports uint64             `json:"default_max_stored_reports"`
 	Owner                   solanago.PublicKey `json:"owner"`
 	ProposedOwner           solanago.PublicKey `json:"proposed_owner"`
-
-	// Program id of the keystone forwarder whose authority PDA may call `on_report`
-	ForwarderId solanago.PublicKey `json:"forwarder_id"`
-	FeedAdmins  AccountList        `json:"feed_admins"`
+	FeedAdmins              AccountList        `json:"feed_admins"`
 
 	// Workflows allowed to write any data ID without feed-specific metadata
 	DefaultWorkflowMetadata WorkflowMetadataList `json:"default_workflow_metadata"`
@@ -3229,11 +3144,6 @@ func (obj StoreState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
-	}
-	// Serialize `ForwarderId`:
-	err = encoder.Encode(obj.ForwarderId)
-	if err != nil {
-		return errors.NewField("ForwarderId", err)
 	}
 	// Serialize `FeedAdmins`:
 	err = encoder.Encode(obj.FeedAdmins)
@@ -3298,11 +3208,6 @@ func (obj *StoreState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
-	}
-	// Deserialize `ForwarderId`:
-	err = decoder.Decode(&obj.ForwarderId)
-	if err != nil {
-		return errors.NewField("ForwarderId", err)
 	}
 	// Deserialize `FeedAdmins`:
 	err = decoder.Decode(&obj.FeedAdmins)

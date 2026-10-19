@@ -29,7 +29,6 @@ pub fn initialize(
     let state = &mut ctx.accounts.state.load_init()?;
     state.version = ACCOUNT_VERSION;
     state.owner = ctx.accounts.owner.key();
-    state.forwarder_id = ctx.accounts.forwarder_program.key();
     state.default_max_stored_reports = default_max_stored_reports;
     state.max_observation_forward_secs = max_observation_forward_secs;
     state.store_authority_bump =
@@ -54,7 +53,6 @@ pub fn initialize(
 
     emit!(StoreInitialized {
         state: state_key,
-        forwarder_id: state.forwarder_id,
         default_max_stored_reports,
         max_observation_forward_secs,
     });
@@ -110,18 +108,6 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
         state: ctx.accounts.state.key(),
         feed_admin,
         is_admin,
-    });
-    Ok(())
-}
-
-pub fn update_forwarder_id(ctx: Context<UpdateForwarder>) -> Result<()> {
-    let state = &mut ctx.accounts.state.load_mut()?;
-    let previous = state.forwarder_id;
-    state.forwarder_id = ctx.accounts.forwarder_program.key();
-    emit!(ForwarderUpdated {
-        state: ctx.accounts.state.key(),
-        previous_forwarder: previous,
-        new_forwarder: state.forwarder_id,
     });
     Ok(())
 }
