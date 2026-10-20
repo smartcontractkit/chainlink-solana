@@ -63,7 +63,7 @@ type txResultsSource struct {
 }
 
 // Fetch is the externally called method that returns the specific TxResults output
-func (t *txResultsSource) Fetch(ctx context.Context) (interface{}, error) {
+func (t *txResultsSource) Fetch(ctx context.Context) (any, error) {
 	out, _, err := t.fetch(ctx)
 	return out, err
 }

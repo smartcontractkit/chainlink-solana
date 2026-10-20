@@ -24,7 +24,7 @@ import (
 func TestBalanceMonitor(t *testing.T) {
 	const chainID = "Chainlinktest-42"
 	ks := keystore{}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		var k solana.PublicKey
 		n, err := rand.Read(k[:])
 		require.NoError(t, err)

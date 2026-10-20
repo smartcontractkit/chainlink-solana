@@ -29,7 +29,7 @@ type readBinding interface {
 	GetAddress(context.Context, any) (solana.PublicKey, error)
 	GetGenericName() string
 	GetReadDefinition() config.ReadDefinition
-	GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef)
+	GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef any, outputIDLTypeDef codecv1.IdlTypeDef)
 	GetAddressResponseHardCoder() *commoncodec.HardCodeModifierConfig
 	SetCodec(types.RemoteCodec)
 	SetModifier(commoncodec.Modifier)

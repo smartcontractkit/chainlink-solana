@@ -35,14 +35,12 @@ func TestBlocksSorter(t *testing.T) {
 			require.NoError(t, sorter.Close())
 		})
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for _, b := range []uint64{2, 10, 1, 3} {
 				inCh <- types.Block{SlotNumber: b}
 			}
 			close(inCh)
-		}()
+		})
 		for _, b := range expectedBlocks {
 			select {
 			case block, ok := <-ch:

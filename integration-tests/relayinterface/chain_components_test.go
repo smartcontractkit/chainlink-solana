@@ -353,7 +353,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 
 				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
 				batchCallEntry := make(BatchCallEntry)
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					// setup test data
 					ts := CreateTestStruct(i, it)
 					tsItem := StoreTestStruct{
@@ -371,7 +371,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				}
 				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
 				require.NoError(t, err)
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					resultAnyContract, testDataAnyContract := result[bound], batchCallEntry[bound]
 					returnValue, err := resultAnyContract[i].GetResult()
 					assert.NoError(t, err)
@@ -393,7 +393,7 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 
 				batchGetLatestValueRequest := make(types.BatchGetLatestValuesRequest)
 				batchCallEntry := make(BatchCallEntry)
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					// setup test data
 					firstItemIdx := i
 					secondItemIdx := i + 10
@@ -415,14 +415,14 @@ func RunChainComponentsSolanaTests[T WrappedTestingT[T]](t T, it *SolanaChainCom
 				}
 				result, err := cr.BatchGetLatestValues(ctx, batchGetLatestValueRequest)
 				require.NoError(t, err)
-				for idx := 0; idx < 3; idx++ {
+				for idx := range 3 {
 					fmt.Printf("expected: %+v\n", batchCallEntry[bound1][idx].ReturnValue)
 					if val, err := result[bound1][idx].GetResult(); err == nil {
 						fmt.Printf("result: %+v\n", val)
 					}
 				}
 
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					testDataAnyContract, testDataAnySecondContract := batchCallEntry[bound1], batchCallEntry[bound2]
 					resultAnyContract, resultAnySecondContract := result[bound1], result[bound2]
 					returnValueAnyContract, errAnyContract := resultAnyContract[i].GetResult()
@@ -617,7 +617,7 @@ func RunChainWriterTests[T WrappedTestingT[T]](t T, it *SolanaChainComponentsInt
 
 				// append random addresses to lookup table address list
 				lookupTableAddresses := make([]solana.PublicKey, 0, 10)
-				for i := 0; i < 9; i++ {
+				for range 9 {
 					pk, pkErr := solana.NewRandomPrivateKey()
 					require.NoError(t, pkErr)
 					lookupTableAddresses = append(lookupTableAddresses, pk.PublicKey())

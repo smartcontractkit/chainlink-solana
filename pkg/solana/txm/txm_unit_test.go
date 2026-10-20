@@ -171,7 +171,7 @@ func TestTxm_ProcessError(t *testing.T) {
 
 	t.Run("process BlockhashNotFound error", func(t *testing.T) {
 		t.Parallel()
-		err := map[string][]interface{}{
+		err := map[string][]any{
 			"BlockhashNotFound": {
 				0, map[string]int{"Custom": 6003},
 			},
@@ -188,7 +188,7 @@ func TestTxm_ProcessError(t *testing.T) {
 	})
 	t.Run("process AlreadyProcessed error", func(t *testing.T) {
 		t.Parallel()
-		err := map[string][]interface{}{
+		err := map[string][]any{
 			"AlreadyProcessed": {
 				0, map[string]int{"Custom": 6003},
 			},
@@ -214,7 +214,7 @@ func TestTxm_ProcessError(t *testing.T) {
 		for _, errCase := range fatalErrorCases {
 			t.Run(fmt.Sprintf("process %s error", errCase), func(t *testing.T) {
 				t.Parallel()
-				err := map[string][]interface{}{
+				err := map[string][]any{
 					errCase: {
 						0, map[string]int{"Custom": 6003},
 					},
@@ -233,7 +233,7 @@ func TestTxm_ProcessError(t *testing.T) {
 	})
 	t.Run("process unknown error", func(t *testing.T) {
 		t.Parallel()
-		err := map[string][]interface{}{
+		err := map[string][]any{
 			"MadeUpError": {
 				0, map[string]int{"Custom": 6003},
 			},

@@ -13,7 +13,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/config/configtest"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config/configdoc"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	mnCfg "github.com/smartcontractkit/chainlink-framework/multinode/config"
 )
@@ -21,7 +22,7 @@ import (
 var defaults TOMLConfig
 
 func init() {
-	if err := configtest.DocDefaultsOnly(strings.NewReader(docsTOML), &defaults, config.DecodeTOML); err != nil {
+	if err := configdoc.DefaultsOnly(strings.NewReader(docsTOML), &defaults, config.DecodeTOML); err != nil {
 		log.Fatalf("Failed to initialize defaults from docs: %v", err)
 	}
 }

@@ -63,7 +63,7 @@ type feedBalancesSource struct {
 	feedConfig config.SolanaFeedConfig
 }
 
-func (s *feedBalancesSource) Fetch(ctx context.Context) (interface{}, error) {
+func (s *feedBalancesSource) Fetch(ctx context.Context) (any, error) {
 	state, _, err := s.bs.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract state: %w", err)
@@ -89,7 +89,7 @@ type balancesSource struct {
 }
 
 // Fetch is the shared logic for reading balances from the chain
-func (s *balancesSource) Fetch(ctx context.Context) (interface{}, error) {
+func (s *balancesSource) Fetch(ctx context.Context) (any, error) {
 	var totalErr error
 	balances := types.Balances{
 		Values:    make(map[string]uint64),

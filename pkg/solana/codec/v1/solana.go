@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -74,7 +75,7 @@ func NewCodec(conf solcommoncodec.Config) (commontypes.RemoteCodec, error) {
 	return parsed.ToCodec()
 }
 
-func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod basecodec.Modifier) (entry solcommoncodec.Entry, err error) {
+func CreateCodecEntry(idlDefinition any, offChainName string, idl IDL, mod basecodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
 	case IdlTypeDef:
 		entry, err = NewAccountEntry(offChainName, AccountIDLTypes{Account: v, Types: idl.Types}, true, mod, binary.LittleEndian())
@@ -94,7 +95,7 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 	return entry, nil
 }
 
-func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
+func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl IDL) (any, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
 	case solcommoncodec.ChainConfigTypeAccountDef:
@@ -433,10 +434,8 @@ func getByteCodecByStringType(curType IdlTypeAsString, builder commonencodings.B
 func validDependency(refs *codecRefs, parent, child string) bool {
 	deps, ok := refs.dependencies[child]
 	if ok {
-		for _, dep := range deps {
-			if dep == parent {
-				return false
-			}
+		if slices.Contains(deps, parent) {
+			return false
 		}
 	}
 

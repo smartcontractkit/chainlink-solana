@@ -62,7 +62,7 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	defer mockServer.Close()
 
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
+		ChainID: new("devnet"),
 	}
 	cfg.SetDefaults()
 	testChain := chain{
@@ -74,11 +74,11 @@ func TestSolanaChain_GetClient(t *testing.T) {
 
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/1"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/2"),
 		},
 	}
@@ -88,23 +88,23 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	// random nodes (happy path, 1 valid + multiple invalid)
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/1"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/1"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/2"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/3"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/4"),
 		},
 	}
@@ -119,11 +119,11 @@ func TestSolanaChain_GetClient(t *testing.T) {
 	// no valid nodes to select from
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/1"),
 		},
 		{
-			Name: ptr("devnet"),
+			Name: new("devnet"),
 			URL:  config.MustParseURL(mockServer.URL + "/mismatch/2"),
 		},
 	}
@@ -169,7 +169,7 @@ func TestSolanaChain_VerifiedClients(t *testing.T) {
 			defer mockServer.Close()
 
 			cfg := &solcfg.TOMLConfig{
-				ChainID: ptr(tc.chainID),
+				ChainID: new(tc.chainID),
 			}
 			cfg.SetDefaults()
 
@@ -217,8 +217,8 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 	defer mockServer.Close()
 
 	cfg := &solcfg.TOMLConfig{
-		ChainID: ptr("devnet"),
-		Enabled: ptr(true),
+		ChainID: new("devnet"),
+		Enabled: new(true),
 	}
 	cfg.SetDefaults()
 	testChain := chain{
@@ -260,8 +260,9 @@ func TestSolanaChain_VerifiedClient_ParallelClients(t *testing.T) {
 	assert.Equal(t, testChain.clientCache[mockServer.URL], client1)
 }
 
+//go:fix inline
 func ptr[T any](t T) *T {
-	return &t
+	return new(t)
 }
 
 func TestChain_Transact(t *testing.T) {
@@ -280,7 +281,7 @@ func TestChain_Transact(t *testing.T) {
 	// configuration
 	cfg := solcfg.NewDefault()
 	cfg.Nodes = append(cfg.Nodes, &solcfg.Node{
-		Name:     ptr("localnet-" + t.Name()),
+		Name:     new("localnet-" + t.Name()),
 		URL:      config.MustParseURL(url),
 		SendOnly: false,
 	})
@@ -352,23 +353,23 @@ func TestSolanaChain_MultiNode_GetClient(t *testing.T) {
 	cfg := &solcfg.TOMLConfig{
 		ChainID: ptr(client.DevnetGenesisHash),
 	}
-	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.MultiNode.MultiNode.Enabled = new(true)
 	cfg.SetDefaults()
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name:  ptr("devnet"),
+			Name:  new("devnet"),
 			URL:   config.MustParseURL(mockServer.URL + "/1"),
-			Order: ptr(int32(2)),
+			Order: new(int32(2)),
 		},
 		{
-			Name:  ptr("devnet"),
+			Name:  new("devnet"),
 			URL:   config.MustParseURL(mockServer.URL + "/2"),
-			Order: ptr(int32(2)),
+			Order: new(int32(2)),
 		},
 		{
-			Name:  ptr("devnet"),
+			Name:  new("devnet"),
 			URL:   config.MustParseURL(mockServer.URL + "/mismatch"),
-			Order: ptr(int32(1)), // Try to select bad node first with priority selection mode
+			Order: new(int32(1)), // Try to select bad node first with priority selection mode
 		},
 	}
 
@@ -405,10 +406,10 @@ func TestChain_MultiNode_TransactionSender(t *testing.T) {
 
 	// configuration
 	cfg := solcfg.NewDefault()
-	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.MultiNode.MultiNode.Enabled = new(true)
 	cfg.Nodes = append(cfg.Nodes,
 		&solcfg.Node{
-			Name:     ptr("localnet-" + t.Name() + "-primary"),
+			Name:     new("localnet-" + t.Name() + "-primary"),
 			URL:      config.MustParseURL(url),
 			SendOnly: false,
 		})
@@ -506,10 +507,10 @@ func TestSolanaChain_MultiNode_Txm(t *testing.T) {
 	t.Skip()
 	ctx := t.Context()
 	cfg := solcfg.NewDefault()
-	cfg.MultiNode.MultiNode.Enabled = ptr(true)
+	cfg.MultiNode.MultiNode.Enabled = new(true)
 	cfg.Nodes = []*solcfg.Node{
 		{
-			Name: ptr("primary"),
+			Name: new("primary"),
 			URL:  config.MustParseURL(solanatesting.SetupLocalSolNode(t)),
 		},
 	}

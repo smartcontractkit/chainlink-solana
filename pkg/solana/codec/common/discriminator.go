@@ -86,7 +86,7 @@ func (d Discriminator) Decode(encoded []byte) (any, []byte, error) {
 
 func (d Discriminator) GetType() reflect.Type {
 	// Pointer type so that nil can inject values and so that the NamedCodec won't wrap with no-nil pointer.
-	return reflect.TypeOf(&[]byte{})
+	return reflect.TypeFor[*[]byte]()
 }
 
 func (d Discriminator) Size(_ int) (int, error) {
@@ -105,7 +105,7 @@ type DiscriminatorExtractor struct {
 func NewDiscriminatorExtractor() DiscriminatorExtractor {
 	instance := DiscriminatorExtractor{}
 	const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-	for i := 0; i < len(base64Chars); i++ {
+	for i := range len(base64Chars) {
 		instance.b64Index[base64Chars[i]] = byte(i)
 	}
 	return instance
@@ -121,7 +121,7 @@ func (e *DiscriminatorExtractor) Extract(data string) [DiscriminatorLength]byte 
 	s := data[:12]
 
 	// base64 decode
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		// decode base64 chars into associated byte
 		c1 := e.b64Index[s[0]]
 		c2 := e.b64Index[s[1]]

@@ -219,7 +219,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		f := uint8(1)
 		initialEthAddresses := make([][20]uint8, 4)
 		initialTransmitterAddresses := make([][32]uint8, 4)
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			initialEthAddresses[i] = defaultSigners[i].address
 			initialTransmitterAddresses[i] = defaultTransmitters[i].address
 		}
@@ -284,7 +284,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		remainingAccounts := []solana.PublicKey{
 			reportState.PublicKey(),
 		}
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			remainingAccount, err := solana.NewRandomPrivateKey()
 			require.NoError(t, err)
 			remainingAccounts = append(remainingAccounts, remainingAccount.PublicKey())
@@ -429,7 +429,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		// Create lookup table with random accounts
 		numLookupAccounts := 10
 		lookupAccounts := make([]solana.PublicKey, numLookupAccounts)
-		for i := 0; i < numLookupAccounts; i++ {
+		for i := range numLookupAccounts {
 			privKey, keyErr := solana.NewRandomPrivateKey()
 			require.NoError(t, keyErr)
 			lookupAccounts[i] = privKey.PublicKey()
@@ -438,7 +438,7 @@ func TestKeystoneForwarder(t *testing.T) {
 		// Setup the lookup table on-chain (retry up to 2 times on failure)
 		// because this fails to find the correct slot sometimes.
 		var lookupTableAddress solana.PublicKey
-		for attempt := 0; attempt < 3; attempt++ {
+		for attempt := range 3 {
 			lookupTableAddress, err = setupLookupTableWithSafeSlot(t.Context(), solanaClient, deployerKey, lookupAccounts)
 			if err == nil {
 				break
@@ -693,7 +693,7 @@ func buildMessageHash(rawReportBytes []byte) (msgHash32 []byte, reportContext96 
 
 func generateSigners(t *testing.T, n int) []Signer {
 	signers := make([]Signer, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		privKey, err := secp256k1.GeneratePrivateKey()
 		require.NoError(t, err)
 		uint8Address := ethAddress(privKey.PubKey())

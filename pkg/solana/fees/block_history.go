@@ -284,7 +284,7 @@ func (bhe *blockHistoryEstimator) populateCache(ctx context.Context, loadBatch, 
 
 	// Iterate over the confirmed slots in reverse order to fetch most recent blocks first
 	// Iterate until we run out of slots
-	for i := len(*confirmedSlots) - 1; i >= 0; i-- {
+	for i := range slices.Backward(*confirmedSlots) {
 		slot := (*confirmedSlots)[i]
 
 		// If median already exists for slot, skip fetching block
