@@ -45,7 +45,7 @@ func ExtractEvents(logs []string, programIDBase58 string) []string {
 }
 
 // Decode extracts an event from the the encoded event given as a string.
-func Decode(base64Encoded string) (interface{}, error) {
+func Decode(base64Encoded string) (any, error) {
 	buf, err := base64.StdEncoding.DecodeString(base64Encoded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode event '%s' from base64: %w", base64Encoded, err)
@@ -83,8 +83,8 @@ func Decode(base64Encoded string) (interface{}, error) {
 	return nil, fmt.Errorf("Unrecognised event discriminator %x", discriminator)
 }
 
-func DecodeMultiple(base64EncodedEvents []string) ([]interface{}, error) {
-	events := []interface{}{}
+func DecodeMultiple(base64EncodedEvents []string) ([]any, error) {
+	events := []any{}
 	for _, encoded := range base64EncodedEvents {
 		event, err := Decode(encoded)
 		if err != nil {

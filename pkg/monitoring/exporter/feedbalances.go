@@ -51,7 +51,7 @@ type feedBalances struct {
 	addresses   map[string]solana.PublicKey
 }
 
-func (p *feedBalances) Export(ctx context.Context, data interface{}) {
+func (p *feedBalances) Export(ctx context.Context, data any) {
 	balances, isBalances := data.(types.Balances)
 	if !isBalances {
 		return

@@ -225,19 +225,17 @@ func (e *CPIEventExtractor) ExtractCPIEvents(
 			)
 
 			event := types.ProgramEvent{
-				Program: sourceProgram.ToSolana().String(),
-				BlockData: types.BlockData{
-					SlotNumber:          blockData.SlotNumber,
-					BlockHeight:         blockData.BlockHeight,
-					BlockHash:           blockData.BlockHash,
-					BlockTime:           blockData.BlockTime,
-					TransactionHash:     blockData.TransactionHash,
-					TransactionIndex:    blockData.TransactionIndex,
-					TransactionLogIndex: logIdx,
-					Error:               blockData.Error,
-				},
-				Data:  encodedData,
-				IsCPI: true,
+				Program:             sourceProgram.ToSolana().String(),
+				SlotNumber:          blockData.SlotNumber,
+				BlockHeight:         blockData.BlockHeight,
+				BlockHash:           blockData.BlockHash,
+				BlockTime:           blockData.BlockTime,
+				TransactionHash:     blockData.TransactionHash,
+				TransactionIndex:    blockData.TransactionIndex,
+				TransactionLogIndex: logIdx,
+				Error:               blockData.Error,
+				Data:                encodedData,
+				IsCPI:               true,
 			}
 
 			events = append(events, event)

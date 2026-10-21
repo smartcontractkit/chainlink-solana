@@ -108,12 +108,10 @@ func TestSignatureList_AllocateWaitSet(t *testing.T) {
 	assert.Equal(t, 2, ind2)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		sigs.Wait(ind1)
 		sigs.Wait(ind2)
-		wg.Done()
-	}()
+	})
 	assert.NoError(t, sigs.Set(ind2, solana.Signature{1}))
 	assert.NoError(t, sigs.Set(ind1, solana.Signature{1}))
 	wg.Wait()

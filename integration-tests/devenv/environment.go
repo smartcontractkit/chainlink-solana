@@ -158,9 +158,10 @@ func formatBuffer(buf []byte) string {
 	if len(buf) == 0 {
 		return ""
 	}
-	result := fmt.Sprintf("%d", buf[0])
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("%d", buf[0]))
 	for _, b := range buf[1:] {
-		result += fmt.Sprintf(",%d", b)
+		result.WriteString(fmt.Sprintf(",%d", b))
 	}
-	return result
+	return result.String()
 }

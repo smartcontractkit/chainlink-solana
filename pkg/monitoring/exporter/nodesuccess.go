@@ -68,7 +68,7 @@ type nodeSuccess struct {
 	metrics   metrics.NodeSuccess
 }
 
-func (p *nodeSuccess) Export(ctx context.Context, data interface{}) {
+func (p *nodeSuccess) Export(ctx context.Context, data any) {
 	details, err := types.MakeTxDetails(data)
 	if err != nil {
 		return // skip if input could not be parsed

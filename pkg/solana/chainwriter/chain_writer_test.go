@@ -1447,28 +1447,28 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 		Inner      InnerStaticV2
 	}
 	type TestItemV2 struct {
-		Field                 int32
-		OracleId              uint8     //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
-		OracleIds             [32]uint8 //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
-		AccountStruct         AccountStructV2
-		Accounts              []solana.PublicKey
-		DifferentField        string
-		BigField              ag_binary.Int128
-		NestedDynamicStruct   NestedDynamicV2
-		NestedStaticStruct    NestedStaticV2
+		Field               int32
+		OracleId            uint8     //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
+		OracleIds           [32]uint8 //nolint:revive,staticcheck // field name must match codec's snakeToPascal mapping
+		AccountStruct       AccountStructV2
+		Accounts            []solana.PublicKey
+		DifferentField      string
+		BigField            ag_binary.Int128
+		NestedDynamicStruct NestedDynamicV2
+		NestedStaticStruct  NestedStaticV2
 	}
 
 	// Test v2 encoding with matching struct (same data as v1; IDL source differs but codec field names align)
 	testArrayV2 := [1]TestItemV2{{
-		Field:                 1,
-		OracleId:              2,
-		OracleIds:             [32]uint8{3},
-		AccountStruct:         AccountStructV2{},
-		Accounts:              []solana.PublicKey{},
-		DifferentField:        "test",
-		BigField:              ag_binary.Int128{Lo: 5},
-		NestedDynamicStruct:   NestedDynamicV2{FixedBytes: [2]uint8{6, 7}, Inner: InnerDynamicV2{IntVal: 8, S: "inner"}},
-		NestedStaticStruct:    NestedStaticV2{FixedBytes: [2]uint8{9, 10}, Inner: InnerStaticV2{IntVal: 11}},
+		Field:               1,
+		OracleId:            2,
+		OracleIds:           [32]uint8{3},
+		AccountStruct:       AccountStructV2{},
+		Accounts:            []solana.PublicKey{},
+		DifferentField:      "test",
+		BigField:            ag_binary.Int128{Lo: 5},
+		NestedDynamicStruct: NestedDynamicV2{FixedBytes: [2]uint8{6, 7}, Inner: InnerDynamicV2{IntVal: 8, S: "inner"}},
+		NestedStaticStruct:  NestedStaticV2{FixedBytes: [2]uint8{9, 10}, Inner: InnerStaticV2{IntVal: 11}},
 	}}
 
 	encodedPayloadv2, err := cw.EncodePayload(ctx, testArrayV2, chainwriter.MethodConfig{
@@ -1481,7 +1481,7 @@ func TestChainWriter_ParsePrograms(t *testing.T) {
 	require.Equal(t, encodedPayloadv1, encodedPayloadv2)
 }
 
-func mustBorshEncodeStruct(t *testing.T, data interface{}) []byte {
+func mustBorshEncodeStruct(t *testing.T, data any) []byte {
 	buf := new(bytes.Buffer)
 	err := ag_binary.NewBorshEncoder(buf).Encode(data)
 	require.NoError(t, err)
@@ -1536,7 +1536,7 @@ func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 	t.Helper()
 
 	addresses := make([]solana.PublicKey, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		addresses[i] = GetRandomPubKey(t)
 	}
 	return addresses

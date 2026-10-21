@@ -423,10 +423,10 @@ func (m *OCRv2) TransferOwnership(to string) error {
 	panic("implement me")
 }
 
-func (m *OCRv2) GetLatestConfigDetails() (map[string]interface{}, error) {
+func (m *OCRv2) GetLatestConfigDetails() (map[string]any, error) {
 	panic("implement me")
 }
 
-func (m *OCRv2) GetOwedPayment(transmitterAddr string) (map[string]interface{}, error) {
+func (m *OCRv2) GetOwedPayment(transmitterAddr string) (map[string]any, error) {
 	panic("implement me")
 }

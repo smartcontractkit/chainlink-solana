@@ -76,7 +76,7 @@ func (_m *mockBinding) GetReadDefinition() config.ReadDefinition {
 	return config.ReadDefinition{}
 }
 
-func (_m *mockBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
+func (_m *mockBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef any, outputIDLTypeDef codecv1.IdlTypeDef) {
 	return codecv1.IDL{}, codecv1.IdlTypeDef{}, codecv1.IdlTypeDef{}
 }
 

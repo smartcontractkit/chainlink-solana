@@ -110,10 +110,10 @@ type fakeRddSource struct {
 	minFeeds, maxFeeds uint8
 }
 
-func (f *fakeRddSource) Fetch(_ context.Context) (interface{}, error) {
+func (f *fakeRddSource) Fetch(_ context.Context) (any, error) {
 	numFeeds := int(f.minFeeds) + rand.Intn(int(f.maxFeeds-f.minFeeds))
 	feeds := make([]commonMonitoring.FeedConfig, numFeeds)
-	for i := 0; i < numFeeds; i++ {
+	for i := range numFeeds {
 		feeds[i] = GenerateFeedConfig()
 	}
 	return feeds, nil
@@ -142,7 +142,7 @@ type fakeSource struct {
 	log commonMonitoring.Logger
 }
 
-func (f *fakeSource) Fetch(ctx context.Context) (interface{}, error) {
+func (f *fakeSource) Fetch(ctx context.Context) (any, error) {
 	return GenerateBalances(), nil
 }
 

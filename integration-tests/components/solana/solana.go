@@ -191,9 +191,9 @@ func getContainerRequest(containerName, image, publicKey string, inactiveFeature
 // and returns an Output with the same external/internal URLs and container ref.
 func FindSolanaByName(ctx context.Context, name string) (*Output, error) {
 	c, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{
-		ContainerRequest: tc.ContainerRequest{Name: name},
-		Reuse:            true,
-		Started:          true,
+		Name:    name,
+		Reuse:   true,
+		Started: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to find solana container %q: %w", name, err)

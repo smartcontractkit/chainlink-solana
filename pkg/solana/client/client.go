@@ -203,7 +203,7 @@ func (c *Client) Balance(ctx context.Context, addr solana.PublicKey) (bal uint64
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s)", addr.String()), func() (any, error) {
 		return c.rpc.GetBalance(ctx, addr, c.commitment)
 	})
 	if err != nil {
@@ -226,7 +226,7 @@ func (c *Client) BalanceWithCommitment(ctx context.Context, addr solana.PublicKe
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s,%s)", addr.String(), commitment), func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(fmt.Sprintf("GetBalance(%s,%s)", addr.String(), commitment), func() (any, error) {
 		return c.rpc.GetBalance(ctx, addr, commitment)
 	})
 
@@ -256,7 +256,7 @@ func (c *Client) SlotHeightWithCommitment(ctx context.Context, commitment rpc.Co
 
 	// Include the commitment in the requestGroup key so calls with different commitments won't be merged
 	key := fmt.Sprintf("GetSlotHeight(%s)", commitment)
-	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(key, func() (any, error) {
 		return c.rpc.GetSlot(ctx, commitment)
 	})
 	res, ok := v.(uint64)
@@ -289,7 +289,7 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (t
 
 	// Use txHash in the key so different signatures won't be merged on concurrent calls.
 	key := fmt.Sprintf("GetTransaction(%s)", txHash.String())
-	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(key, func() (any, error) {
 		version := MaxSupportTransactionVersion
 		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment, MaxSupportedTransactionVersion: &version})
 	})
@@ -350,7 +350,7 @@ func (c *Client) GetProgramAccountsWithOpts(ctx context.Context, program solana.
 	return c.rpc.GetProgramAccountsWithOpts(ctx, program, opts)
 }
 
-func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar interface{}) (err error) {
+func (c *Client) GetAccountDataBorshInto(ctx context.Context, addr solana.PublicKey, inVar any) (err error) {
 	done := c.latency("get_account_data_borsh_into")
 	defer func() { done(err) }()
 
@@ -387,7 +387,7 @@ func (c *Client) GetBlocks(ctx context.Context, startSlot uint64, endSlot *uint6
 		endSlotStr = fmt.Sprint(*endSlot)
 	}
 	key := fmt.Sprintf("GetBlocks(%d,%s)", startSlot, endSlotStr)
-	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(key, func() (any, error) {
 		return c.rpc.GetBlocks(ctx, startSlot, endSlot, c.commitment)
 	})
 	res, ok := v.(rpc.BlocksResult)
@@ -404,7 +404,7 @@ func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBloc
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (any, error) {
 		return c.rpc.GetLatestBlockhash(ctx, c.commitment)
 	})
 	res, ok := v.(*rpc.GetLatestBlockhashResult)
@@ -424,7 +424,7 @@ func (c *Client) ChainID(ctx context.Context) (chainID mn.StringID, err error) {
 	ctx, cancel := context.WithTimeout(ctx, c.contextDuration)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do("GetGenesisHash", func() (any, error) {
 		return c.rpc.GetGenesisHash(ctx)
 	})
 	if err != nil {
@@ -568,7 +568,7 @@ func (c *Client) GetLatestBlockHeight(ctx context.Context) (height uint64, err e
 	ctx, cancel := context.WithTimeout(ctx, c.txTimeout)
 	defer cancel()
 
-	v, err, _ := c.requestGroup.Do("GetBlockHeight", func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do("GetBlockHeight", func() (any, error) {
 		return c.rpc.GetBlockHeight(ctx, c.commitment)
 	})
 	res, ok := v.(uint64)
@@ -595,7 +595,7 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 	// Adding slot to the key so concurrent calls to GetBlock for different slots are not merged. Without including the slot,
 	// it would treat all GetBlock calls as identical and merge them, returning whichever block it fetched first to all callers.
 	key := fmt.Sprintf("GetBlockWithOpts(%d)", slot)
-	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(key, func() (any, error) {
 		version := MaxSupportTransactionVersion
 		return c.rpc.GetBlockWithOpts(ctx, slot, &rpc.GetBlockOpts{
 			Commitment:                     c.commitment,
@@ -621,7 +621,7 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 
 	// Incorporate startSlot and limit into the key to differentiate on concurrent calls.
 	key := fmt.Sprintf("GetBlocksWithLimit(%d,%d)", startSlot, limit)
-	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
+	v, err, _ := c.requestGroup.Do(key, func() (any, error) {
 		return c.rpc.GetBlocksWithLimit(ctx, startSlot, limit, c.commitment)
 	})
 	res, ok := v.(*rpc.BlocksResult)

@@ -27,8 +27,8 @@ func (s SolanaConfig) GetChainID() string             { return s.ChainID }
 func (s SolanaConfig) GetReadTimeout() time.Duration  { return s.ReadTimeout }
 func (s SolanaConfig) GetPollInterval() time.Duration { return s.PollInterval }
 
-func (s SolanaConfig) ToMapping() map[string]interface{} {
-	return map[string]interface{}{
+func (s SolanaConfig) ToMapping() map[string]any {
+	return map[string]any{
 		"network_name": s.NetworkName,
 		"network_id":   s.NetworkID,
 		"chain_id":     s.ChainID,

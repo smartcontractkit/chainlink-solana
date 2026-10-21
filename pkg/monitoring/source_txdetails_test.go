@@ -85,7 +85,7 @@ func TestTxDetailsSource(t *testing.T) {
 	assert.NotZero(t, data[0].Slot)
 }
 
-func parseTxDetails(t *testing.T, in interface{}) []types.TxDetails {
+func parseTxDetails(t *testing.T, in any) []types.TxDetails {
 	t.Helper()
 	out, err := types.MakeTxDetails(in)
 	require.NoError(t, err)

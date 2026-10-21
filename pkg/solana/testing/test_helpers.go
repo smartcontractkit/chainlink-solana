@@ -113,7 +113,7 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 
 	// Wait for api server to boot
 	var ready bool
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		time.Sleep(time.Second)
 		client := rpc.New(url)
 		out, err := client.GetHealth(t.Context())
@@ -269,7 +269,7 @@ func findContiguousFreePorts(t *testing.T, n int) int {
 	idx, _ := strconv.Atoi(strings.TrimSpace(string(buf[:readN])))
 
 	windows := portWindowSpan / n
-	for attempt := 0; attempt < windows; attempt++ {
+	for attempt := range windows {
 		window := (idx + attempt) % windows
 		base := portWindowStart + window*n
 		if portsFree(t.Context(), base, n) {

@@ -199,8 +199,8 @@ func Test_Converters(t *testing.T) {
 		opts := &commonsol.GetAccountInfoOpts{
 			Encoding:       commonsol.EncodingBase64,
 			Commitment:     commonsol.CommitmentConfirmed,
-			DataSlice:      &commonsol.DataSlice{Offset: uint64Ptr(5), Length: uint64Ptr(9)},
-			MinContextSlot: uint64Ptr(77),
+			DataSlice:      &commonsol.DataSlice{Offset: new(uint64(5)), Length: new(uint64(9))},
+			MinContextSlot: new(uint64(77)),
 		}
 		got := convertAccountInfoOpts(opts)
 		require.Equal(t, solanago.EncodingType(commonsol.EncodingBase64), got.Encoding)
@@ -225,7 +225,7 @@ func Test_Converters(t *testing.T) {
 			ParentSlot:        100,
 			Signatures:        []solanago.Signature{sig(5)},
 			BlockTime:         &bt,
-			BlockHeight:       uint64Ptr(1234),
+			BlockHeight:       new(uint64(1234)),
 			Transactions: []rpc.TransactionWithMeta{
 				{
 					Version: rpc.TransactionVersion(0),
@@ -240,7 +240,7 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, commonsol.Hash(cpk(2)), got.PreviousBlockhash)
 		require.Equal(t, uint64(100), got.ParentSlot)
 		require.NotNil(t, got.BlockTime)
-		require.Equal(t, uint64Ptr(1234), got.BlockHeight)
+		require.Equal(t, new(uint64(1234)), got.BlockHeight)
 	})
 
 	t.Run("convertTransaction_nilSafe", func(t *testing.T) {
@@ -434,8 +434,6 @@ func sig(i byte) solanago.Signature {
 
 func csig(i byte) commonsol.Signature { return commonsol.Signature(sig(i)) }
 
-func uint64Ptr(v uint64) *uint64 { return &v }
-
 // submitStubChain implements the Chain interface with only the methods needed by
 // SubmitTransaction, avoiding the import cycle that mocks/chain.go causes.
 type submitStubChain struct {
@@ -532,8 +530,8 @@ func TestConvertAccountResult(t *testing.T) {
 
 	t.Run("non-nil result with nil Value", func(t *testing.T) {
 		acc := &rpc.GetAccountInfoResult{
-			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 42}},
-			Value:      nil,
+			Context: rpc.Context{Slot: 42},
+			Value:   nil,
 		}
 		got, err := convertAccountResult(acc, commonsol.EncodingBase64)
 		require.NoError(t, err)
@@ -545,7 +543,7 @@ func TestConvertAccountResult(t *testing.T) {
 	t.Run("non-nil result with populated Value", func(t *testing.T) {
 		data := rpc.DataBytesOrJSONFromBytes([]byte{0xca, 0xfe})
 		acc := &rpc.GetAccountInfoResult{
-			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 100}},
+			Context: rpc.Context{Slot: 100},
 			Value: &rpc.Account{
 				Lamports:   999,
 				Owner:      pk(5),
@@ -569,7 +567,7 @@ func TestConvertAccountResult(t *testing.T) {
 
 	t.Run("non-nil result with nil Data inside Value", func(t *testing.T) {
 		acc := &rpc.GetAccountInfoResult{
-			RPCContext: rpc.RPCContext{Context: rpc.Context{Slot: 7}},
+			Context: rpc.Context{Slot: 7},
 			Value: &rpc.Account{
 				Lamports: 1,
 				Owner:    pk(2),
