@@ -14,10 +14,8 @@ pub enum StoreError {
     ArrayLengthMismatch,
     #[msg("config is empty")]
     EmptyConfig,
-    #[msg("invalid data id")]
+    #[msg("invalid data id, it must not be zero and its svr path id must be zero")]
     InvalidDataId,
-    #[msg("svr path id must not be zero")]
-    ZeroSvrPathId,
     #[msg("invalid address")]
     InvalidAddress,
     #[msg("invalid workflow name")]
@@ -44,12 +42,8 @@ pub enum StoreError {
     MaxStoredReportsTooLow,
     #[msg("min answer exceeds max answer")]
     InvalidMinMaxRange,
-    #[msg("fallback time exceeds max stored reports")]
-    FallbackTimeAboveMaxStoredReports,
-    #[msg("svr data ids need max sync iterations")]
-    InvalidMaxSyncIterations,
-    #[msg("decimals exceed the stored decimals")]
-    DecimalsAboveStoredDecimals,
+    #[msg("no data present")]
+    NoDataPresent,
     #[msg("report callback program is not executable")]
     ReportCallbackNoContract,
     #[msg("description is too long")]

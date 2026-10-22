@@ -56,8 +56,6 @@ pub enum CacheSkipReason {
     InvalidVersion,
     /// The feed's writer is not the signing data feeds store authority (e.g. still OCR2).
     UnauthorizedWriter,
-    /// The round came through an SVR path or was only adopted, legacy feeds take non-SVR rounds.
-    NotPrimary,
     /// Round is not newer than the feed's latest round.
     StaleTimestamp,
     /// Answer does not fit once rescaled to the feed's decimals.
@@ -201,8 +199,7 @@ pub mod store {
         apply_round(&mut ctx.accounts.feed, round)
     }
 
-    /// Report callback of the data feeds store (CRE), configured on the non-SVR data ID backing
-    /// this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the
+    /// Report callback of the data feeds store (CRE), configured on the data ID backing this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the
     /// signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is
     /// skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
     pub fn on_report_callback(
@@ -218,10 +215,6 @@ pub mod store {
             Ok(true)
         };
 
-        // legacy feeds are non-SVR readers, SVR-exclusive rounds must not reach them
-        if args.svr_path_id != [0, 0] || !args.is_freshest {
-            return skip(CacheSkipReason::NotPrimary);
-        }
         if !feed_info.is_writable {
             return skip(CacheSkipReason::NotWritable);
         }
@@ -747,13 +740,11 @@ mod tests {
     fn cache_round(timestamp: u32, answer: i128) -> OnReportCallbackArgs {
         OnReportCallbackArgs {
             data_id: [1; 16],
-            svr_path_id: [0, 0],
             round_id: 1,
             answer,
             decimals: 18,
             observations_timestamp: timestamp,
             recorded_timestamp: timestamp,
-            is_freshest: true,
         }
     }
 

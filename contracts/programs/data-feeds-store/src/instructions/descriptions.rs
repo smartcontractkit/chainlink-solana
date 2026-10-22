@@ -1,14 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_DESCRIPTION_SEED, SVR_PATH_DESCRIPTION_SEED,
-    },
+    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_DESCRIPTION_SEED},
     context::FeedAdminAccounts,
     data_id,
     error::StoreError,
     event::*,
-    state::{FeedDescription, SvrPathDescription},
+    state::FeedDescription,
     utils::{create_pda_account, encode_description, verify_feed_admin},
 };
 
@@ -38,7 +36,7 @@ fn ensure_account<'info>(
     Ok(false)
 }
 
-/// Set descriptions shared by every instance and SVR path of a feed, e.g. "ETH/USD".
+/// Set descriptions shared by every instance of a feed, e.g. "ETH/USD".
 pub fn set_feed_descriptions<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     indexed_feed_ids: Vec<[u8; 16]>,
@@ -61,7 +59,7 @@ pub fn set_feed_descriptions<'info>(
         .zip(ctx.remaining_accounts.iter())
     {
         require!(
-            !data_id::is_zero(id) && data_id::is_valid_indexed_feed_id(id),
+            data_id::is_valid_indexed_feed_id(id),
             StoreError::InvalidDataId
         );
         let encoded = encode_description(description)?;
@@ -84,55 +82,6 @@ pub fn set_feed_descriptions<'info>(
         emit!(FeedDescriptionSet {
             state: state_key,
             indexed_feed_id: *id,
-            description: description.clone(),
-        });
-    }
-    Ok(())
-}
-
-/// Set descriptions of SVR paths, appended to feed descriptions for SVR data IDs.
-pub fn set_svr_path_descriptions<'info>(
-    ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    svr_path_ids: Vec<[u8; 2]>,
-    descriptions: Vec<String>,
-) -> Result<()> {
-    verify_feed_admin(
-        &ctx.accounts.feed_admin,
-        &ctx.accounts.state.load()?.feed_admins,
-    )?;
-    require!(
-        svr_path_ids.len() == descriptions.len()
-            && svr_path_ids.len() == ctx.remaining_accounts.len(),
-        StoreError::ArrayLengthMismatch
-    );
-
-    let state_key = ctx.accounts.state.key();
-    for ((path_id, description), info) in svr_path_ids
-        .iter()
-        .zip(descriptions.iter())
-        .zip(ctx.remaining_accounts.iter())
-    {
-        require!(*path_id != [0, 0], StoreError::ZeroSvrPathId);
-        let encoded = encode_description(description)?;
-        ensure_account(
-            &ctx,
-            info,
-            SVR_PATH_DESCRIPTION_SEED,
-            path_id,
-            ANCHOR_DISCRIMINATOR + SvrPathDescription::INIT_SPACE,
-        )?;
-
-        SvrPathDescription {
-            version: ACCOUNT_VERSION,
-            state: state_key,
-            svr_path_id: *path_id,
-            description: encoded,
-        }
-        .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
-
-        emit!(SvrPathDescriptionSet {
-            state: state_key,
-            svr_path_id: *path_id,
             description: description.clone(),
         });
     }

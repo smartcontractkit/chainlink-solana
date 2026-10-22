@@ -245,7 +245,7 @@ func NewLowerFlagInstruction(
 }
 
 // Builds a "on_report_callback" instruction.
-// Report callback of the data feeds store (CRE), configured on the non-SVR data ID backing // this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the // signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is // skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
+// Report callback of the data feeds store (CRE), configured on the data ID backing this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the // signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is // skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
 func NewOnReportCallbackInstruction(
 	// Params:
 	argsParam OnReportCallbackArgs,

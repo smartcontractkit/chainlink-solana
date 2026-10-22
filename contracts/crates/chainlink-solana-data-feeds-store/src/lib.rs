@@ -1,88 +1,69 @@
-//! CPI accessors for the Chainlink Data Feeds store. Reads go through the store's read
-//! instructions, so SVR path selection and per-proxy decimals apply.
+//! CPI client for the reader interface of the Chainlink Data Feeds store: the latest or a stored
+//! round of a data ID (answer with 18 decimals), the stored decimals and the feed description.
 //!
-//! Proxy reads take the proxy config account, the non-SVR feed account of its data ID and, for SVR
-//! data IDs, the data ID config account.
+//! Proxies read through this interface, so a store version that keeps it can replace the store
+//! behind a proxy. Reads that need other decimals go through the data feeds proxy, not here.
 
 use anchor_lang::prelude::*;
-use data_feeds_store::cpi::accounts::{DirectRead, ProxyRead};
-use data_feeds_store::state::RoundData;
+use data_feeds_store::cpi::accounts::{DescriptionRead, FeedRead};
 
+pub use data_feeds_store::state::ReaderRound;
 pub use data_feeds_store::ID as DATA_FEEDS_STORE_ID;
 
-fn proxy_read<'info>(
-    proxy: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-    data_id_config: Option<AccountInfo<'info>>,
-) -> ProxyRead<'info> {
-    ProxyRead {
-        proxy,
-        feed,
-        data_id_config,
-        feed_description: None,
-        svr_path_description: None,
-    }
-}
-
-/// Latest round data for a proxy, answer downscaled to the proxy's decimals.
-pub fn latest_round_data<'info>(
-    store_program: AccountInfo<'info>,
-    proxy: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-    data_id_config: Option<AccountInfo<'info>>,
-) -> Result<RoundData> {
-    let ctx = CpiContext::new(store_program, proxy_read(proxy, feed, data_id_config));
-    Ok(data_feeds_store::cpi::latest_round_data(ctx)?.get())
-}
-
-/// Round data for a shared-history round, zero when the proxy cannot be served it.
-pub fn get_round_data<'info>(
-    store_program: AccountInfo<'info>,
-    proxy: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-    data_id_config: Option<AccountInfo<'info>>,
-    round_id: u64,
-) -> Result<RoundData> {
-    let ctx = CpiContext::new(store_program, proxy_read(proxy, feed, data_id_config));
-    Ok(data_feeds_store::cpi::get_round_data(ctx, round_id)?.get())
-}
-
-/// Decimals the proxy serves.
-pub fn decimals<'info>(
-    store_program: AccountInfo<'info>,
-    proxy: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-) -> Result<u8> {
-    let ctx = CpiContext::new(store_program, proxy_read(proxy, feed, None));
-    Ok(data_feeds_store::cpi::decimals(ctx)?.get())
-}
-
-/// Latest round data for any data ID, bypassing proxy configuration.
-#[allow(clippy::too_many_arguments)]
-pub fn get_latest_round_data<'info>(
+/// Latest round of a data ID. Fails with the store's `NoDataPresent` while the feed has no report.
+pub fn get_latest_round<'info>(
     store_program: AccountInfo<'info>,
     state: AccountInfo<'info>,
     feed: AccountInfo<'info>,
-    data_id_config: Option<AccountInfo<'info>>,
     data_id: [u8; 16],
-    decimals: u8,
-    fallback_time: u32,
-    max_sync_iterations: u32,
-) -> Result<RoundData> {
+) -> Result<ReaderRound> {
+    let ctx = CpiContext::new(store_program, FeedRead { state, feed });
+    Ok(data_feeds_store::cpi::get_latest_round(ctx, data_id)?.get())
+}
+
+/// A stored round of a data ID. Fails with the store's `NoDataPresent` for a round that was never
+/// written or has been overwritten.
+pub fn get_round<'info>(
+    store_program: AccountInfo<'info>,
+    state: AccountInfo<'info>,
+    feed: AccountInfo<'info>,
+    data_id: [u8; 16],
+    round_id: u64,
+) -> Result<ReaderRound> {
+    let ctx = CpiContext::new(store_program, FeedRead { state, feed });
+    Ok(data_feeds_store::cpi::get_round(ctx, data_id, round_id)?.get())
+}
+
+/// Decimals the store keeps answers with.
+pub fn get_decimals<'info>(
+    store_program: AccountInfo<'info>,
+    state: AccountInfo<'info>,
+    data_id: [u8; 16],
+) -> Result<u8> {
     let ctx = CpiContext::new(
         store_program,
-        DirectRead {
+        DescriptionRead {
             state,
-            feed,
-            data_id_config,
+            feed_description: None,
         },
     );
-    Ok(data_feeds_store::cpi::get_latest_round_data(
-        ctx,
-        data_id,
-        decimals,
-        fallback_time,
-        max_sync_iterations,
-    )?
-    .get())
+    Ok(data_feeds_store::cpi::get_decimals(ctx, data_id)?.get())
+}
+
+/// Description of the feed of a data ID, empty when none is set. Pass the feed description
+/// account to get it.
+pub fn get_description<'info>(
+    store_program: AccountInfo<'info>,
+    state: AccountInfo<'info>,
+    feed_description: Option<AccountInfo<'info>>,
+    data_id: [u8; 16],
+) -> Result<String> {
+    let ctx = CpiContext::new(
+        store_program,
+        DescriptionRead {
+            state,
+            feed_description,
+        },
+    );
+    Ok(data_feeds_store::cpi::get_description(ctx, data_id)?.get())
 }

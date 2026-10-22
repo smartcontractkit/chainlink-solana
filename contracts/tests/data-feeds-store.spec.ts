@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
-import { assert, expect } from "chai";
+import { assert } from "chai";
 import { randomBytes } from "crypto";
 import { DataFeedsStore } from "../target/types/data_feeds_store";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
@@ -35,7 +35,7 @@ const encodeReports = (reports: Report[]) => {
   return out;
 };
 
-// compact feed id (8) | index (1) | svr path id (2) | instance (1) | reserved (4)
+// compact feed id (8) | index (1) | svr path id (2, reserved) | instance (1) | reserved (4)
 const newDataId = () => {
   const id = Buffer.alloc(16);
   randomBytes(8).copy(id, 0);
@@ -46,16 +46,17 @@ const withSvrPath = (id: Buffer, path: number) => {
   out.writeUInt16BE(path, 9);
   return out;
 };
-const nonSvr = (id: Buffer) => withSvrPath(id, 0);
-const isSvr = (id: Buffer) => id.readUInt16BE(9) !== 0;
+const withInstance = (id: Buffer, instance: number) => {
+  const out = Buffer.from(id);
+  out[11] = instance;
+  return out;
+};
 const indexedFeedId = (id: Buffer) => {
-  const out = nonSvr(id);
+  const out = Buffer.from(id);
   out[11] = 0;
   out.fill(0, 12);
   return out;
 };
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("data feeds store", function () {
   this.timeout(60_000);
@@ -82,12 +83,7 @@ describe("data feeds store", function () {
       [Buffer.from(seed), state.publicKey.toBuffer(), ...keys],
       program.programId
     )[0];
-  const feedPda = (id: Buffer) => pda("feed", nonSvr(id));
-  const configPda = (id: Buffer) => pda("data_id", id);
-  // a non-SVR data ID's settings live in its feed, an SVR path's in its config
-  const settingsPda = (id: Buffer) => (isSvr(id) ? configPda(id) : feedPda(id));
-  const svrConfigPda = (id: Buffer) => (isSvr(id) ? configPda(id) : null);
-  const proxyPda = (proxyId: Buffer) => pda("proxy", proxyId);
+  const feedPda = (id: Buffer) => pda("feed", id);
   const storeAuthority = () => pda("store_authority");
 
   const meta = (pubkey: PublicKey, isWritable = true): AccountMeta => ({
@@ -145,57 +141,17 @@ describe("data feeds store", function () {
     systemProgram: anchor.web3.SystemProgram.programId,
   });
 
-  // feed history for the non-SVR id plus a config for every SVR path
+  // a feed account per data id, which also holds the data id's settings
   const setupFeed = async (...dataIds: Buffer[]) => {
-    const feeds = [
-      ...new Map(
-        dataIds.map((id) => [nonSvr(id).toString("hex"), nonSvr(id)])
-      ).values(),
-    ];
     await program.methods
-      .initFeeds(feeds.map((id) => Array.from(id)))
+      .initFeeds(dataIds.map((id) => Array.from(id)))
       .accountsStrict(adminAccounts())
-      .remainingAccounts(feeds.map((id) => meta(feedPda(id))))
-      .signers([feedAdmin.keypair])
-      .rpc();
-    const svrIds = dataIds.filter(isSvr);
-    if (svrIds.length === 0) return;
-    await program.methods
-      .initDataIds(svrIds.map((id) => Array.from(id)))
-      .accountsStrict(adminAccounts())
-      .remainingAccounts(svrIds.map((id) => meta(configPda(id))))
+      .remainingAccounts(dataIds.map((id) => meta(feedPda(id))))
       .signers([feedAdmin.keypair])
       .rpc();
   };
 
-  const setProxy = async (
-    proxyId: Buffer,
-    dataId: Buffer,
-    decimals: number,
-    fallbackTime = 0,
-    maxSyncIterations = 0
-  ) => {
-    await program.methods
-      .updateConfigsForProxies(
-        [Array.from(proxyId)],
-        [
-          {
-            dataId: Array.from(dataId),
-            decimals,
-            fallbackTime,
-            maxSyncIterations,
-          },
-        ]
-      )
-      .accountsStrict(adminAccounts())
-      .remainingAccounts([meta(proxyPda(proxyId)), meta(feedPda(dataId))])
-      .signers([feedAdmin.keypair])
-      .rpc();
-    return proxyPda(proxyId);
-  };
-
-  // per report: data id config for an SVR path, non-SVR feed, then callback program and accounts
-  // if configured
+  // per report: the feed of its data id, then callback program and accounts if configured
   const report = async (
     reports: Report[],
     callbackAccounts: Map<string, AccountMeta[]> = new Map(),
@@ -206,7 +162,6 @@ describe("data feeds store", function () {
       meta(storeAuthority(), false),
     ];
     for (const r of reports) {
-      if (isSvr(r.dataId)) accounts.push(meta(configPda(r.dataId)));
       accounts.push(meta(feedPda(r.dataId)));
       accounts.push(...(callbackAccounts.get(r.dataId.toString("hex")) ?? []));
     }
@@ -217,43 +172,40 @@ describe("data feeds store", function () {
       workflowOwner,
       accounts
     );
-    const status = await connection.getSignatureStatus(result);
-    lastWriteSlot = status.value.slot;
     return result;
   };
 
-  // wait for a later slot than the last report, so same-slot SVR exclusivity has passed
-  let lastWriteSlot = 0;
-  const nextSlot = async () => {
-    while ((await connection.getSlot("confirmed")) <= lastWriteSlot)
-      await sleep(100);
-  };
-
-  const proxyRead = (proxy: PublicKey, dataId: Buffer) => ({
-    proxy,
-    feed: feedPda(dataId),
-    dataIdConfig: svrConfigPda(dataId),
-    feedDescription: null,
-    svrPathDescription: null,
-  });
-
-  const directRead = (dataId: Buffer) => ({
+  // the reader interface
+  const readAccounts = (id: Buffer) => ({
     state: state.publicKey,
-    feed: feedPda(dataId),
-    dataIdConfig: svrConfigPda(dataId),
+    feed: feedPda(id),
   });
-
-  const latestAnswer = (dataId: Buffer, fallbackTime = 0, maxSync = 0) =>
-    program.methods
-      .getLatestAnswer(Array.from(dataId), 18, fallbackTime, maxSync)
-      .accountsStrict(directRead(dataId))
-      .view() as Promise<BN>;
+  const readLatest = async (id: Buffer) =>
+    (await program.methods
+      .getLatestRound(Array.from(id))
+      .accountsStrict(readAccounts(id))
+      .view())!;
+  const readRound = async (id: Buffer, round: number) =>
+    (await program.methods
+      .getRound(Array.from(id), new BN(round))
+      .accountsStrict(readAccounts(id))
+      .view())!;
+  const latestAnswer = async (id: Buffer) =>
+    (await readLatest(id)).answer as BN;
 
   const expectError = async (p: Promise<any>, name: string) => {
     try {
       await p;
-    } catch (e) {
-      expect(String(e)).to.include(name);
+    } catch (e: any) {
+      // simulation errors keep the program error in their logs, not in their message
+      const text = [
+        String(e),
+        e?.error?.errorCode?.code,
+        ...(e?.logs ?? []),
+        ...(e?.simulationResponse?.logs ?? []),
+        ...(e?.transactionLogs ?? []),
+      ].join("\n");
+      assert.include(text, name);
       return;
     }
     assert.fail(`expected ${name}`);
@@ -296,42 +248,24 @@ describe("data feeds store", function () {
       );
     });
 
-    it("validates proxy configs", async () => {
+    it("rejects the zero data id and reserved SVR path ids", async () => {
       const id = newDataId();
-      await setupFeed(id);
-      await expectError(
-        setProxy(randomBytes(32), id, 19),
-        "DecimalsAboveStoredDecimals"
-      );
-      await expectError(
-        setProxy(randomBytes(32), id, 8, 9),
-        "FallbackTimeAboveMaxStoredReports"
-      );
-      await expectError(
-        setProxy(randomBytes(32), withSvrPath(id, 1), 8, 1, 0),
-        "InvalidMaxSyncIterations"
-      );
-
-      const proxyId = randomBytes(32);
-      const proxy = await setProxy(proxyId, id, 8);
-      const config = await program.account.proxyConfig.fetch(proxy);
-      assert.deepEqual(Buffer.from(config.dataId), id);
-      assert.equal(config.decimals, 8);
-
-      await program.methods
-        .removeConfigsForProxies([Array.from(proxyId)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(proxy)])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      assert.isNull(await connection.getAccountInfo(proxy));
+      for (const bad of [Buffer.alloc(16), withSvrPath(id, 1)]) {
+        await expectError(
+          program.methods
+            .initFeeds([Array.from(bad)])
+            .accountsStrict(adminAccounts())
+            .remainingAccounts([meta(feedPda(bad))])
+            .signers([feedAdmin.keypair])
+            .rpc(),
+          "InvalidDataId"
+        );
+      }
     });
 
-    it("sets descriptions", async () => {
+    it("sets descriptions shared by every instance of a feed", async () => {
       const id = newDataId();
-      const svrId = withSvrPath(id, 7);
       const feedDescription = pda("feed_description", indexedFeedId(id));
-      const pathDescription = pda("svr_path_description", Buffer.from([0, 7]));
 
       await program.methods
         .setFeedDescriptions([Array.from(indexedFeedId(id))], ["ETH/USD"])
@@ -339,22 +273,29 @@ describe("data feeds store", function () {
         .remainingAccounts([meta(feedDescription)])
         .signers([feedAdmin.keypair])
         .rpc();
-      await program.methods
-        .setSvrPathDescriptions([[0, 7]], ["SVR"])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(pathDescription)])
-        .signers([feedAdmin.keypair])
-        .rpc();
 
-      const description = await program.methods
-        .getDescription(Array.from(svrId))
-        .accountsStrict({
-          state: state.publicKey,
-          feedDescription,
-          svrPathDescription: pathDescription,
-        })
-        .view();
-      assert.equal(description, "ETH/USD SVR");
+      const description = (dataId: Buffer, account: PublicKey | null) =>
+        program.methods
+          .getDescription(Array.from(dataId))
+          .accountsStrict({ state: state.publicKey, feedDescription: account })
+          .view();
+      assert.equal(await description(id, feedDescription), "ETH/USD");
+      assert.equal(
+        await description(withInstance(id, 3), feedDescription),
+        "ETH/USD",
+        "another instance of the feed"
+      );
+      assert.equal(await description(id, null), "", "no description account");
+    });
+
+    it("serves the stored decimals", async () => {
+      assert.equal(
+        await program.methods
+          .getDecimals(Array.from(newDataId()))
+          .accountsStrict({ state: state.publicKey, feedDescription: null })
+          .view(),
+        18
+      );
     });
 
     it("checks feed permissions", async () => {
@@ -368,10 +309,7 @@ describe("data feeds store", function () {
       const check = () =>
         program.methods
           .checkFeedPermission(Array.from(id), workflow)
-          .accountsStrict({
-            state: state.publicKey,
-            settings: settingsPda(id),
-          })
+          .accountsStrict({ state: state.publicKey, feed: feedPda(id) })
           .view();
 
       assert.isTrue(await check(), "default metadata");
@@ -382,97 +320,53 @@ describe("data feeds store", function () {
           [{ ...workflow, allowedWorkflowName: Array.from(randomBytes(10)) }]
         )
         .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(settingsPda(id))])
+        .remainingAccounts([meta(feedPda(id))])
         .signers([feedAdmin.keypair])
         .rpc();
       assert.isFalse(await check(), "specific metadata replaces the default");
-    });
-
-    it("keeps non-SVR settings in the feed, so only SVR paths get a config", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      await expectError(
-        program.methods
-          .initDataIds([Array.from(id)])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(configPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "InvalidDataId"
-      );
     });
   });
 
   describe("reports", function () {
     beforeEach(async () => initStore(4));
 
-    it("stores non-SVR reports and serves proxies", async () => {
+    it("stores reports and serves rounds at 18 decimals", async () => {
       const a = newDataId();
       const b = newDataId();
       await setupFeed(a, b);
-      const proxy = await setProxy(randomBytes(32), a, 8);
+      await expectError(readLatest(a), "NoDataPresent");
 
       const tsA = nextTimestamp();
+      const tsB = nextTimestamp();
       await report([
         { dataId: a, timestamp: tsA, answer: new BN(1234).mul(E18).divn(100) },
-        { dataId: b, timestamp: nextTimestamp(), answer: new BN(-5).mul(E18) },
+        { dataId: b, timestamp: tsB, answer: new BN(-5).mul(E18) },
       ]);
 
-      const round = await program.methods
-        .latestRoundData()
-        .accountsStrict(proxyRead(proxy, a))
-        .view();
+      const round = await readLatest(a);
       assert.equal(round.roundId.toNumber(), 1);
-      assert.isTrue(
-        round.answer.eq(new BN(1234).mul(E8).divn(100)),
-        "downscaled to 8 decimals"
-      );
-      assert.equal(round.startedAt.toNumber(), tsA);
-      assert.isTrue(
-        (await latestAnswer(b)).eq(new BN(-5).mul(E18)),
-        "negative answers"
-      );
-
-      assert.equal(
-        await program.methods
-          .decimals()
-          .accountsStrict(proxyRead(proxy, a))
-          .view(),
-        8
-      );
-      assert.equal(
-        (
-          await program.methods
-            .version()
-            .accountsStrict(proxyRead(proxy, a))
-            .view()
-        ).toNumber(),
-        1
-      );
+      assert.isTrue(round.answer.eq(new BN(1234).mul(E18).divn(100)));
+      assert.equal(round.observationsTimestamp, tsA);
+      assert.isAbove(round.recordedTimestamp, 0);
+      assert.isTrue((await latestAnswer(b)).eq(new BN(-5).mul(E18)), "negative");
+      assert.equal((await readLatest(b)).observationsTimestamp, tsB);
     });
 
     it("keeps history in a ring", async () => {
       const id = newDataId();
       await setupFeed(id);
-      const proxy = await setProxy(randomBytes(32), id, 18);
       for (let i = 1; i <= 5; i++) {
         await report([
           { dataId: id, timestamp: nextTimestamp(), answer: new BN(i) },
         ]);
       }
-      const roundData = (r: number) =>
-        program.methods
-          .getRoundData(new BN(r))
-          .accountsStrict(proxyRead(proxy, id))
-          .view();
 
-      assert.isTrue((await roundData(5)).answer.eq(new BN(5)));
-      assert.isTrue((await roundData(2)).answer.eq(new BN(2)));
-      assert.isTrue(
-        (await roundData(1)).answer.isZero(),
-        "evicted from a ring of 4"
-      );
-      assert.isTrue((await roundData(6)).answer.isZero(), "not yet written");
+      assert.isTrue((await readRound(id, 5)).answer.eq(new BN(5)));
+      assert.isTrue((await readRound(id, 2)).answer.eq(new BN(2)));
+      assert.equal((await readLatest(id)).roundId.toNumber(), 5);
+      await expectError(readRound(id, 1), "NoDataPresent"); // evicted from a ring of 4
+      await expectError(readRound(id, 6), "NoDataPresent"); // not yet written
+      await expectError(readRound(id, 0), "NoDataPresent");
     });
 
     it("skips stale, out of range and unpermitted reports", async () => {
@@ -507,7 +401,7 @@ describe("data feeds store", function () {
           ]
         )
         .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(settingsPda(id))])
+        .remainingAccounts([meta(feedPda(id))])
         .signers([feedAdmin.keypair])
         .rpc();
       await report([
@@ -518,7 +412,7 @@ describe("data feeds store", function () {
       await program.methods
         .removeSpecificFeedMetadata([Array.from(id)])
         .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(settingsPda(id))])
+        .remainingAccounts([meta(feedPda(id))])
         .signers([feedAdmin.keypair])
         .rpc();
       await report([
@@ -549,10 +443,10 @@ describe("data feeds store", function () {
         new Map(),
         zoneB
       );
-      assert.isTrue(
-        (await latestAnswer(id)).eq(new BN(0)),
-        "a forwarder outside the allowed workflows is skipped"
-      );
+      await expectError(
+        readLatest(id),
+        "NoDataPresent"
+      ); // a forwarder outside the allowed workflows is skipped
 
       const workflow = (allowedSender: PublicKey) => ({
         allowedSender,
@@ -608,88 +502,9 @@ describe("data feeds store", function () {
         "MaxStoredReportsNotIncreased"
       );
 
-      const proxy = await setProxy(randomBytes(32), id, 18);
       assert.isTrue(
-        (
-          await program.methods
-            .getRoundData(new BN(1))
-            .accountsStrict(proxyRead(proxy, id))
-            .view()
-        ).answer.eq(new BN(1)),
+        (await readRound(id, 1)).answer.eq(new BN(1)),
         "history survives the resize"
-      );
-    });
-  });
-
-  describe("SVR", function () {
-    beforeEach(async () => initStore(16));
-
-    it("appends fresher SVR reports and adopts the head otherwise", async () => {
-      const id = newDataId();
-      const svrId = withSvrPath(id, 1);
-      await setupFeed(id, svrId);
-
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(100) },
-      ]);
-      const svrTs = nextTimestamp();
-      await report([{ dataId: svrId, timestamp: svrTs, answer: new BN(111) }]);
-
-      const config = await program.account.dataIdConfig.fetch(configPda(svrId));
-      assert.equal(config.svrRoundId.toNumber(), 2, "appended round 2");
-      assert.isTrue(config.svrAnswer.eq(new BN(111)));
-
-      await nextSlot();
-      assert.equal(
-        (await latestAnswer(id)).toString(),
-        "111",
-        "released to non-SVR readers"
-      );
-      assert.equal((await latestAnswer(svrId)).toString(), "111");
-
-      // a newer non-SVR report, then an SVR report behind it adopts the head
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(120) },
-      ]);
-      await report([
-        { dataId: svrId, timestamp: svrTs + 1, answer: new BN(1) },
-      ]);
-      const adopted = await program.account.dataIdConfig.fetch(
-        configPda(svrId)
-      );
-      assert.equal(adopted.svrRoundId.toNumber(), 3, "adopted the head");
-      assert.isTrue(adopted.svrAnswer.eq(new BN(120)));
-      const feed = await program.account.feedData.fetch(feedPda(id));
-      assert.equal(feed.roundId.toNumber(), 3, "no round appended");
-    });
-
-    it("falls back to aged non-SVR rounds and honours disabled paths", async () => {
-      const id = newDataId();
-      const svrId = withSvrPath(id, 2);
-      await setupFeed(id, svrId);
-
-      await report([
-        { dataId: svrId, timestamp: nextTimestamp(), answer: new BN(111) },
-      ]);
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(120) },
-      ]);
-      await sleep(3_000);
-
-      // long window: the path keeps its own selection
-      assert.isTrue((await latestAnswer(svrId, 600, 5)).eq(new BN(111)));
-      // short window: newest non-SVR round older than the window
-      assert.isTrue((await latestAnswer(svrId, 1, 5)).eq(new BN(120)));
-
-      await program.methods
-        .setSvrDisabled([Array.from(svrId)], [true])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(configPda(svrId))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      assert.isTrue(
-        (await latestAnswer(svrId, 600, 5)).eq(new BN(120)),
-        "disabled path"
       );
     });
   });
@@ -709,7 +524,7 @@ describe("data feeds store", function () {
           [{ program: programId, accounts, revertOnFailure }]
         )
         .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(settingsPda(dataId)), meta(programId, false)])
+        .remainingAccounts([meta(feedPda(dataId)), meta(programId, false)])
         .signers([feedAdmin.keypair])
         .rpc();
 
@@ -753,8 +568,7 @@ describe("data feeds store", function () {
 
     it("writes through to a repointed DF1 feed", async () => {
       const id = newDataId();
-      const svrId = withSvrPath(id, 1);
-      await setupFeed(id, svrId);
+      await setupFeed(id);
       const legacy = await createLegacyFeed(8);
       await setCallback(
         id,
@@ -797,16 +611,6 @@ describe("data feeds store", function () {
         round.answer.eq(new BN(105).mul(E8).divn(100)),
         "rescaled to the feed decimals"
       );
-
-      // SVR rounds never reach the legacy feed
-      await report([
-        {
-          dataId: svrId,
-          timestamp: nextTimestamp(),
-          answer: new BN(3).mul(E18),
-        },
-      ]);
-      assert.equal((await legacyRound(legacy)).roundId, 1);
 
       // rollback: point the writer elsewhere
       await setWriter(legacy, Keypair.generate().publicKey);

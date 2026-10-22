@@ -60,24 +60,12 @@ pub struct MaxObservationForwardDurationSecondsUpdated {
 #[event]
 pub struct FeedInitialized {
     pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub max_stored_reports: u64,
 }
 
 #[event]
 pub struct FeedClosed {
-    pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
-}
-
-#[event]
-pub struct DataIdInitialized {
-    pub state: Pubkey,
-    pub data_id: [u8; 16],
-}
-
-#[event]
-pub struct DataIdClosed {
     pub state: Pubkey,
     pub data_id: [u8; 16],
 }
@@ -85,55 +73,22 @@ pub struct DataIdClosed {
 #[event]
 pub struct MaxStoredReportsSet {
     pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub max_stored_reports: u64,
 }
 
 #[event]
 pub struct MinMaxAnswerSet {
     pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub min_answer: i128,
     pub max_answer: i128,
-}
-
-#[event]
-pub struct SvrFeedDisabled {
-    pub state: Pubkey,
-    pub svr_data_id: [u8; 16],
-    pub is_disabled: bool,
-}
-
-#[event]
-pub struct ProxyConfigUpdated {
-    pub state: Pubkey,
-    pub proxy: Pubkey,
-    pub proxy_id: [u8; 32],
-    pub data_id: [u8; 16],
-    pub decimals: u8,
-    pub fallback_time: u32,
-    pub max_sync_iterations: u32,
-}
-
-#[event]
-pub struct ProxyConfigRemoved {
-    pub state: Pubkey,
-    pub proxy: Pubkey,
-    pub proxy_id: [u8; 32],
-    pub data_id: [u8; 16],
 }
 
 #[event]
 pub struct FeedDescriptionSet {
     pub state: Pubkey,
     pub indexed_feed_id: [u8; 16],
-    pub description: String,
-}
-
-#[event]
-pub struct SvrPathDescriptionSet {
-    pub state: Pubkey,
-    pub svr_path_id: [u8; 2],
     pub description: String,
 }
 
@@ -176,15 +131,7 @@ pub struct FutureReportIgnored {
 #[event]
 pub struct StaleReport {
     pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
-    pub observations_timestamp: u32,
-    pub latest_observations_timestamp: u32,
-}
-
-#[event]
-pub struct StaleSvrReport {
-    pub state: Pubkey,
-    pub svr_data_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub observations_timestamp: u32,
     pub latest_observations_timestamp: u32,
 }
@@ -201,25 +148,7 @@ pub struct AnswerOutOfMinMaxRange {
 #[event]
 pub struct FeedUpdated {
     pub state: Pubkey,
-    pub non_svr_data_id: [u8; 16],
-    pub round_id: u64,
-    pub observations_timestamp: u32,
-    pub answer: i128,
-}
-
-#[event]
-pub struct SvrFeedUpdated {
-    pub state: Pubkey,
-    pub svr_data_id: [u8; 16],
-    pub round_id: u64,
-    pub observations_timestamp: u32,
-    pub answer: i128,
-}
-
-#[event]
-pub struct SvrReportSynced {
-    pub state: Pubkey,
-    pub svr_data_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub round_id: u64,
     pub observations_timestamp: u32,
     pub answer: i128,

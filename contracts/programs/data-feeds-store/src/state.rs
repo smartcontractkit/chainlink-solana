@@ -32,10 +32,10 @@ pub struct StoreState {
     pub _reserved: [u8; 64],
 }
 
-/// Non-SVR feed history and the non-SVR data ID's settings, one per non-SVR data ID. The account
-/// holds this header followed by a circular buffer of `max_stored_reports` [`StoredReport`]s, round
-/// `r` lives at slot `r % max_stored_reports`. Keeping the settings here rather than in a separate
-/// account saves a non-SVR report one account in the transaction.
+/// Feed history and the data ID's settings, one per data ID. The account holds this header followed
+/// by a circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` lives at slot
+/// `r % max_stored_reports`. Keeping the settings in the feed account means a report passes one
+/// store account, which is what lets more reports fit a transaction.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct FeedData {
@@ -50,11 +50,9 @@ pub struct FeedData {
     pub _padding1: [u8; 4],
     pub data_id: [u8; 16],
     pub state: Pubkey,
-    /// Latest round ID, SVR-authored rounds included
+    /// Latest round ID
     pub round_id: u64,
-    /// Newest round released to non-SVR readers, behind `round_id` while an SVR-authored round is
-    /// exclusive to its path for the slot it landed in
-    pub visible_round_id: u64,
+    pub _reserved0: [u8; 8],
     pub max_stored_reports: u64,
     pub latest_recorded_slot: u64,
     pub latest_answer: i128,
@@ -84,8 +82,7 @@ pub struct StoredReport {
     pub recorded_slot: u64,
 }
 
-/// Permissions and report callback of a data ID: part of the feed account for a non-SVR data ID,
-/// of the [`DataIdConfig`] for an SVR path.
+/// Permissions and report callback of a data ID, part of its feed account.
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct DataIdSettings {
@@ -116,64 +113,13 @@ impl DataIdSettings {
     }
 }
 
-/// SVR path state: its settings and the report it selected. Non-SVR data IDs keep their settings
-/// in their feed account and have no config.
-#[account(zero_copy)]
-#[derive(InitSpace)]
-pub struct DataIdConfig {
-    pub version: u8,
-    /// Readers fall back to the non-SVR feed when set
-    pub svr_disabled: u8,
-    pub _padding0: [u8; 2],
-    pub svr_observations_timestamp: u32,
-    pub svr_recorded_timestamp: u32,
-    pub _padding1: [u8; 4],
-    pub data_id: [u8; 16],
-    pub state: Pubkey,
-    /// Shared-history round the SVR path selected, 0 until it selects one
-    pub svr_round_id: u64,
-    pub svr_recorded_slot: u64,
-    pub svr_answer: i128,
-    pub settings: DataIdSettings,
-    pub _reserved: [u8; 64],
-}
-
-/// Reader configuration, the Solana counterpart of an EVM aggregator proxy. Its address is the
-/// address readers pass to the proxy read instructions.
-#[account]
-#[derive(InitSpace)]
-pub struct ProxyConfig {
-    pub version: u8,
-    pub state: Pubkey,
-    pub proxy_id: [u8; 32],
-    /// Full data ID, non-SVR or SVR path
-    pub data_id: [u8; 16],
-    /// Decimals answers are downscaled to, at most the stored decimals
-    pub decimals: u8,
-    /// Seconds an SVR report stays valid before readers fall back to non-SVR rounds
-    pub fallback_time: u32,
-    /// Max non-SVR rounds scanned when syncing a stale SVR path
-    pub max_sync_iterations: u32,
-    pub _reserved: [u8; 32],
-}
-
-/// Description shared by every instance and SVR path of a feed, keyed by indexed feed ID.
+/// Description shared by every instance of a feed, keyed by indexed feed ID.
 #[account]
 #[derive(InitSpace)]
 pub struct FeedDescription {
     pub version: u8,
     pub state: Pubkey,
     pub indexed_feed_id: [u8; 16],
-    /// UTF-8, zero padded
-    pub description: [u8; DESCRIPTION_LEN],
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct SvrPathDescription {
-    pub version: u8,
-    pub state: Pubkey,
-    pub svr_path_id: [u8; 2],
     /// UTF-8, zero padded
     pub description: [u8; DESCRIPTION_LEN],
 }
@@ -210,7 +156,6 @@ const_assert_eq!(size_of::<StoreState>(), 3200);
 const_assert_eq!(size_of::<DataIdSettings>(), 1168);
 const_assert_eq!(size_of::<FeedData>(), 1376);
 const_assert_eq!(size_of::<StoredReport>(), 32);
-const_assert_eq!(size_of::<DataIdConfig>(), 1328);
 
 // ================================================================
 // │                     Instruction arguments                    │
@@ -224,14 +169,6 @@ pub struct ReceivedReport {
     pub timestamp: u32,
     /// Answer with `STORED_DECIMALS`
     pub answer: i128,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
-pub struct ProxyConfigArgs {
-    pub data_id: [u8; 16],
-    pub decimals: u8,
-    pub fallback_time: u32,
-    pub max_sync_iterations: u32,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
@@ -257,27 +194,22 @@ pub struct CallbackConfigArgs {
 pub struct OnReportCallbackArgs {
     /// Data ID the round is stored under
     pub data_id: [u8; 16],
-    /// SVR path the report arrived through, zero for the non-SVR path
-    pub svr_path_id: [u8; 2],
     pub round_id: u64,
     pub answer: i128,
     /// Decimals of `answer`, always `STORED_DECIMALS`
     pub decimals: u8,
     pub observations_timestamp: u32,
     pub recorded_timestamp: u32,
-    /// Whether the report is appended to the shared history, false when an SVR path only adopted
-    /// a round that was already stored
-    pub is_freshest: bool,
 }
 
-/// Aggregator-compatible round data.
+/// A round as returned by the reader instructions, the answer has `STORED_DECIMALS`. This is the
+/// seam proxies read through, so it must stay Borsh-compatible across store versions.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default, PartialEq)]
-pub struct RoundData {
+pub struct ReaderRound {
     pub round_id: u64,
     pub answer: i128,
     /// Offchain observations timestamp
-    pub started_at: u64,
+    pub observations_timestamp: u32,
     /// Onchain recorded timestamp
-    pub updated_at: u64,
-    pub answered_in_round: u64,
+    pub recorded_timestamp: u32,
 }

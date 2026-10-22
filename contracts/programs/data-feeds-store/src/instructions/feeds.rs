@@ -11,31 +11,28 @@ use crate::{
     utils::{close_account, create_pda_account, load_feed, store, verify_feed_admin},
 };
 
-fn validate_non_svr(id: &[u8; 16]) -> Result<()> {
-    require!(
-        !data_id::is_zero(id) && data_id::is_valid_non_svr(id),
-        StoreError::InvalidDataId
-    );
+fn validate_data_id(id: &[u8; 16]) -> Result<()> {
+    require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
     Ok(())
 }
 
-/// Create the history accounts of non-SVR data IDs with the store's default ring size. Accounts
+/// Create the feed accounts of data IDs with the store's default ring size. Accounts
 /// that already exist are left untouched.
 pub fn init_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    non_svr_data_ids: Vec<[u8; 16]>,
+    data_ids: Vec<[u8; 16]>,
 ) -> Result<()> {
     let state = ctx.accounts.state.load()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
     require_eq!(
-        non_svr_data_ids.len(),
+        data_ids.len(),
         ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
     let state_key = ctx.accounts.state.key();
-    for (id, info) in non_svr_data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        validate_non_svr(id)?;
+    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
+        validate_data_id(id)?;
 
         let (address, bump) =
             Pubkey::find_program_address(&[FEED_SEED, state_key.as_ref(), id], &crate::ID);
@@ -64,7 +61,7 @@ pub fn init_feeds<'info>(
 
         emit!(FeedInitialized {
             state: state_key,
-            non_svr_data_id: *id,
+            data_id: *id,
             max_stored_reports,
         });
     }
@@ -74,36 +71,36 @@ pub fn init_feeds<'info>(
 /// Close feed history accounts, returning their rent to the feed admin.
 pub fn close_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    non_svr_data_ids: Vec<[u8; 16]>,
+    data_ids: Vec<[u8; 16]>,
 ) -> Result<()> {
     verify_feed_admin(
         &ctx.accounts.feed_admin,
         &ctx.accounts.state.load()?.feed_admins,
     )?;
     require_eq!(
-        non_svr_data_ids.len(),
+        data_ids.len(),
         ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
     let state_key = ctx.accounts.state.key();
-    for (id, info) in non_svr_data_ids.iter().zip(ctx.remaining_accounts.iter()) {
+    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
         load_feed(info, &state_key, id)?;
         close_account(info, &ctx.accounts.feed_admin.to_account_info())?;
         emit!(FeedClosed {
             state: state_key,
-            non_svr_data_id: *id,
+            data_id: *id,
         });
     }
     Ok(())
 }
 
-/// Set the number of non-SVR reports retained per feed. The first configuration is free,
+/// Set the number of reports retained per feed. The first configuration is free,
 /// afterwards the ring can only grow, and only while it has never wrapped. Growing is limited to
 /// 10KiB (320 reports) per instruction.
 pub fn set_max_stored_reports<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    non_svr_data_ids: Vec<[u8; 16]>,
+    data_ids: Vec<[u8; 16]>,
     max_stored_reports: Vec<u64>,
 ) -> Result<()> {
     verify_feed_admin(
@@ -111,8 +108,8 @@ pub fn set_max_stored_reports<'info>(
         &ctx.accounts.state.load()?.feed_admins,
     )?;
     require!(
-        non_svr_data_ids.len() == max_stored_reports.len()
-            && non_svr_data_ids.len() == ctx.remaining_accounts.len(),
+        data_ids.len() == max_stored_reports.len()
+            && data_ids.len() == ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
@@ -120,12 +117,12 @@ pub fn set_max_stored_reports<'info>(
     let feed_admin = ctx.accounts.feed_admin.to_account_info();
     let rent = Rent::get()?;
 
-    for ((id, new_max), info) in non_svr_data_ids
+    for ((id, new_max), info) in data_ids
         .iter()
         .zip(max_stored_reports.iter().copied())
         .zip(ctx.remaining_accounts.iter())
     {
-        validate_non_svr(id)?;
+        validate_data_id(id)?;
         let mut feed = load_feed(info, &state_key, id)?;
 
         check_max_stored_reports(&feed, new_max).map_err(|e| match e {
@@ -178,18 +175,18 @@ pub fn set_max_stored_reports<'info>(
 
         emit!(MaxStoredReportsSet {
             state: state_key,
-            non_svr_data_id: *id,
+            data_id: *id,
             max_stored_reports: new_max,
         });
     }
     Ok(())
 }
 
-/// Set the accepted answer range of feeds, shared by their SVR paths. The (i128::MIN, i128::MAX)
+/// Set the accepted answer range of feeds, The (i128::MIN, i128::MAX)
 /// pair clears the range.
 pub fn set_min_max_answers<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    non_svr_data_ids: Vec<[u8; 16]>,
+    data_ids: Vec<[u8; 16]>,
     min_answers: Vec<i128>,
     max_answers: Vec<i128>,
 ) -> Result<()> {
@@ -198,19 +195,19 @@ pub fn set_min_max_answers<'info>(
         &ctx.accounts.state.load()?.feed_admins,
     )?;
     require!(
-        non_svr_data_ids.len() == min_answers.len()
-            && non_svr_data_ids.len() == max_answers.len()
-            && non_svr_data_ids.len() == ctx.remaining_accounts.len(),
+        data_ids.len() == min_answers.len()
+            && data_ids.len() == max_answers.len()
+            && data_ids.len() == ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
     let state_key = ctx.accounts.state.key();
-    for (i, (id, info)) in non_svr_data_ids
+    for (i, (id, info)) in data_ids
         .iter()
         .zip(ctx.remaining_accounts.iter())
         .enumerate()
     {
-        validate_non_svr(id)?;
+        validate_data_id(id)?;
         let mut feed = load_feed(info, &state_key, id)?;
         let (min_answer, max_answer) = (min_answers[i], max_answers[i]);
 
@@ -229,7 +226,7 @@ pub fn set_min_max_answers<'info>(
 
         emit!(MinMaxAnswerSet {
             state: state_key,
-            non_svr_data_id: *id,
+            data_id: *id,
             min_answer,
             max_answer,
         });

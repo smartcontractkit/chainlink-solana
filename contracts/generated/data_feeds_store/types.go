@@ -301,315 +301,7 @@ func UnmarshalCallbackConfigArgs(buf []byte) (*CallbackConfigArgs, error) {
 	return obj, nil
 }
 
-type DataIdClosed struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
-}
-
-func (obj DataIdClosed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj DataIdClosed) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding DataIdClosed: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *DataIdClosed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj *DataIdClosed) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling DataIdClosed: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalDataIdClosed(buf []byte) (*DataIdClosed, error) {
-	obj := new(DataIdClosed)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-// SVR path state: its settings and the report it selected. Non-SVR data IDs keep their settings
-// in their feed account and have no config.
-type DataIdConfig struct {
-	Version uint8 `json:"version"`
-
-	// Readers fall back to the non-SVR feed when set
-	SvrDisabled              uint8              `json:"svr_disabled"`
-	Padding0                 [2]uint8           `json:"_padding0"`
-	SvrObservationsTimestamp uint32             `json:"svr_observations_timestamp"`
-	SvrRecordedTimestamp     uint32             `json:"svr_recorded_timestamp"`
-	Padding1                 [4]uint8           `json:"_padding1"`
-	DataId                   [16]uint8          `json:"data_id"`
-	State                    solanago.PublicKey `json:"state"`
-
-	// Shared-history round the SVR path selected, 0 until it selects one
-	SvrRoundId      uint64         `json:"svr_round_id"`
-	SvrRecordedSlot uint64         `json:"svr_recorded_slot"`
-	SvrAnswer       binary.Int128  `json:"svr_answer"`
-	Settings        DataIdSettings `json:"settings"`
-	Reserved        [64]uint8      `json:"_reserved"`
-}
-
-func (obj DataIdConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Serialize `SvrDisabled`:
-	err = encoder.Encode(obj.SvrDisabled)
-	if err != nil {
-		return errors.NewField("SvrDisabled", err)
-	}
-	// Serialize `Padding0`:
-	err = encoder.Encode(obj.Padding0)
-	if err != nil {
-		return errors.NewField("Padding0", err)
-	}
-	// Serialize `SvrObservationsTimestamp`:
-	err = encoder.Encode(obj.SvrObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("SvrObservationsTimestamp", err)
-	}
-	// Serialize `SvrRecordedTimestamp`:
-	err = encoder.Encode(obj.SvrRecordedTimestamp)
-	if err != nil {
-		return errors.NewField("SvrRecordedTimestamp", err)
-	}
-	// Serialize `Padding1`:
-	err = encoder.Encode(obj.Padding1)
-	if err != nil {
-		return errors.NewField("Padding1", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrRoundId`:
-	err = encoder.Encode(obj.SvrRoundId)
-	if err != nil {
-		return errors.NewField("SvrRoundId", err)
-	}
-	// Serialize `SvrRecordedSlot`:
-	err = encoder.Encode(obj.SvrRecordedSlot)
-	if err != nil {
-		return errors.NewField("SvrRecordedSlot", err)
-	}
-	// Serialize `SvrAnswer`:
-	err = encoder.Encode(obj.SvrAnswer)
-	if err != nil {
-		return errors.NewField("SvrAnswer", err)
-	}
-	// Serialize `Settings`:
-	err = encoder.Encode(obj.Settings)
-	if err != nil {
-		return errors.NewField("Settings", err)
-	}
-	// Serialize `Reserved`:
-	err = encoder.Encode(obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
-	}
-	return nil
-}
-
-func (obj DataIdConfig) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding DataIdConfig: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *DataIdConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Deserialize `SvrDisabled`:
-	err = decoder.Decode(&obj.SvrDisabled)
-	if err != nil {
-		return errors.NewField("SvrDisabled", err)
-	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
-	if err != nil {
-		return errors.NewField("Padding0", err)
-	}
-	// Deserialize `SvrObservationsTimestamp`:
-	err = decoder.Decode(&obj.SvrObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("SvrObservationsTimestamp", err)
-	}
-	// Deserialize `SvrRecordedTimestamp`:
-	err = decoder.Decode(&obj.SvrRecordedTimestamp)
-	if err != nil {
-		return errors.NewField("SvrRecordedTimestamp", err)
-	}
-	// Deserialize `Padding1`:
-	err = decoder.Decode(&obj.Padding1)
-	if err != nil {
-		return errors.NewField("Padding1", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrRoundId`:
-	err = decoder.Decode(&obj.SvrRoundId)
-	if err != nil {
-		return errors.NewField("SvrRoundId", err)
-	}
-	// Deserialize `SvrRecordedSlot`:
-	err = decoder.Decode(&obj.SvrRecordedSlot)
-	if err != nil {
-		return errors.NewField("SvrRecordedSlot", err)
-	}
-	// Deserialize `SvrAnswer`:
-	err = decoder.Decode(&obj.SvrAnswer)
-	if err != nil {
-		return errors.NewField("SvrAnswer", err)
-	}
-	// Deserialize `Settings`:
-	err = decoder.Decode(&obj.Settings)
-	if err != nil {
-		return errors.NewField("Settings", err)
-	}
-	// Deserialize `Reserved`:
-	err = decoder.Decode(&obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
-	}
-	return nil
-}
-
-func (obj *DataIdConfig) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling DataIdConfig: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalDataIdConfig(buf []byte) (*DataIdConfig, error) {
-	obj := new(DataIdConfig)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type DataIdInitialized struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
-}
-
-func (obj DataIdInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj DataIdInitialized) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding DataIdInitialized: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *DataIdInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj *DataIdInitialized) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling DataIdInitialized: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalDataIdInitialized(buf []byte) (*DataIdInitialized, error) {
-	obj := new(DataIdInitialized)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-// Permissions and report callback of a data ID: part of the feed account for a non-SVR data ID,
-// of the [`DataIdConfig`] for an SVR path.
+// Permissions and report callback of a data ID, part of its feed account.
 type DataIdSettings struct {
 	// Whether a callback returning false drops the report
 	CallbackRevertOnFailure uint8 `json:"callback_revert_on_failure"`
@@ -864,8 +556,8 @@ func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
 }
 
 type FeedClosed struct {
-	State        solanago.PublicKey `json:"state"`
-	NonSvrDataId [16]uint8          `json:"non_svr_data_id"`
+	State  solanago.PublicKey `json:"state"`
+	DataId [16]uint8          `json:"data_id"`
 }
 
 func (obj FeedClosed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -874,10 +566,10 @@ func (obj FeedClosed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	return nil
 }
@@ -898,10 +590,10 @@ func (obj *FeedClosed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	return nil
 }
@@ -923,10 +615,10 @@ func UnmarshalFeedClosed(buf []byte) (*FeedClosed, error) {
 	return obj, nil
 }
 
-// Non-SVR feed history and the non-SVR data ID's settings, one per non-SVR data ID. The account
-// holds this header followed by a circular buffer of `max_stored_reports` [`StoredReport`]s, round
-// `r` lives at slot `r % max_stored_reports`. Keeping the settings here rather than in a separate
-// account saves a non-SVR report one account in the transaction.
+// Feed history and the data ID's settings, one per data ID. The account holds this header followed
+// by a circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` lives at slot
+// `r % max_stored_reports`. Keeping the settings in the feed account means a report passes one
+// store account, which is what lets more reports fit a transaction.
 type FeedData struct {
 	Version uint8 `json:"version"`
 
@@ -942,12 +634,9 @@ type FeedData struct {
 	DataId                      [16]uint8          `json:"data_id"`
 	State                       solanago.PublicKey `json:"state"`
 
-	// Latest round ID, SVR-authored rounds included
-	RoundId uint64 `json:"round_id"`
-
-	// Newest round released to non-SVR readers, behind `round_id` while an SVR-authored round is
-	// exclusive to its path for the slot it landed in
-	VisibleRoundId     uint64         `json:"visible_round_id"`
+	// Latest round ID
+	RoundId            uint64         `json:"round_id"`
+	Reserved0          [8]uint8       `json:"_reserved0"`
 	MaxStoredReports   uint64         `json:"max_stored_reports"`
 	LatestRecordedSlot uint64         `json:"latest_recorded_slot"`
 	LatestAnswer       binary.Int128  `json:"latest_answer"`
@@ -1008,10 +697,10 @@ func (obj FeedData) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("RoundId", err)
 	}
-	// Serialize `VisibleRoundId`:
-	err = encoder.Encode(obj.VisibleRoundId)
+	// Serialize `Reserved0`:
+	err = encoder.Encode(obj.Reserved0)
 	if err != nil {
-		return errors.NewField("VisibleRoundId", err)
+		return errors.NewField("Reserved0", err)
 	}
 	// Serialize `MaxStoredReports`:
 	err = encoder.Encode(obj.MaxStoredReports)
@@ -1112,10 +801,10 @@ func (obj *FeedData) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	if err != nil {
 		return errors.NewField("RoundId", err)
 	}
-	// Deserialize `VisibleRoundId`:
-	err = decoder.Decode(&obj.VisibleRoundId)
+	// Deserialize `Reserved0`:
+	err = decoder.Decode(&obj.Reserved0)
 	if err != nil {
-		return errors.NewField("VisibleRoundId", err)
+		return errors.NewField("Reserved0", err)
 	}
 	// Deserialize `MaxStoredReports`:
 	err = decoder.Decode(&obj.MaxStoredReports)
@@ -1172,7 +861,7 @@ func UnmarshalFeedData(buf []byte) (*FeedData, error) {
 	return obj, nil
 }
 
-// Description shared by every instance and SVR path of a feed, keyed by indexed feed ID.
+// Description shared by every instance of a feed, keyed by indexed feed ID.
 type FeedDescription struct {
 	Version       uint8              `json:"version"`
 	State         solanago.PublicKey `json:"state"`
@@ -1330,7 +1019,7 @@ func UnmarshalFeedDescriptionSet(buf []byte) (*FeedDescriptionSet, error) {
 
 type FeedInitialized struct {
 	State            solanago.PublicKey `json:"state"`
-	NonSvrDataId     [16]uint8          `json:"non_svr_data_id"`
+	DataId           [16]uint8          `json:"data_id"`
 	MaxStoredReports uint64             `json:"max_stored_reports"`
 }
 
@@ -1340,10 +1029,10 @@ func (obj FeedInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err erro
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `MaxStoredReports`:
 	err = encoder.Encode(obj.MaxStoredReports)
@@ -1369,10 +1058,10 @@ func (obj *FeedInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err e
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `MaxStoredReports`:
 	err = decoder.Decode(&obj.MaxStoredReports)
@@ -1401,7 +1090,7 @@ func UnmarshalFeedInitialized(buf []byte) (*FeedInitialized, error) {
 
 type FeedUpdated struct {
 	State                 solanago.PublicKey `json:"state"`
-	NonSvrDataId          [16]uint8          `json:"non_svr_data_id"`
+	DataId                [16]uint8          `json:"data_id"`
 	RoundId               uint64             `json:"round_id"`
 	ObservationsTimestamp uint32             `json:"observations_timestamp"`
 	Answer                binary.Int128      `json:"answer"`
@@ -1413,10 +1102,10 @@ func (obj FeedUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `RoundId`:
 	err = encoder.Encode(obj.RoundId)
@@ -1452,10 +1141,10 @@ func (obj *FeedUpdated) UnmarshalWithDecoder(decoder *binary.Decoder) (err error
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `RoundId`:
 	err = decoder.Decode(&obj.RoundId)
@@ -1729,7 +1418,7 @@ func UnmarshalMaxObservationForwardDurationSecondsUpdated(buf []byte) (*MaxObser
 
 type MaxStoredReportsSet struct {
 	State            solanago.PublicKey `json:"state"`
-	NonSvrDataId     [16]uint8          `json:"non_svr_data_id"`
+	DataId           [16]uint8          `json:"data_id"`
 	MaxStoredReports uint64             `json:"max_stored_reports"`
 }
 
@@ -1739,10 +1428,10 @@ func (obj MaxStoredReportsSet) MarshalWithEncoder(encoder *binary.Encoder) (err 
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `MaxStoredReports`:
 	err = encoder.Encode(obj.MaxStoredReports)
@@ -1768,10 +1457,10 @@ func (obj *MaxStoredReportsSet) UnmarshalWithDecoder(decoder *binary.Decoder) (e
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `MaxStoredReports`:
 	err = decoder.Decode(&obj.MaxStoredReports)
@@ -1799,10 +1488,10 @@ func UnmarshalMaxStoredReportsSet(buf []byte) (*MaxStoredReportsSet, error) {
 }
 
 type MinMaxAnswerSet struct {
-	State        solanago.PublicKey `json:"state"`
-	NonSvrDataId [16]uint8          `json:"non_svr_data_id"`
-	MinAnswer    binary.Int128      `json:"min_answer"`
-	MaxAnswer    binary.Int128      `json:"max_answer"`
+	State     solanago.PublicKey `json:"state"`
+	DataId    [16]uint8          `json:"data_id"`
+	MinAnswer binary.Int128      `json:"min_answer"`
+	MaxAnswer binary.Int128      `json:"max_answer"`
 }
 
 func (obj MinMaxAnswerSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1811,10 +1500,10 @@ func (obj MinMaxAnswerSet) MarshalWithEncoder(encoder *binary.Encoder) (err erro
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `MinAnswer`:
 	err = encoder.Encode(obj.MinAnswer)
@@ -1845,10 +1534,10 @@ func (obj *MinMaxAnswerSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err e
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `MinAnswer`:
 	err = decoder.Decode(&obj.MinAnswer)
@@ -2022,414 +1711,87 @@ func UnmarshalOwnershipTransferred(buf []byte) (*OwnershipTransferred, error) {
 	return obj, nil
 }
 
-// Reader configuration, the Solana counterpart of an EVM aggregator proxy. Its address is the
-// address readers pass to the proxy read instructions.
-type ProxyConfig struct {
-	Version uint8              `json:"version"`
-	State   solanago.PublicKey `json:"state"`
-	ProxyId [32]uint8          `json:"proxy_id"`
+// A round as returned by the reader instructions, the answer has `STORED_DECIMALS`. This is the
+// seam proxies read through, so it must stay Borsh-compatible across store versions.
+type ReaderRound struct {
+	RoundId uint64        `json:"round_id"`
+	Answer  binary.Int128 `json:"answer"`
 
-	// Full data ID, non-SVR or SVR path
-	DataId [16]uint8 `json:"data_id"`
+	// Offchain observations timestamp
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
 
-	// Decimals answers are downscaled to, at most the stored decimals
-	Decimals uint8 `json:"decimals"`
-
-	// Seconds an SVR report stays valid before readers fall back to non-SVR rounds
-	FallbackTime uint32 `json:"fallback_time"`
-
-	// Max non-SVR rounds scanned when syncing a stale SVR path
-	MaxSyncIterations uint32    `json:"max_sync_iterations"`
-	Reserved          [32]uint8 `json:"_reserved"`
+	// Onchain recorded timestamp
+	RecordedTimestamp uint32 `json:"recorded_timestamp"`
 }
 
-func (obj ProxyConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
+func (obj ReaderRound) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
 	if err != nil {
-		return errors.NewField("Version", err)
+		return errors.NewField("RoundId", err)
 	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
+	// Serialize `Answer`:
+	err = encoder.Encode(obj.Answer)
 	if err != nil {
-		return errors.NewField("State", err)
+		return errors.NewField("Answer", err)
 	}
-	// Serialize `ProxyId`:
-	err = encoder.Encode(obj.ProxyId)
+	// Serialize `ObservationsTimestamp`:
+	err = encoder.Encode(obj.ObservationsTimestamp)
 	if err != nil {
-		return errors.NewField("ProxyId", err)
+		return errors.NewField("ObservationsTimestamp", err)
 	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
+	// Serialize `RecordedTimestamp`:
+	err = encoder.Encode(obj.RecordedTimestamp)
 	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `Decimals`:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Serialize `FallbackTime`:
-	err = encoder.Encode(obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Serialize `MaxSyncIterations`:
-	err = encoder.Encode(obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	// Serialize `Reserved`:
-	err = encoder.Encode(obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
+		return errors.NewField("RecordedTimestamp", err)
 	}
 	return nil
 }
 
-func (obj ProxyConfig) Marshal() ([]byte, error) {
+func (obj ReaderRound) Marshal() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	encoder := binary.NewBorshEncoder(buf)
 	err := obj.MarshalWithEncoder(encoder)
 	if err != nil {
-		return nil, fmt.Errorf("error while encoding ProxyConfig: %w", err)
+		return nil, fmt.Errorf("error while encoding ReaderRound: %w", err)
 	}
 	return buf.Bytes(), nil
 }
 
-func (obj *ProxyConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
+func (obj *ReaderRound) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
 	if err != nil {
-		return errors.NewField("Version", err)
+		return errors.NewField("RoundId", err)
 	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
 	if err != nil {
-		return errors.NewField("State", err)
+		return errors.NewField("Answer", err)
 	}
-	// Deserialize `ProxyId`:
-	err = decoder.Decode(&obj.ProxyId)
+	// Deserialize `ObservationsTimestamp`:
+	err = decoder.Decode(&obj.ObservationsTimestamp)
 	if err != nil {
-		return errors.NewField("ProxyId", err)
+		return errors.NewField("ObservationsTimestamp", err)
 	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
+	// Deserialize `RecordedTimestamp`:
+	err = decoder.Decode(&obj.RecordedTimestamp)
 	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Deserialize `FallbackTime`:
-	err = decoder.Decode(&obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Deserialize `MaxSyncIterations`:
-	err = decoder.Decode(&obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	// Deserialize `Reserved`:
-	err = decoder.Decode(&obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
+		return errors.NewField("RecordedTimestamp", err)
 	}
 	return nil
 }
 
-func (obj *ProxyConfig) Unmarshal(buf []byte) error {
+func (obj *ReaderRound) Unmarshal(buf []byte) error {
 	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling ProxyConfig: %w", err)
+		return fmt.Errorf("error while unmarshaling ReaderRound: %w", err)
 	}
 	return nil
 }
 
-func UnmarshalProxyConfig(buf []byte) (*ProxyConfig, error) {
-	obj := new(ProxyConfig)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type ProxyConfigArgs struct {
-	DataId            [16]uint8 `json:"data_id"`
-	Decimals          uint8     `json:"decimals"`
-	FallbackTime      uint32    `json:"fallback_time"`
-	MaxSyncIterations uint32    `json:"max_sync_iterations"`
-}
-
-func (obj ProxyConfigArgs) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `Decimals`:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Serialize `FallbackTime`:
-	err = encoder.Encode(obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Serialize `MaxSyncIterations`:
-	err = encoder.Encode(obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	return nil
-}
-
-func (obj ProxyConfigArgs) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding ProxyConfigArgs: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *ProxyConfigArgs) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Deserialize `FallbackTime`:
-	err = decoder.Decode(&obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Deserialize `MaxSyncIterations`:
-	err = decoder.Decode(&obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	return nil
-}
-
-func (obj *ProxyConfigArgs) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ProxyConfigArgs: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalProxyConfigArgs(buf []byte) (*ProxyConfigArgs, error) {
-	obj := new(ProxyConfigArgs)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type ProxyConfigRemoved struct {
-	State   solanago.PublicKey `json:"state"`
-	Proxy   solanago.PublicKey `json:"proxy"`
-	ProxyId [32]uint8          `json:"proxy_id"`
-	DataId  [16]uint8          `json:"data_id"`
-}
-
-func (obj ProxyConfigRemoved) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `Proxy`:
-	err = encoder.Encode(obj.Proxy)
-	if err != nil {
-		return errors.NewField("Proxy", err)
-	}
-	// Serialize `ProxyId`:
-	err = encoder.Encode(obj.ProxyId)
-	if err != nil {
-		return errors.NewField("ProxyId", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj ProxyConfigRemoved) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding ProxyConfigRemoved: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *ProxyConfigRemoved) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `Proxy`:
-	err = decoder.Decode(&obj.Proxy)
-	if err != nil {
-		return errors.NewField("Proxy", err)
-	}
-	// Deserialize `ProxyId`:
-	err = decoder.Decode(&obj.ProxyId)
-	if err != nil {
-		return errors.NewField("ProxyId", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj *ProxyConfigRemoved) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ProxyConfigRemoved: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalProxyConfigRemoved(buf []byte) (*ProxyConfigRemoved, error) {
-	obj := new(ProxyConfigRemoved)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type ProxyConfigUpdated struct {
-	State             solanago.PublicKey `json:"state"`
-	Proxy             solanago.PublicKey `json:"proxy"`
-	ProxyId           [32]uint8          `json:"proxy_id"`
-	DataId            [16]uint8          `json:"data_id"`
-	Decimals          uint8              `json:"decimals"`
-	FallbackTime      uint32             `json:"fallback_time"`
-	MaxSyncIterations uint32             `json:"max_sync_iterations"`
-}
-
-func (obj ProxyConfigUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `Proxy`:
-	err = encoder.Encode(obj.Proxy)
-	if err != nil {
-		return errors.NewField("Proxy", err)
-	}
-	// Serialize `ProxyId`:
-	err = encoder.Encode(obj.ProxyId)
-	if err != nil {
-		return errors.NewField("ProxyId", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `Decimals`:
-	err = encoder.Encode(obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Serialize `FallbackTime`:
-	err = encoder.Encode(obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Serialize `MaxSyncIterations`:
-	err = encoder.Encode(obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	return nil
-}
-
-func (obj ProxyConfigUpdated) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding ProxyConfigUpdated: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *ProxyConfigUpdated) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `Proxy`:
-	err = decoder.Decode(&obj.Proxy)
-	if err != nil {
-		return errors.NewField("Proxy", err)
-	}
-	// Deserialize `ProxyId`:
-	err = decoder.Decode(&obj.ProxyId)
-	if err != nil {
-		return errors.NewField("ProxyId", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `Decimals`:
-	err = decoder.Decode(&obj.Decimals)
-	if err != nil {
-		return errors.NewField("Decimals", err)
-	}
-	// Deserialize `FallbackTime`:
-	err = decoder.Decode(&obj.FallbackTime)
-	if err != nil {
-		return errors.NewField("FallbackTime", err)
-	}
-	// Deserialize `MaxSyncIterations`:
-	err = decoder.Decode(&obj.MaxSyncIterations)
-	if err != nil {
-		return errors.NewField("MaxSyncIterations", err)
-	}
-	return nil
-}
-
-func (obj *ProxyConfigUpdated) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ProxyConfigUpdated: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalProxyConfigUpdated(buf []byte) (*ProxyConfigUpdated, error) {
-	obj := new(ProxyConfigUpdated)
+func UnmarshalReaderRound(buf []byte) (*ReaderRound, error) {
+	obj := new(ReaderRound)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -2623,104 +1985,6 @@ func UnmarshalReportCallbackRejected(buf []byte) (*ReportCallbackRejected, error
 	return obj, nil
 }
 
-// Aggregator-compatible round data.
-type RoundData struct {
-	RoundId uint64        `json:"round_id"`
-	Answer  binary.Int128 `json:"answer"`
-
-	// Offchain observations timestamp
-	StartedAt uint64 `json:"started_at"`
-
-	// Onchain recorded timestamp
-	UpdatedAt       uint64 `json:"updated_at"`
-	AnsweredInRound uint64 `json:"answered_in_round"`
-}
-
-func (obj RoundData) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `RoundId`:
-	err = encoder.Encode(obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Serialize `Answer`:
-	err = encoder.Encode(obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	// Serialize `StartedAt`:
-	err = encoder.Encode(obj.StartedAt)
-	if err != nil {
-		return errors.NewField("StartedAt", err)
-	}
-	// Serialize `UpdatedAt`:
-	err = encoder.Encode(obj.UpdatedAt)
-	if err != nil {
-		return errors.NewField("UpdatedAt", err)
-	}
-	// Serialize `AnsweredInRound`:
-	err = encoder.Encode(obj.AnsweredInRound)
-	if err != nil {
-		return errors.NewField("AnsweredInRound", err)
-	}
-	return nil
-}
-
-func (obj RoundData) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding RoundData: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *RoundData) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `RoundId`:
-	err = decoder.Decode(&obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Deserialize `Answer`:
-	err = decoder.Decode(&obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	// Deserialize `StartedAt`:
-	err = decoder.Decode(&obj.StartedAt)
-	if err != nil {
-		return errors.NewField("StartedAt", err)
-	}
-	// Deserialize `UpdatedAt`:
-	err = decoder.Decode(&obj.UpdatedAt)
-	if err != nil {
-		return errors.NewField("UpdatedAt", err)
-	}
-	// Deserialize `AnsweredInRound`:
-	err = decoder.Decode(&obj.AnsweredInRound)
-	if err != nil {
-		return errors.NewField("AnsweredInRound", err)
-	}
-	return nil
-}
-
-func (obj *RoundData) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling RoundData: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalRoundData(buf []byte) (*RoundData, error) {
-	obj := new(RoundData)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type SpecificFeedMetadataRemoved struct {
 	State  solanago.PublicKey `json:"state"`
 	DataId [16]uint8          `json:"data_id"`
@@ -2854,7 +2118,7 @@ func UnmarshalSpecificFeedMetadataSet(buf []byte) (*SpecificFeedMetadataSet, err
 
 type StaleReport struct {
 	State                       solanago.PublicKey `json:"state"`
-	NonSvrDataId                [16]uint8          `json:"non_svr_data_id"`
+	DataId                      [16]uint8          `json:"data_id"`
 	ObservationsTimestamp       uint32             `json:"observations_timestamp"`
 	LatestObservationsTimestamp uint32             `json:"latest_observations_timestamp"`
 }
@@ -2865,10 +2129,10 @@ func (obj StaleReport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `NonSvrDataId`:
-	err = encoder.Encode(obj.NonSvrDataId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `ObservationsTimestamp`:
 	err = encoder.Encode(obj.ObservationsTimestamp)
@@ -2899,10 +2163,10 @@ func (obj *StaleReport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `NonSvrDataId`:
-	err = decoder.Decode(&obj.NonSvrDataId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("NonSvrDataId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `ObservationsTimestamp`:
 	err = decoder.Decode(&obj.ObservationsTimestamp)
@@ -2927,88 +2191,6 @@ func (obj *StaleReport) Unmarshal(buf []byte) error {
 
 func UnmarshalStaleReport(buf []byte) (*StaleReport, error) {
 	obj := new(StaleReport)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type StaleSvrReport struct {
-	State                       solanago.PublicKey `json:"state"`
-	SvrDataId                   [16]uint8          `json:"svr_data_id"`
-	ObservationsTimestamp       uint32             `json:"observations_timestamp"`
-	LatestObservationsTimestamp uint32             `json:"latest_observations_timestamp"`
-}
-
-func (obj StaleSvrReport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrDataId`:
-	err = encoder.Encode(obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Serialize `ObservationsTimestamp`:
-	err = encoder.Encode(obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Serialize `LatestObservationsTimestamp`:
-	err = encoder.Encode(obj.LatestObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("LatestObservationsTimestamp", err)
-	}
-	return nil
-}
-
-func (obj StaleSvrReport) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding StaleSvrReport: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *StaleSvrReport) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrDataId`:
-	err = decoder.Decode(&obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Deserialize `ObservationsTimestamp`:
-	err = decoder.Decode(&obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Deserialize `LatestObservationsTimestamp`:
-	err = decoder.Decode(&obj.LatestObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("LatestObservationsTimestamp", err)
-	}
-	return nil
-}
-
-func (obj *StaleSvrReport) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling StaleSvrReport: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalStaleSvrReport(buf []byte) (*StaleSvrReport, error) {
-	obj := new(StaleSvrReport)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -3237,418 +2419,6 @@ func (obj *StoreState) Unmarshal(buf []byte) error {
 
 func UnmarshalStoreState(buf []byte) (*StoreState, error) {
 	obj := new(StoreState)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type SvrFeedDisabled struct {
-	State      solanago.PublicKey `json:"state"`
-	SvrDataId  [16]uint8          `json:"svr_data_id"`
-	IsDisabled bool               `json:"is_disabled"`
-}
-
-func (obj SvrFeedDisabled) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrDataId`:
-	err = encoder.Encode(obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Serialize `IsDisabled`:
-	err = encoder.Encode(obj.IsDisabled)
-	if err != nil {
-		return errors.NewField("IsDisabled", err)
-	}
-	return nil
-}
-
-func (obj SvrFeedDisabled) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding SvrFeedDisabled: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *SvrFeedDisabled) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrDataId`:
-	err = decoder.Decode(&obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Deserialize `IsDisabled`:
-	err = decoder.Decode(&obj.IsDisabled)
-	if err != nil {
-		return errors.NewField("IsDisabled", err)
-	}
-	return nil
-}
-
-func (obj *SvrFeedDisabled) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling SvrFeedDisabled: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalSvrFeedDisabled(buf []byte) (*SvrFeedDisabled, error) {
-	obj := new(SvrFeedDisabled)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type SvrFeedUpdated struct {
-	State                 solanago.PublicKey `json:"state"`
-	SvrDataId             [16]uint8          `json:"svr_data_id"`
-	RoundId               uint64             `json:"round_id"`
-	ObservationsTimestamp uint32             `json:"observations_timestamp"`
-	Answer                binary.Int128      `json:"answer"`
-}
-
-func (obj SvrFeedUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrDataId`:
-	err = encoder.Encode(obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Serialize `RoundId`:
-	err = encoder.Encode(obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Serialize `ObservationsTimestamp`:
-	err = encoder.Encode(obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Serialize `Answer`:
-	err = encoder.Encode(obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	return nil
-}
-
-func (obj SvrFeedUpdated) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding SvrFeedUpdated: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *SvrFeedUpdated) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrDataId`:
-	err = decoder.Decode(&obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Deserialize `RoundId`:
-	err = decoder.Decode(&obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Deserialize `ObservationsTimestamp`:
-	err = decoder.Decode(&obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Deserialize `Answer`:
-	err = decoder.Decode(&obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	return nil
-}
-
-func (obj *SvrFeedUpdated) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling SvrFeedUpdated: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalSvrFeedUpdated(buf []byte) (*SvrFeedUpdated, error) {
-	obj := new(SvrFeedUpdated)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type SvrPathDescription struct {
-	Version   uint8              `json:"version"`
-	State     solanago.PublicKey `json:"state"`
-	SvrPathId [2]uint8           `json:"svr_path_id"`
-
-	// UTF-8, zero padded
-	Description [64]uint8 `json:"description"`
-}
-
-func (obj SvrPathDescription) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrPathId`:
-	err = encoder.Encode(obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
-	}
-	// Serialize `Description`:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj SvrPathDescription) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding SvrPathDescription: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *SvrPathDescription) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrPathId`:
-	err = decoder.Decode(&obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj *SvrPathDescription) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling SvrPathDescription: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalSvrPathDescription(buf []byte) (*SvrPathDescription, error) {
-	obj := new(SvrPathDescription)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type SvrPathDescriptionSet struct {
-	State       solanago.PublicKey `json:"state"`
-	SvrPathId   [2]uint8           `json:"svr_path_id"`
-	Description string             `json:"description"`
-}
-
-func (obj SvrPathDescriptionSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrPathId`:
-	err = encoder.Encode(obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
-	}
-	// Serialize `Description`:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj SvrPathDescriptionSet) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding SvrPathDescriptionSet: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *SvrPathDescriptionSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrPathId`:
-	err = decoder.Decode(&obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj *SvrPathDescriptionSet) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling SvrPathDescriptionSet: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalSvrPathDescriptionSet(buf []byte) (*SvrPathDescriptionSet, error) {
-	obj := new(SvrPathDescriptionSet)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type SvrReportSynced struct {
-	State                 solanago.PublicKey `json:"state"`
-	SvrDataId             [16]uint8          `json:"svr_data_id"`
-	RoundId               uint64             `json:"round_id"`
-	ObservationsTimestamp uint32             `json:"observations_timestamp"`
-	Answer                binary.Int128      `json:"answer"`
-}
-
-func (obj SvrReportSynced) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `SvrDataId`:
-	err = encoder.Encode(obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Serialize `RoundId`:
-	err = encoder.Encode(obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Serialize `ObservationsTimestamp`:
-	err = encoder.Encode(obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Serialize `Answer`:
-	err = encoder.Encode(obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	return nil
-}
-
-func (obj SvrReportSynced) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding SvrReportSynced: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *SvrReportSynced) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `SvrDataId`:
-	err = decoder.Decode(&obj.SvrDataId)
-	if err != nil {
-		return errors.NewField("SvrDataId", err)
-	}
-	// Deserialize `RoundId`:
-	err = decoder.Decode(&obj.RoundId)
-	if err != nil {
-		return errors.NewField("RoundId", err)
-	}
-	// Deserialize `ObservationsTimestamp`:
-	err = decoder.Decode(&obj.ObservationsTimestamp)
-	if err != nil {
-		return errors.NewField("ObservationsTimestamp", err)
-	}
-	// Deserialize `Answer`:
-	err = decoder.Decode(&obj.Answer)
-	if err != nil {
-		return errors.NewField("Answer", err)
-	}
-	return nil
-}
-
-func (obj *SvrReportSynced) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling SvrReportSynced: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalSvrReportSynced(buf []byte) (*SvrReportSynced, error) {
-	obj := new(SvrReportSynced)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err

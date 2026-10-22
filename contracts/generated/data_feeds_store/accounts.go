@@ -15,13 +15,6 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 		return nil, fmt.Errorf("failed to peek account discriminator: %w", err)
 	}
 	switch discriminator {
-	case Account_DataIdConfig:
-		value := new(DataIdConfig)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account as DataIdConfig: %w", err)
-		}
-		return value, nil
 	case Account_FeedData:
 		value := new(FeedData)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -36,13 +29,6 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal account as FeedDescription: %w", err)
 		}
 		return value, nil
-	case Account_ProxyConfig:
-		value := new(ProxyConfig)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account as ProxyConfig: %w", err)
-		}
-		return value, nil
 	case Account_StoreState:
 		value := new(StoreState)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -50,33 +36,9 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal account as StoreState: %w", err)
 		}
 		return value, nil
-	case Account_SvrPathDescription:
-		value := new(SvrPathDescription)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account as SvrPathDescription: %w", err)
-		}
-		return value, nil
 	default:
 		return nil, fmt.Errorf("unknown discriminator: %s", binary.FormatDiscriminator(discriminator))
 	}
-}
-
-func ParseAccount_DataIdConfig(accountData []byte) (*DataIdConfig, error) {
-	decoder := binary.NewBorshDecoder(accountData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Account_DataIdConfig {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Account_DataIdConfig, binary.FormatDiscriminator(discriminator))
-	}
-	acc := new(DataIdConfig)
-	err = acc.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account of type DataIdConfig: %w", err)
-	}
-	return acc, nil
 }
 
 func ParseAccount_FeedData(accountData []byte) (*FeedData, error) {
@@ -113,23 +75,6 @@ func ParseAccount_FeedDescription(accountData []byte) (*FeedDescription, error) 
 	return acc, nil
 }
 
-func ParseAccount_ProxyConfig(accountData []byte) (*ProxyConfig, error) {
-	decoder := binary.NewBorshDecoder(accountData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Account_ProxyConfig {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Account_ProxyConfig, binary.FormatDiscriminator(discriminator))
-	}
-	acc := new(ProxyConfig)
-	err = acc.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account of type ProxyConfig: %w", err)
-	}
-	return acc, nil
-}
-
 func ParseAccount_StoreState(accountData []byte) (*StoreState, error) {
 	decoder := binary.NewBorshDecoder(accountData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -143,23 +88,6 @@ func ParseAccount_StoreState(accountData []byte) (*StoreState, error) {
 	err = acc.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal account of type StoreState: %w", err)
-	}
-	return acc, nil
-}
-
-func ParseAccount_SvrPathDescription(accountData []byte) (*SvrPathDescription, error) {
-	decoder := binary.NewBorshDecoder(accountData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Account_SvrPathDescription {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Account_SvrPathDescription, binary.FormatDiscriminator(discriminator))
-	}
-	acc := new(SvrPathDescription)
-	err = acc.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account of type SvrPathDescription: %w", err)
 	}
 	return acc, nil
 }

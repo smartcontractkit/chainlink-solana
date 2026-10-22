@@ -66,7 +66,6 @@ pub mod dummy_receiver {
             data_id: args.data_id,
             round_id: args.round_id,
             answer: args.answer,
-            is_freshest: args.is_freshest,
         });
         Ok(args.answer >= 0)
     }
@@ -195,13 +194,11 @@ pub struct OnReportCallback<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OnReportCallbackArgs {
     pub data_id: [u8; 16],
-    pub svr_path_id: [u8; 2],
     pub round_id: u64,
     pub answer: i128,
     pub decimals: u8,
     pub observations_timestamp: u32,
     pub recorded_timestamp: u32,
-    pub is_freshest: bool,
 }
 
 #[event]
@@ -209,5 +206,4 @@ pub struct CallbackCalled {
     pub data_id: [u8; 16],
     pub round_id: u64,
     pub answer: i128,
-    pub is_freshest: bool,
 }

@@ -9,12 +9,11 @@ use bytemuck::Pod;
 
 use crate::{
     common::{ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, ZERO_ADDRESS, ZERO_NAME},
-    data_id,
     error::{AuthError, StoreError},
     logic::Ring,
     state::{
-        feed_account_len, AccountList, DataIdConfig, DataIdSettings, FeedData, StoredReport,
-        WorkflowMetadata, FEED_RING_OFFSET,
+        feed_account_len, AccountList, DataIdSettings, FeedData, StoredReport, WorkflowMetadata,
+        FEED_RING_OFFSET,
     },
 };
 
@@ -133,68 +132,38 @@ pub fn store<T: Pod + Discriminator>(info: &AccountInfo, value: &T) -> Result<()
     Ok(())
 }
 
-/// Load a data ID config belonging to `state` and `data_id`.
-pub fn load_data_id_config(
-    info: &AccountInfo,
-    state: &Pubkey,
-    data_id: &[u8; 16],
-) -> Result<Box<DataIdConfig>> {
-    let config: Box<DataIdConfig> = load_boxed(info)?;
-    require!(
-        config.state == *state && config.data_id == *data_id,
-        StoreError::AccountMismatch
-    );
-    Ok(config)
-}
-
-/// Load a feed header belonging to `state` and `non_svr_data_id`, checking its ring fits.
-pub fn load_feed(
-    info: &AccountInfo,
-    state: &Pubkey,
-    non_svr_data_id: &[u8; 16],
-) -> Result<Box<FeedData>> {
+/// Load a feed header belonging to `state` and `data_id`, checking its ring fits.
+pub fn load_feed(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Result<Box<FeedData>> {
     let feed: Box<FeedData> = load_boxed(info)?;
     require!(
         feed.state == *state
-            && feed.data_id == *non_svr_data_id
+            && feed.data_id == *data_id
             && info.data_len() >= feed_account_len(feed.max_stored_reports),
         StoreError::AccountMismatch
     );
     Ok(feed)
 }
 
-/// Settings of a data ID: from its feed account for a non-SVR data ID, from its data ID config for
-/// an SVR path.
+/// Settings of a data ID, kept in its feed account.
 pub fn load_settings(
     info: &AccountInfo,
     state: &Pubkey,
     data_id: &[u8; 16],
 ) -> Result<DataIdSettings> {
-    Ok(if data_id::is_svr(data_id) {
-        load_data_id_config(info, state, data_id)?.settings
-    } else {
-        load_feed(info, state, data_id)?.settings
-    })
+    Ok(load_feed(info, state, data_id)?.settings)
 }
 
-/// Update the settings of a data ID in its feed account or data ID config, see [`load_settings`].
+/// Update the settings of a data ID in its feed account.
 pub fn update_settings<R>(
     info: &AccountInfo,
     state: &Pubkey,
     data_id: &[u8; 16],
     f: impl FnOnce(&mut DataIdSettings) -> Result<R>,
 ) -> Result<R> {
-    if data_id::is_svr(data_id) {
-        let mut config = load_data_id_config(info, state, data_id)?;
-        let result = f(&mut config.settings)?;
-        store(info, &*config)?;
-        Ok(result)
-    } else {
-        let mut feed = load_feed(info, state, data_id)?;
-        let result = f(&mut feed.settings)?;
-        store(info, &*feed)?;
-        Ok(result)
-    }
+    let mut feed = load_feed(info, state, data_id)?;
+    let result = f(&mut feed.settings)?;
+    store(info, &*feed)?;
+    Ok(result)
 }
 
 /// Circular buffer over a feed account's data (the whole account data, header included).
@@ -320,20 +289,6 @@ pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
         .position(|b| *b == 0)
         .unwrap_or(DESCRIPTION_LEN);
     String::from_utf8_lossy(&description[..end]).into_owned()
-}
-
-/// Full description of a data ID as `feed svr_path`, like the EVM store.
-pub fn combine_descriptions(feed: String, svr_path: Option<String>) -> String {
-    match svr_path {
-        Some(path) if !path.is_empty() => {
-            if feed.is_empty() {
-                path
-            } else {
-                format!("{feed} {path}")
-            }
-        }
-        _ => feed,
-    }
 }
 
 pub fn next_account<'a, 'info>(

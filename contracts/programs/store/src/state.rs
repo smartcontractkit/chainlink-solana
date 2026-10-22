@@ -23,16 +23,12 @@ pub struct NewTransmission {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OnReportCallbackArgs {
     pub data_id: [u8; 16],
-    /// SVR path the report arrived through, zero for the non-SVR path
-    pub svr_path_id: [u8; 2],
     pub round_id: u64,
     pub answer: i128,
     /// Decimals `answer` is expressed in, rescaled to the feed's decimals on write
     pub decimals: u8,
     pub observations_timestamp: u32,
     pub recorded_timestamp: u32,
-    /// False when an SVR path only adopted an already stored round
-    pub is_freshest: bool,
 }
 
 #[repr(C)]

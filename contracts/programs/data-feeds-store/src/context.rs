@@ -3,9 +3,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::common::{ANCHOR_DISCRIMINATOR, STORE_AUTHORITY_SEED};
 use crate::error::AuthError;
-use crate::state::{
-    DataIdConfig, FeedData, FeedDescription, ProxyConfig, StoreState, SvrPathDescription,
-};
+use crate::state::{FeedData, FeedDescription, StoreState};
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -76,37 +74,17 @@ pub struct OnReport<'info> {
     )]
     pub store_authority: UncheckedAccount<'info>,
     // remaining accounts, one group per report in report order:
-    //   SVR paths only: data id config (writable)
-    //   non-SVR feed (writable)
+    //   feed of the data id (writable)
     //   callback program + configured callback accounts, when a callback is configured
 }
 
-/// Proxy (reader config) reads.
+/// Round reads by data ID: the reader interface proxies and other programs call.
 #[derive(Accounts)]
-pub struct ProxyRead<'info> {
-    pub proxy: Account<'info, ProxyConfig>,
-
-    /// Non-SVR feed of the proxy's data ID, matched in the handler
-    pub feed: AccountLoader<'info, FeedData>,
-
-    /// Data ID config of the proxy's data ID, required for SVR data IDs
-    pub data_id_config: Option<AccountLoader<'info, DataIdConfig>>,
-
-    pub feed_description: Option<Account<'info, FeedDescription>>,
-
-    pub svr_path_description: Option<Account<'info, SvrPathDescription>>,
-}
-
-/// Reads by data ID, bypassing proxy configuration.
-#[derive(Accounts)]
-pub struct DirectRead<'info> {
+pub struct FeedRead<'info> {
     pub state: AccountLoader<'info, StoreState>,
 
-    /// Non-SVR feed of the data ID, matched in the handler
+    /// Feed of the data ID, matched against the state and the data ID in the handler
     pub feed: AccountLoader<'info, FeedData>,
-
-    /// Data ID config, required for SVR data IDs
-    pub data_id_config: Option<AccountLoader<'info, DataIdConfig>>,
 }
 
 #[derive(Accounts)]
@@ -114,17 +92,14 @@ pub struct DescriptionRead<'info> {
     pub state: AccountLoader<'info, StoreState>,
 
     pub feed_description: Option<Account<'info, FeedDescription>>,
-
-    pub svr_path_description: Option<Account<'info, SvrPathDescription>>,
 }
 
 #[derive(Accounts)]
 pub struct PermissionRead<'info> {
     pub state: AccountLoader<'info, StoreState>,
 
-    /// CHECK: settings of the data ID, its feed (non-SVR) or data ID config (SVR path), checked in
-    /// the handler. The default metadata applies when omitted.
-    pub settings: Option<UncheckedAccount<'info>>,
+    /// Feed of the data ID, the default metadata applies when omitted
+    pub feed: Option<AccountLoader<'info, FeedData>>,
 }
 
 #[derive(Accounts)]

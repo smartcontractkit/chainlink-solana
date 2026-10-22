@@ -12,11 +12,10 @@ use crate::{
     data_id,
     error::StoreError,
     event::*,
-    logic::{self, Now, Rejection, SvrPlan, SvrSlot},
-    state::{DataIdConfig, DataIdSettings, FeedData, OnReportCallbackArgs, ReceivedReport, StoreState},
+    logic::{self, Now, Rejection},
+    state::{DataIdSettings, FeedData, OnReportCallbackArgs, ReceivedReport, StoreState},
     utils::{
-        has_permission, load_boxed, load_data_id_config, load_feed, next_account, store,
-        workflow_metadata, RingMut,
+        has_permission, load_boxed, load_feed, next_account, store, workflow_metadata, RingMut,
     },
 };
 
@@ -53,35 +52,23 @@ pub fn handler<'info>(
 
     let mut accounts = ctx.remaining_accounts.iter();
     for report in reports.iter() {
-        // an SVR path passes its config before the shared feed, a non-SVR data ID only its feed
-        let svr = data_id::is_svr(&report.data_id);
-        let config = if svr {
-            let info = next_account(&mut accounts)?;
-            Some((info, load_data_id_config(info, &state_key, &report.data_id)?))
-        } else {
-            None
-        };
+        require!(
+            data_id::is_valid_data_id(&report.data_id),
+            StoreError::InvalidDataId
+        );
         let feed_info = next_account(&mut accounts)?;
-        let feed = load_feed(
-            feed_info,
-            &state_key,
-            &data_id::to_non_svr(&report.data_id),
-        )?;
-        let settings = match &config {
-            Some((_, config)) => &config.settings,
-            None => &feed.settings,
-        };
+        let feed = load_feed(feed_info, &state_key, &report.data_id)?;
 
         // callback program and accounts must be passed exactly as configured
-        let callback_infos = if settings.has_callback() {
+        let callback_infos = if feed.settings.has_callback() {
             let program = next_account(&mut accounts)?;
             require_keys_eq!(
                 *program.key,
-                settings.callback_program,
+                feed.settings.callback_program,
                 StoreError::AccountMismatch
             );
             let mut infos = vec![program.clone()];
-            for expected in settings.callback_accounts() {
+            for expected in feed.settings.callback_accounts() {
                 let info = next_account(&mut accounts)?;
                 require_keys_eq!(*info.key, *expected, StoreError::AccountMismatch);
                 infos.push(info.clone());
@@ -92,7 +79,7 @@ pub fn handler<'info>(
         };
 
         if !has_permission(
-            &settings.specific_workflow_metadata,
+            &feed.settings.specific_workflow_metadata,
             &state.default_workflow_metadata,
             &sender,
             &workflow_owner,
@@ -108,18 +95,15 @@ pub fn handler<'info>(
             continue;
         }
 
-        let processed = Processed {
+        Processed {
             state: state_key,
             report,
             now,
             max_forward_secs,
             callback: &callback,
             callback_infos: &callback_infos,
-        };
-        match config {
-            Some((config_info, config)) => processed.svr(config_info, feed_info, feed, config)?,
-            None => processed.non_svr(feed_info, feed)?,
         }
+        .apply(feed_info, feed)?;
     }
 
     require!(accounts.next().is_none(), StoreError::InvalidAccountCount);
@@ -134,22 +118,22 @@ struct Callback<'info> {
 
 impl<'info> Callback<'info> {
     /// Call the data ID's callback, if any. Returns false only when the callback did not accept
-    /// the report and its config drops rejected reports. A callback that fails aborts the whole
+    /// the report and its settings drop rejected reports. A callback that fails aborts the whole
     /// transaction, Solana cannot contain a failed cross-program call.
     fn call(
         &self,
-        config: &DataIdSettings,
+        settings: &DataIdSettings,
         infos: &[AccountInfo<'info>],
         args: OnReportCallbackArgs,
     ) -> Result<bool> {
-        if !config.has_callback() {
+        if !settings.has_callback() {
             return Ok(true);
         }
 
         let (program, callback_accounts) = infos.split_first().unwrap();
         let mut metas = vec![AccountMeta::new_readonly(*self.store_authority.key, true)];
         for (i, info) in callback_accounts.iter().enumerate() {
-            metas.push(if config.callback_account_writable(i) {
+            metas.push(if settings.callback_account_writable(i) {
                 AccountMeta::new(*info.key, false)
             } else {
                 AccountMeta::new_readonly(*info.key, false)
@@ -165,7 +149,7 @@ impl<'info> Callback<'info> {
 
         invoke_signed(
             &Instruction {
-                program_id: config.callback_program,
+                program_id: settings.callback_program,
                 accounts: metas,
                 data,
             },
@@ -174,12 +158,12 @@ impl<'info> Callback<'info> {
         )?;
 
         let accepted = match get_return_data() {
-            Some((program_id, data)) if program_id == config.callback_program => {
+            Some((program_id, data)) if program_id == settings.callback_program => {
                 bool::try_from_slice(&data).unwrap_or(false)
             }
             _ => false,
         };
-        Ok(accepted || config.callback_revert_on_failure == 0)
+        Ok(accepted || settings.callback_revert_on_failure == 0)
     }
 }
 
@@ -193,30 +177,24 @@ struct Processed<'a, 'info> {
 }
 
 impl<'info> Processed<'_, 'info> {
-    fn rejected(&self, data_id: [u8; 16], rejection: Rejection, svr: bool) {
+    fn rejected(&self, rejection: Rejection) {
         let report = self.report;
         match rejection {
             Rejection::FutureReport => emit!(FutureReportIgnored {
                 state: self.state,
-                data_id,
+                data_id: report.data_id,
                 observations_timestamp: report.timestamp,
                 recorded_timestamp: self.now.timestamp,
             }),
-            Rejection::Stale(latest) if svr => emit!(StaleSvrReport {
-                state: self.state,
-                svr_data_id: data_id,
-                observations_timestamp: report.timestamp,
-                latest_observations_timestamp: latest,
-            }),
             Rejection::Stale(latest) => emit!(StaleReport {
                 state: self.state,
-                non_svr_data_id: data_id,
+                data_id: report.data_id,
                 observations_timestamp: report.timestamp,
                 latest_observations_timestamp: latest,
             }),
             Rejection::OutOfRange(min_answer, max_answer) => emit!(AnswerOutOfMinMaxRange {
                 state: self.state,
-                data_id,
+                data_id: report.data_id,
                 min_answer,
                 max_answer,
                 answer: report.answer,
@@ -224,11 +202,10 @@ impl<'info> Processed<'_, 'info> {
         }
     }
 
-    fn non_svr(&self, feed_info: &AccountInfo<'info>, mut feed: Box<FeedData>) -> Result<()> {
+    fn apply(&self, feed_info: &AccountInfo<'info>, mut feed: Box<FeedData>) -> Result<()> {
         let report = self.report;
-        let non_svr_data_id = report.data_id;
 
-        let round_id = match logic::check_non_svr_report(
+        let round_id = match logic::check_report(
             &feed,
             report.timestamp,
             report.answer,
@@ -237,7 +214,7 @@ impl<'info> Processed<'_, 'info> {
         ) {
             Ok(round_id) => round_id,
             Err(rejection) => {
-                self.rejected(non_svr_data_id, rejection, false);
+                self.rejected(rejection);
                 return Ok(());
             }
         };
@@ -247,20 +224,18 @@ impl<'info> Processed<'_, 'info> {
             &feed.settings,
             self.callback_infos,
             OnReportCallbackArgs {
-                data_id: non_svr_data_id,
-                svr_path_id: [0, 0],
+                data_id: report.data_id,
                 round_id,
                 answer: report.answer,
                 decimals: STORED_DECIMALS,
                 observations_timestamp: report.timestamp,
                 recorded_timestamp: self.now.timestamp,
-                is_freshest: true,
             },
         )?;
         if !accepted {
             emit!(ReportCallbackRejected {
                 state: self.state,
-                data_id: non_svr_data_id,
+                data_id: report.data_id,
                 round_id,
                 answer: report.answer,
             });
@@ -276,139 +251,17 @@ impl<'info> Processed<'_, 'info> {
                 report.timestamp,
                 report.answer,
                 self.now,
-                false,
             );
         }
         store(feed_info, &*feed)?;
 
         emit!(FeedUpdated {
             state: self.state,
-            non_svr_data_id,
+            data_id: report.data_id,
             round_id,
             observations_timestamp: report.timestamp,
             answer: report.answer,
         });
-        Ok(())
-    }
-
-    fn svr(
-        &self,
-        config_info: &AccountInfo<'info>,
-        feed_info: &AccountInfo<'info>,
-        mut feed: Box<FeedData>,
-        mut config: Box<DataIdConfig>,
-    ) -> Result<()> {
-        let report = self.report;
-        let svr_data_id = report.data_id;
-        let non_svr_data_id = data_id::to_non_svr(&svr_data_id);
-
-        let mut slot = SvrSlot {
-            disabled: config.svr_disabled != 0,
-            round_id: config.svr_round_id,
-            answer: config.svr_answer,
-            observations_timestamp: config.svr_observations_timestamp,
-            recorded_timestamp: config.svr_recorded_timestamp,
-            recorded_slot: config.svr_recorded_slot,
-        };
-
-        let plan = match logic::check_svr_report(
-            &feed,
-            &slot,
-            report.timestamp,
-            report.answer,
-            self.now,
-            self.max_forward_secs,
-        ) {
-            Ok(plan) => plan,
-            Err(rejection) => {
-                self.rejected(svr_data_id, rejection, true);
-                return Ok(());
-            }
-        };
-
-        let args = match plan {
-            SvrPlan::Append { round_id } => OnReportCallbackArgs {
-                data_id: svr_data_id,
-                svr_path_id: data_id::svr_path_id(&svr_data_id),
-                round_id,
-                answer: report.answer,
-                decimals: STORED_DECIMALS,
-                observations_timestamp: report.timestamp,
-                recorded_timestamp: self.now.timestamp,
-                is_freshest: true,
-            },
-            // the head is already stored, so this selection adds no round to the shared history
-            SvrPlan::AdoptHead(head) => OnReportCallbackArgs {
-                data_id: svr_data_id,
-                svr_path_id: data_id::svr_path_id(&svr_data_id),
-                round_id: head.round_id,
-                answer: head.answer,
-                decimals: STORED_DECIMALS,
-                observations_timestamp: head.observations_timestamp,
-                recorded_timestamp: head.recorded_timestamp,
-                is_freshest: false,
-            },
-        };
-        if !self
-            .callback
-            .call(&config.settings, self.callback_infos, args.clone())?
-        {
-            emit!(ReportCallbackRejected {
-                state: self.state,
-                data_id: svr_data_id,
-                round_id: args.round_id,
-                answer: args.answer,
-            });
-            return Ok(());
-        }
-
-        {
-            let mut data = feed_info.try_borrow_mut_data()?;
-            let mut ring = RingMut::new(&mut data[..]);
-            logic::apply_svr_plan(
-                &mut feed,
-                &mut ring,
-                &mut slot,
-                plan,
-                report.timestamp,
-                report.answer,
-                self.now,
-            );
-        }
-
-        config.svr_round_id = slot.round_id;
-        config.svr_answer = slot.answer;
-        config.svr_observations_timestamp = slot.observations_timestamp;
-        config.svr_recorded_timestamp = slot.recorded_timestamp;
-        config.svr_recorded_slot = slot.recorded_slot;
-        store(config_info, &*config)?;
-
-        match plan {
-            SvrPlan::Append { round_id } => {
-                store(feed_info, &*feed)?;
-                emit!(FeedUpdated {
-                    state: self.state,
-                    non_svr_data_id,
-                    round_id,
-                    observations_timestamp: report.timestamp,
-                    answer: report.answer,
-                });
-                emit!(SvrFeedUpdated {
-                    state: self.state,
-                    svr_data_id,
-                    round_id,
-                    observations_timestamp: report.timestamp,
-                    answer: report.answer,
-                });
-            }
-            SvrPlan::AdoptHead(head) => emit!(SvrReportSynced {
-                state: self.state,
-                svr_data_id,
-                round_id: head.round_id,
-                observations_timestamp: head.observations_timestamp,
-                answer: head.answer,
-            }),
-        }
         Ok(())
     }
 }

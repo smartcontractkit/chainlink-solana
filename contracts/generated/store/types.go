@@ -292,7 +292,6 @@ const (
 	CacheSkipReason_NotWritable
 	CacheSkipReason_InvalidVersion
 	CacheSkipReason_UnauthorizedWriter
-	CacheSkipReason_NotPrimary
 	CacheSkipReason_StaleTimestamp
 	CacheSkipReason_AnswerOverflow
 )
@@ -307,8 +306,6 @@ func (value CacheSkipReason) String() string {
 		return "InvalidVersion"
 	case CacheSkipReason_UnauthorizedWriter:
 		return "UnauthorizedWriter"
-	case CacheSkipReason_NotPrimary:
-		return "NotPrimary"
 	case CacheSkipReason_StaleTimestamp:
 		return "StaleTimestamp"
 	case CacheSkipReason_AnswerOverflow:
@@ -381,20 +378,14 @@ func UnmarshalNewTransmission(buf []byte) (*NewTransmission, error) {
 // Arguments of `on_report_callback`, the report callback interface of the data feeds store.
 // Must stay Borsh-identical to `data_feeds_store::state::OnReportCallbackArgs`.
 type OnReportCallbackArgs struct {
-	DataId [16]uint8 `json:"data_id"`
-
-	// SVR path the report arrived through, zero for the non-SVR path
-	SvrPathId [2]uint8      `json:"svr_path_id"`
-	RoundId   uint64        `json:"round_id"`
-	Answer    binary.Int128 `json:"answer"`
+	DataId  [16]uint8     `json:"data_id"`
+	RoundId uint64        `json:"round_id"`
+	Answer  binary.Int128 `json:"answer"`
 
 	// Decimals `answer` is expressed in, rescaled to the feed's decimals on write
 	Decimals              uint8  `json:"decimals"`
 	ObservationsTimestamp uint32 `json:"observations_timestamp"`
 	RecordedTimestamp     uint32 `json:"recorded_timestamp"`
-
-	// False when an SVR path only adopted an already stored round
-	IsFreshest bool `json:"is_freshest"`
 }
 
 func (obj OnReportCallbackArgs) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -402,11 +393,6 @@ func (obj OnReportCallbackArgs) MarshalWithEncoder(encoder *binary.Encoder) (err
 	err = encoder.Encode(obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
-	}
-	// Serialize `SvrPathId`:
-	err = encoder.Encode(obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
 	}
 	// Serialize `RoundId`:
 	err = encoder.Encode(obj.RoundId)
@@ -433,11 +419,6 @@ func (obj OnReportCallbackArgs) MarshalWithEncoder(encoder *binary.Encoder) (err
 	if err != nil {
 		return errors.NewField("RecordedTimestamp", err)
 	}
-	// Serialize `IsFreshest`:
-	err = encoder.Encode(obj.IsFreshest)
-	if err != nil {
-		return errors.NewField("IsFreshest", err)
-	}
 	return nil
 }
 
@@ -456,11 +437,6 @@ func (obj *OnReportCallbackArgs) UnmarshalWithDecoder(decoder *binary.Decoder) (
 	err = decoder.Decode(&obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
-	}
-	// Deserialize `SvrPathId`:
-	err = decoder.Decode(&obj.SvrPathId)
-	if err != nil {
-		return errors.NewField("SvrPathId", err)
 	}
 	// Deserialize `RoundId`:
 	err = decoder.Decode(&obj.RoundId)
@@ -486,11 +462,6 @@ func (obj *OnReportCallbackArgs) UnmarshalWithDecoder(decoder *binary.Decoder) (
 	err = decoder.Decode(&obj.RecordedTimestamp)
 	if err != nil {
 		return errors.NewField("RecordedTimestamp", err)
-	}
-	// Deserialize `IsFreshest`:
-	err = decoder.Decode(&obj.IsFreshest)
-	if err != nil {
-		return errors.NewField("IsFreshest", err)
 	}
 	return nil
 }

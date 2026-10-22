@@ -22,20 +22,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as AnswerOutOfMinMaxRange: %w", err)
 		}
 		return value, nil
-	case Event_DataIdClosed:
-		value := new(DataIdClosed)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as DataIdClosed: %w", err)
-		}
-		return value, nil
-	case Event_DataIdInitialized:
-		value := new(DataIdInitialized)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as DataIdInitialized: %w", err)
-		}
-		return value, nil
 	case Event_DefaultFeedMetadataSet:
 		value := new(DefaultFeedMetadataSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -127,20 +113,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as OwnershipTransferred: %w", err)
 		}
 		return value, nil
-	case Event_ProxyConfigRemoved:
-		value := new(ProxyConfigRemoved)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as ProxyConfigRemoved: %w", err)
-		}
-		return value, nil
-	case Event_ProxyConfigUpdated:
-		value := new(ProxyConfigUpdated)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as ProxyConfigUpdated: %w", err)
-		}
-		return value, nil
 	case Event_ReportCallbackConfigSet:
 		value := new(ReportCallbackConfigSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -176,46 +148,11 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as StaleReport: %w", err)
 		}
 		return value, nil
-	case Event_StaleSvrReport:
-		value := new(StaleSvrReport)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as StaleSvrReport: %w", err)
-		}
-		return value, nil
 	case Event_StoreInitialized:
 		value := new(StoreInitialized)
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as StoreInitialized: %w", err)
-		}
-		return value, nil
-	case Event_SvrFeedDisabled:
-		value := new(SvrFeedDisabled)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as SvrFeedDisabled: %w", err)
-		}
-		return value, nil
-	case Event_SvrFeedUpdated:
-		value := new(SvrFeedUpdated)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as SvrFeedUpdated: %w", err)
-		}
-		return value, nil
-	case Event_SvrPathDescriptionSet:
-		value := new(SvrPathDescriptionSet)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as SvrPathDescriptionSet: %w", err)
-		}
-		return value, nil
-	case Event_SvrReportSynced:
-		value := new(SvrReportSynced)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as SvrReportSynced: %w", err)
 		}
 		return value, nil
 	case Event_TokenRecovered:
@@ -243,40 +180,6 @@ func ParseEvent_AnswerOutOfMinMaxRange(eventData []byte) (*AnswerOutOfMinMaxRang
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type AnswerOutOfMinMaxRange: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_DataIdClosed(eventData []byte) (*DataIdClosed, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_DataIdClosed {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_DataIdClosed, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(DataIdClosed)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type DataIdClosed: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_DataIdInitialized(eventData []byte) (*DataIdInitialized, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_DataIdInitialized {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_DataIdInitialized, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(DataIdInitialized)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type DataIdInitialized: %w", err)
 	}
 	return event, nil
 }
@@ -502,40 +405,6 @@ func ParseEvent_OwnershipTransferred(eventData []byte) (*OwnershipTransferred, e
 	return event, nil
 }
 
-func ParseEvent_ProxyConfigRemoved(eventData []byte) (*ProxyConfigRemoved, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_ProxyConfigRemoved {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_ProxyConfigRemoved, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(ProxyConfigRemoved)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type ProxyConfigRemoved: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_ProxyConfigUpdated(eventData []byte) (*ProxyConfigUpdated, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_ProxyConfigUpdated {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_ProxyConfigUpdated, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(ProxyConfigUpdated)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type ProxyConfigUpdated: %w", err)
-	}
-	return event, nil
-}
-
 func ParseEvent_ReportCallbackConfigSet(eventData []byte) (*ReportCallbackConfigSet, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -621,23 +490,6 @@ func ParseEvent_StaleReport(eventData []byte) (*StaleReport, error) {
 	return event, nil
 }
 
-func ParseEvent_StaleSvrReport(eventData []byte) (*StaleSvrReport, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_StaleSvrReport {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_StaleSvrReport, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(StaleSvrReport)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type StaleSvrReport: %w", err)
-	}
-	return event, nil
-}
-
 func ParseEvent_StoreInitialized(eventData []byte) (*StoreInitialized, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -651,74 +503,6 @@ func ParseEvent_StoreInitialized(eventData []byte) (*StoreInitialized, error) {
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type StoreInitialized: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_SvrFeedDisabled(eventData []byte) (*SvrFeedDisabled, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_SvrFeedDisabled {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_SvrFeedDisabled, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(SvrFeedDisabled)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type SvrFeedDisabled: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_SvrFeedUpdated(eventData []byte) (*SvrFeedUpdated, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_SvrFeedUpdated {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_SvrFeedUpdated, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(SvrFeedUpdated)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type SvrFeedUpdated: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_SvrPathDescriptionSet(eventData []byte) (*SvrPathDescriptionSet, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_SvrPathDescriptionSet {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_SvrPathDescriptionSet, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(SvrPathDescriptionSet)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type SvrPathDescriptionSet: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_SvrReportSynced(eventData []byte) (*SvrReportSynced, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_SvrReportSynced {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_SvrReportSynced, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(SvrReportSynced)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type SvrReportSynced: %w", err)
 	}
 	return event, nil
 }
