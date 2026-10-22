@@ -1,0 +1,27 @@
+[package]
+name = "data-feeds-store"
+version = "0.1.0"
+description = "Chainlink Data Feeds store receiving CRE reports through the keystone forwarder"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "data_feeds_store"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.0"
+anchor-spl = { version = "0.31.0", default-features = false, features = ["token", "token_2022"] }
+static_assertions = "1.1.0"
+bytemuck = { version = "1.20.0", features = ["min_const_generics", "extern_crate_alloc"] }
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
+
+[lints]
+workspace = true
