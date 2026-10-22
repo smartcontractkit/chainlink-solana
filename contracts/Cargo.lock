@@ -590,6 +590,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chainlink_solana_data_feeds_proxy"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "data-feeds-proxy",
+]
+
+[[package]]
 name = "chainlink_solana_data_feeds_store"
 version = "0.0.1"
 dependencies = [
@@ -723,6 +731,17 @@ dependencies = [
  "keystone-forwarder",
  "static_assertions",
  "store",
+]
+
+[[package]]
+name = "data-feeds-proxy"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "arrayvec 1.0.1",
+ "bytemuck",
+ "chainlink_solana_data_feeds_store",
+ "static_assertions",
 ]
 
 [[package]]

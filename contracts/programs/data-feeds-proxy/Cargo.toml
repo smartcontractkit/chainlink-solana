@@ -1,0 +1,27 @@
+[package]
+name = "data-feeds-proxy"
+version = "0.1.0"
+description = "Chainlink Data Feeds proxy: a stable address in front of a data feeds store"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "data_feeds_proxy"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build", "chainlink_solana_data_feeds_store/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.0", features = ["init-if-needed"] }
+static_assertions = "1.1.0"
+bytemuck = { version = "1.20.0", features = ["min_const_generics", "extern_crate_alloc"] }
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
+chainlink_solana_data_feeds_store = { path = "../../crates/chainlink-solana-data-feeds-store" }
+
+[lints]
+workspace = true
