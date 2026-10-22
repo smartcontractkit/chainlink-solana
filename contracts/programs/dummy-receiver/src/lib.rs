@@ -70,6 +70,20 @@ pub mod dummy_receiver {
         Ok(args.answer >= 0)
     }
 
+    // as a mock data feeds store reader (the reader interface a proxy calls), answers 42 with 18
+    // decimals for any data ID and round
+    pub fn get_latest_round(_ctx: Context<MockRead>, _data_id: [u8; 16]) -> Result<ReaderRound> {
+        Ok(mock_round(1))
+    }
+
+    pub fn get_round(
+        _ctx: Context<MockRead>,
+        _data_id: [u8; 16],
+        round_id: u64,
+    ) -> Result<ReaderRound> {
+        Ok(mock_round(round_id))
+    }
+
     // as a mock legacy store
     pub fn cache_submit(ctx: Context<CacheSubmit>, rounds: Vec<CacheTransmission>) -> Result<()> {
         // // just assume that ctx.remaining_accounts[0] is the LatestCacheSubmission account
@@ -206,4 +220,30 @@ pub struct CallbackCalled {
     pub data_id: [u8; 16],
     pub round_id: u64,
     pub answer: i128,
+}
+
+fn mock_round(round_id: u64) -> ReaderRound {
+    ReaderRound {
+        round_id,
+        answer: 42_000_000_000_000_000_000,
+        observations_timestamp: 1_000,
+        recorded_timestamp: 1_001,
+    }
+}
+
+#[derive(Accounts)]
+pub struct MockRead<'info> {
+    /// CHECK: unused by the mock
+    pub state: UncheckedAccount<'info>,
+    /// CHECK: unused by the mock
+    pub feed: UncheckedAccount<'info>,
+}
+
+// mirrors data_feeds_store::state::ReaderRound
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct ReaderRound {
+    pub round_id: u64,
+    pub answer: i128,
+    pub observations_timestamp: u32,
+    pub recorded_timestamp: u32,
 }

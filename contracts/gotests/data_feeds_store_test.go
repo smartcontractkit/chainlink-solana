@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -17,6 +18,7 @@ import (
 	ctf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 
+	"github.com/smartcontractkit/chainlink-solana/contracts/generated/data_feeds_proxy"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/data_feeds_store"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/store"
@@ -37,6 +39,7 @@ func TestDataFeedsStore(t *testing.T) {
 		"keystone_forwarder": keystone_forwarder.ProgramID.String(),
 		"data_feeds_store":   data_feeds_store.ProgramID.String(),
 		"store":              store.ProgramID.String(),
+		"data_feeds_proxy":   data_feeds_proxy.ProgramID.String(),
 	}
 	provider := cldf_solana_provider.NewCTFChainProvider(t, 16423721717087811551,
 		cldf_solana_provider.CTFChainProviderConfig{
@@ -220,6 +223,44 @@ func TestDataFeedsStore(t *testing.T) {
 	for _, tg := range df1 {
 		requireStored(tg, 1)
 	}
+
+	// A proxy in front of the store serves the same round, at the store's decimals and rescaled.
+	proxyState, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	feedConfig, _, err := solana.FindProgramAddress(
+		[][]byte{[]byte("feed_config"), proxyState.PublicKey().Bytes(), df1[0].id[:]}, data_feeds_proxy.ProgramID)
+	require.NoError(t, err)
+	send([]solana.Instruction{
+		build(data_feeds_proxy.NewInitializeInstruction(nil, deployer.PublicKey(), proxyState.PublicKey(),
+			data_feeds_store.ProgramID, storeState.PublicKey(), solana.SystemProgramID)),
+	}, proxyState)
+	send([]solana.Instruction{
+		build(data_feeds_proxy.NewSetMinDecimalsInstruction(df1[0].id, 8, deployer.PublicKey(), proxyState.PublicKey(),
+			feedConfig, solana.SystemProgramID)),
+	})
+	simulateRound := func(label string, ix solana.Instruction) data_feeds_proxy.Round {
+		tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(deployer.PublicKey()))
+		require.NoError(t, err)
+		sim, err := client.SimulateTransactionWithOpts(t.Context(), tx, &rpc.SimulateTransactionOpts{
+			SigVerify: false, ReplaceRecentBlockhash: true, Commitment: rpc.CommitmentConfirmed})
+		require.NoError(t, err)
+		require.Nil(t, sim.Value.Err, "logs: %v", sim.Value.Logs)
+		require.NotNil(t, sim.Value.ReturnData)
+		t.Logf("%s: %d compute units", label, *sim.Value.UnitsConsumed)
+		var round data_feeds_proxy.Round
+		require.NoError(t, round.UnmarshalWithDecoder(bin.NewBorshDecoder(sim.Value.ReturnData.Data.Content)))
+		return round
+	}
+	direct := simulateRound("store read", build(data_feeds_store.NewGetLatestRoundInstruction(df1[0].id,
+		storeState.PublicKey(), df1[0].feed)))
+	require.Equal(t, uint64(1), direct.RoundId)
+	atStoreDecimals := simulateRound("proxy read", build(data_feeds_proxy.NewReadInstruction(df1[0].id, nil, proxyState.PublicKey(),
+		data_feeds_store.ProgramID, storeState.PublicKey(), df1[0].feed)))
+	require.Equal(t, uint64(1), atStoreDecimals.RoundId)
+	require.Equal(t, 0, answer.Cmp(atStoreDecimals.Answer.BigInt()))
+	scaled := simulateRound("proxy read_scaled", build(data_feeds_proxy.NewReadScaledInstruction(df1[0].id, 8, nil, proxyState.PublicKey(),
+		data_feeds_store.ProgramID, storeState.PublicKey(), df1[0].feed, feedConfig)))
+	require.Equal(t, "325012000000", scaled.Answer.BigInt().String(), "3250.12 at 8 decimals")
 
 	// F=5 (mainnet): one report fits without the DF1 write-through.
 	storeOnly := newFeed(3, false)
