@@ -136,6 +136,71 @@ func (_c *TxManager_Enqueue_Call) RunAndReturn(run func(context.Context, string,
 	return _c
 }
 
+// EnqueueV1 provides a mock function with given fields: ctx, accountID, tx, txID, txLastValidBlockHeight, txCfgs
+func (_m *TxManager) EnqueueV1(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...utils.SetTxConfig) error {
+	_va := make([]interface{}, len(txCfgs))
+	for _i := range txCfgs {
+		_va[_i] = txCfgs[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, accountID, tx, txID, txLastValidBlockHeight)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnqueueV1")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *solana.Transaction, *string, uint64, ...utils.SetTxConfig) error); ok {
+		r0 = rf(ctx, accountID, tx, txID, txLastValidBlockHeight, txCfgs...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// TxManager_EnqueueV1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueV1'
+type TxManager_EnqueueV1_Call struct {
+	*mock.Call
+}
+
+// EnqueueV1 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - accountID string
+//   - tx *solana.Transaction
+//   - txID *string
+//   - txLastValidBlockHeight uint64
+//   - txCfgs ...utils.SetTxConfig
+func (_e *TxManager_Expecter) EnqueueV1(ctx interface{}, accountID interface{}, tx interface{}, txID interface{}, txLastValidBlockHeight interface{}, txCfgs ...interface{}) *TxManager_EnqueueV1_Call {
+	return &TxManager_EnqueueV1_Call{Call: _e.mock.On("EnqueueV1",
+		append([]interface{}{ctx, accountID, tx, txID, txLastValidBlockHeight}, txCfgs...)...)}
+}
+
+func (_c *TxManager_EnqueueV1_Call) Run(run func(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...utils.SetTxConfig)) *TxManager_EnqueueV1_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]utils.SetTxConfig, len(args)-5)
+		for i, a := range args[5:] {
+			if a != nil {
+				variadicArgs[i] = a.(utils.SetTxConfig)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*solana.Transaction), args[3].(*string), args[4].(uint64), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *TxManager_EnqueueV1_Call) Return(_a0 error) *TxManager_EnqueueV1_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *TxManager_EnqueueV1_Call) RunAndReturn(run func(context.Context, string, *solana.Transaction, *string, uint64, ...utils.SetTxConfig) error) *TxManager_EnqueueV1_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTransactionStatus provides a mock function with given fields: ctx, transactionID
 func (_m *TxManager) GetTransactionStatus(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
 	ret := _m.Called(ctx, transactionID)

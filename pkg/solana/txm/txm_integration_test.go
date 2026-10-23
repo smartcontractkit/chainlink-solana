@@ -44,6 +44,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 		useValidBlockHash       bool
 		expectRebroadcast       bool
 		expectTransactionStatus types.TransactionStatus
+		enqueueV1               bool // requires a validator with SIMD-0385 (v1 transactions) active
 	}
 
 	testCases := []TestCase{
@@ -68,6 +69,22 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 			expectRebroadcast:       false,
 			expectTransactionStatus: types.Finalized,
 		},
+		{
+			name:                    "V1WithRebroadcast",
+			txExpirationRebroadcast: true,
+			useValidBlockHash:       false,
+			expectRebroadcast:       true,
+			expectTransactionStatus: types.Finalized,
+			enqueueV1:               true,
+		},
+		{
+			name:                    "V1ConfirmedBeforeRebroadcast",
+			txExpirationRebroadcast: true,
+			useValidBlockHash:       true,
+			expectRebroadcast:       false,
+			expectTransactionStatus: types.Finalized,
+			enqueueV1:               true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -84,10 +101,30 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 			// Create and enqueue tx
 			txID := tc.name
 			tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, tc.useValidBlockHash)
-			require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
+			if tc.enqueueV1 {
+				require.NoError(t, txmInstance.EnqueueV1(ctx, "", tx, &txID, lastValidBlockHeight))
+			} else {
+				require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
+			}
 
 			// Wait for the transaction to reach the expected status
 			waitForStatus(t, txmInstance, txID, tc.expectTransactionStatus, 60*time.Second, 1*time.Second)
+
+			if tc.enqueueV1 {
+				// Verify the transaction that landed on chain is a v1 transaction with the inline compute budget set
+				sig, err := txmInstance.GetTransactionSig(txID)
+				require.NoError(t, err)
+				res, err := client.GetTransaction(ctx, sig)
+				require.NoError(t, err)
+				require.NotNil(t, res.Transaction)
+				require.NotNil(t, res.Meta)
+				require.Nil(t, res.Meta.Err)
+				onchainTx, err := res.Transaction.GetTransaction()
+				require.NoError(t, err)
+				require.Equal(t, solana.MessageVersionV1, onchainTx.Message.GetVersion())
+				require.NotNil(t, onchainTx.Message.TransactionConfig.ComputeUnitLimit)
+				require.NotNil(t, onchainTx.Message.TransactionConfig.PriorityFee)
+			}
 
 			// Verify balances
 			finalSenderBalance, err := client.Balance(ctx, senderPubKey)

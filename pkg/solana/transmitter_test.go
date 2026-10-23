@@ -55,6 +55,10 @@ func (txm verifyTxSize) GetTransactionStatus(ctx context.Context, transactionID 
 	panic("implement me")
 }
 
+func (txm verifyTxSize) EnqueueV1(_ context.Context, _ string, _ *solana.Transaction, _ *string, _ uint64, _ ...txmutils.SetTxConfig) error {
+	panic("implement me")
+}
+
 func (txm verifyTxSize) Enqueue(_ context.Context, _ string, tx *solana.Transaction, txID *string, _ uint64, _ ...txmutils.SetTxConfig) error {
 	// additional components that transaction manager adds to the transaction
 	require.NoError(txm.t, fees.SetComputeUnitPrice(tx, 0))
