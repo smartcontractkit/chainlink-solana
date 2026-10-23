@@ -26,6 +26,7 @@ import (
 	clientmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/client/mocks"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	configmocks "github.com/smartcontractkit/chainlink-solana/pkg/solana/config/mocks"
+	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	txmutils "github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
 
@@ -103,6 +104,28 @@ func Test_Converters(t *testing.T) {
 		require.Equal(t, commonsol.MessageAddressTableLookupSlice{
 			{AccountKey: cpk(3), WritableIndexes: []uint8{5}, ReadonlyIndexes: []uint8{7}},
 		}, got.AddressTableLookups)
+	})
+
+	t.Run("convertMessage v1 from wire exposes compute unit limit as an instruction", func(t *testing.T) {
+		tx, err := solanago.NewTransaction(
+			[]solanago.Instruction{solanago.NewInstruction(pk(0), solanago.AccountMetaSlice{solanago.NewAccountMeta(pk(1), true, true)}, []byte{0x01})},
+			solanago.Hash(pk(9)),
+			solanago.TransactionPayer(pk(1)),
+			solanago.TransactionV1Config(solanago.TransactionConfig{}.WithComputeUnitLimit(150_000).WithPriorityFee(42)),
+		)
+		require.NoError(t, err)
+		raw, err := tx.MarshalBinary()
+		require.NoError(t, err)
+		decoded, err := solanago.TransactionFromBytes(raw)
+		require.NoError(t, err)
+
+		got := convertMessage(decoded.Message)
+		require.GreaterOrEqual(t, len(got.Instructions), 2)
+		limitIx := got.Instructions[len(got.Instructions)-1]
+		require.Equal(t, commonsol.PublicKey(fees.ComputeBudgetProgram), got.AccountKeys[limitIx.ProgramIDIndex])
+		parsed, err := fees.ParseComputeUnitLimit(limitIx.Data)
+		require.NoError(t, err)
+		require.Equal(t, fees.ComputeUnitLimit(150_000), parsed)
 	})
 
 	t.Run("convertTokenBalance", func(t *testing.T) {
@@ -489,6 +512,11 @@ func (m *stubTxManager) Enqueue(ctx context.Context, accountID string, tx *solan
 	return args.Error(0)
 }
 
+func (m *stubTxManager) EnqueueV1(ctx context.Context, accountID string, tx *solanago.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error {
+	args := m.MethodCalled("EnqueueV1", ctx, accountID, tx, txID, lastValidBlockHeight, txCfgs)
+	return args.Error(0)
+}
+
 func (m *stubTxManager) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
 	args := m.MethodCalled("GetTransactionStatus", ctx, transactionID)
 	return args.Get(0).(commontypes.TransactionStatus), args.Error(1)
@@ -499,8 +527,9 @@ func (m *stubTxManager) GetTransactionSig(transactionID string) (solanago.Signat
 	return args.Get(0).(solanago.Signature), args.Error(1)
 }
 
-func validBase64Tx(t *testing.T) string {
+func validBase64Tx(t *testing.T, opts ...solanago.TransactionOption) string {
 	t.Helper()
+	opts = append([]solanago.TransactionOption{solanago.TransactionPayer(pk(1))}, opts...)
 	tx, err := solanago.NewTransaction(
 		[]solanago.Instruction{
 			solanago.NewInstruction(
@@ -512,7 +541,7 @@ func validBase64Tx(t *testing.T) string {
 			),
 		},
 		solanago.Hash(pk(9)),
-		solanago.TransactionPayer(pk(1)),
+		opts...,
 	)
 	require.NoError(t, err)
 
@@ -878,6 +907,43 @@ func TestSubmitTransaction_NilCfg(t *testing.T) {
 	require.NotNil(t, reply)
 	assert.Equal(t, commonsol.TxSuccess, reply.Status)
 	assert.Nil(t, capturedCfgs, "no tx configs should be set when Cfg is nil")
+}
+
+func TestSubmitTransaction_V1TxUsesEnqueueV1(t *testing.T) {
+	ss, mockReader, txm := newSubmitTestHarness(t, 5*time.Second)
+
+	mockReader.EXPECT().LatestBlockhash(mock.Anything).Return(&rpc.GetLatestBlockhashResult{
+		Value: &rpc.LatestBlockhashResult{
+			Blockhash:            solanago.Hash(pk(8)),
+			LastValidBlockHeight: 500,
+		},
+	}, nil)
+
+	var enqueued *solanago.Transaction
+	txm.On("EnqueueV1", mock.Anything, pk(1).String(), mock.Anything, mock.Anything, uint64(500), mock.Anything).
+		Run(func(args mock.Arguments) {
+			enqueued = args.Get(2).(*solanago.Transaction)
+		}).
+		Return(nil)
+
+	txm.On("GetTransactionStatus", mock.Anything, mock.Anything).
+		Return(commontypes.Unconfirmed, nil)
+
+	req := commonsol.SubmitTransactionRequest{
+		EncodedTransaction: validBase64Tx(t, solanago.TransactionMessageVersion(solanago.MessageVersionV1)),
+		Receiver:           cpk(1),
+	}
+
+	reply, err := ss.SubmitTransaction(t.Context(), req)
+	require.NoError(t, err)
+	require.NotNil(t, reply)
+	assert.Equal(t, commonsol.TxSuccess, reply.Status)
+
+	require.NotNil(t, enqueued)
+	assert.Equal(t, solanago.MessageVersionV1, enqueued.Message.GetVersion())
+	assert.Equal(t, solanago.Hash(pk(8)), enqueued.Message.RecentBlockhash)
+	assert.Empty(t, enqueued.Signatures)
+	txm.AssertNotCalled(t, "Enqueue", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func newGetProgramAccountsTestHarness(t *testing.T) (*solanaService, *clientmocks.ReaderWriter) {
