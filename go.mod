@@ -210,6 +210,4 @@ retract v1.1.0 // tag moved - checksum mismatch
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
 
-replace github.com/smartcontractkit/chainlink-common => ../chainlink-common
-
 exclude google.golang.org/grpc v1.84.0 // CVE-2026-84445
