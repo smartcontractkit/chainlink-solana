@@ -71,7 +71,7 @@ func setV1ComputeBudget(tx *solanaGo.Transaction, computeUnitLimit uint32, compu
 	}
 	tx.Message.TransactionConfig = tx.Message.TransactionConfig.
 		WithComputeUnitLimit(computeUnitLimit).
-		WithPriorityFee(v1PriorityFee(computeUnitPrice, computeUnitLimit))
+		WithPriorityFee(v1PriorityFee(computeUnitPrice, computeUnitLimit)).WithLoadedAccountsDataSizeLimit(64 * 1024 * 1024)
 }
 
 func defaultV1ComputeUnitLimit(tx *solanaGo.Transaction) uint32 {
