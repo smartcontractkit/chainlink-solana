@@ -156,14 +156,14 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  bn.js@5.2.2:
-    resolution: {integrity: sha512-v2YAxEmKaBLahNwE1mjp4WON6huMNeuDvagFZW+ASCuA/ku0bXR9hSMw0XpiqMoA3+rmnyck/tPRSFQkoC9Cuw==}
+  bn.js@5.2.5:
+    resolution: {integrity: sha512-Vq886eXykuP5E6HcKSSStP3bJgrE6In5WKxVUvJ8XGpWWYs2xZHWqUwzCtGgEtBcxyd57KBFDPFoUfNzdaHCNg==}
 
   borsh@0.7.0:
     resolution: {integrity: sha512-CLCsZGIBCFnPtkNnieW/a8wmreDmfUtjU2m9yHrzPXIlNbqVs0AQrSatSG6vdNYUqdc83tkQi2eHfF98ubzQLA==}
 
-  brace-expansion@2.0.2:
-    resolution: {integrity: sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ==}
+  brace-expansion@2.1.7:
+    resolution: {integrity: sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g==}
 
   browser-stdout@1.3.1:
     resolution: {integrity: sha512-qhAVI1+Av2X7qelOfAIYwXONood6XlZE/fXaBSmW/T5SzLAmCgzi+eiWE7fUvbHaeNBQH13UftjpXxsfLkMpgw==}
@@ -368,8 +368,8 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
-  js-yaml@4.1.1:
-    resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
   json-stringify-safe@5.0.1:
@@ -396,8 +396,8 @@ packages:
   make-error@1.3.6:
     resolution: {integrity: sha512-s8UhlNe7vPKomQhC1qFelMokr/Sc3AgNbso3n74mVPA5LTZwkB9NlXf4XPamLxJE8h0gh73rM94xvwRT2CVInw==}
 
-  minimatch@9.0.5:
-    resolution: {integrity: sha512-G6T0ZX48xgozx7587koeX9Ys2NYy6Gmv//P89sEte9V9whIapMNF4idKxnW2QtCcLiTWlb/wfCabAtAFWhhBow==}
+  minimatch@9.0.9:
+    resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
     engines: {node: '>=16 || 14 >=14.17'}
 
   minimist@1.2.8:
@@ -593,6 +593,7 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   webidl-conversions@3.0.1:
@@ -617,8 +618,8 @@ packages:
     resolution: {integrity: sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ==}
     engines: {node: '>=12'}
 
-  ws@7.5.10:
-    resolution: {integrity: sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ==}
+  ws@7.5.13:
+    resolution: {integrity: sha512-rsKI6xDBFVf4r/x8XyChGK04QR/XHroxs/jUcoWvtEZM8TPU/X/uIY9B1CsSzYws9ZJb/6bbBu7dPhFW00CAoA==}
     engines: {node: '>=8.3.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -629,8 +630,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.19.0:
-    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -677,7 +678,7 @@ snapshots:
       '@coral-xyz/borsh': 0.31.1(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@4.9.5)(utf-8-validate@5.0.10))
       '@noble/hashes': 1.8.0
       '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@4.9.5)(utf-8-validate@5.0.10)
-      bn.js: 5.2.2
+      bn.js: 5.2.5
       bs58: 4.0.1
       buffer-layout: 1.2.2
       camelcase: 6.3.0
@@ -695,7 +696,7 @@ snapshots:
   '@coral-xyz/borsh@0.31.1(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@4.9.5)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@4.9.5)(utf-8-validate@5.0.10)
-      bn.js: 5.2.2
+      bn.js: 5.2.5
       buffer-layout: 1.2.2
 
   '@isaacs/cliui@8.0.2':
@@ -745,7 +746,7 @@ snapshots:
       '@solana/buffer-layout': 4.0.1
       '@solana/codecs-numbers': 2.3.0(typescript@4.9.5)
       agentkeepalive: 4.6.0
-      bn.js: 5.2.2
+      bn.js: 5.2.5
       borsh: 0.7.0
       bs58: 4.0.1
       buffer: 6.0.3
@@ -817,15 +818,15 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  bn.js@5.2.2: {}
+  bn.js@5.2.5: {}
 
   borsh@0.7.0:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 5.2.5
       bs58: 4.0.1
       text-encoding-utf-8: 1.0.2
 
-  brace-expansion@2.0.2:
+  brace-expansion@2.1.7:
     dependencies:
       balanced-match: 1.0.2
 
@@ -966,7 +967,7 @@ snapshots:
     dependencies:
       foreground-child: 3.3.1
       jackspeak: 3.4.3
-      minimatch: 9.0.5
+      minimatch: 9.0.9
       minipass: 7.1.2
       package-json-from-dist: 1.0.1
       path-scurry: 1.11.1
@@ -991,9 +992,9 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  isomorphic-ws@4.0.1(ws@7.5.10(bufferutil@4.1.0)(utf-8-validate@5.0.10)):
+  isomorphic-ws@4.0.1(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@5.0.10)):
     dependencies:
-      ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      ws: 7.5.13(bufferutil@4.1.0)(utf-8-validate@5.0.10)
 
   jackspeak@3.4.3:
     dependencies:
@@ -1010,16 +1011,16 @@ snapshots:
       delay: 5.0.0
       es6-promisify: 5.0.0
       eyes: 0.1.8
-      isomorphic-ws: 4.0.1(ws@7.5.10(bufferutil@4.1.0)(utf-8-validate@5.0.10))
+      isomorphic-ws: 4.0.1(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@5.0.10))
       json-stringify-safe: 5.0.1
       stream-json: 1.9.1
       uuid: 8.3.2
-      ws: 7.5.10(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      ws: 7.5.13(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  js-yaml@4.1.1:
+  js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
 
@@ -1047,9 +1048,9 @@ snapshots:
 
   make-error@1.3.6: {}
 
-  minimatch@9.0.5:
+  minimatch@9.0.9:
     dependencies:
-      brace-expansion: 2.0.2
+      brace-expansion: 2.1.7
 
   minimist@1.2.8: {}
 
@@ -1070,9 +1071,9 @@ snapshots:
       glob: 10.5.0
       he: 1.2.0
       is-path-inside: 3.0.3
-      js-yaml: 4.1.1
+      js-yaml: 4.3.2
       log-symbols: 4.1.0
-      minimatch: 9.0.5
+      minimatch: 9.0.9
       ms: 2.1.3
       picocolors: 1.1.1
       serialize-javascript: 6.0.2
@@ -1133,7 +1134,7 @@ snapshots:
       buffer: 6.0.3
       eventemitter3: 5.0.4
       uuid: 8.3.2
-      ws: 8.19.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
+      ws: 8.22.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 5.0.10
@@ -1274,12 +1275,12 @@ snapshots:
       string-width: 5.1.2
       strip-ansi: 7.1.2
 
-  ws@7.5.10(bufferutil@4.1.0)(utf-8-validate@5.0.10):
+  ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@5.0.10):
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 5.0.10
 
-  ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@5.0.10):
+  ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@5.0.10):
     optionalDependencies:
       bufferutil: 4.1.0
       utf-8-validate: 5.0.10
