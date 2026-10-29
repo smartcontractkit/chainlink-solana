@@ -1,10 +1,11 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{ACCOUNT_VERSION, STORE_DECIMALS},
+    common::{data_id_seed, ACCOUNT_VERSION, STORE_DECIMALS},
     context::*,
     error::{AuthError, ProxyError},
     event::*,
+    state::FeedConfig,
 };
 
 pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
@@ -27,7 +28,7 @@ pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<
     }
     state.feed_admins.extend(&feed_admins);
 
-    emit!(ProxyInitialized {
+    emit_cpi!(ProxyInitialized {
         state: state_key,
         store_program: state.store_program,
         store_state: state.store_state,
@@ -43,7 +44,7 @@ pub fn transfer_ownership(ctx: Context<OwnerOnly>, proposed_owner: Pubkey) -> Re
         ProxyError::InvalidProposedOwner
     );
     state.proposed_owner = proposed_owner;
-    emit!(OwnershipTransferRequested {
+    emit_cpi!(OwnershipTransferRequested {
         state: ctx.accounts.state.key(),
         from: state.owner,
         to: proposed_owner,
@@ -55,7 +56,7 @@ pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let state = &mut ctx.accounts.state.load_mut()?;
     let previous = state.owner;
     state.owner = std::mem::take(&mut state.proposed_owner);
-    emit!(OwnershipTransferred {
+    emit_cpi!(OwnershipTransferred {
         state: ctx.accounts.state.key(),
         from: previous,
         to: state.owner,
@@ -80,7 +81,7 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
         // already in the requested state
         _ => {}
     }
-    emit!(FeedAdminSet {
+    emit_cpi!(FeedAdminSet {
         state: ctx.accounts.state.key(),
         feed_admin,
         is_admin,
@@ -95,7 +96,7 @@ pub fn set_store(ctx: Context<SetStore>) -> Result<()> {
     let (previous_program, previous_state) = (state.store_program, state.store_state);
     state.store_program = ctx.accounts.store_program.key();
     state.store_state = ctx.accounts.store_state.key();
-    emit!(StoreSet {
+    emit_cpi!(StoreSet {
         state: ctx.accounts.state.key(),
         previous_program,
         previous_state,
@@ -126,10 +127,10 @@ pub fn set_min_decimals(
     let config = &mut ctx.accounts.feed_config;
     config.version = ACCOUNT_VERSION;
     config.state = state_key;
-    config.data_id = data_id;
+    config.data_id = data_id_seed(&data_id);
     config.min_decimals = min_decimals;
 
-    emit!(MinDecimalsSet {
+    emit_cpi!(MinDecimalsSet {
         state: state_key,
         data_id,
         min_decimals,
@@ -139,9 +140,20 @@ pub fn set_min_decimals(
 
 /// The fewest decimals `read_scaled` serves a data ID at.
 pub fn get_min_decimals(ctx: Context<GetMinDecimals>, _data_id: [u8; 16]) -> Result<u8> {
-    Ok(ctx
-        .accounts
-        .feed_config
-        .as_ref()
-        .map_or(STORE_DECIMALS, |config| config.min_decimals))
+    min_decimals(ctx.accounts.feed_config.as_deref())
+}
+
+/// The minimum decimals of an optional feed config, the stored decimals without one.
+pub fn min_decimals(config: Option<&FeedConfig>) -> Result<u8> {
+    match config {
+        None => Ok(STORE_DECIMALS),
+        Some(config) => {
+            require_eq!(
+                config.version,
+                ACCOUNT_VERSION,
+                ProxyError::InvalidAccountVersion
+            );
+            Ok(config.min_decimals)
+        }
+    }
 }

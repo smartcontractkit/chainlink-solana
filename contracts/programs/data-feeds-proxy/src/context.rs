@@ -1,9 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::common::{ANCHOR_DISCRIMINATOR, FEED_CONFIG_SEED};
-use crate::error::AuthError;
+use crate::common::{data_id_seed, ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_CONFIG_SEED};
+use crate::error::{AuthError, ProxyError};
+
+// Contexts that change state emit CPI events (`#[event_cpi]` adds the event authority PDA and this
+// program as their last accounts). Every context checks the state's layout version.
 use crate::state::{FeedConfig, ProxyState};
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]
@@ -23,30 +27,33 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct OwnerOnly<'info> {
     #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>,
 
-    #[account(mut)]
+    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
     #[account(address = state.load()?.proposed_owner @ AuthError::Unauthorized)]
     pub new_owner: Signer<'info>,
 
-    #[account(mut)]
+    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct SetStore<'info> {
     #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
     pub owner: Signer<'info>,
 
-    #[account(mut)]
+    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 
     /// CHECK: the new store program, executable is enough
@@ -58,6 +65,7 @@ pub struct SetStore<'info> {
     pub store_state: UncheckedAccount<'info>,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 #[instruction(data_id: [u8; 16])]
 pub struct SetMinDecimals<'info> {
@@ -65,13 +73,14 @@ pub struct SetMinDecimals<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
+    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 
     #[account(
         init_if_needed,
         payer = admin,
         space = ANCHOR_DISCRIMINATOR + FeedConfig::INIT_SPACE,
-        seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id],
+        seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id_seed(&data_id)],
         bump,
     )]
     pub feed_config: Account<'info, FeedConfig>,
@@ -82,16 +91,18 @@ pub struct SetMinDecimals<'info> {
 #[derive(Accounts)]
 #[instruction(data_id: [u8; 16])]
 pub struct GetMinDecimals<'info> {
+    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 
     /// Settings of the data ID, the stored decimals apply when omitted
-    #[account(seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id], bump)]
+    #[account(seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id_seed(&data_id)], bump)]
     pub feed_config: Option<Account<'info, FeedConfig>>,
 }
 
 /// Read a round of a data ID at the store's decimals.
 #[derive(Accounts)]
 pub struct Read<'info> {
+    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 
     /// CHECK: the configured store program
@@ -110,6 +121,7 @@ pub struct Read<'info> {
 #[derive(Accounts)]
 #[instruction(data_id: [u8; 16])]
 pub struct ReadScaled<'info> {
+    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, ProxyState>,
 
     /// CHECK: the configured store program
@@ -124,6 +136,6 @@ pub struct ReadScaled<'info> {
     pub feed: UncheckedAccount<'info>,
 
     /// Settings of the data ID, the stored decimals are the minimum when omitted
-    #[account(seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id], bump)]
+    #[account(seeds = [FEED_CONFIG_SEED, state.key().as_ref(), &data_id_seed(&data_id)], bump)]
     pub feed_config: Option<Account<'info, FeedConfig>>,
 }

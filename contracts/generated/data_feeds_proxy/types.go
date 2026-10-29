@@ -147,10 +147,16 @@ func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
 type FeedConfig struct {
 	Version uint8              `json:"version"`
 	State   solanago.PublicKey `json:"state"`
-	DataId  [16]uint8          `json:"data_id"`
+
+	// Data ID zero padded to 32 bytes
+	DataId [32]uint8 `json:"data_id"`
 
 	// Fewest decimals `read_scaled` serves this data ID at, at most the stored decimals
 	MinDecimals uint8 `json:"min_decimals"`
+
+	// Room for later per-feed read settings, e.g. the EVM store's SVR fallback time and sync
+	// iterations if SVR is added
+	Reserved [32]uint8 `json:"_reserved"`
 }
 
 func (obj FeedConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -173,6 +179,11 @@ func (obj FeedConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	err = encoder.Encode(obj.MinDecimals)
 	if err != nil {
 		return errors.NewField("MinDecimals", err)
+	}
+	// Serialize `Reserved`:
+	err = encoder.Encode(obj.Reserved)
+	if err != nil {
+		return errors.NewField("Reserved", err)
 	}
 	return nil
 }
@@ -207,6 +218,11 @@ func (obj *FeedConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	err = decoder.Decode(&obj.MinDecimals)
 	if err != nil {
 		return errors.NewField("MinDecimals", err)
+	}
+	// Deserialize `Reserved`:
+	err = decoder.Decode(&obj.Reserved)
+	if err != nil {
+		return errors.NewField("Reserved", err)
 	}
 	return nil
 }

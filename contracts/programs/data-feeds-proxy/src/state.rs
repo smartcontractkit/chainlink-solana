@@ -43,9 +43,13 @@ const_assert_eq!(size_of::<ProxyState>(), 784);
 pub struct FeedConfig {
     pub version: u8,
     pub state: Pubkey,
-    pub data_id: [u8; 16],
+    /// Data ID zero padded to 32 bytes
+    pub data_id: [u8; 32],
     /// Fewest decimals `read_scaled` serves this data ID at, at most the stored decimals
     pub min_decimals: u8,
+    /// Room for later per-feed read settings, e.g. the EVM store's SVR fallback time and sync
+    /// iterations if SVR is added
+    pub _reserved: [u8; 32],
 }
 
 /// A round as returned by the proxy. `read` returns the store's answer as is, with the store's

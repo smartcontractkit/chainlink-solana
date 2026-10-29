@@ -22,4 +22,6 @@ pub enum ProxyError {
     FeedAdminsNotSorted,
     #[msg("invalid proposed owner")]
     InvalidProposedOwner,
+    #[msg("account has an unsupported version")]
+    InvalidAccountVersion,
 }

@@ -58,12 +58,28 @@ describe("data feeds proxy", function () {
       [Buffer.from(seed), storeState.publicKey.toBuffer(), ...keys],
       store.programId
     )[0];
-  const feedPda = (id: Buffer) => storePda("feed", id);
+  // accounts key data ids zero padded to 32 bytes
+  const seed32 = (id: Buffer) => Buffer.concat([id, Buffer.alloc(16)]);
+  const feedPda = (id: Buffer) => storePda("feed", seed32(id));
   const feedConfigPda = (id: Buffer) =>
     PublicKey.findProgramAddressSync(
-      [Buffer.from("feed_config"), proxyState.publicKey.toBuffer(), id],
+      [Buffer.from("feed_config"), proxyState.publicKey.toBuffer(), seed32(id)],
       proxy.programId
     )[0];
+  // CPI events: #[event_cpi] contexts take the event authority PDA and the program
+  const eventAuthority = (programId: PublicKey) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("__event_authority")],
+      programId
+    )[0];
+  const proxyEvents = () => ({
+    eventAuthority: eventAuthority(proxy.programId),
+    program: proxy.programId,
+  });
+  const storeEvents = () => ({
+    eventAuthority: eventAuthority(store.programId),
+    program: store.programId,
+  });
 
   const meta = (pubkey: PublicKey, isWritable = true): AccountMeta => ({
     pubkey,
@@ -87,6 +103,7 @@ describe("data feeds proxy", function () {
     await store.methods
       .initFeeds([Array.from(id)])
       .accountsStrict({
+        ...storeEvents(),
         feedAdmin: feedAdmin.keypair.publicKey,
         state: storeState.publicKey,
         systemProgram: SystemProgram.programId,
@@ -102,13 +119,8 @@ describe("data feeds proxy", function () {
         workflowOwner,
         [
           meta(storeState.publicKey, false),
-          meta(
-            PublicKey.findProgramAddressSync(
-              [Buffer.from("store_authority"), storeState.publicKey.toBuffer()],
-              store.programId
-            )[0],
-            false
-          ),
+          meta(eventAuthority(store.programId), false),
+          meta(store.programId, false),
           meta(feedPda(id)),
         ]
       );
@@ -150,6 +162,7 @@ describe("data feeds proxy", function () {
     proxy.methods
       .setMinDecimals(Array.from(id), min)
       .accountsStrict({
+        ...proxyEvents(),
         admin: admin.keypair.publicKey,
         state: proxyState.publicKey,
         feedConfig: feedConfigPda(id),
@@ -190,6 +203,7 @@ describe("data feeds proxy", function () {
     await store.methods
       .initialize([feedAdmin.keypair.publicKey], new BN(8), 3600)
       .accountsStrict({
+        ...storeEvents(),
         owner: provider.publicKey,
         state: storeState.publicKey,
         systemProgram: SystemProgram.programId,
@@ -210,6 +224,7 @@ describe("data feeds proxy", function () {
         },
       ])
       .accountsStrict({
+        ...storeEvents(),
         feedAdmin: feedAdmin.keypair.publicKey,
         state: storeState.publicKey,
       })
@@ -225,6 +240,7 @@ describe("data feeds proxy", function () {
     await proxy.methods
       .initialize([])
       .accountsStrict({
+        ...proxyEvents(),
         owner: provider.publicKey,
         state: proxyState.publicKey,
         storeProgram: store.programId,
@@ -249,6 +265,7 @@ describe("data feeds proxy", function () {
       proxy.methods
         .initialize([])
         .accountsStrict({
+          ...proxyEvents(),
           owner: provider.publicKey,
           state: state.publicKey,
           storeProgram: store.programId,
@@ -380,6 +397,7 @@ describe("data feeds proxy", function () {
       await proxy.methods
         .setFeedAdmin(feedAdmin.keypair.publicKey, true)
         .accountsStrict({
+          ...proxyEvents(),
           owner: provider.publicKey,
           state: proxyState.publicKey,
         })
@@ -421,6 +439,7 @@ describe("data feeds proxy", function () {
       proxy.methods
         .setStore()
         .accountsStrict({
+          ...proxyEvents(),
           owner: provider.publicKey,
           state: proxyState.publicKey,
           storeProgram: dummyReceiver.programId,
@@ -432,6 +451,7 @@ describe("data feeds proxy", function () {
     await proxy.methods
       .setStore()
       .accountsStrict({
+        ...proxyEvents(),
         owner: provider.publicKey,
         state: proxyState.publicKey,
         storeProgram: dummyReceiver.programId,
@@ -450,7 +470,12 @@ describe("data feeds proxy", function () {
       })
       .view())!;
     assert.isTrue(swapped.answer.eq(new BN(42).mul(E18)));
-    assert.equal((await proxy.account.proxyState.fetch(proxyState.publicKey)).storeProgram.toBase58(), dummyReceiver.programId.toBase58());
+    assert.equal(
+      (
+        await proxy.account.proxyState.fetch(proxyState.publicKey)
+      ).storeProgram.toBase58(),
+      dummyReceiver.programId.toBase58()
+    );
 
     // the old store's accounts are no longer accepted
     await expectError(read(id), "ConstraintAddress");
@@ -469,12 +494,17 @@ describe("data feeds proxy", function () {
     );
     await proxy.methods
       .transferOwnership(next.publicKey)
-      .accountsStrict({ owner: provider.publicKey, state: proxyState.publicKey })
+      .accountsStrict({
+        ...proxyEvents(),
+        owner: provider.publicKey,
+        state: proxyState.publicKey,
+      })
       .rpc();
     await expectError(
       proxy.methods
         .acceptOwnership()
         .accountsStrict({
+          ...proxyEvents(),
           newOwner: provider.publicKey,
           state: proxyState.publicKey,
         })
@@ -484,6 +514,7 @@ describe("data feeds proxy", function () {
     await proxy.methods
       .acceptOwnership()
       .accountsStrict({
+        ...proxyEvents(),
         newOwner: next.publicKey,
         state: proxyState.publicKey,
       })

@@ -58,10 +58,7 @@ pub fn read_scaled(
     round_id: Option<u64>,
 ) -> Result<Round> {
     let accounts = &ctx.accounts;
-    let min_decimals = accounts
-        .feed_config
-        .as_ref()
-        .map_or(STORE_DECIMALS, |config| config.min_decimals);
+    let min_decimals = crate::admin::min_decimals(accounts.feed_config.as_deref())?;
     require!(
         decimals >= min_decimals && decimals <= STORE_DECIMALS,
         ProxyError::InvalidDecimals

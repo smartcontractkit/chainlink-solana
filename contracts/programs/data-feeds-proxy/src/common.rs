@@ -10,3 +10,11 @@ pub const STORE_DECIMALS: u8 = 18;
 pub const MAX_FEED_ADMINS: usize = 16;
 
 pub const FEED_CONFIG_SEED: &[u8] = b"feed_config";
+
+/// A data ID as accounts derive their addresses from, zero padded to 32 bytes as in the store, so
+/// a wider data ID format later keeps every account address.
+pub fn data_id_seed(data_id: &[u8; 16]) -> [u8; 32] {
+    let mut seed = [0u8; 32];
+    seed[..16].copy_from_slice(data_id);
+    seed
+}

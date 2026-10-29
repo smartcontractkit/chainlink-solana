@@ -260,16 +260,19 @@ func TestDataFeedsStore(t *testing.T) {
 	// A proxy in front of the store serves the same round, at the store's decimals and rescaled.
 	proxyState, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
+	var configSeed [32]byte
+	copy(configSeed[:], df1[0].id[:])
 	feedConfig, _, err := solana.FindProgramAddress(
-		[][]byte{[]byte("feed_config"), proxyState.PublicKey().Bytes(), df1[0].id[:]}, data_feeds_proxy.ProgramID)
+		[][]byte{[]byte("feed_config"), proxyState.PublicKey().Bytes(), configSeed[:]}, data_feeds_proxy.ProgramID)
 	require.NoError(t, err)
+	proxyEvents := eventAuthority(data_feeds_proxy.ProgramID)
 	send([]solana.Instruction{
 		build(data_feeds_proxy.NewInitializeInstruction(nil, deployer.PublicKey(), proxyState.PublicKey(),
-			data_feeds_store.ProgramID, storeState.PublicKey(), solana.SystemProgramID)),
+			data_feeds_store.ProgramID, storeState.PublicKey(), solana.SystemProgramID, proxyEvents, data_feeds_proxy.ProgramID)),
 	}, proxyState)
 	send([]solana.Instruction{
 		build(data_feeds_proxy.NewSetMinDecimalsInstruction(df1[0].id, 8, deployer.PublicKey(), proxyState.PublicKey(),
-			feedConfig, solana.SystemProgramID)),
+			feedConfig, solana.SystemProgramID, proxyEvents, data_feeds_proxy.ProgramID)),
 	})
 	simulateRound := func(label string, ix solana.Instruction) data_feeds_proxy.Round {
 		tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(deployer.PublicKey()))

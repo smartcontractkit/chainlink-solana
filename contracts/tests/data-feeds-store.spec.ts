@@ -399,7 +399,10 @@ describe("data feeds store", function () {
       assert.isTrue(round.answer.eq(new BN(1234).mul(E18).divn(100)));
       assert.equal(round.observationsTimestamp, tsA);
       assert.isAbove(round.recordedTimestamp, 0);
-      assert.isTrue((await latestAnswer(b)).eq(new BN(-5).mul(E18)), "negative");
+      assert.isTrue(
+        (await latestAnswer(b)).eq(new BN(-5).mul(E18)),
+        "negative"
+      );
       assert.equal((await readLatest(b)).observationsTimestamp, tsB);
     });
 
@@ -415,7 +418,10 @@ describe("data feeds store", function () {
         { dataId: uninitialized, timestamp: ts, answer: new BN(2) },
         { dataId: valid, timestamp: ts, answer: new BN(3) },
       ]);
-      assert.isTrue((await latestAnswer(valid)).eq(new BN(3)), "valid report lands");
+      assert.isTrue(
+        (await latestAnswer(valid)).eq(new BN(3)),
+        "valid report lands"
+      );
 
       const names = (await cpiEvents(signature)).map((e) => e.name);
       assert.includeMembers(names, [
@@ -441,7 +447,11 @@ describe("data feeds store", function () {
       assert.equal(rounds[0].roundId.toNumber(), 1);
       assert.isTrue(rounds[0].answer.eq(new BN(42)));
       assert.equal(rounds[0].observationsTimestamp, ts);
-      assert.equal(rounds[1].roundId.toNumber(), 0, "no report yet: zero round");
+      assert.equal(
+        rounds[1].roundId.toNumber(),
+        0,
+        "no report yet: zero round"
+      );
     });
 
     it("keeps history in a ring", async () => {
@@ -535,10 +545,7 @@ describe("data feeds store", function () {
         new Map(),
         zoneB
       );
-      await expectError(
-        readLatest(id),
-        "NoDataPresent"
-      ); // a forwarder outside the allowed workflows is skipped
+      await expectError(readLatest(id), "NoDataPresent"); // a forwarder outside the allowed workflows is skipped
 
       const workflow = (allowedSender: PublicKey) => ({
         allowedSender,
@@ -826,7 +833,13 @@ describe("data feeds store", function () {
         false
       );
       await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3).mul(E18) }],
+        [
+          {
+            dataId: id,
+            timestamp: nextTimestamp(),
+            answer: new BN(3).mul(E18),
+          },
+        ],
         new Map([
           [
             id.toString("hex"),
