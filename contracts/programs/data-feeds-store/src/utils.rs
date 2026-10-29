@@ -2,13 +2,18 @@ use std::mem::size_of;
 
 use anchor_lang::{
     prelude::*,
-    solana_program::{program::invoke_signed, system_instruction},
+    solana_program::{
+        instruction::{AccountMeta, Instruction},
+        program::invoke_signed,
+        system_instruction,
+    },
     Discriminator,
 };
 use bytemuck::Pod;
 
 use crate::{
-    common::{ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, ZERO_ADDRESS, ZERO_NAME},
+    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, ZERO_ADDRESS, ZERO_NAME},
+    data_id,
     error::{AuthError, StoreError},
     logic::Ring,
     state::{
@@ -79,20 +84,6 @@ pub fn create_pda_account<'info>(
     Ok(())
 }
 
-/// Close a program owned account, sending its lamports to `receiver`.
-pub fn close_account<'info>(
-    account: &AccountInfo<'info>,
-    receiver: &AccountInfo<'info>,
-) -> Result<()> {
-    require!(account.is_writable, StoreError::AccountNotWritable);
-    let lamports = account.lamports();
-    **receiver.try_borrow_mut_lamports()? += lamports;
-    **account.try_borrow_mut_lamports()? = 0;
-    account.assign(&System::id());
-    account.resize(0)?;
-    Ok(())
-}
-
 /// Read a zero-copy account by value, checking owner and discriminator. Alignment agnostic.
 pub fn load<T: Pod + Discriminator>(info: &AccountInfo) -> Result<T> {
     require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
@@ -132,16 +123,51 @@ pub fn store<T: Pod + Discriminator>(info: &AccountInfo, value: &T) -> Result<()
     Ok(())
 }
 
-/// Load a feed header belonging to `state` and `data_id`, checking its ring fits.
+/// Load a feed header belonging to `state` and `data_id`, checking its version and that its ring
+/// fits.
 pub fn load_feed(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Result<Box<FeedData>> {
     let feed: Box<FeedData> = load_boxed(info)?;
+    require_eq!(
+        feed.version,
+        ACCOUNT_VERSION,
+        StoreError::InvalidAccountVersion
+    );
     require!(
         feed.state == *state
-            && feed.data_id == *data_id
+            && feed.data_id == data_id::to_seed(data_id)
             && info.data_len() >= feed_account_len(feed.max_stored_reports),
         StoreError::AccountMismatch
     );
     Ok(feed)
+}
+
+/// Whether an account was never created: a feed of a data ID that has not been initialized.
+pub fn is_uninitialized(info: &AccountInfo) -> bool {
+    *info.owner == System::id() && info.data_is_empty()
+}
+
+/// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke
+/// signed by the event authority PDA.
+pub struct EventEmitter<'info> {
+    pub authority: AccountInfo<'info>,
+    pub bump: u8,
+}
+
+impl EventEmitter<'_> {
+    pub fn emit(&self, event: &impl anchor_lang::Event) -> Result<()> {
+        let mut data = anchor_lang::event::EVENT_IX_TAG_LE.to_vec();
+        data.extend(event.data());
+        invoke_signed(
+            &Instruction::new_with_bytes(
+                crate::ID,
+                &data,
+                vec![AccountMeta::new_readonly(*self.authority.key, true)],
+            ),
+            std::slice::from_ref(&self.authority),
+            &[&[b"__event_authority", &[self.bump]]],
+        )
+        .map_err(Into::into)
+    }
 }
 
 /// Settings of a data ID, kept in its feed account.

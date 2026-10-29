@@ -54,7 +54,7 @@ pub enum CacheSkipReason {
     NotWritable,
     /// Feed version does not match `FEED_VERSION`.
     InvalidVersion,
-    /// The feed's writer is not the signing data feeds store authority (e.g. still OCR2).
+    /// The feed's writer is not the signing data feeds store callback authority (e.g. still OCR2).
     UnauthorizedWriter,
     /// Round is not newer than the feed's latest round.
     StaleTimestamp,
@@ -199,16 +199,18 @@ pub mod store {
         apply_round(&mut ctx.accounts.feed, round)
     }
 
-    /// Report callback of the data feeds store (CRE), configured on the data ID backing this feed. Writes the round, rescaled to the feed's decimals, if the feed's writer is the
-    /// signing store authority. A round the feed cannot take (e.g. its writer is still OCR2) is
-    /// skipped with a `CacheRoundSkipped` event. Always accepts, so the store keeps its own write.
+    /// Report callback of the data feeds store (CRE), configured on the data ID backing this feed.
+    /// Writes the round, rescaled to the feed's decimals, if the feed's writer is the signing
+    /// authority: the data feeds store's callback authority PDA for this program. A round the feed
+    /// cannot take (e.g. its writer is still OCR2) is skipped with a `CacheRoundSkipped` event.
+    /// Always accepts, so the store keeps its own write. Its events are CPI events (`emit_cpi!`).
     pub fn on_report_callback(
         ctx: Context<OnReportCallback>,
         args: OnReportCallbackArgs,
     ) -> Result<bool> {
         let feed_info = ctx.accounts.feed.to_account_info();
-        let skip = |reason| {
-            emit!(CacheRoundSkipped {
+        let skip = |reason| -> Result<bool> {
+            emit_cpi!(CacheRoundSkipped {
                 feed: feed_info.key(),
                 reason,
             });
@@ -237,7 +239,7 @@ pub mod store {
         // the feed is not a typed account of this context, persist explicitly
         feed.exit(&crate::ID)?;
 
-        emit!(CacheRoundSubmitted {
+        emit_cpi!(CacheRoundSubmitted {
             feed: feed_info.key(),
             round_id: feed.latest_round_id,
             answer: transmission.answer,
@@ -660,9 +662,12 @@ pub struct Submit<'info> {
     pub authority: Signer<'info>,
 }
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct OnReportCallback<'info> {
-    /// The data feeds store authority. Each feed only accepts rounds if this is its writer.
+    /// The data feeds store's callback authority PDA of this program (`[b"callback_authority",
+    /// store state, this program]` under the data feeds store). Each feed only accepts rounds if
+    /// this is its writer.
     pub authority: Signer<'info>,
     /// CHECK: the legacy feed, validated in the handler so a bad feed is skipped, not failed
     pub feed: UncheckedAccount<'info>,

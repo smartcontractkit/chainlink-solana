@@ -56,4 +56,10 @@ pub enum StoreError {
     InvalidProposedOwner,
     #[msg("insufficient balance")]
     InsufficientBalance,
+    #[msg("account has an unsupported version")]
+    InvalidAccountVersion,
+    #[msg("report callback program is not allowed")]
+    ReportCallbackNotAllowed,
+    #[msg("too many data ids for one read")]
+    TooManyDataIds,
 }

@@ -1,14 +1,41 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{MAX_CALLBACK_ACCOUNTS, MAX_WORKFLOW_METADATAS},
+    common::{
+        ACCOUNT_VERSION, CALLBACK_AUTHORITY_SEED, CALLBACK_PROGRAM_SEED, MAX_CALLBACK_ACCOUNTS,
+        MAX_WORKFLOW_METADATAS,
+    },
     context::FeedAdminAccounts,
     data_id,
     error::StoreError,
     event::*,
-    state::{CallbackConfigArgs, WorkflowMetadata},
+    state::{CallbackConfigArgs, CallbackProgram, WorkflowMetadata},
     utils::{update_settings, validate_workflow_metadata, verify_feed_admin},
 };
+
+/// Check a program is on the owner's callback allowlist through its allowlist entry account.
+fn require_allowed(state: &Pubkey, program: &Pubkey, entry: &AccountInfo) -> Result<()> {
+    let (address, _) = Pubkey::find_program_address(
+        &[CALLBACK_PROGRAM_SEED, state.as_ref(), program.as_ref()],
+        &crate::ID,
+    );
+    require_keys_eq!(address, *entry.key, StoreError::AccountMismatch);
+    require!(
+        *entry.owner == crate::ID && !entry.data_is_empty(),
+        StoreError::ReportCallbackNotAllowed
+    );
+    let allowed = CallbackProgram::try_deserialize(&mut &entry.try_borrow_data()?[..])?;
+    require_eq!(
+        allowed.version,
+        ACCOUNT_VERSION,
+        StoreError::InvalidAccountVersion
+    );
+    require!(
+        allowed.allowed && allowed.state == *state && allowed.program == *program,
+        StoreError::ReportCallbackNotAllowed
+    );
+    Ok(())
+}
 
 /// Set the workflows allowed to write the given data IDs, replacing any previous feed-specific
 /// metadata. Data IDs without feed-specific metadata use the store's default metadata. Remaining
@@ -51,13 +78,13 @@ pub fn set_specific_feed_metadata<'info>(
         })?;
 
         if replaced {
-            emit!(SpecificFeedMetadataRemoved {
+            emit_cpi!(SpecificFeedMetadataRemoved {
                 state: state_key,
                 data_id: *id,
             });
         }
 
-        emit!(SpecificFeedMetadataSet {
+        emit_cpi!(SpecificFeedMetadataSet {
             state: state_key,
             data_id: *id,
             workflow_metadata: workflow_metadata.clone(),
@@ -92,7 +119,7 @@ pub fn remove_specific_feed_metadata<'info>(
             Ok(())
         })?;
 
-        emit!(SpecificFeedMetadataRemoved {
+        emit_cpi!(SpecificFeedMetadataRemoved {
             state: state_key,
             data_id: *id,
         });
@@ -101,7 +128,9 @@ pub fn remove_specific_feed_metadata<'info>(
 }
 
 /// Configure report callbacks. Remaining accounts are the feeds of the data IDs in order, followed
-/// by the callback program account of every enabled (non-default program) callback in order.
+/// by the callback program account and its allowlist entry of every enabled (non-default program)
+/// callback in order. Only programs the owner allowed can be configured. Each program is called
+/// with its own callback authority PDA as signer, so it can never act as another program's.
 pub fn set_report_callback_configs<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -123,7 +152,7 @@ pub fn set_report_callback_configs<'info>(
         .count();
     require_eq!(
         ctx.remaining_accounts.len(),
-        data_ids.len() + enabled,
+        data_ids.len() + 2 * enabled,
         StoreError::InvalidAccountCount
     );
     let (settings_infos, program_infos) = ctx.remaining_accounts.split_at(data_ids.len());
@@ -137,16 +166,27 @@ pub fn set_report_callback_configs<'info>(
     {
         require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
         // A callback that could never run is rejected here instead of failing every report.
+        let mut authority_bump = 0;
         if callback.program != Pubkey::default() {
             let program = program_infos.next().unwrap();
             require!(
                 program.key() == callback.program && program.executable,
                 StoreError::ReportCallbackNoContract
             );
+            require_allowed(&state_key, &callback.program, program_infos.next().unwrap())?;
             require!(
                 callback.accounts.len() <= MAX_CALLBACK_ACCOUNTS,
                 StoreError::MaxEntriesExceeded
             );
+            authority_bump = Pubkey::find_program_address(
+                &[
+                    CALLBACK_AUTHORITY_SEED,
+                    state_key.as_ref(),
+                    callback.program.as_ref(),
+                ],
+                &crate::ID,
+            )
+            .1;
         }
 
         let (previous_program, current_program) =
@@ -157,6 +197,7 @@ pub fn set_report_callback_configs<'info>(
                 settings.callback_accounts_len = 0;
                 settings.callback_writable_mask = 0;
                 settings.callback_revert_on_failure = 0;
+                settings.callback_authority_bump = authority_bump;
                 if callback.program != Pubkey::default() {
                     settings.callback_revert_on_failure = callback.revert_on_failure as u8;
                     settings.callback_accounts_len = callback.accounts.len() as u8;
@@ -170,7 +211,7 @@ pub fn set_report_callback_configs<'info>(
                 Ok((previous_program, settings.callback_program))
             })?;
 
-        emit!(ReportCallbackConfigSet {
+        emit_cpi!(ReportCallbackConfigSet {
             state: state_key,
             data_id: *id,
             previous_program,

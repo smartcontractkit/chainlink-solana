@@ -16,6 +16,8 @@ import (
 func NewAcceptOwnershipInstruction(
 	newOwnerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -33,6 +35,10 @@ func NewAcceptOwnershipInstruction(
 		accounts__.Append(solanago.NewAccountMeta(newOwnerAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 3 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -83,52 +89,6 @@ func NewCheckFeedPermissionInstruction(
 		// Account 1 "feed": Read-only, Non-signer, Optional
 		// Feed of the data ID, the default metadata applies when omitted
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
-	}
-
-	// Create the instruction.
-	return solanago.NewInstruction(
-		ProgramID,
-		accounts__,
-		buf__.Bytes(),
-	), nil
-}
-
-// Builds a "close_feeds" instruction.
-// Close feed accounts (remaining accounts: feed PDAs).
-func NewCloseFeedsInstruction(
-	// Params:
-	dataIdsParam [][16]uint8,
-
-	// Accounts:
-	feedAdminAccount solanago.PublicKey,
-	stateAccount solanago.PublicKey,
-	systemProgramAccount solanago.PublicKey,
-) (solanago.Instruction, error) {
-	buf__ := new(bytes.Buffer)
-	enc__ := binary.NewBorshEncoder(buf__)
-
-	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_CloseFeeds[:], false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
-	}
-	{
-		// Serialize `dataIdsParam`:
-		err = enc__.Encode(dataIdsParam)
-		if err != nil {
-			return nil, errors.NewField("dataIdsParam", err)
-		}
-	}
-	accounts__ := solanago.AccountMetaSlice{}
-
-	// Add the accounts to the instruction.
-	{
-		// Account 0 "feed_admin": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(feedAdminAccount, true, true))
-		// Account 1 "state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 2 "system_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -269,6 +229,46 @@ func NewGetLatestRoundInstruction(
 	), nil
 }
 
+// Builds a "get_latest_rounds" instruction.
+// Latest rounds of up to 31 data IDs (remaining accounts: their feeds), answers with 18 // decimals. A feed without a report yields round ID 0.
+func NewGetLatestRoundsInstruction(
+	// Params:
+	dataIdsParam [][16]uint8,
+
+	// Accounts:
+	stateAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_GetLatestRounds[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
 // Builds a "get_round" instruction.
 // A stored round of a data ID, answer with 18 decimals.
 func NewGetRoundInstruction(
@@ -329,6 +329,8 @@ func NewInitFeedsInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -355,6 +357,10 @@ func NewInitFeedsInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -377,6 +383,8 @@ func NewInitializeInstruction(
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -413,6 +421,10 @@ func NewInitializeInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, true))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -424,7 +436,7 @@ func NewInitializeInstruction(
 }
 
 // Builds a "on_report" instruction.
-// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`, remaining accounts are one // group per report: the feed of its data ID, then the callback program and accounts when a // callback is configured.
+// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`, remaining accounts are one // group per report: the feed of its data ID, then the callback program, its callback authority // PDA and the configured accounts when a callback is configured.
 func NewOnReportInstruction(
 	// Params:
 	metadataParam []byte,
@@ -434,7 +446,8 @@ func NewOnReportInstruction(
 	forwarderStateAccount solanago.PublicKey,
 	forwarderAuthorityAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	storeAuthorityAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -468,9 +481,12 @@ func NewOnReportInstruction(
 		// verified. Any number of forwarders, e.g. one per zone, is just more workflow metadata.
 		accounts__.Append(solanago.NewAccountMeta(forwarderAuthorityAccount, false, true))
 		// Account 2 "state": Read-only, Non-signer, Required
+		// Version checked in the handler, which loads it once for every report
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 3 "store_authority": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeAuthorityAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -493,6 +509,8 @@ func NewRecoverNativeInstruction(
 	storeAuthorityAccount solanago.PublicKey,
 	toAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -523,6 +541,10 @@ func NewRecoverNativeInstruction(
 		accounts__.Append(solanago.NewAccountMeta(toAccount, true, false))
 		// Account 4 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 5 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 6 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -547,6 +569,8 @@ func NewRecoverTokensInstruction(
 	toAccount solanago.PublicKey,
 	mintAccount solanago.PublicKey,
 	tokenProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -581,6 +605,10 @@ func NewRecoverTokensInstruction(
 		accounts__.Append(solanago.NewAccountMeta(mintAccount, false, false))
 		// Account 6 "token_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(tokenProgramAccount, false, false))
+		// Account 7 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 8 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -601,6 +629,8 @@ func NewRemoveSpecificFeedMetadataInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -627,6 +657,72 @@ func NewRemoveSpecificFeedMetadataInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "set_callback_program_allowed" instruction.
+// Allow or disallow a program as a report callback. Its allowlist entry PDA // `[CALLBACK_PROGRAM_SEED, state, callback_program]` is created on first use.
+func NewSetCallbackProgramAllowedInstruction(
+	// Params:
+	callbackProgramParam solanago.PublicKey,
+	allowedParam bool,
+
+	// Accounts:
+	ownerAccount solanago.PublicKey,
+	stateAccount solanago.PublicKey,
+	allowlistEntryAccount solanago.PublicKey,
+	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_SetCallbackProgramAllowed[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `callbackProgramParam`:
+		err = enc__.Encode(callbackProgramParam)
+		if err != nil {
+			return nil, errors.NewField("callbackProgramParam", err)
+		}
+		// Serialize `allowedParam`:
+		err = enc__.Encode(allowedParam)
+		if err != nil {
+			return nil, errors.NewField("allowedParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "owner": Writable, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 2 "allowlist_entry": Writable, Non-signer, Required
+		// the handler
+		accounts__.Append(solanago.NewAccountMeta(allowlistEntryAccount, true, false))
+		// Account 3 "system_program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 4 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 5 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -646,6 +742,8 @@ func NewSetDefaultFeedMetadataInstruction(
 	// Accounts:
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -670,6 +768,10 @@ func NewSetDefaultFeedMetadataInstruction(
 		accounts__.Append(solanago.NewAccountMeta(feedAdminAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 3 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -690,6 +792,8 @@ func NewSetFeedAdminInstruction(
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -719,6 +823,10 @@ func NewSetFeedAdminInstruction(
 		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 3 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -740,6 +848,8 @@ func NewSetFeedDescriptionsInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -771,6 +881,10 @@ func NewSetFeedDescriptionsInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -790,6 +904,8 @@ func NewSetMaxObservationForwardDurationInstruction(
 	// Accounts:
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -814,6 +930,10 @@ func NewSetMaxObservationForwardDurationInstruction(
 		accounts__.Append(solanago.NewAccountMeta(feedAdminAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 3 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -835,6 +955,8 @@ func NewSetMaxStoredReportsInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -866,6 +988,10 @@ func NewSetMaxStoredReportsInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -888,6 +1014,8 @@ func NewSetMinMaxAnswersInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -924,6 +1052,10 @@ func NewSetMinMaxAnswersInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -935,7 +1067,7 @@ func NewSetMinMaxAnswersInstruction(
 }
 
 // Builds a "set_report_callback_configs" instruction.
-// Configure report callbacks (remaining accounts: feed PDAs, then the program account of // every enabled callback).
+// Configure report callbacks (remaining accounts: feed PDAs, then the program account and // allowlist entry of every enabled callback).
 func NewSetReportCallbackConfigsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -945,6 +1077,8 @@ func NewSetReportCallbackConfigsInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -976,6 +1110,10 @@ func NewSetReportCallbackConfigsInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -997,6 +1135,8 @@ func NewSetSpecificFeedMetadataInstruction(
 	feedAdminAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	systemProgramAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -1028,6 +1168,10 @@ func NewSetSpecificFeedMetadataInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 2 "system_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 4 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -1047,6 +1191,8 @@ func NewTransferOwnershipInstruction(
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	eventAuthorityAccount solanago.PublicKey,
+	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -1071,6 +1217,10 @@ func NewTransferOwnershipInstruction(
 		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "event_authority": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
+		// Account 3 "program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -1088,6 +1238,8 @@ type AcceptOwnershipInstruction struct {
 	NewOwnerSigner bool               `json:"new_owner_signer"`
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *AcceptOwnershipInstruction) GetDiscriminator() []byte {
@@ -1127,13 +1279,27 @@ func (obj *AcceptOwnershipInstruction) UnmarshalAccountIndices(buf []byte) ([]ui
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *AcceptOwnershipInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set new_owner account from index
@@ -1148,6 +1314,18 @@ func (obj *AcceptOwnershipInstruction) PopulateFromAccountIndices(indices []uint
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -1155,6 +1333,8 @@ func (obj *AcceptOwnershipInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.NewOwner)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -1281,126 +1461,6 @@ func (obj *CheckFeedPermissionInstruction) Unmarshal(buf []byte) error {
 // UnmarshalCheckFeedPermissionInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
 func UnmarshalCheckFeedPermissionInstruction(buf []byte) (*CheckFeedPermissionInstruction, error) {
 	obj := new(CheckFeedPermissionInstruction)
-	var err error
-	err = obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type CloseFeedsInstruction struct {
-	DataIds [][16]uint8 `json:"data_ids"`
-
-	// Accounts:
-	FeedAdmin         solanago.PublicKey `json:"feed_admin"`
-	FeedAdminWritable bool               `json:"feed_admin_writable"`
-	FeedAdminSigner   bool               `json:"feed_admin_signer"`
-	State             solanago.PublicKey `json:"state"`
-	SystemProgram     solanago.PublicKey `json:"system_program"`
-}
-
-func (obj *CloseFeedsInstruction) GetDiscriminator() []byte {
-	return Instruction_CloseFeeds[:]
-}
-
-// UnmarshalWithDecoder unmarshals the CloseFeedsInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *CloseFeedsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
-	var err error
-	// Read the discriminator and check it against the expected value:
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "CloseFeedsInstruction", err)
-	}
-	if discriminator != Instruction_CloseFeeds {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "CloseFeedsInstruction", Instruction_CloseFeeds, discriminator)
-	}
-	// Deserialize `DataIds`:
-	err = decoder.Decode(&obj.DataIds)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *CloseFeedsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
-	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
-	decoder := binary.NewBorshDecoder(buf)
-	indices := make([]uint8, 0)
-	index := uint8(0)
-	var err error
-	// Decode from feed_admin account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_admin", err)
-	}
-	indices = append(indices, index)
-	// Decode from state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from system_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
-	}
-	indices = append(indices, index)
-	return indices, nil
-}
-
-func (obj *CloseFeedsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
-	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
-	}
-	indexOffset := 0
-	// Set feed_admin account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_admin", len(accountKeys)-1)
-	}
-	obj.FeedAdmin = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
-	}
-	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set system_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
-	}
-	obj.SystemProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	return nil
-}
-
-func (obj *CloseFeedsInstruction) GetAccountKeys() []solanago.PublicKey {
-	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.FeedAdmin)
-	keys = append(keys, obj.State)
-	keys = append(keys, obj.SystemProgram)
-	return keys
-}
-
-// Unmarshal unmarshals the CloseFeedsInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *CloseFeedsInstruction) Unmarshal(buf []byte) error {
-	var err error
-	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling CloseFeedsInstruction: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalCloseFeedsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalCloseFeedsInstruction(buf []byte) (*CloseFeedsInstruction, error) {
-	obj := new(CloseFeedsInstruction)
 	var err error
 	err = obj.Unmarshal(buf)
 	if err != nil {
@@ -1720,6 +1780,94 @@ func UnmarshalGetLatestRoundInstruction(buf []byte) (*GetLatestRoundInstruction,
 	return obj, nil
 }
 
+type GetLatestRoundsInstruction struct {
+	DataIds [][16]uint8 `json:"data_ids"`
+
+	// Accounts:
+	State solanago.PublicKey `json:"state"`
+}
+
+func (obj *GetLatestRoundsInstruction) GetDiscriminator() []byte {
+	return Instruction_GetLatestRounds[:]
+}
+
+// UnmarshalWithDecoder unmarshals the GetLatestRoundsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *GetLatestRoundsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "GetLatestRoundsInstruction", err)
+	}
+	if discriminator != Instruction_GetLatestRounds {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "GetLatestRoundsInstruction", Instruction_GetLatestRounds, discriminator)
+	}
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GetLatestRoundsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *GetLatestRoundsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 1 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 1, len(indices))
+	}
+	indexOffset := 0
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *GetLatestRoundsInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.State)
+	return keys
+}
+
+// Unmarshal unmarshals the GetLatestRoundsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *GetLatestRoundsInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling GetLatestRoundsInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalGetLatestRoundsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalGetLatestRoundsInstruction(buf []byte) (*GetLatestRoundsInstruction, error) {
+	obj := new(GetLatestRoundsInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type GetRoundInstruction struct {
 	DataId  [16]uint8 `json:"data_id"`
 	RoundId uint64    `json:"round_id"`
@@ -1838,6 +1986,8 @@ type InitFeedsInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *InitFeedsInstruction) GetDiscriminator() []byte {
@@ -1890,13 +2040,27 @@ func (obj *InitFeedsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, e
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *InitFeedsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -1917,6 +2081,18 @@ func (obj *InitFeedsInstruction) PopulateFromAccountIndices(indices []uint8, acc
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -1925,6 +2101,8 @@ func (obj *InitFeedsInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -1955,13 +2133,15 @@ type InitializeInstruction struct {
 	MaxObservationForwardSecs uint32               `json:"max_observation_forward_secs"`
 
 	// Accounts:
-	Owner         solanago.PublicKey `json:"owner"`
-	OwnerWritable bool               `json:"owner_writable"`
-	OwnerSigner   bool               `json:"owner_signer"`
-	State         solanago.PublicKey `json:"state"`
-	StateWritable bool               `json:"state_writable"`
-	StateSigner   bool               `json:"state_signer"`
-	SystemProgram solanago.PublicKey `json:"system_program"`
+	Owner          solanago.PublicKey `json:"owner"`
+	OwnerWritable  bool               `json:"owner_writable"`
+	OwnerSigner    bool               `json:"owner_signer"`
+	State          solanago.PublicKey `json:"state"`
+	StateWritable  bool               `json:"state_writable"`
+	StateSigner    bool               `json:"state_signer"`
+	SystemProgram  solanago.PublicKey `json:"system_program"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *InitializeInstruction) GetDiscriminator() []byte {
@@ -2024,13 +2204,27 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -2051,6 +2245,18 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2059,6 +2265,8 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2092,7 +2300,8 @@ type OnReportInstruction struct {
 	ForwarderAuthority       solanago.PublicKey `json:"forwarder_authority"`
 	ForwarderAuthoritySigner bool               `json:"forwarder_authority_signer"`
 	State                    solanago.PublicKey `json:"state"`
-	StoreAuthority           solanago.PublicKey `json:"store_authority"`
+	EventAuthority           solanago.PublicKey `json:"event_authority"`
+	Program                  solanago.PublicKey `json:"program"`
 }
 
 func (obj *OnReportInstruction) GetDiscriminator() []byte {
@@ -2150,11 +2359,18 @@ func (obj *OnReportInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, er
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from store_authority account index
+	// Decode from event_authority account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_authority", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
 	}
 	indices = append(indices, index)
 	return indices, nil
@@ -2162,8 +2378,8 @@ func (obj *OnReportInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, er
 
 func (obj *OnReportInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 4 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set forwarder_state account from index
@@ -2184,11 +2400,17 @@ func (obj *OnReportInstruction) PopulateFromAccountIndices(indices []uint8, acco
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set store_authority account from index
+	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_authority", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
 	}
-	obj.StoreAuthority = accountKeys[indices[indexOffset]]
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
 	indexOffset++
 	return nil
 }
@@ -2198,7 +2420,8 @@ func (obj *OnReportInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.ForwarderState)
 	keys = append(keys, obj.ForwarderAuthority)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.StoreAuthority)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2235,6 +2458,8 @@ type RecoverNativeInstruction struct {
 	To                     solanago.PublicKey `json:"to"`
 	ToWritable             bool               `json:"to_writable"`
 	SystemProgram          solanago.PublicKey `json:"system_program"`
+	EventAuthority         solanago.PublicKey `json:"event_authority"`
+	Program                solanago.PublicKey `json:"program"`
 }
 
 func (obj *RecoverNativeInstruction) GetDiscriminator() []byte {
@@ -2301,13 +2526,27 @@ func (obj *RecoverNativeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *RecoverNativeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 5 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
+	if len(indices) != 7 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 7, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -2340,6 +2579,18 @@ func (obj *RecoverNativeInstruction) PopulateFromAccountIndices(indices []uint8,
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2350,6 +2601,8 @@ func (obj *RecoverNativeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.StoreAuthority)
 	keys = append(keys, obj.To)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2388,6 +2641,8 @@ type RecoverTokensInstruction struct {
 	ToWritable     bool               `json:"to_writable"`
 	Mint           solanago.PublicKey `json:"mint"`
 	TokenProgram   solanago.PublicKey `json:"token_program"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *RecoverTokensInstruction) GetDiscriminator() []byte {
@@ -2468,13 +2723,27 @@ func (obj *RecoverTokensInstruction) UnmarshalAccountIndices(buf []byte) ([]uint
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "token_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *RecoverTokensInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 7 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 7, len(indices))
+	if len(indices) != 9 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 9, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -2519,6 +2788,18 @@ func (obj *RecoverTokensInstruction) PopulateFromAccountIndices(indices []uint8,
 	}
 	obj.TokenProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2531,6 +2812,8 @@ func (obj *RecoverTokensInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.To)
 	keys = append(keys, obj.Mint)
 	keys = append(keys, obj.TokenProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2564,6 +2847,8 @@ type RemoveSpecificFeedMetadataInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *RemoveSpecificFeedMetadataInstruction) GetDiscriminator() []byte {
@@ -2616,13 +2901,27 @@ func (obj *RemoveSpecificFeedMetadataInstruction) UnmarshalAccountIndices(buf []
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *RemoveSpecificFeedMetadataInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -2643,6 +2942,18 @@ func (obj *RemoveSpecificFeedMetadataInstruction) PopulateFromAccountIndices(ind
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2651,6 +2962,8 @@ func (obj *RemoveSpecificFeedMetadataInstruction) GetAccountKeys() []solanago.Pu
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2675,6 +2988,178 @@ func UnmarshalRemoveSpecificFeedMetadataInstruction(buf []byte) (*RemoveSpecific
 	return obj, nil
 }
 
+type SetCallbackProgramAllowedInstruction struct {
+	CallbackProgram solanago.PublicKey `json:"callback_program"`
+	Allowed         bool               `json:"allowed"`
+
+	// Accounts:
+	Owner                  solanago.PublicKey `json:"owner"`
+	OwnerWritable          bool               `json:"owner_writable"`
+	OwnerSigner            bool               `json:"owner_signer"`
+	State                  solanago.PublicKey `json:"state"`
+	AllowlistEntry         solanago.PublicKey `json:"allowlist_entry"`
+	AllowlistEntryWritable bool               `json:"allowlist_entry_writable"`
+	SystemProgram          solanago.PublicKey `json:"system_program"`
+	EventAuthority         solanago.PublicKey `json:"event_authority"`
+	Program                solanago.PublicKey `json:"program"`
+}
+
+func (obj *SetCallbackProgramAllowedInstruction) GetDiscriminator() []byte {
+	return Instruction_SetCallbackProgramAllowed[:]
+}
+
+// UnmarshalWithDecoder unmarshals the SetCallbackProgramAllowedInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *SetCallbackProgramAllowedInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "SetCallbackProgramAllowedInstruction", err)
+	}
+	if discriminator != Instruction_SetCallbackProgramAllowed {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetCallbackProgramAllowedInstruction", Instruction_SetCallbackProgramAllowed, discriminator)
+	}
+	// Deserialize `CallbackProgram`:
+	err = decoder.Decode(&obj.CallbackProgram)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Allowed`:
+	err = decoder.Decode(&obj.Allowed)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SetCallbackProgramAllowedInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from owner account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "owner", err)
+	}
+	indices = append(indices, index)
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from allowlist_entry account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "allowlist_entry", err)
+	}
+	indices = append(indices, index)
+	// Decode from system_program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+	}
+	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *SetCallbackProgramAllowedInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 6 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 6, len(indices))
+	}
+	indexOffset := 0
+	// Set owner account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "owner", len(accountKeys)-1)
+	}
+	obj.Owner = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set allowlist_entry account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "allowlist_entry", len(accountKeys)-1)
+	}
+	obj.AllowlistEntry = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set system_program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
+	}
+	obj.SystemProgram = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *SetCallbackProgramAllowedInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Owner)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.AllowlistEntry)
+	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
+	return keys
+}
+
+// Unmarshal unmarshals the SetCallbackProgramAllowedInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *SetCallbackProgramAllowedInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling SetCallbackProgramAllowedInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalSetCallbackProgramAllowedInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalSetCallbackProgramAllowedInstruction(buf []byte) (*SetCallbackProgramAllowedInstruction, error) {
+	obj := new(SetCallbackProgramAllowedInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type SetDefaultFeedMetadataInstruction struct {
 	WorkflowMetadata []WorkflowMetadata `json:"workflow_metadata"`
 
@@ -2683,6 +3168,8 @@ type SetDefaultFeedMetadataInstruction struct {
 	FeedAdminSigner bool               `json:"feed_admin_signer"`
 	State           solanago.PublicKey `json:"state"`
 	StateWritable   bool               `json:"state_writable"`
+	EventAuthority  solanago.PublicKey `json:"event_authority"`
+	Program         solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetDefaultFeedMetadataInstruction) GetDiscriminator() []byte {
@@ -2728,13 +3215,27 @@ func (obj *SetDefaultFeedMetadataInstruction) UnmarshalAccountIndices(buf []byte
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetDefaultFeedMetadataInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -2749,6 +3250,18 @@ func (obj *SetDefaultFeedMetadataInstruction) PopulateFromAccountIndices(indices
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2756,6 +3269,8 @@ func (obj *SetDefaultFeedMetadataInstruction) GetAccountKeys() []solanago.Public
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2785,10 +3300,12 @@ type SetFeedAdminInstruction struct {
 	IsAdmin   bool               `json:"is_admin"`
 
 	// Accounts:
-	Owner         solanago.PublicKey `json:"owner"`
-	OwnerSigner   bool               `json:"owner_signer"`
-	State         solanago.PublicKey `json:"state"`
-	StateWritable bool               `json:"state_writable"`
+	Owner          solanago.PublicKey `json:"owner"`
+	OwnerSigner    bool               `json:"owner_signer"`
+	State          solanago.PublicKey `json:"state"`
+	StateWritable  bool               `json:"state_writable"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetFeedAdminInstruction) GetDiscriminator() []byte {
@@ -2839,13 +3356,27 @@ func (obj *SetFeedAdminInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetFeedAdminInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -2860,6 +3391,18 @@ func (obj *SetFeedAdminInstruction) PopulateFromAccountIndices(indices []uint8, 
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2867,6 +3410,8 @@ func (obj *SetFeedAdminInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -2901,6 +3446,8 @@ type SetFeedDescriptionsInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetFeedDescriptionsInstruction) GetDiscriminator() []byte {
@@ -2958,13 +3505,27 @@ func (obj *SetFeedDescriptionsInstruction) UnmarshalAccountIndices(buf []byte) (
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetFeedDescriptionsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -2985,6 +3546,18 @@ func (obj *SetFeedDescriptionsInstruction) PopulateFromAccountIndices(indices []
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -2993,6 +3566,8 @@ func (obj *SetFeedDescriptionsInstruction) GetAccountKeys() []solanago.PublicKey
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3025,6 +3600,8 @@ type SetMaxObservationForwardDurationInstruction struct {
 	FeedAdminSigner bool               `json:"feed_admin_signer"`
 	State           solanago.PublicKey `json:"state"`
 	StateWritable   bool               `json:"state_writable"`
+	EventAuthority  solanago.PublicKey `json:"event_authority"`
+	Program         solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetMaxObservationForwardDurationInstruction) GetDiscriminator() []byte {
@@ -3070,13 +3647,27 @@ func (obj *SetMaxObservationForwardDurationInstruction) UnmarshalAccountIndices(
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetMaxObservationForwardDurationInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -3091,6 +3682,18 @@ func (obj *SetMaxObservationForwardDurationInstruction) PopulateFromAccountIndic
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3098,6 +3701,8 @@ func (obj *SetMaxObservationForwardDurationInstruction) GetAccountKeys() []solan
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3132,6 +3737,8 @@ type SetMaxStoredReportsInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetMaxStoredReportsInstruction) GetDiscriminator() []byte {
@@ -3189,13 +3796,27 @@ func (obj *SetMaxStoredReportsInstruction) UnmarshalAccountIndices(buf []byte) (
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetMaxStoredReportsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -3216,6 +3837,18 @@ func (obj *SetMaxStoredReportsInstruction) PopulateFromAccountIndices(indices []
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3224,6 +3857,8 @@ func (obj *SetMaxStoredReportsInstruction) GetAccountKeys() []solanago.PublicKey
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3259,6 +3894,8 @@ type SetMinMaxAnswersInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetMinMaxAnswersInstruction) GetDiscriminator() []byte {
@@ -3321,13 +3958,27 @@ func (obj *SetMinMaxAnswersInstruction) UnmarshalAccountIndices(buf []byte) ([]u
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetMinMaxAnswersInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -3348,6 +3999,18 @@ func (obj *SetMinMaxAnswersInstruction) PopulateFromAccountIndices(indices []uin
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3356,6 +4019,8 @@ func (obj *SetMinMaxAnswersInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3390,6 +4055,8 @@ type SetReportCallbackConfigsInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetReportCallbackConfigsInstruction) GetDiscriminator() []byte {
@@ -3447,13 +4114,27 @@ func (obj *SetReportCallbackConfigsInstruction) UnmarshalAccountIndices(buf []by
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetReportCallbackConfigsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -3474,6 +4155,18 @@ func (obj *SetReportCallbackConfigsInstruction) PopulateFromAccountIndices(indic
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3482,6 +4175,8 @@ func (obj *SetReportCallbackConfigsInstruction) GetAccountKeys() []solanago.Publ
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3516,6 +4211,8 @@ type SetSpecificFeedMetadataInstruction struct {
 	FeedAdminSigner   bool               `json:"feed_admin_signer"`
 	State             solanago.PublicKey `json:"state"`
 	SystemProgram     solanago.PublicKey `json:"system_program"`
+	EventAuthority    solanago.PublicKey `json:"event_authority"`
+	Program           solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetSpecificFeedMetadataInstruction) GetDiscriminator() []byte {
@@ -3573,13 +4270,27 @@ func (obj *SetSpecificFeedMetadataInstruction) UnmarshalAccountIndices(buf []byt
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *SetSpecificFeedMetadataInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 3 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 3, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set feed_admin account from index
@@ -3600,6 +4311,18 @@ func (obj *SetSpecificFeedMetadataInstruction) PopulateFromAccountIndices(indice
 	}
 	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3608,6 +4331,8 @@ func (obj *SetSpecificFeedMetadataInstruction) GetAccountKeys() []solanago.Publi
 	keys = append(keys, obj.FeedAdmin)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3636,10 +4361,12 @@ type TransferOwnershipInstruction struct {
 	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
 
 	// Accounts:
-	Owner         solanago.PublicKey `json:"owner"`
-	OwnerSigner   bool               `json:"owner_signer"`
-	State         solanago.PublicKey `json:"state"`
-	StateWritable bool               `json:"state_writable"`
+	Owner          solanago.PublicKey `json:"owner"`
+	OwnerSigner    bool               `json:"owner_signer"`
+	State          solanago.PublicKey `json:"state"`
+	StateWritable  bool               `json:"state_writable"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *TransferOwnershipInstruction) GetDiscriminator() []byte {
@@ -3685,13 +4412,27 @@ func (obj *TransferOwnershipInstruction) UnmarshalAccountIndices(buf []byte) ([]
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from event_authority account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
+	}
+	indices = append(indices, index)
+	// Decode from program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
+	}
+	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *TransferOwnershipInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -3706,6 +4447,18 @@ func (obj *TransferOwnershipInstruction) PopulateFromAccountIndices(indices []ui
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set event_authority account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
+	}
+	obj.EventAuthority = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
+	}
+	obj.Program = accountKeys[indices[indexOffset]]
+	indexOffset++
 	return nil
 }
 
@@ -3713,6 +4466,8 @@ func (obj *TransferOwnershipInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.EventAuthority)
+	keys = append(keys, obj.Program)
 	return keys
 }
 
@@ -3798,24 +4553,6 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 			}
 		}
 		return instruction, nil
-	case Instruction_CloseFeeds:
-		instruction := new(CloseFeedsInstruction)
-		decoder := binary.NewBorshDecoder(instructionData)
-		err := instruction.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as CloseFeedsInstruction: %w", err)
-		}
-		if accountIndicesData != nil && len(accountIndicesData) > 0 {
-			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
-			}
-			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
-			if err != nil {
-				return nil, fmt.Errorf("failed to populate accounts: %w", err)
-			}
-		}
-		return instruction, nil
 	case Instruction_GetDecimals:
 		instruction := new(GetDecimalsInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
@@ -3858,6 +4595,24 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as GetLatestRoundInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_GetLatestRounds:
+		instruction := new(GetLatestRoundsInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as GetLatestRoundsInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -3984,6 +4739,24 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as RemoveSpecificFeedMetadataInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_SetCallbackProgramAllowed:
+		instruction := new(SetCallbackProgramAllowedInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as SetCallbackProgramAllowedInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)

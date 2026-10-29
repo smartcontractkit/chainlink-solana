@@ -8,8 +8,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::STORED_DECIMALS,
-    context::{DescriptionRead, FeedRead, PermissionRead},
+    common::{ACCOUNT_VERSION, MAX_BATCH_READ, STORED_DECIMALS},
+    context::{DescriptionRead, FeedRead, FeedsRead, PermissionRead},
     data_id,
     error::StoreError,
     logic::{self, LatestReport},
@@ -45,6 +45,34 @@ pub fn get_latest_round(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<Rea
         .ok_or_else(|| StoreError::NoDataPresent.into())
 }
 
+/// Latest rounds of several data IDs, in order (remaining accounts: their feeds), as the EVM
+/// store's `getLatestRoundDataBatch`. A feed without a report yields a zero round (round ID 0)
+/// instead of failing the read; an invalid data ID or a feed account that does not match fails it.
+/// At most `MAX_BATCH_READ` data IDs, the return data limit.
+pub fn get_latest_rounds<'info>(
+    ctx: Context<'_, '_, 'info, 'info, FeedsRead<'info>>,
+    data_ids: Vec<[u8; 16]>,
+) -> Result<Vec<ReaderRound>> {
+    require!(data_ids.len() <= MAX_BATCH_READ, StoreError::TooManyDataIds);
+    require_eq!(
+        data_ids.len(),
+        ctx.remaining_accounts.len(),
+        StoreError::ArrayLengthMismatch
+    );
+    let state_key = ctx.accounts.state.key();
+    data_ids
+        .iter()
+        .zip(ctx.remaining_accounts.iter())
+        .map(|(id, info)| {
+            check_data_id(id)?;
+            let feed = load_feed(info, &state_key, id)?;
+            Ok(logic::latest_report(&feed)
+                .map(to_round)
+                .unwrap_or_default())
+        })
+        .collect()
+}
+
 /// A stored round of a data ID. Fails with `NoDataPresent` for a round that was never written or
 /// has been overwritten in the ring.
 pub fn get_round(ctx: Context<FeedRead>, data_id: [u8; 16], round_id: u64) -> Result<ReaderRound> {
@@ -71,14 +99,15 @@ pub fn get_description(ctx: Context<DescriptionRead>, data_id: [u8; 16]) -> Resu
         None => Ok(String::new()),
         Some(description) => {
             let FeedDescription {
+                version,
                 state,
                 indexed_feed_id,
                 description,
-                ..
             } = description;
+            require_eq!(*version, ACCOUNT_VERSION, StoreError::InvalidAccountVersion);
             require!(
                 *state == ctx.accounts.state.key()
-                    && *indexed_feed_id == data_id::to_indexed_feed_id(&data_id),
+                    && *indexed_feed_id == data_id::to_seed(&data_id::to_indexed_feed_id(&data_id)),
                 StoreError::AccountMismatch
             );
             Ok(decode_description(description))

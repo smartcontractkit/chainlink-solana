@@ -16,12 +16,24 @@
 
 pub type DataId = [u8; 16];
 
+/// A data ID as accounts store it and derive their addresses from: zero padded to 32 bytes. Data
+/// IDs are 16 bytes on the wire, in events and in callback arguments (as on EVM), accounts are
+/// keyed on 32 bytes so a wider data ID format later keeps every existing account address.
+pub type DataIdSeed = [u8; 32];
+
 const SVR_PATH: std::ops::Range<usize> = 9..11;
 const INSTANCE: usize = 11;
 const RESERVED: std::ops::Range<usize> = 12..16;
 
 pub fn is_zero(data_id: &DataId) -> bool {
     *data_id == [0; 16]
+}
+
+/// The 32-byte account key of a data ID: the data ID followed by 16 zero bytes.
+pub fn to_seed(data_id: &DataId) -> DataIdSeed {
+    let mut seed = [0u8; 32];
+    seed[..16].copy_from_slice(data_id);
+    seed
 }
 
 /// Whether a data ID carries an SVR path ID. The store does not support SVR yet, the bytes stay
@@ -94,6 +106,14 @@ mod tests {
             [0, 0, 0, 1]
         )));
         assert!(!is_valid_indexed_feed_id(&id(FEED, 3, [0, 1], 0, [0; 4])));
+    }
+
+    #[test]
+    fn seed_zero_pads_the_data_id() {
+        let full = id(FEED, 3, [0, 0], 4, [9, 9, 9, 9]);
+        let seed = to_seed(&full);
+        assert_eq!(&seed[..16], &full);
+        assert_eq!(&seed[16..], &[0u8; 16]);
     }
 
     #[test]

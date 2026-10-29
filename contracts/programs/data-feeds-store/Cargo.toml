@@ -17,7 +17,7 @@ default = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = "0.31.0"
+anchor-lang = { version = "0.31.0", features = ["event-cpi"] }
 anchor-spl = { version = "0.31.0", default-features = false, features = ["token", "token_2022"] }
 static_assertions = "1.1.0"
 bytemuck = { version = "1.20.0", features = ["min_const_generics", "extern_crate_alloc"] }

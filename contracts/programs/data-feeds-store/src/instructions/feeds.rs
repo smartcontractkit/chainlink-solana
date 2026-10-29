@@ -8,7 +8,7 @@ use crate::{
     event::*,
     logic::{check_max_stored_reports, MaxStoredReportsError},
     state::{feed_account_len, FeedData},
-    utils::{close_account, create_pda_account, load_feed, store, verify_feed_admin},
+    utils::{create_pda_account, load_feed, store, verify_feed_admin},
 };
 
 fn validate_data_id(id: &[u8; 16]) -> Result<()> {
@@ -17,7 +17,9 @@ fn validate_data_id(id: &[u8; 16]) -> Result<()> {
 }
 
 /// Create the feed accounts of data IDs with the store's default ring size. Accounts
-/// that already exist are left untouched.
+/// that already exist are left untouched. Feeds are never closed, as on the EVM store where a
+/// feed's storage is never deleted: retiring a feed means removing what writes it (workflow
+/// metadata) and its callback.
 pub fn init_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -34,8 +36,9 @@ pub fn init_feeds<'info>(
     for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
         validate_data_id(id)?;
 
+        let seed = data_id::to_seed(id);
         let (address, bump) =
-            Pubkey::find_program_address(&[FEED_SEED, state_key.as_ref(), id], &crate::ID);
+            Pubkey::find_program_address(&[FEED_SEED, state_key.as_ref(), &seed], &crate::ID);
         require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
 
         if !info.data_is_empty() {
@@ -46,7 +49,7 @@ pub fn init_feeds<'info>(
         let max_stored_reports = state.default_max_stored_reports;
         create_pda_account(
             feed_account_len(max_stored_reports),
-            &[FEED_SEED, state_key.as_ref(), id, &[bump]],
+            &[FEED_SEED, state_key.as_ref(), &seed, &[bump]],
             &ctx.accounts.feed_admin.to_account_info(),
             info,
             &ctx.accounts.system_program.to_account_info(),
@@ -54,42 +57,15 @@ pub fn init_feeds<'info>(
 
         let mut feed: Box<FeedData> = bytemuck::zeroed_box();
         feed.version = ACCOUNT_VERSION;
-        feed.data_id = *id;
+        feed.data_id = seed;
         feed.state = state_key;
         feed.max_stored_reports = max_stored_reports;
         store(info, &*feed)?;
 
-        emit!(FeedInitialized {
+        emit_cpi!(FeedInitialized {
             state: state_key,
             data_id: *id,
             max_stored_reports,
-        });
-    }
-    Ok(())
-}
-
-/// Close feed history accounts, returning their rent to the feed admin.
-pub fn close_feeds<'info>(
-    ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    data_ids: Vec<[u8; 16]>,
-) -> Result<()> {
-    verify_feed_admin(
-        &ctx.accounts.feed_admin,
-        &ctx.accounts.state.load()?.feed_admins,
-    )?;
-    require_eq!(
-        data_ids.len(),
-        ctx.remaining_accounts.len(),
-        StoreError::ArrayLengthMismatch
-    );
-
-    let state_key = ctx.accounts.state.key();
-    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        load_feed(info, &state_key, id)?;
-        close_account(info, &ctx.accounts.feed_admin.to_account_info())?;
-        emit!(FeedClosed {
-            state: state_key,
-            data_id: *id,
         });
     }
     Ok(())
@@ -173,7 +149,7 @@ pub fn set_max_stored_reports<'info>(
         feed.max_stored_reports_configured = 1;
         store(info, &*feed)?;
 
-        emit!(MaxStoredReportsSet {
+        emit_cpi!(MaxStoredReportsSet {
             state: state_key,
             data_id: *id,
             max_stored_reports: new_max,
@@ -224,7 +200,7 @@ pub fn set_min_max_answers<'info>(
         }
         store(info, &*feed)?;
 
-        emit!(MinMaxAnswerSet {
+        emit_cpi!(MinMaxAnswerSet {
             state: state_key,
             data_id: *id,
             min_answer,

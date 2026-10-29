@@ -17,7 +17,7 @@ use crate::common::{
 #[derive(InitSpace)]
 pub struct StoreState {
     pub version: u8,
-    /// Bump of the store authority PDA, which signs report callbacks
+    /// Bump of the store authority PDA, which only holds recoverable tokens and SOL
     pub store_authority_bump: u8,
     pub _padding0: [u8; 2],
     /// Maximum seconds a report's observation timestamp may lead the clock before it is ignored
@@ -48,10 +48,13 @@ pub struct FeedData {
     pub latest_observations_timestamp: u32,
     pub latest_recorded_timestamp: u32,
     pub _padding1: [u8; 4],
-    pub data_id: [u8; 16],
+    /// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
+    pub data_id: [u8; 32],
     pub state: Pubkey,
     /// Latest round ID
     pub round_id: u64,
+    /// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
+    /// (`visibleRoundId`), so SVR can be added without moving the fields below.
     pub _reserved0: [u8; 8],
     pub max_stored_reports: u64,
     pub latest_recorded_slot: u64,
@@ -59,7 +62,7 @@ pub struct FeedData {
     pub min_answer: i128,
     pub max_answer: i128,
     pub settings: DataIdSettings,
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 48],
 }
 
 /// Offset of the circular buffer in a feed account.
@@ -91,7 +94,9 @@ pub struct DataIdSettings {
     pub callback_accounts_len: u8,
     /// Bit i set when `callback_accounts[i]` is passed writable
     pub callback_writable_mask: u8,
-    pub _padding0: [u8; 5],
+    /// Bump of the callback authority PDA of `callback_program`
+    pub callback_authority_bump: u8,
+    pub _padding0: [u8; 4],
     /// Program called with every report applied for this data ID, default when disabled
     pub callback_program: Pubkey,
     pub callback_accounts: [Pubkey; MAX_CALLBACK_ACCOUNTS],
@@ -119,9 +124,21 @@ impl DataIdSettings {
 pub struct FeedDescription {
     pub version: u8,
     pub state: Pubkey,
-    pub indexed_feed_id: [u8; 16],
+    /// Indexed feed ID zero padded to 32 bytes
+    pub indexed_feed_id: [u8; 32],
     /// UTF-8, zero padded
     pub description: [u8; DESCRIPTION_LEN],
+}
+
+/// Owner-managed allowlist entry: whether a program may be configured as a report callback.
+#[account]
+#[derive(InitSpace)]
+pub struct CallbackProgram {
+    pub version: u8,
+    pub state: Pubkey,
+    pub program: Pubkey,
+    pub allowed: bool,
+    pub _reserved: [u8; 32],
 }
 
 /// Fixed size list of public keys
@@ -156,6 +173,13 @@ const_assert_eq!(size_of::<StoreState>(), 3200);
 const_assert_eq!(size_of::<DataIdSettings>(), 1168);
 const_assert_eq!(size_of::<FeedData>(), 1376);
 const_assert_eq!(size_of::<StoredReport>(), 32);
+// Offsets clients decode feed accounts by (add 8 for the discriminator); `state` is the
+// getProgramAccounts filter for a store's feeds.
+const_assert_eq!(std::mem::offset_of!(FeedData, data_id), 16);
+const_assert_eq!(std::mem::offset_of!(FeedData, state), 48);
+const_assert_eq!(std::mem::offset_of!(FeedData, round_id), 80);
+const_assert_eq!(std::mem::offset_of!(FeedData, latest_answer), 112);
+const_assert_eq!(std::mem::offset_of!(FeedData, settings), 160);
 
 // ================================================================
 // │                     Instruction arguments                    │
@@ -188,8 +212,9 @@ pub struct CallbackConfigArgs {
 }
 
 /// Arguments of the `on_report_callback` instruction a callback program implements. It is called
-/// with the store authority PDA as the first (signer) account followed by the configured accounts,
-/// and must set Borsh `bool` return data, true to accept the report.
+/// with the program's callback authority PDA (`[CALLBACK_AUTHORITY_SEED, state, program]`) as the
+/// first (signer) account followed by the configured accounts, and must set Borsh `bool` return
+/// data, true to accept the report.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct OnReportCallbackArgs {
     /// Data ID the round is stored under

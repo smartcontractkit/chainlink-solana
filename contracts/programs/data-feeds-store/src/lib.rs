@@ -4,6 +4,7 @@
 //! circular buffer and served through a small reader interface that proxies call. Per data ID
 //! report callbacks let other programs follow updates, the DF1 store uses one to keep its existing
 //! feed accounts written. SVR data IDs are reserved in the data ID layout, not supported yet.
+//! Events are CPI events (`emit_cpi!`).
 
 pub mod common;
 pub mod context;
@@ -65,6 +66,16 @@ pub mod data_feeds_store {
         admin::set_feed_admin(ctx, feed_admin, is_admin)
     }
 
+    /// Allow or disallow a program as a report callback. Its allowlist entry PDA
+    /// `[CALLBACK_PROGRAM_SEED, state, callback_program]` is created on first use.
+    pub fn set_callback_program_allowed(
+        ctx: Context<SetCallbackProgramAllowed>,
+        callback_program: Pubkey,
+        allowed: bool,
+    ) -> Result<()> {
+        admin::set_callback_program_allowed(ctx, callback_program, allowed)
+    }
+
     /// Recover SPL tokens held by token accounts of the store authority PDA.
     pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
         admin::recover_tokens(ctx, amount)
@@ -103,14 +114,6 @@ pub mod data_feeds_store {
         feeds::init_feeds(ctx, data_ids)
     }
 
-    /// Close feed accounts (remaining accounts: feed PDAs).
-    pub fn close_feeds<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-        data_ids: Vec<[u8; 16]>,
-    ) -> Result<()> {
-        feeds::close_feeds(ctx, data_ids)
-    }
-
     /// Set ring sizes (remaining accounts: feed PDAs).
     pub fn set_max_stored_reports<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
@@ -147,8 +150,8 @@ pub mod data_feeds_store {
         settings::remove_specific_feed_metadata(ctx, data_ids)
     }
 
-    /// Configure report callbacks (remaining accounts: feed PDAs, then the program account of
-    /// every enabled callback).
+    /// Configure report callbacks (remaining accounts: feed PDAs, then the program account and
+    /// allowlist entry of every enabled callback).
     pub fn set_report_callback_configs<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -171,8 +174,8 @@ pub mod data_feeds_store {
     // ================================================================
 
     /// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`, remaining accounts are one
-    /// group per report: the feed of its data ID, then the callback program and accounts when a
-    /// callback is configured.
+    /// group per report: the feed of its data ID, then the callback program, its callback authority
+    /// PDA and the configured accounts when a callback is configured.
     pub fn on_report<'info>(
         ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
         metadata: Vec<u8>,
@@ -188,6 +191,15 @@ pub mod data_feeds_store {
     /// Latest round of a data ID, answer with 18 decimals.
     pub fn get_latest_round(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<ReaderRound> {
         reads::get_latest_round(ctx, data_id)
+    }
+
+    /// Latest rounds of up to 31 data IDs (remaining accounts: their feeds), answers with 18
+    /// decimals. A feed without a report yields round ID 0.
+    pub fn get_latest_rounds<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedsRead<'info>>,
+        data_ids: Vec<[u8; 16]>,
+    ) -> Result<Vec<ReaderRound>> {
+        reads::get_latest_rounds(ctx, data_ids)
     }
 
     /// A stored round of a data ID, answer with 18 decimals.
