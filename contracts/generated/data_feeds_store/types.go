@@ -301,6 +301,77 @@ func UnmarshalCallbackConfigArgs(buf []byte) (*CallbackConfigArgs, error) {
 	return obj, nil
 }
 
+type CallbackProgramAllowedSet struct {
+	State   solanago.PublicKey `json:"state"`
+	Program solanago.PublicKey `json:"program"`
+	Allowed bool               `json:"allowed"`
+}
+
+func (obj CallbackProgramAllowedSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `Program`:
+	err = encoder.Encode(obj.Program)
+	if err != nil {
+		return errors.NewField("Program", err)
+	}
+	// Serialize `Allowed`:
+	err = encoder.Encode(obj.Allowed)
+	if err != nil {
+		return errors.NewField("Allowed", err)
+	}
+	return nil
+}
+
+func (obj CallbackProgramAllowedSet) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding CallbackProgramAllowedSet: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *CallbackProgramAllowedSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `Program`:
+	err = decoder.Decode(&obj.Program)
+	if err != nil {
+		return errors.NewField("Program", err)
+	}
+	// Deserialize `Allowed`:
+	err = decoder.Decode(&obj.Allowed)
+	if err != nil {
+		return errors.NewField("Allowed", err)
+	}
+	return nil
+}
+
+func (obj *CallbackProgramAllowedSet) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling CallbackProgramAllowedSet: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalCallbackProgramAllowedSet(buf []byte) (*CallbackProgramAllowedSet, error) {
+	obj := new(CallbackProgramAllowedSet)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 // Permissions and report callback of a data ID, part of its feed account.
 type DataIdSettings struct {
 	// Whether a callback returning false drops the report
@@ -308,8 +379,11 @@ type DataIdSettings struct {
 	CallbackAccountsLen     uint8 `json:"callback_accounts_len"`
 
 	// Bit i set when `callback_accounts[i]` is passed writable
-	CallbackWritableMask uint8    `json:"callback_writable_mask"`
-	Padding0             [5]uint8 `json:"_padding0"`
+	CallbackWritableMask uint8 `json:"callback_writable_mask"`
+
+	// Bump of the callback authority PDA of `callback_program`
+	CallbackAuthorityBump uint8    `json:"callback_authority_bump"`
+	Padding0              [4]uint8 `json:"_padding0"`
 
 	// Program called with every report applied for this data ID, default when disabled
 	CallbackProgram  solanago.PublicKey    `json:"callback_program"`
@@ -334,6 +408,11 @@ func (obj DataIdSettings) MarshalWithEncoder(encoder *binary.Encoder) (err error
 	err = encoder.Encode(obj.CallbackWritableMask)
 	if err != nil {
 		return errors.NewField("CallbackWritableMask", err)
+	}
+	// Serialize `CallbackAuthorityBump`:
+	err = encoder.Encode(obj.CallbackAuthorityBump)
+	if err != nil {
+		return errors.NewField("CallbackAuthorityBump", err)
 	}
 	// Serialize `Padding0`:
 	err = encoder.Encode(obj.Padding0)
@@ -383,6 +462,11 @@ func (obj *DataIdSettings) UnmarshalWithDecoder(decoder *binary.Decoder) (err er
 	err = decoder.Decode(&obj.CallbackWritableMask)
 	if err != nil {
 		return errors.NewField("CallbackWritableMask", err)
+	}
+	// Deserialize `CallbackAuthorityBump`:
+	err = decoder.Decode(&obj.CallbackAuthorityBump)
+	if err != nil {
+		return errors.NewField("CallbackAuthorityBump", err)
 	}
 	// Deserialize `Padding0`:
 	err = decoder.Decode(&obj.Padding0)
@@ -555,66 +639,6 @@ func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
 	return obj, nil
 }
 
-type FeedClosed struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
-}
-
-func (obj FeedClosed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj FeedClosed) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedClosed: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *FeedClosed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	return nil
-}
-
-func (obj *FeedClosed) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedClosed: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalFeedClosed(buf []byte) (*FeedClosed, error) {
-	obj := new(FeedClosed)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 // Feed history and the data ID's settings, one per data ID. The account holds this header followed
 // by a circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` lives at slot
 // `r % max_stored_reports`. Keeping the settings in the feed account means a report passes one
@@ -626,16 +650,21 @@ type FeedData struct {
 	MaxStoredReportsConfigured uint8 `json:"max_stored_reports_configured"`
 
 	// Whether an accepted answer range is set, unbounded otherwise
-	MinMaxConfigured            uint8              `json:"min_max_configured"`
-	Padding0                    uint8              `json:"_padding0"`
-	LatestObservationsTimestamp uint32             `json:"latest_observations_timestamp"`
-	LatestRecordedTimestamp     uint32             `json:"latest_recorded_timestamp"`
-	Padding1                    [4]uint8           `json:"_padding1"`
-	DataId                      [16]uint8          `json:"data_id"`
-	State                       solanago.PublicKey `json:"state"`
+	MinMaxConfigured            uint8    `json:"min_max_configured"`
+	Padding0                    uint8    `json:"_padding0"`
+	LatestObservationsTimestamp uint32   `json:"latest_observations_timestamp"`
+	LatestRecordedTimestamp     uint32   `json:"latest_recorded_timestamp"`
+	Padding1                    [4]uint8 `json:"_padding1"`
+
+	// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
+	DataId [32]uint8          `json:"data_id"`
+	State  solanago.PublicKey `json:"state"`
 
 	// Latest round ID
-	RoundId            uint64         `json:"round_id"`
+	RoundId uint64 `json:"round_id"`
+
+	// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
+	// (`visibleRoundId`), so SVR can be added without moving the fields below.
 	Reserved0          [8]uint8       `json:"_reserved0"`
 	MaxStoredReports   uint64         `json:"max_stored_reports"`
 	LatestRecordedSlot uint64         `json:"latest_recorded_slot"`
@@ -643,7 +672,7 @@ type FeedData struct {
 	MinAnswer          binary.Int128  `json:"min_answer"`
 	MaxAnswer          binary.Int128  `json:"max_answer"`
 	Settings           DataIdSettings `json:"settings"`
-	Reserved           [64]uint8      `json:"_reserved"`
+	Reserved           [48]uint8      `json:"_reserved"`
 }
 
 func (obj FeedData) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -863,9 +892,11 @@ func UnmarshalFeedData(buf []byte) (*FeedData, error) {
 
 // Description shared by every instance of a feed, keyed by indexed feed ID.
 type FeedDescription struct {
-	Version       uint8              `json:"version"`
-	State         solanago.PublicKey `json:"state"`
-	IndexedFeedId [16]uint8          `json:"indexed_feed_id"`
+	Version uint8              `json:"version"`
+	State   solanago.PublicKey `json:"state"`
+
+	// Indexed feed ID zero padded to 32 bytes
+	IndexedFeedId [32]uint8 `json:"indexed_feed_id"`
 
 	// UTF-8, zero padded
 	Description [64]uint8 `json:"description"`
@@ -1088,6 +1119,66 @@ func UnmarshalFeedInitialized(buf []byte) (*FeedInitialized, error) {
 	return obj, nil
 }
 
+type FeedNotInitializedIgnored struct {
+	State  solanago.PublicKey `json:"state"`
+	DataId [16]uint8          `json:"data_id"`
+}
+
+func (obj FeedNotInitializedIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	return nil
+}
+
+func (obj FeedNotInitializedIgnored) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding FeedNotInitializedIgnored: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *FeedNotInitializedIgnored) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	return nil
+}
+
+func (obj *FeedNotInitializedIgnored) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling FeedNotInitializedIgnored: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalFeedNotInitializedIgnored(buf []byte) (*FeedNotInitializedIgnored, error) {
+	obj := new(FeedNotInitializedIgnored)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type FeedUpdated struct {
 	State                 solanago.PublicKey `json:"state"`
 	DataId                [16]uint8          `json:"data_id"`
@@ -1256,6 +1347,66 @@ func (obj *FutureReportIgnored) Unmarshal(buf []byte) error {
 
 func UnmarshalFutureReportIgnored(buf []byte) (*FutureReportIgnored, error) {
 	obj := new(FutureReportIgnored)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type InvalidDataIdIgnored struct {
+	State  solanago.PublicKey `json:"state"`
+	DataId [16]uint8          `json:"data_id"`
+}
+
+func (obj InvalidDataIdIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	return nil
+}
+
+func (obj InvalidDataIdIgnored) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding InvalidDataIdIgnored: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *InvalidDataIdIgnored) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	return nil
+}
+
+func (obj *InvalidDataIdIgnored) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling InvalidDataIdIgnored: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalInvalidDataIdIgnored(buf []byte) (*InvalidDataIdIgnored, error) {
+	obj := new(InvalidDataIdIgnored)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -2273,7 +2424,7 @@ func UnmarshalStoreInitialized(buf []byte) (*StoreInitialized, error) {
 type StoreState struct {
 	Version uint8 `json:"version"`
 
-	// Bump of the store authority PDA, which signs report callbacks
+	// Bump of the store authority PDA, which only holds recoverable tokens and SOL
 	StoreAuthorityBump uint8    `json:"store_authority_bump"`
 	Padding0           [2]uint8 `json:"_padding0"`
 

@@ -1,11 +1,12 @@
 //! CPI client for the reader interface of the Chainlink Data Feeds store: the latest or a stored
-//! round of a data ID (answer with 18 decimals), the stored decimals and the feed description.
+//! round of a data ID (answer with 18 decimals), the latest rounds of several data IDs, the stored
+//! decimals and the feed description.
 //!
 //! Proxies read through this interface, so a store version that keeps it can replace the store
 //! behind a proxy. Reads that need other decimals go through the data feeds proxy, not here.
 
 use anchor_lang::prelude::*;
-use data_feeds_store::cpi::accounts::{DescriptionRead, FeedRead};
+use data_feeds_store::cpi::accounts::{DescriptionRead, FeedRead, FeedsRead};
 
 pub use data_feeds_store::state::ReaderRound;
 pub use data_feeds_store::ID as DATA_FEEDS_STORE_ID;
@@ -19,6 +20,18 @@ pub fn get_latest_round<'info>(
 ) -> Result<ReaderRound> {
     let ctx = CpiContext::new(store_program, FeedRead { state, feed });
     Ok(data_feeds_store::cpi::get_latest_round(ctx, data_id)?.get())
+}
+
+/// Latest rounds of up to 31 data IDs, `feeds` in the same order. A feed without a report yields
+/// a zero round (round ID 0).
+pub fn get_latest_rounds<'info>(
+    store_program: AccountInfo<'info>,
+    state: AccountInfo<'info>,
+    feeds: Vec<AccountInfo<'info>>,
+    data_ids: Vec<[u8; 16]>,
+) -> Result<Vec<ReaderRound>> {
+    let ctx = CpiContext::new(store_program, FeedsRead { state }).with_remaining_accounts(feeds);
+    Ok(data_feeds_store::cpi::get_latest_rounds(ctx, data_ids)?.get())
 }
 
 /// A stored round of a data ID. Fails with the store's `NoDataPresent` for a round that was never

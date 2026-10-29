@@ -13,13 +13,15 @@ var (
 // Event discriminators
 var (
 	Event_AnswerOutOfMinMaxRange                      = [8]byte{11, 76, 139, 16, 19, 145, 46, 40}
+	Event_CallbackProgramAllowedSet                   = [8]byte{178, 28, 124, 189, 61, 18, 220, 90}
 	Event_DefaultFeedMetadataSet                      = [8]byte{228, 50, 167, 196, 5, 3, 142, 220}
 	Event_FeedAdminSet                                = [8]byte{34, 71, 225, 118, 151, 185, 149, 144}
-	Event_FeedClosed                                  = [8]byte{172, 177, 74, 18, 119, 96, 196, 207}
 	Event_FeedDescriptionSet                          = [8]byte{204, 4, 197, 215, 180, 77, 137, 82}
 	Event_FeedInitialized                             = [8]byte{112, 111, 89, 0, 44, 197, 88, 78}
+	Event_FeedNotInitializedIgnored                   = [8]byte{93, 168, 81, 77, 76, 3, 181, 171}
 	Event_FeedUpdated                                 = [8]byte{200, 60, 190, 86, 247, 9, 50, 81}
 	Event_FutureReportIgnored                         = [8]byte{208, 131, 78, 5, 205, 229, 248, 183}
+	Event_InvalidDataIdIgnored                        = [8]byte{73, 188, 11, 249, 134, 230, 239, 164}
 	Event_InvalidUpdatePermission                     = [8]byte{140, 196, 100, 239, 180, 175, 183, 154}
 	Event_MaxObservationForwardDurationSecondsUpdated = [8]byte{21, 34, 81, 2, 208, 208, 147, 222}
 	Event_MaxStoredReportsSet                         = [8]byte{17, 12, 52, 44, 242, 141, 146, 135}
@@ -39,10 +41,10 @@ var (
 var (
 	Instruction_AcceptOwnership                  = [8]byte{172, 23, 43, 13, 238, 213, 85, 150}
 	Instruction_CheckFeedPermission              = [8]byte{27, 200, 93, 229, 253, 200, 18, 191}
-	Instruction_CloseFeeds                       = [8]byte{100, 65, 97, 49, 210, 218, 153, 244}
 	Instruction_GetDecimals                      = [8]byte{25, 145, 60, 213, 165, 223, 179, 173}
 	Instruction_GetDescription                   = [8]byte{231, 247, 47, 127, 96, 114, 175, 84}
 	Instruction_GetLatestRound                   = [8]byte{200, 218, 233, 250, 29, 234, 205, 187}
+	Instruction_GetLatestRounds                  = [8]byte{229, 156, 84, 86, 200, 12, 249, 213}
 	Instruction_GetRound                         = [8]byte{38, 203, 121, 16, 1, 137, 65, 163}
 	Instruction_InitFeeds                        = [8]byte{74, 175, 53, 104, 185, 70, 65, 169}
 	Instruction_Initialize                       = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
@@ -50,6 +52,7 @@ var (
 	Instruction_RecoverNative                    = [8]byte{69, 102, 250, 101, 197, 55, 113, 4}
 	Instruction_RecoverTokens                    = [8]byte{156, 18, 205, 212, 197, 254, 126, 142}
 	Instruction_RemoveSpecificFeedMetadata       = [8]byte{156, 18, 177, 76, 126, 57, 95, 114}
+	Instruction_SetCallbackProgramAllowed        = [8]byte{65, 129, 8, 58, 200, 17, 159, 164}
 	Instruction_SetDefaultFeedMetadata           = [8]byte{77, 85, 174, 7, 126, 211, 45, 223}
 	Instruction_SetFeedAdmin                     = [8]byte{211, 48, 243, 150, 226, 199, 26, 136}
 	Instruction_SetFeedDescriptions              = [8]byte{154, 207, 197, 50, 43, 120, 101, 198}

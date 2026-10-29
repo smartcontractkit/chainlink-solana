@@ -63,23 +63,24 @@ pub fn set_feed_descriptions<'info>(
             StoreError::InvalidDataId
         );
         let encoded = encode_description(description)?;
+        let seed = data_id::to_seed(id);
         ensure_account(
             &ctx,
             info,
             FEED_DESCRIPTION_SEED,
-            id,
+            &seed,
             ANCHOR_DISCRIMINATOR + FeedDescription::INIT_SPACE,
         )?;
 
         FeedDescription {
             version: ACCOUNT_VERSION,
             state: state_key,
-            indexed_feed_id: *id,
+            indexed_feed_id: seed,
             description: encoded,
         }
         .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
 
-        emit!(FeedDescriptionSet {
+        emit_cpi!(FeedDescriptionSet {
             state: state_key,
             indexed_feed_id: *id,
             description: description.clone(),

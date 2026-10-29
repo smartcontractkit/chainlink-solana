@@ -2,6 +2,7 @@ package keystone_forwarder_test
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -98,16 +99,38 @@ func TestDataFeedsStore(t *testing.T) {
 		require.NoError(t, err)
 		return addr
 	}
-	storeAuthority := pda("store_authority", nil)
+	// data IDs key accounts zero padded to 32 bytes
+	feedPDA := func(id [16]uint8) solana.PublicKey {
+		var seed [32]byte
+		copy(seed[:], id[:])
+		return pda("feed", seed[:])
+	}
+	// events are CPI events: emitting instructions take the program's event authority and the program
+	eventAuthority := func(program solana.PublicKey) solana.PublicKey {
+		addr, _, err := solana.FindProgramAddress([][]byte{[]byte("__event_authority")}, program)
+		require.NoError(t, err)
+		return addr
+	}
+	storeEvents, df1Events := eventAuthority(data_feeds_store.ProgramID), eventAuthority(store.ProgramID)
+	// the DF1 store's callbacks are signed by its own callback authority, the DF1 feeds' writer
+	df1CallbackAuthority := pda("callback_authority", store.ProgramID.Bytes())
 
 	send([]solana.Instruction{
 		build(data_feeds_store.NewInitializeInstruction([]solana.PublicKey{deployer.PublicKey()}, 16, 3600,
-			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID)),
+			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
 		build(data_feeds_store.NewSetDefaultFeedMetadataInstruction([]data_feeds_store.WorkflowMetadata{
 			{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
 			{AllowedSender: mainnetAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
-		}, deployer.PublicKey(), storeState.PublicKey())),
+			// the deployer sends reports directly to measure compute and heap per report
+			{AllowedSender: deployer.PublicKey(), AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
+		}, deployer.PublicKey(), storeState.PublicKey(), storeEvents, data_feeds_store.ProgramID)),
 	}, storeState)
+	// the owner allows the DF1 store as a callback program
+	send([]solana.Instruction{
+		build(data_feeds_store.NewSetCallbackProgramAllowedInstruction(store.ProgramID, true, deployer.PublicKey(),
+			storeState.PublicKey(), pda("callback_program", store.ProgramID.Bytes()), solana.SystemProgramID,
+			storeEvents, data_feeds_store.ProgramID)),
+	})
 
 	// target is a non-SVR feed and, when legacy is set, the DF1 feed it writes through to
 	type target struct {
@@ -120,31 +143,35 @@ func TestDataFeedsStore(t *testing.T) {
 	newFeed := func(n byte, df1 bool) target {
 		var id [16]uint8
 		copy(id[:], []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, n})
-		tg := target{id: id, feed: pda("feed", id[:])}
+		tg := target{id: id, feed: feedPDA(id)}
 		send([]solana.Instruction{
-			withAccounts(build(data_feeds_store.NewInitFeedsInstruction([][16]uint8{id}, deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID)),
+			withAccounts(build(data_feeds_store.NewInitFeedsInstruction([][16]uint8{id}, deployer.PublicKey(), storeState.PublicKey(),
+				solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
 				solana.Meta(tg.feed).WRITE()),
 		})
 		if !df1 {
 			return tg
 		}
-		// DF1 feed at 8 decimals, repointed to the store authority, written through a callback
+		// DF1 feed at 8 decimals, repointed to the DF1 store's callback authority, written through a callback
 		legacy, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
 		tg.legacy = legacy.PublicKey()
 		send([]solana.Instruction{
 			build(system.NewCreateAccountInstruction(rent, space, store.ProgramID, deployer.PublicKey(), tg.legacy).ValidateAndBuild()),
 			build(store.NewCreateFeedInstruction("ETH / USD", 8, 1, 1, tg.legacy, deployer.PublicKey())),
-			build(store.NewSetWriterInstruction(storeAuthority, tg.legacy, deployer.PublicKey(), deployer.PublicKey())),
+			build(store.NewSetWriterInstruction(df1CallbackAuthority, tg.legacy, deployer.PublicKey(), deployer.PublicKey())),
 		}, legacy)
 		// a non-SVR data ID's callback lives in its feed account
 		send([]solana.Instruction{
 			withAccounts(build(data_feeds_store.NewSetReportCallbackConfigsInstruction([][16]uint8{id},
 				[]data_feeds_store.CallbackConfigArgs{{
-					Program:  store.ProgramID,
-					Accounts: []data_feeds_store.CallbackAccount{{Pubkey: tg.legacy, IsWritable: true}},
-				}}, deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID)),
-				solana.Meta(tg.feed).WRITE(), solana.Meta(store.ProgramID)),
+					Program: store.ProgramID,
+					// the DF1 feed, then the DF1 store's event authority and program for its CPI events
+					Accounts: []data_feeds_store.CallbackAccount{
+						{Pubkey: tg.legacy, IsWritable: true}, {Pubkey: df1Events}, {Pubkey: store.ProgramID},
+					},
+				}}, deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
+				solana.Meta(tg.feed).WRITE(), solana.Meta(store.ProgramID), solana.Meta(pda("callback_program", store.ProgramID.Bytes()))),
 		})
 		return tg
 	}
@@ -152,23 +179,30 @@ func TestDataFeedsStore(t *testing.T) {
 	// report: Borsh Vec<ReceivedReport { data_id, timestamp: u32, answer: i128 }>
 	answer := new(big.Int).Mul(big.NewInt(325012), new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil)) // 3250.12 at 18 decimals
 	observedAt := uint32(time.Now().Unix() - 30)
-	// reportIx builds the forwarder report instruction a CRE write sends: the remaining accounts are
-	// the store state and authority, then per non-SVR report its feed and, when it writes through to
-	// DF1, the callback program and DF1 feed.
-	reportIx := func(forwarderState, forwarderAuthority solana.PublicKey, f uint8, id uint16, targets []target) solana.Instruction {
+	// payloadAndAccounts builds the report payload and the store's accounts after the forwarder's:
+	// the store state, its event authority and program, then per report its feed and, when it
+	// writes through to DF1, the callback program, its callback authority, the DF1 feed and the DF1
+	// store's event authority and program.
+	payloadAndAccounts := func(targets []target, observed uint32) ([]byte, []*solana.AccountMeta) {
 		payload := make([]byte, 4+36*len(targets))
 		binary.LittleEndian.PutUint32(payload, uint32(len(targets)))
-		remaining := []*solana.AccountMeta{solana.Meta(storeState.PublicKey()), solana.Meta(storeAuthority)}
+		remaining := []*solana.AccountMeta{solana.Meta(storeState.PublicKey()), solana.Meta(storeEvents), solana.Meta(data_feeds_store.ProgramID)}
 		for i, tg := range targets {
 			o := 4 + 36*i
 			copy(payload[o:], tg.id[:])
-			binary.LittleEndian.PutUint32(payload[o+16:], observedAt)
+			binary.LittleEndian.PutUint32(payload[o+16:], observed)
 			copy(payload[o+20:], littleEndianI128(answer))
 			remaining = append(remaining, solana.Meta(tg.feed).WRITE())
 			if !tg.legacy.IsZero() {
-				remaining = append(remaining, solana.Meta(store.ProgramID), solana.Meta(tg.legacy).WRITE())
+				remaining = append(remaining, solana.Meta(store.ProgramID), solana.Meta(df1CallbackAuthority),
+					solana.Meta(tg.legacy).WRITE(), solana.Meta(df1Events), solana.Meta(store.ProgramID))
 			}
 		}
+		return payload, remaining
+	}
+	// reportIx builds the forwarder report instruction a CRE write sends.
+	reportIx := func(forwarderState, forwarderAuthority solana.PublicKey, f uint8, id uint16, targets []target) solana.Instruction {
+		payload, remaining := payloadAndAccounts(targets, observedAt)
 		keys := make([]solana.PublicKey, len(remaining))
 		for i, m := range remaining {
 			keys[i] = m.PublicKey
@@ -217,12 +251,11 @@ func TestDataFeedsStore(t *testing.T) {
 		require.Equal(t, big.NewInt(325012000000).String(), fromLittleEndianI128(live[16:32]).String())
 	}
 
-	// F=2 (staging): two reports, each written through to DF1, fit one legacy transaction.
+	// F=2 (staging): one report written through to DF1 fits one legacy transaction. With CPI events
+	// (the store's and the DF1 store's event authorities) a second one no longer does.
 	df1 := []target{newFeed(1, true), newFeed(2, true)}
-	sendLegacy(reportIx(stagingForwarder, stagingAuthority, stagingF, reportId+20, df1), "F=2, 2 reports with DF1 write-through")
-	for _, tg := range df1 {
-		requireStored(tg, 1)
-	}
+	sendLegacy(reportIx(stagingForwarder, stagingAuthority, stagingF, reportId+20, df1[:1]), "F=2, 1 report with DF1 write-through")
+	requireStored(df1[0], 1)
 
 	// A proxy in front of the store serves the same round, at the store's decimals and rescaled.
 	proxyState, err := solana.NewRandomPrivateKey()
@@ -267,14 +300,51 @@ func TestDataFeedsStore(t *testing.T) {
 	sendLegacy(reportIx(mainnetForwarder, mainnetAuthority, mainnetF, reportId+21, []target{storeOnly}), "F=5, 1 report")
 	requireStored(storeOnly, 1)
 
-	// A third report at F=2, or a DF1 write-through at F=5, needs V1 transactions.
-	unused := target{feed: solana.NewWallet().PublicKey(), legacy: solana.NewWallet().PublicKey()}
-	size := legacyTxSize(t, deployer, reportIx(stagingForwarder, stagingAuthority, stagingF, reportId+22, append(df1, unused)))
-	t.Logf("legacy tx, F=2, 3 reports with DF1 write-through: %d bytes", size)
+	// F=2 (staging): two store-only reports fit.
+	storeOnly2 := []target{newFeed(4, false), newFeed(5, false)}
+	sendLegacy(reportIx(stagingForwarder, stagingAuthority, stagingF, reportId+24, storeOnly2), "F=2, 2 reports")
+	for _, tg := range storeOnly2 {
+		requireStored(tg, 1)
+	}
+
+	// A second DF1 write-through at F=2, or one at F=5, needs V1 transactions.
+	size := legacyTxSize(t, deployer, reportIx(stagingForwarder, stagingAuthority, stagingF, reportId+22, df1))
+	t.Logf("legacy tx, F=2, 2 reports with DF1 write-through: %d bytes", size)
 	require.Greater(t, size, maxLegacyTxSize)
 	size = legacyTxSize(t, deployer, reportIx(mainnetForwarder, mainnetAuthority, mainnetF, reportId+23, df1[:1]))
 	t.Logf("legacy tx, F=5, 1 report with DF1 write-through: %d bytes", size)
 	require.Greater(t, size, maxLegacyTxSize)
+
+	// Compute and heap per report, without the forwarder's signatures so more reports fit one legacy
+	// transaction: the deployer is an allowed sender and calls on_report directly. The heap is the
+	// default 32KiB, so a heap overrun fails the transaction. Every report is accepted and, for DF1
+	// targets, written through.
+	metadata := make([]byte, 64)
+	copy(metadata[32:42], testWorkflowName[:])
+	copy(metadata[42:62], testWorkflowOwner[:])
+	measure := func(targets []target, observed uint32, label string) {
+		payload, remaining := payloadAndAccounts(targets, observed)
+		ix := withAccounts(build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID,
+			deployer.PublicKey(), remaining[0].PublicKey, remaining[1].PublicKey, remaining[2].PublicKey)), remaining[3:]...)
+		size := legacyTxSize(t, deployer, ix)
+		res, err := common.SendAndConfirm(t.Context(), client, []solana.Instruction{ix}, deployer, rpc.CommitmentConfirmed,
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
+		require.NoError(t, err, label)
+		t.Logf("direct on_report, %s: %d compute units, %d bytes", label, *res.Meta.ComputeUnitsConsumed, size)
+	}
+	var storeTargets, df1Targets []target
+	for n := byte(0); n < 12; n++ {
+		storeTargets = append(storeTargets, newFeed(0x40+n, false))
+	}
+	for n := byte(0); n < 6; n++ {
+		df1Targets = append(df1Targets, newFeed(0x80+n, true))
+	}
+	for i, n := range []int{1, 6, 12} {
+		measure(storeTargets[:n], observedAt+uint32(10+i), fmt.Sprintf("%d store-only reports", n))
+	}
+	for i, n := range []int{1, 3, 6} {
+		measure(df1Targets[:n], observedAt+uint32(20+i), fmt.Sprintf("%d reports with DF1 write-through", n))
+	}
 }
 
 // maxLegacyTxSize is the Solana packet limit on a serialized transaction.

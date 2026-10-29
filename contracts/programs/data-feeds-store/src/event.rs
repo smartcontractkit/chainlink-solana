@@ -1,4 +1,9 @@
-//! Events mirror the EVM `DataFeedsStore`, each also carries the store state account.
+//! Events mirror the EVM `DataFeedsStore`, each also carries the store state account. They are
+//! emitted as CPI events (`emit_cpi!`): a self-invoke the event authority PDA signs, carried in the
+//! transaction's inner instructions, so they cannot be lost to log truncation when one `on_report`
+//! applies many reports. `InvalidDataIdIgnored`, `FeedNotInitializedIgnored` and
+//! `CallbackProgramAllowedSet` have no EVM counterpart: the EVM store creates feed storage on first
+//! write and needs no callback allowlist.
 
 use anchor_lang::prelude::*;
 
@@ -62,12 +67,6 @@ pub struct FeedInitialized {
     pub state: Pubkey,
     pub data_id: [u8; 16],
     pub max_stored_reports: u64,
-}
-
-#[event]
-pub struct FeedClosed {
-    pub state: Pubkey,
-    pub data_id: [u8; 16],
 }
 
 #[event]
@@ -160,4 +159,23 @@ pub struct ReportCallbackRejected {
     pub data_id: [u8; 16],
     pub round_id: u64,
     pub answer: i128,
+}
+
+#[event]
+pub struct InvalidDataIdIgnored {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+}
+
+#[event]
+pub struct FeedNotInitializedIgnored {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+}
+
+#[event]
+pub struct CallbackProgramAllowedSet {
+    pub state: Pubkey,
+    pub program: Pubkey,
+    pub allowed: bool,
 }

@@ -3,14 +3,14 @@ use anchor_spl::token_interface;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, MAX_ACCOUNT_DATA_INCREASE, MAX_WORKFLOW_METADATAS, MIN_MAX_STORED_REPORTS,
-        STORE_AUTHORITY_SEED,
+        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, CALLBACK_PROGRAM_SEED, MAX_ACCOUNT_DATA_INCREASE,
+        MAX_WORKFLOW_METADATAS, MIN_MAX_STORED_REPORTS, STORE_AUTHORITY_SEED,
     },
     context::*,
     error::StoreError,
     event::*,
-    state::{feed_account_len, WorkflowMetadata},
-    utils::{validate_workflow_metadata, verify_feed_admin},
+    state::{feed_account_len, CallbackProgram, WorkflowMetadata},
+    utils::{create_pda_account, validate_workflow_metadata, verify_feed_admin},
 };
 
 pub fn initialize(
@@ -43,7 +43,7 @@ pub fn initialize(
         // sorted for binary search
         require!(previous < admin, StoreError::InvalidAddress);
         state.feed_admins.push(admin);
-        emit!(FeedAdminSet {
+        emit_cpi!(FeedAdminSet {
             state: state_key,
             feed_admin: admin,
             is_admin: true,
@@ -51,7 +51,7 @@ pub fn initialize(
         previous = admin;
     }
 
-    emit!(StoreInitialized {
+    emit_cpi!(StoreInitialized {
         state: state_key,
         default_max_stored_reports,
         max_observation_forward_secs,
@@ -67,7 +67,7 @@ pub fn transfer_ownership(ctx: Context<OwnerOnly>, proposed_owner: Pubkey) -> Re
         StoreError::InvalidProposedOwner
     );
     state.proposed_owner = proposed_owner;
-    emit!(OwnershipTransferRequested {
+    emit_cpi!(OwnershipTransferRequested {
         state: ctx.accounts.state.key(),
         from: state.owner,
         to: proposed_owner,
@@ -79,7 +79,7 @@ pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let state = &mut ctx.accounts.state.load_mut()?;
     let previous = state.owner;
     state.owner = std::mem::take(&mut state.proposed_owner);
-    emit!(OwnershipTransferred {
+    emit_cpi!(OwnershipTransferred {
         state: ctx.accounts.state.key(),
         from: previous,
         to: state.owner,
@@ -104,7 +104,7 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
         // already in the requested state
         _ => {}
     }
-    emit!(FeedAdminSet {
+    emit_cpi!(FeedAdminSet {
         state: ctx.accounts.state.key(),
         feed_admin,
         is_admin,
@@ -131,7 +131,7 @@ pub fn set_default_feed_metadata(
         state.default_workflow_metadata.push(*metadata);
     }
 
-    emit!(DefaultFeedMetadataSet {
+    emit_cpi!(DefaultFeedMetadataSet {
         state: ctx.accounts.state.key(),
         workflow_metadata,
     });
@@ -145,9 +145,59 @@ pub fn set_max_observation_forward_duration(
     let state = &mut ctx.accounts.state.load_mut()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
     state.max_observation_forward_secs = max_observation_forward_secs;
-    emit!(MaxObservationForwardDurationSecondsUpdated {
+    emit_cpi!(MaxObservationForwardDurationSecondsUpdated {
         state: ctx.accounts.state.key(),
         new_duration: max_observation_forward_secs,
+    });
+    Ok(())
+}
+
+/// Allow or disallow a program as a report callback. Feed admins can only configure allowed
+/// programs; disallowing does not remove callbacks already configured, feed admins disable those.
+pub fn set_callback_program_allowed(
+    ctx: Context<SetCallbackProgramAllowed>,
+    callback_program: Pubkey,
+    allowed: bool,
+) -> Result<()> {
+    let program = callback_program;
+    require_keys_neq!(program, Pubkey::default(), StoreError::InvalidAddress);
+    let state_key = ctx.accounts.state.key();
+    let info = ctx.accounts.allowlist_entry.to_account_info();
+    let (address, bump) = Pubkey::find_program_address(
+        &[CALLBACK_PROGRAM_SEED, state_key.as_ref(), program.as_ref()],
+        &crate::ID,
+    );
+    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
+
+    if info.data_is_empty() {
+        create_pda_account(
+            ANCHOR_DISCRIMINATOR + CallbackProgram::INIT_SPACE,
+            &[
+                CALLBACK_PROGRAM_SEED,
+                state_key.as_ref(),
+                program.as_ref(),
+                &[bump],
+            ],
+            &ctx.accounts.owner.to_account_info(),
+            &info,
+            &ctx.accounts.system_program.to_account_info(),
+        )?;
+    } else {
+        require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
+    }
+    CallbackProgram {
+        version: ACCOUNT_VERSION,
+        state: state_key,
+        program,
+        allowed,
+        _reserved: [0; 32],
+    }
+    .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
+
+    emit_cpi!(CallbackProgramAllowedSet {
+        state: state_key,
+        program,
+        allowed,
     });
     Ok(())
 }
@@ -178,7 +228,7 @@ pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
         ctx.accounts.mint.decimals,
     )?;
 
-    emit!(TokenRecovered {
+    emit_cpi!(TokenRecovered {
         state: state_key,
         mint: ctx.accounts.mint.key(),
         to: ctx.accounts.to.key(),
@@ -210,7 +260,7 @@ pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
         amount,
     )?;
 
-    emit!(TokenRecovered {
+    emit_cpi!(TokenRecovered {
         state: state_key,
         mint: Pubkey::default(),
         to: ctx.accounts.to.key(),
