@@ -251,6 +251,16 @@ describe("data feeds proxy", function () {
       .rpc();
   });
 
+  it("gives every error its own code", () => {
+    const errors = proxy.idl.errors!;
+    const codes = errors.map((e) => e.code);
+    assert.equal(new Set(codes).size, codes.length);
+    assert.include(
+      errors.map((e) => e.name),
+      "unauthorized"
+    );
+  });
+
   it("initializes", async () => {
     const s = await proxy.account.proxyState.fetch(proxyState.publicKey);
     assert.isTrue(s.owner.equals(provider.publicKey));

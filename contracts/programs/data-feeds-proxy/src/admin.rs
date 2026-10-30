@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     common::{data_id_seed, ACCOUNT_VERSION, STORE_DECIMALS},
     context::*,
-    error::{AuthError, ProxyError},
+    error::ProxyError,
     event::*,
     state::FeedConfig,
 };
@@ -119,12 +119,18 @@ pub fn set_min_decimals(
         let admin = ctx.accounts.admin.key();
         require!(
             admin == state.owner || state.feed_admins.binary_search(&admin).is_ok(),
-            AuthError::Unauthorized
+            ProxyError::Unauthorized
         );
     }
     require!(min_decimals <= STORE_DECIMALS, ProxyError::InvalidDecimals);
 
     let config = &mut ctx.accounts.feed_config;
+    // version 0 is a config created by this call; an existing one is rewritten only at the layout
+    // this program knows
+    require!(
+        config.version == 0 || config.version == ACCOUNT_VERSION,
+        ProxyError::InvalidAccountVersion
+    );
     config.version = ACCOUNT_VERSION;
     config.state = state_key;
     config.data_id = data_id_seed(&data_id);

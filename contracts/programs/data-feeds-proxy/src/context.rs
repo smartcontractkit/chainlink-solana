@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::common::{data_id_seed, ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_CONFIG_SEED};
-use crate::error::{AuthError, ProxyError};
+use crate::error::ProxyError;
 
 // Contexts that change state emit CPI events (`#[event_cpi]` adds the event authority PDA and this
 // program as their last accounts). Every context checks the state's layout version.
@@ -30,7 +30,7 @@ pub struct Initialize<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct OwnerOnly<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.owner @ ProxyError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
@@ -40,7 +40,7 @@ pub struct OwnerOnly<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
-    #[account(address = state.load()?.proposed_owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.proposed_owner @ ProxyError::Unauthorized)]
     pub new_owner: Signer<'info>,
 
     #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]
@@ -50,7 +50,7 @@ pub struct AcceptOwnership<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct SetStore<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.owner @ ProxyError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ ProxyError::InvalidAccountVersion)]

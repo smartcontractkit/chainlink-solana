@@ -1,13 +1,8 @@
 use anchor_lang::error_code;
 
-// Kept separate from `ProxyError`: anchor-go only generates Go types for error blocks after the
-// first one.
-#[error_code]
-pub enum AuthError {
-    #[msg("The signer is unauthorized")]
-    Unauthorized,
-}
-
+// One error enum, so every code is unique and in the IDL (Anchor numbers each `#[error_code]`
+// block from 6000 and the IDL keeps only one block). New errors are appended so existing codes
+// keep their numbers.
 #[error_code]
 pub enum ProxyError {
     #[msg("decimals are below the feed's minimum or above the stored decimals")]
@@ -24,4 +19,6 @@ pub enum ProxyError {
     InvalidProposedOwner,
     #[msg("account has an unsupported version")]
     InvalidAccountVersion,
+    #[msg("The signer is unauthorized")]
+    Unauthorized,
 }
