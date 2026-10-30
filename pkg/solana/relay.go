@@ -42,6 +42,10 @@ type TxManager interface {
 	// - If a txID is provided, it will be used to identify the tx. Otherwise, a random UUID will be generated.
 	// - The caller needs to set the tx.Message.RecentBlockhash and provide the corresponding lastValidBlockHeight. These values are obtained from the GetLatestBlockhash RPC call.
 	Enqueue(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
+	// EnqueueV1 behaves like Enqueue but submits the tx as a V1 (SIMD-0385) transaction.
+	// The compute unit limit and price are set through the message's inline TransactionConfig, so the tx
+	// must not contain ComputeBudget instructions or use address lookup tables.
+	EnqueueV1(ctx context.Context, accountID string, tx *solana.Transaction, txID *string, lastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error
 	GetTransactionStatus(ctx context.Context, transactionID string) (relaytypes.TransactionStatus, error)
 	GetTransactionSig(transactionID string) (solana.Signature, error)
 }
