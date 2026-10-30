@@ -29,7 +29,7 @@ func TestBuildReport(t *testing.T) {
 	v := big.NewInt(0)
 	v.SetString("1000000000000000000", 10)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		oo = append(oo, median.ParsedAttributedObservation{
 			Timestamp:       uint32(time.Now().Unix()),
 			Value:           big.NewInt(1234567890),
@@ -174,12 +174,10 @@ func TestHashReport(t *testing.T) {
 		65, 205, 71, 121, 195, 138, 77, 137,
 	}
 	var mockReportCtx = types.ReportContext{
-		ReportTimestamp: types.ReportTimestamp{
-			ConfigDigest: mockDigest,
-			Epoch:        1,
-			Round:        1,
-		},
-		ExtraHash: [32]byte{},
+		ConfigDigest: mockDigest,
+		Epoch:        1,
+		Round:        1,
+		ExtraHash:    [32]byte{},
 	}
 
 	var mockReport = types.Report{

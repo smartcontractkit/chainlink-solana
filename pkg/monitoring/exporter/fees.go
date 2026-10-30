@@ -52,7 +52,7 @@ type feesExporter struct {
 	metrics metrics.Fees
 }
 
-func (f *feesExporter) Export(ctx context.Context, data interface{}) {
+func (f *feesExporter) Export(ctx context.Context, data any) {
 	details, err := types.MakeTxDetails(data)
 	if err != nil {
 		return // skip if input could not be parsed

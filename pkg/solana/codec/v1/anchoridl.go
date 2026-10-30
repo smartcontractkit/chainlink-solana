@@ -84,7 +84,7 @@ type IdlAccountItem struct {
 }
 
 func (env *IdlAccountItem) UnmarshalJSON(data []byte) error {
-	var temp interface{}
+	var temp any
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (env *IdlAccountItem) UnmarshalJSON(data []byte) error {
 	}
 
 	switch v := temp.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if len(v) == 0 {
 			return nil
 		}
@@ -126,9 +126,9 @@ func (env IdlAccountItem) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	var result interface{}
+	var result any
 	if env.IdlAccounts != nil {
-		result = map[string]interface{}{
+		result = map[string]any{
 			"accounts": env.IdlAccounts,
 		}
 	} else {
@@ -238,7 +238,7 @@ type IdlTypeArray struct {
 }
 
 func (env IdlType) MarshalJSON() ([]byte, error) {
-	var result interface{}
+	var result any
 	switch {
 	case env.IsString():
 		result = env.GetString()
@@ -250,8 +250,8 @@ func (env IdlType) MarshalJSON() ([]byte, error) {
 		result = env.GetIdlTypeDefined()
 	case env.IsArray():
 		array := env.GetArray()
-		result = map[string]interface{}{
-			"array": []interface{}{array.Thing, array.Num},
+		result = map[string]any{
+			"array": []any{array.Thing, array.Num},
 		}
 	default:
 		return nil, fmt.Errorf("nil envelope is not supported in IdlType")
@@ -261,7 +261,7 @@ func (env IdlType) MarshalJSON() ([]byte, error) {
 }
 
 func (env *IdlType) UnmarshalJSON(data []byte) error {
-	var temp interface{}
+	var temp any
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 	switch v := temp.(type) {
 	case string:
 		env.AsString = IdlTypeAsString(v)
-	case map[string]interface{}:
+	case map[string]any:
 		if len(v) == 0 {
 			return nil
 		}
@@ -313,7 +313,7 @@ func (env *IdlType) UnmarshalJSON(data []byte) error {
 			if typeFound {
 				return fmt.Errorf("multiple types found for IdlType: %s", spew.Sdump(temp))
 			}
-			arrVal, ok := got.([]interface{})
+			arrVal, ok := got.([]any)
 			if !ok {
 				return fmt.Errorf("array is not in expected format: %s", spew.Sdump(got))
 			}

@@ -25,7 +25,7 @@ const AnchorCPIMethodName = "anchor:event"
 type PublicKey solana.PublicKey
 
 // Scan implements Scanner for database/sql.
-func (k *PublicKey) Scan(src interface{}) error {
+func (k *PublicKey) Scan(src any) error {
 	return scanFixedLengthArray("PublicKey", solana.PublicKeyLength, src, k[:])
 }
 
@@ -58,7 +58,7 @@ func PublicKeysToString(keys []PublicKey) string {
 type Hash solana.Hash
 
 // Scan implements Scanner for database/sql.
-func (h *Hash) Scan(src interface{}) error {
+func (h *Hash) Scan(src any) error {
 	return scanFixedLengthArray("Hash", solana.PublicKeyLength, src, h[:])
 }
 
@@ -78,7 +78,7 @@ func (h Hash) String() string {
 type Signature solana.Signature
 
 // Scan implements Scanner for database/sql.
-func (s *Signature) Scan(src interface{}) error {
+func (s *Signature) Scan(src any) error {
 	return scanFixedLengthArray("Signature", solana.SignatureLength, src, s[:])
 }
 
@@ -95,7 +95,7 @@ func (s Signature) String() string {
 	return s.ToSolana().String()
 }
 
-func scanFixedLengthArray(name string, maxLength int, src interface{}, dest []byte) error {
+func scanFixedLengthArray(name string, maxLength int, src any, dest []byte) error {
 	srcB, ok := src.([]byte)
 	if !ok {
 		return fmt.Errorf("can't scan %T into %s", src, name)
@@ -113,7 +113,7 @@ func (p SubKeyPaths) Value() (driver.Value, error) {
 	return json.Marshal([][]string(p))
 }
 
-func (p *SubKeyPaths) Scan(src interface{}) error {
+func (p *SubKeyPaths) Scan(src any) error {
 	return scanJSON("SubKeyPaths", p, src)
 }
 
@@ -146,7 +146,7 @@ func AnchorCPIEventDiscriminator() EventSignature {
 }
 
 // Scan implements Scanner for database/sql.
-func (s *EventSignature) Scan(src interface{}) error {
+func (s *EventSignature) Scan(src any) error {
 	return scanFixedLengthArray("EventSignature", EventSignatureLength, src, s[:])
 }
 
@@ -169,7 +169,7 @@ type Decoder interface {
 
 type EventIdl codecv1.EventIDLTypes
 
-func (e *EventIdl) Scan(src interface{}) error {
+func (e *EventIdl) Scan(src any) error {
 	return scanJSON("EventIdl", e, src)
 }
 
@@ -181,7 +181,7 @@ func (e EventIdl) Equal(o EventIdl) bool {
 	return reflect.DeepEqual(e, o)
 }
 
-func (c *ExtraFilterConfig) Scan(src interface{}) error {
+func (c *ExtraFilterConfig) Scan(src any) error {
 	return scanJSON("ExtraFilterConfig", c, src)
 }
 
@@ -192,7 +192,7 @@ func (c ExtraFilterConfig) Value() (driver.Value, error) {
 	return json.Marshal(c)
 }
 
-func scanJSON(name string, dest, src interface{}) error {
+func scanJSON(name string, dest, src any) error {
 	if src == nil {
 		return nil
 	}
@@ -231,7 +231,7 @@ func NewIndexedValue(typedVal any) (IndexedValue, error) {
 
 type IndexedValues []IndexedValue
 
-func (v *IndexedValues) Scan(src interface{}) error {
+func (v *IndexedValues) Scan(src any) error {
 	byteArray := pq.ByteaArray{}
 	err := byteArray.Scan(src)
 	if err != nil {

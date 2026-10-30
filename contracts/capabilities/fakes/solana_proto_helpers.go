@@ -43,12 +43,12 @@ func convertGetAccountInfoOpts(opts *solcap.GetAccountInfoOpts) (*rpc.GetAccount
 	out := &rpc.GetAccountInfoOpts{
 		Encoding:       solana.EncodingType(defaultEncoding(opts.GetEncoding())),
 		Commitment:     rpc.CommitmentType(defaultCommitment(opts.GetCommitment())),
-		MinContextSlot: uint64Ptr(opts.GetMinContextSlot()),
+		MinContextSlot: new(opts.GetMinContextSlot()),
 	}
 	if ds := opts.GetDataSlice(); ds != nil {
 		out.DataSlice = &rpc.DataSlice{
-			Offset: uint64Ptr(ds.GetOffset()),
-			Length: uint64Ptr(ds.GetLength()),
+			Offset: new(ds.GetOffset()),
+			Length: new(ds.GetLength()),
 		}
 	}
 
@@ -164,8 +164,9 @@ func encodingTypeToProto(enc solana.EncodingType) solcap.EncodingType {
 	}
 }
 
+//go:fix inline
 func uint64Ptr(v uint64) *uint64 {
-	return &v
+	return new(v)
 }
 
 const maxDiagPayloadLen = 1024

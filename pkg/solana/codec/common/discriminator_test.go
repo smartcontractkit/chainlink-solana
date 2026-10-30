@@ -65,7 +65,7 @@ func TestDiscriminator(t *testing.T) {
 
 	t.Run("GetType returns the type of the discriminator", func(t *testing.T) {
 		c := commoncodec.NewDiscriminator("Foo", true)
-		require.Equal(t, reflect.TypeOf(&[]byte{}), c.GetType())
+		require.Equal(t, reflect.TypeFor[*[]byte](), c.GetType())
 	})
 
 	t.Run("Size returns the length of the discriminator", func(t *testing.T) {

@@ -66,7 +66,7 @@ func (d *onRampAddress) Decode(encoded []byte) (any, []byte, error) {
 }
 
 func (d *onRampAddress) GetType() reflect.Type {
-	return reflect.TypeOf([]byte{})
+	return reflect.TypeFor[[]byte]()
 }
 
 func (d *onRampAddress) Size(val int) (int, error) {

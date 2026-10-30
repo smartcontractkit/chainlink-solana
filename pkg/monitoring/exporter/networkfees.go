@@ -44,7 +44,7 @@ type networkFees struct {
 	lgr     commonMonitoring.Logger
 }
 
-func (p *networkFees) Export(ctx context.Context, data interface{}) {
+func (p *networkFees) Export(ctx context.Context, data any) {
 	blockData, ok := data.(fees.BlockData)
 	if !ok {
 		return // skip if input could not be parsed

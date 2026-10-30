@@ -84,8 +84,8 @@ func (s SolanaFeedConfig) GetContractAddressBytes() []byte {
 	return s.StateAccount.Bytes()
 }
 
-func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
-	return map[string]interface{}{
+func (s SolanaFeedConfig) ToMapping() map[string]any {
+	return map[string]any{
 		"feed_name":        s.Name,
 		"feed_path":        s.Path,
 		"symbol":           s.Symbol,
@@ -93,7 +93,7 @@ func (s SolanaFeedConfig) ToMapping() map[string]interface{} {
 		"contract_type":    s.ContractType,
 		"contract_status":  s.ContractStatus,
 		"contract_address": s.ContractAddress.Bytes(),
-		"contract_address_string": map[string]interface{}{
+		"contract_address_string": map[string]any{
 			"string": s.ContractAddressBase58,
 		},
 

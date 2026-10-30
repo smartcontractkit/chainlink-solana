@@ -102,7 +102,7 @@ func encodeFieldsOnItem(t *testing.T, request *EncodeRequest, isAccount bool) oc
 }
 
 func encodeFieldsOnSliceOrArray(t *testing.T, request *EncodeRequest) []byte {
-	var toEncode interface{}
+	var toEncode any
 	buf := new(bytes.Buffer)
 	switch request.TestOn {
 	case TestItemArray1Type:

@@ -55,7 +55,7 @@ func newMockedLPwithConfig(t *testing.T, cfg config.Config, chainID string) mock
 
 func newMockedLP(t *testing.T) mockedLP {
 	cfg := config.NewDefault()
-	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](100)
+	cfg.Chain.LogPollerSlotsBatchSize = new(int64(100))
 	return newMockedLPwithConfig(t, cfg, chainID)
 }
 
@@ -115,26 +115,22 @@ func TestLogPoller_run(t *testing.T) {
 		loader.EXPECT().BackfillForAddresses(mock.Anything, []types.PublicKey{addr}, uint64(101), uint64(102)).RunAndReturn(func(_ context.Context, _ []types.PublicKey, _, _ uint64) (<-chan types.Block, func(), error) {
 			ch := make(chan types.Block, 2)
 			ch <- types.Block{SlotNumber: 101, Events: []types.ProgramEvent{{
-				Program: addr.ToSolana().String(),
-				BlockData: types.BlockData{
-					SlotNumber:          101,
-					BlockTime:           solana.UnixTimeSeconds(1),
-					TransactionHash:     solana.Signature{1},
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Data: base64.StdEncoding.EncodeToString(eventSig[:]),
+				Program:             addr.ToSolana().String(),
+				SlotNumber:          101,
+				BlockTime:           solana.UnixTimeSeconds(1),
+				TransactionHash:     solana.Signature{1},
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+				Data:                base64.StdEncoding.EncodeToString(eventSig[:]),
 			}}}
 			ch <- types.Block{SlotNumber: 102, Events: []types.ProgramEvent{{
-				Program: addr.ToSolana().String(),
-				BlockData: types.BlockData{
-					SlotNumber:          102,
-					BlockTime:           solana.UnixTimeSeconds(2),
-					TransactionHash:     solana.Signature{2},
-					TransactionIndex:    0,
-					TransactionLogIndex: 0,
-				},
-				Data: base64.StdEncoding.EncodeToString(append(eventSig[:], []byte{1, 42, 0, 0, 0}...)),
+				Program:             addr.ToSolana().String(),
+				SlotNumber:          102,
+				BlockTime:           solana.UnixTimeSeconds(2),
+				TransactionHash:     solana.Signature{2},
+				TransactionIndex:    0,
+				TransactionLogIndex: 0,
+				Data:                base64.StdEncoding.EncodeToString(append(eventSig[:], []byte{1, 42, 0, 0, 0}...)),
 			}}}
 			close(ch)
 			return ch, func() {}, nil
@@ -512,7 +508,7 @@ func TestLogPoller_run_EncodedLogCollector_uniqueGetSignaturesRequests(t *testin
 
 	const slotsBatchSize = 2
 	cfg := config.NewDefault()
-	cfg.Chain.LogPollerSlotsBatchSize = ptr[int64](slotsBatchSize)
+	cfg.Chain.LogPollerSlotsBatchSize = new(int64(slotsBatchSize))
 
 	lp := newMockedLPwithConfig(t, cfg, chainID)
 	loader := NewEncodedLogCollector(lp.Client, logger.Test(t), t.Name(), nil, nil, slotsBatchSize)
@@ -774,18 +770,16 @@ func TestProcess(t *testing.T) {
 
 	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
 	ev := types.ProgramEvent{
-		Program: addr.ToSolana().String(),
-		BlockData: types.BlockData{
-			SlotNumber:          uint64(expectedLog.BlockNumber),
-			BlockHeight:         3,
-			BlockHash:           expectedLog.BlockHash.ToSolana(),
-			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
-			TransactionHash:     expectedLog.TxHash.ToSolana(),
-			TransactionIndex:    txIndex,
-			TransactionLogIndex: txLogIndex,
-			Error:               nil,
-		},
-		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
+		Program:             addr.ToSolana().String(),
+		SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec // G115
+		BlockHeight:         3,
+		BlockHash:           expectedLog.BlockHash.ToSolana(),
+		BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+		TransactionHash:     expectedLog.TxHash.ToSolana(),
+		TransactionIndex:    txIndex,
+		TransactionLogIndex: txLogIndex,
+		Error:               nil,
+		Data:                base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
 
 	orm := mocks.NewMockORM(t)
@@ -1004,16 +998,14 @@ func TestProcess_skipsBadFilterWithoutBlockingOthers(t *testing.T) {
 	expectedLog.Data = append(eventSig[:], expectedLog.Data...)
 
 	ev := types.ProgramEvent{
-		Program: addr.ToSolana().String(),
-		BlockData: types.BlockData{
-			SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec
-			BlockHash:           expectedLog.BlockHash.ToSolana(),
-			BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
-			TransactionHash:     expectedLog.TxHash.ToSolana(),
-			TransactionIndex:    txIndex,
-			TransactionLogIndex: txLogIndex,
-		},
-		Data: base64.StdEncoding.EncodeToString(expectedLog.Data),
+		Program:             addr.ToSolana().String(),
+		SlotNumber:          uint64(expectedLog.BlockNumber), //nolint:gosec
+		BlockHash:           expectedLog.BlockHash.ToSolana(),
+		BlockTime:           solana.UnixTimeSeconds(expectedLog.BlockTimestamp.Unix()),
+		TransactionHash:     expectedLog.TxHash.ToSolana(),
+		TransactionIndex:    txIndex,
+		TransactionLogIndex: txLogIndex,
+		Data:                base64.StdEncoding.EncodeToString(expectedLog.Data),
 	}
 
 	orm := mocks.NewMockORM(t)

@@ -159,7 +159,7 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup works with MetaBool bitmap lookups", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
@@ -198,7 +198,7 @@ func TestAccountLookups(t *testing.T) {
 
 		accounts := [3]*solana.AccountMeta{}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
@@ -227,7 +227,7 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup fails with MetaBool with an Invalid BitmapLocation", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
@@ -254,7 +254,7 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup fails when MetaBool Bitmap is an invalid type", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
@@ -281,7 +281,7 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup fails if lookup returns more than 64 values and uses bitmap", func(t *testing.T) {
 		accounts := [65]*solana.AccountMeta{}
 
-		for i := 0; i < 65; i++ {
+		for i := range 65 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsWritable: true,
@@ -306,7 +306,7 @@ func TestAccountLookups(t *testing.T) {
 	t.Run("AccountLookup fails if provided bitmap is not 8 bytes", func(t *testing.T) {
 		accounts := [3]*solana.AccountMeta{}
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			accounts[i] = &solana.AccountMeta{
 				PublicKey:  utils.GetRandomPubKey(t),
 				IsSigner:   (i)%2 == 0,
@@ -400,7 +400,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}}
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"test_seed":           seed1,
 			"another_seed":        seed2,
 			"ccip_chain_selector": seed3,
@@ -423,7 +423,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}}
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"test_seed": []byte("data"),
 		}
 
@@ -460,7 +460,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: true,
 		}}
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"test_seed":               seed1,
 			"another_seed":            seed2,
 			"unknown_encoded_address": seed3,
@@ -499,7 +499,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: false,
 		}}
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"single_seed": singleSeed,
 			"array_seed":  arraySeed,
 		}
@@ -539,7 +539,7 @@ func TestPDALookups(t *testing.T) {
 			IsWritable: false,
 		}}
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"seed1": arraySeed1,
 			"seed2": arraySeed2,
 		}
@@ -719,7 +719,7 @@ func TestLookupTables(t *testing.T) {
 
 		InitializeDataAccount(ctx, t, rpcClient, programID, sender, lookupTable)
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"seed1": []byte("lookup"),
 		}
 
@@ -769,7 +769,7 @@ func TestLookupTables(t *testing.T) {
 		// Deployed contract_reader_interface contract
 		programID := solana.MustPublicKeyFromBase58("6AfuXF6HapDUhQfE4nQG9C1SGtA1YjP3icaJyRfU4RyE")
 
-		args := map[string]interface{}{
+		args := map[string]any{
 			"seed1": []byte("lookup"),
 		}
 
@@ -1137,7 +1137,7 @@ func CreateTestPubKeys(t *testing.T, num int) solana.PublicKeySlice {
 	t.Helper()
 
 	addresses := make([]solana.PublicKey, num)
-	for i := 0; i < num; i++ {
+	for i := range num {
 		addresses[i] = utils.GetRandomPubKey(t)
 	}
 	return addresses

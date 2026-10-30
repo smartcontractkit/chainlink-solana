@@ -219,11 +219,9 @@ func (txm *Txm) sendWithRetry(ctx context.Context, msg pendingTx) (solanaGo.Tran
 	txm.lggr.Debugw("tx initial broadcast", "id", msg.id, "fee", msg.cfg.BaseComputeUnitPrice, "signature", sig, "lastValidBlockHeight", msg.lastValidBlockHeight)
 
 	// pass in copy of msg (to build new tx with bumped fee) and broadcasted tx == initTx (to retry tx without bumping)
-	txm.done.Add(1)
-	go func() {
-		defer txm.done.Done()
+	txm.done.Go(func() {
 		txm.retryTx(ctx, cancel, msg, initTx, sig)
-	}()
+	})
 
 	// Return signed tx, id, signature for use in simulation
 	return initTx, msg.id, sig, nil
@@ -427,7 +425,7 @@ func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWr
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < len(sigsBatch); i++ {
+	for i := range sigsBatch {
 		statuses, err := client.SignatureStatuses(ctx, sigsBatch[i])
 		if err != nil {
 			txm.lggr.Errorw("failed to get signature statuses in txm.confirm", "error", err)
@@ -446,7 +444,7 @@ func (txm *Txm) processConfirmations(ctx context.Context, client client.ReaderWr
 				return
 			}
 
-			for j := 0; j < len(sortedRes); j++ {
+			for j := range sortedRes {
 				sig, status := sortedSigs[j], sortedRes[j]
 				if status == nil {
 					// sig not found could mean invalid tx or not picked up yet, keep polling
@@ -1054,12 +1052,12 @@ func (txm *Txm) simulateTx(ctx context.Context, tx *solanaGo.Transaction) (res *
 }
 
 // ProcessError parses and handles relevant errors found in simulation results
-func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr interface{}, simulation bool, txID string) (txState txmutils.TxState, errType TxErrType) {
+func (txm *Txm) ProcessError(ctx context.Context, sig solanaGo.Signature, resErr any, simulation bool, txID string) (txState txmutils.TxState, errType TxErrType) {
 	if resErr != nil {
 		// handle various errors
 		// https://github.com/solana-labs/solana/blob/master/sdk/src/transaction/error.rs
 		errStr := fmt.Sprintf("%v", resErr) // convert to string to handle various interfaces
-		logValues := []interface{}{
+		logValues := []any{
 			"signature", sig,
 			"error", resErr,
 			"transactionID", txID,

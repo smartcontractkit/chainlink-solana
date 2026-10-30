@@ -50,8 +50,8 @@ type AccountLookup struct {
 	Name     string `json:"name,omitempty"`
 	Location string `json:"location"`
 	// IsSigner and IsWritable can either be a constant bool or a location to a bitmap which decides the bools
-	IsSigner   MetaBool `json:"isSigner,omitempty"`
-	IsWritable MetaBool `json:"isWritable,omitempty"`
+	IsSigner   MetaBool `json:"isSigner"`
+	IsWritable MetaBool `json:"isWritable"`
 }
 
 type MetaBool struct {
@@ -60,8 +60,8 @@ type MetaBool struct {
 }
 
 type Seed struct {
-	Static  []byte `json:"static,omitempty"`  // Static seed value
-	Dynamic Lookup `json:"dynamic,omitempty"` // Dynamic lookup for seed
+	Static  []byte `json:"static,omitempty"` // Static seed value
+	Dynamic Lookup `json:"dynamic"`          // Dynamic lookup for seed
 }
 
 // PDALookups generates Program Derived Addresses (PDA) by combining a derived public key with one or more seeds.
@@ -75,7 +75,7 @@ type PDALookups struct {
 	IsSigner   bool   `json:"isSigner,omitempty"`
 	IsWritable bool   `json:"isWritable,omitempty"`
 	// OPTIONAL: On-chain location and type of desired data from PDA (e.g. a sub-account of the data account)
-	InternalField InternalField `json:"internalField,omitempty"`
+	InternalField InternalField `json:"internalField"`
 }
 
 type InternalField struct {
@@ -209,7 +209,7 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 	}
 	result := make([]bool, length)
 	if mb.BitmapLocation == "" {
-		for i := 0; i < length; i++ {
+		for i := range length {
 			result[i] = mb.Value
 		}
 		return result, nil
@@ -230,7 +230,7 @@ func resolveBitMap(mb MetaBool, args any, length int) ([]bool, error) {
 
 	// The bitmap is user defined and always uint64 size. The input cannot be further validated for correctness.
 	bitmapInt := binary.LittleEndian.Uint64(bitmapVals[0])
-	for i := 0; i < length; i++ {
+	for i := range length {
 		result[i] = bitmapInt&(1<<i) > 0
 	}
 

@@ -44,7 +44,7 @@ type nodeBalances struct {
 	addresses map[string]solana.PublicKey
 }
 
-func (nb *nodeBalances) Export(ctx context.Context, data interface{}) {
+func (nb *nodeBalances) Export(ctx context.Context, data any) {
 	balances, isBalances := data.(types.Balances)
 	if !isBalances {
 		return

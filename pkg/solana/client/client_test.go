@@ -375,7 +375,7 @@ func TestClient_SendTxDuplicates_Integration(t *testing.T) {
 	sigs := make([]solana.Signature, n)
 	var wg sync.WaitGroup
 	wg.Add(5)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		go func(i int) {
 			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond) // randomly submit txs
 			sig, sendErr := c.SendTx(ctx, tx)

@@ -11,7 +11,7 @@ import (
 func CalculateFee(base, maxFee, minFee uint64, count uint) uint64 {
 	amount := base
 
-	for i := uint(0); i < count; i++ {
+	for i := range count {
 		if base == 0 && i == 0 {
 			amount = 1
 		} else {
