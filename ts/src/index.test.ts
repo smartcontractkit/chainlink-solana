@@ -3,12 +3,14 @@ import {
   CHAINLINK_STORE_PROGRAM_ID,
   OCR2Feed,
   Round,
+  StoreFeed,
 } from ".";
 import { BN } from "@coral-xyz/anchor";
 import * as anchor from "@coral-xyz/anchor";
 import * as os from "os";
 import * as fs from "fs";
 import * as path from "path";
+import { createHash } from "crypto";
 
 describe("OCR2Feed", () => {
   it("parseLog", () => {
@@ -108,4 +110,79 @@ describe("OCR2Feed", () => {
     },
     20_000
   );
+});
+
+describe("StoreFeed", () => {
+  // Program data log of a CacheRoundSubmitted event, as emitted by the store
+  const eventLog = (
+    feed: anchor.web3.PublicKey,
+    roundId: number,
+    answer: BN,
+    timestamp: number
+  ) => {
+    const discriminator = createHash("sha256")
+      .update("event:CacheRoundSubmitted")
+      .digest()
+      .subarray(0, 8);
+    const round = Buffer.alloc(4);
+    round.writeUInt32LE(roundId);
+    const ts = Buffer.alloc(4);
+    ts.writeUInt32LE(timestamp);
+    const data = Buffer.concat([
+      discriminator,
+      feed.toBuffer(),
+      round,
+      answer.toTwos(128).toArrayLike(Buffer, "le", 16),
+      ts,
+    ]);
+    return "Program data: " + data.toString("base64");
+  };
+
+  it("parseLogs", () => {
+    const provider = new anchor.AnchorProvider(
+      new anchor.web3.Connection("http://localhost:8899"),
+      new anchor.Wallet(anchor.web3.Keypair.generate()),
+      {}
+    );
+    const storeFeed = new StoreFeed(provider);
+    const feedA = anchor.web3.Keypair.generate().publicKey;
+    const feedB = anchor.web3.Keypair.generate().publicKey;
+    const store = CHAINLINK_STORE_PROGRAM_ID.toBase58();
+
+    const rounds = storeFeed.parseLogs([
+      `Program ${store} invoke [1]`,
+      eventLog(feedA, 7, new BN("1050000000"), 1648768290),
+      eventLog(feedB, 3, new BN("-250000000"), 1648768291),
+      `Program ${store} success`,
+    ]);
+
+    expect(rounds.length).toEqual(2);
+    expect(rounds[0].feed.equals(feedA)).toBe(true);
+    expect(rounds[0].roundId).toEqual(7);
+    expect(rounds[0].answer.toString()).toEqual("1050000000");
+    expect(rounds[0].observationsTS).toEqual(
+      new Date("2022-03-31T23:11:30.000Z")
+    );
+    expect(rounds[1].feed.equals(feedB)).toBe(true);
+    expect(rounds[1].answer.toString()).toEqual("-250000000");
+  });
+
+  it("parseLogs ignores other programs", () => {
+    const provider = new anchor.AnchorProvider(
+      new anchor.web3.Connection("http://localhost:8899"),
+      new anchor.Wallet(anchor.web3.Keypair.generate()),
+      {}
+    );
+    const other = anchor.web3.Keypair.generate().publicKey.toBase58();
+    const rounds = new StoreFeed(provider).parseLogs([
+      `Program ${other} invoke [1]`,
+      eventLog(anchor.web3.Keypair.generate().publicKey, 1, new BN(1), 1),
+      `Program ${other} success`,
+    ]);
+    expect(rounds.length).toEqual(0);
+  });
+
+  it("parseLog null log", () => {
+    expect(StoreFeed.parseLog(null)).toBeNull();
+  });
 });
