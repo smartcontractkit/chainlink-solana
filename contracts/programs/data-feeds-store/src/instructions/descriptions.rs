@@ -64,13 +64,23 @@ pub fn set_feed_descriptions<'info>(
         );
         let encoded = encode_description(description)?;
         let seed = data_id::to_seed(id);
-        ensure_account(
+        let existed = ensure_account(
             &ctx,
             info,
             FEED_DESCRIPTION_SEED,
             &seed,
             ANCHOR_DISCRIMINATOR + FeedDescription::INIT_SPACE,
         )?;
+        if existed {
+            // an existing description is rewritten only at the layout this program knows
+            require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
+            let current = FeedDescription::try_deserialize(&mut &info.try_borrow_data()?[..])?;
+            require_eq!(
+                current.version,
+                ACCOUNT_VERSION,
+                StoreError::InvalidAccountVersion
+            );
+        }
 
         FeedDescription {
             version: ACCOUNT_VERSION,

@@ -1,13 +1,8 @@
 use anchor_lang::error_code;
 
-// Kept separate from `StoreError`: anchor-go only generates Go types for error blocks after the
-// first one (see data-feeds-cache/src/error.rs).
-#[error_code]
-pub enum AuthError {
-    #[msg("The signer is unauthorized")]
-    Unauthorized,
-}
-
+// One error enum, so every code is unique and in the IDL (Anchor numbers each `#[error_code]`
+// block from 6000 and the IDL keeps only one block). New errors are appended so existing codes
+// keep their numbers.
 #[error_code]
 pub enum StoreError {
     #[msg("array lengths must match")]
@@ -62,4 +57,6 @@ pub enum StoreError {
     ReportCallbackNotAllowed,
     #[msg("too many data ids for one read")]
     TooManyDataIds,
+    #[msg("The signer is unauthorized")]
+    Unauthorized,
 }

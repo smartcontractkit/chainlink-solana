@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use std::{cell::RefCell, mem::size_of};
 
 use anchor_lang::{
     prelude::*,
@@ -14,7 +14,7 @@ use bytemuck::Pod;
 use crate::{
     common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, ZERO_ADDRESS, ZERO_NAME},
     data_id,
-    error::{AuthError, StoreError},
+    error::StoreError,
     logic::Ring,
     state::{
         feed_account_len, AccountList, DataIdSettings, FeedData, StoredReport, WorkflowMetadata,
@@ -126,7 +126,31 @@ pub fn store<T: Pod + Discriminator>(info: &AccountInfo, value: &T) -> Result<()
 /// Load a feed header belonging to `state` and `data_id`, checking its version and that its ring
 /// fits.
 pub fn load_feed(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Result<Box<FeedData>> {
-    let feed: Box<FeedData> = load_boxed(info)?;
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
+    load_feed_into(info, state, data_id, &mut feed)?;
+    Ok(feed)
+}
+
+/// [`load_feed`] into an existing buffer. `on_report` reuses one buffer for every report: the
+/// program's bump allocator never frees, so a fresh box per report would run a batch out of heap.
+pub fn load_feed_into(
+    info: &AccountInfo,
+    state: &Pubkey,
+    data_id: &[u8; 16],
+    feed: &mut FeedData,
+) -> Result<()> {
+    require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
+    {
+        let data = info.try_borrow_data()?;
+        require!(
+            data.len() >= ANCHOR_DISCRIMINATOR + size_of::<FeedData>()
+                && &data[..ANCHOR_DISCRIMINATOR] == FeedData::DISCRIMINATOR,
+            StoreError::InvalidAccount
+        );
+        bytemuck::bytes_of_mut(feed).copy_from_slice(
+            &data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<FeedData>()],
+        );
+    }
     require_eq!(
         feed.version,
         ACCOUNT_VERSION,
@@ -138,7 +162,7 @@ pub fn load_feed(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Resu
             && info.data_len() >= feed_account_len(feed.max_stored_reports),
         StoreError::AccountMismatch
     );
-    Ok(feed)
+    Ok(())
 }
 
 /// Whether an account was never created: a feed of a data ID that has not been initialized.
@@ -147,22 +171,38 @@ pub fn is_uninitialized(info: &AccountInfo) -> bool {
 }
 
 /// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke
-/// signed by the event authority PDA.
+/// signed by the event authority PDA. It reuses one instruction for every event, serializing the
+/// event straight into it, so a batch of reports doesn't allocate per event beyond the copy the
+/// runtime's invoke makes.
 pub struct EventEmitter<'info> {
-    pub authority: AccountInfo<'info>,
-    pub bump: u8,
+    authority: AccountInfo<'info>,
+    bump: u8,
+    ix: RefCell<Instruction>,
 }
 
-impl EventEmitter<'_> {
-    pub fn emit(&self, event: &impl anchor_lang::Event) -> Result<()> {
-        let mut data = anchor_lang::event::EVENT_IX_TAG_LE.to_vec();
-        data.extend(event.data());
+impl<'info> EventEmitter<'info> {
+    pub fn new(authority: AccountInfo<'info>, bump: u8) -> Self {
+        let ix = Instruction {
+            program_id: crate::ID,
+            accounts: vec![AccountMeta::new_readonly(*authority.key, true)],
+            data: Vec::with_capacity(256),
+        };
+        Self {
+            authority,
+            bump,
+            ix: RefCell::new(ix),
+        }
+    }
+
+    pub fn emit<E: AnchorSerialize + Discriminator>(&self, event: &E) -> Result<()> {
+        let mut ix = self.ix.borrow_mut();
+        ix.data.clear();
+        ix.data
+            .extend_from_slice(anchor_lang::event::EVENT_IX_TAG_LE);
+        ix.data.extend_from_slice(E::DISCRIMINATOR);
+        event.serialize(&mut ix.data)?;
         invoke_signed(
-            &Instruction::new_with_bytes(
-                crate::ID,
-                &data,
-                vec![AccountMeta::new_readonly(*self.authority.key, true)],
-            ),
+            &ix,
             std::slice::from_ref(&self.authority),
             &[&[b"__event_authority", &[self.bump]]],
         )
@@ -245,7 +285,7 @@ impl Ring for RingRef<'_> {
 pub fn verify_feed_admin(admin: &Signer, admins: &AccountList) -> Result<()> {
     require!(
         admins.binary_search(admin.key).is_ok(),
-        AuthError::Unauthorized
+        StoreError::Unauthorized
     );
     Ok(())
 }

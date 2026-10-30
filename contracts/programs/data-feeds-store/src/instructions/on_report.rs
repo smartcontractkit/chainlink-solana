@@ -8,7 +8,8 @@ use anchor_lang::{
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, CALLBACK_AUTHORITY_SEED, ON_REPORT_CALLBACK_DISCRIMINATOR, STORED_DECIMALS,
+        ACCOUNT_VERSION, CALLBACK_AUTHORITY_SEED, MAX_CALLBACK_ACCOUNTS,
+        ON_REPORT_CALLBACK_DISCRIMINATOR, STORED_DECIMALS,
     },
     context::OnReport,
     data_id,
@@ -17,7 +18,7 @@ use crate::{
     logic::{self, Now, Rejection},
     state::{DataIdSettings, FeedData, OnReportCallbackArgs, ReceivedReport, StoreState},
     utils::{
-        has_permission, is_uninitialized, load_boxed, load_feed, next_account, store,
+        has_permission, is_uninitialized, load_boxed, load_feed_into, next_account, store,
         workflow_metadata, EventEmitter, RingMut,
     },
 };
@@ -51,11 +52,15 @@ pub fn handler<'info>(
         slot: clock.slot,
         timestamp: clock.unix_timestamp as u32,
     };
-    let events = EventEmitter {
-        authority: ctx.accounts.event_authority.to_account_info(),
-        bump: ctx.bumps.event_authority,
-    };
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
     let mut authorities = CallbackAuthorities::default();
+    // Buffers reused for every report: the bump allocator never frees, so per-report allocations
+    // would run a batch out of the 32KiB heap.
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
+    let mut callback = CallbackScratch::default();
 
     let mut accounts = ctx.remaining_accounts.iter();
     for report in reports.iter() {
@@ -76,10 +81,11 @@ pub fn handler<'info>(
             })?;
             continue;
         }
-        let feed = load_feed(feed_info, &state_key, &report.data_id)?;
+        load_feed_into(feed_info, &state_key, &report.data_id, &mut feed)?;
 
         // callback program, its authority and accounts must be passed exactly as configured
-        let callback_infos = if feed.settings.has_callback() {
+        callback.infos.clear();
+        if feed.settings.has_callback() {
             let program = next_account(&mut accounts)?;
             require_keys_eq!(
                 *program.key,
@@ -92,16 +98,14 @@ pub fn handler<'info>(
                 authorities.get(&state_key, &feed.settings)?,
                 StoreError::AccountMismatch
             );
-            let mut infos = vec![program.clone(), authority.clone()];
+            callback.infos.push(program.clone());
+            callback.infos.push(authority.clone());
             for expected in feed.settings.callback_accounts() {
                 let info = next_account(&mut accounts)?;
                 require_keys_eq!(*info.key, *expected, StoreError::AccountMismatch);
-                infos.push(info.clone());
+                callback.infos.push(info.clone());
             }
-            infos
-        } else {
-            vec![]
-        };
+        }
 
         if !has_permission(
             &feed.settings.specific_workflow_metadata,
@@ -126,9 +130,8 @@ pub fn handler<'info>(
             now,
             max_forward_secs,
             events: &events,
-            callback_infos: &callback_infos,
         }
-        .apply(feed_info, feed)?;
+        .apply(feed_info, &mut feed, &mut callback)?;
     }
 
     require!(accounts.next().is_none(), StoreError::InvalidAccountCount);
@@ -165,6 +168,28 @@ impl CallbackAuthorities {
     }
 }
 
+/// The callback's accounts as passed (program, its callback authority, configured accounts) and
+/// the instruction and account list reused to call it, for every report of a batch.
+struct CallbackScratch<'info> {
+    infos: Vec<AccountInfo<'info>>,
+    call_infos: Vec<AccountInfo<'info>>,
+    ix: Instruction,
+}
+
+impl Default for CallbackScratch<'_> {
+    fn default() -> Self {
+        Self {
+            infos: Vec::with_capacity(2 + MAX_CALLBACK_ACCOUNTS),
+            call_infos: Vec::with_capacity(2 + MAX_CALLBACK_ACCOUNTS),
+            ix: Instruction {
+                program_id: Pubkey::default(),
+                accounts: Vec::with_capacity(1 + MAX_CALLBACK_ACCOUNTS),
+                data: Vec::with_capacity(128),
+            },
+        }
+    }
+}
+
 /// Call the data ID's callback, if any, signed by the callback program's own authority PDA.
 /// Returns false only when the callback did not accept the report and its settings drop rejected
 /// reports. A callback that fails aborts the whole transaction, Solana cannot contain a failed
@@ -172,39 +197,45 @@ impl CallbackAuthorities {
 fn call_callback<'info>(
     state: &Pubkey,
     settings: &DataIdSettings,
-    infos: &[AccountInfo<'info>],
+    scratch: &mut CallbackScratch<'info>,
     args: OnReportCallbackArgs,
 ) -> Result<bool> {
     if !settings.has_callback() {
         return Ok(true);
     }
 
-    // [program, authority, configured accounts...]
+    // scratch.infos: [program, authority, configured accounts...]
+    let CallbackScratch {
+        infos,
+        call_infos,
+        ix,
+    } = scratch;
     let (program, rest) = infos.split_first().unwrap();
     let (authority, callback_accounts) = rest.split_first().unwrap();
-    let mut metas = vec![AccountMeta::new_readonly(*authority.key, true)];
+
+    ix.program_id = settings.callback_program;
+    ix.accounts.clear();
+    ix.accounts
+        .push(AccountMeta::new_readonly(*authority.key, true));
     for (i, info) in callback_accounts.iter().enumerate() {
-        metas.push(if settings.callback_account_writable(i) {
+        ix.accounts.push(if settings.callback_account_writable(i) {
             AccountMeta::new(*info.key, false)
         } else {
             AccountMeta::new_readonly(*info.key, false)
         });
     }
+    ix.data.clear();
+    ix.data.extend_from_slice(&ON_REPORT_CALLBACK_DISCRIMINATOR);
+    args.serialize(&mut ix.data)?;
 
-    let mut data = ON_REPORT_CALLBACK_DISCRIMINATOR.to_vec();
-    args.serialize(&mut data)?;
-
-    let mut account_infos = vec![authority.clone()];
-    account_infos.extend(callback_accounts.iter().cloned());
-    account_infos.push(program.clone());
+    call_infos.clear();
+    call_infos.push(authority.clone());
+    call_infos.extend(callback_accounts.iter().cloned());
+    call_infos.push(program.clone());
 
     invoke_signed(
-        &Instruction {
-            program_id: settings.callback_program,
-            accounts: metas,
-            data,
-        },
-        &account_infos,
+        ix,
+        call_infos,
         &[&[
             CALLBACK_AUTHORITY_SEED,
             state.as_ref(),
@@ -228,7 +259,6 @@ struct Processed<'a, 'info> {
     now: Now,
     max_forward_secs: u32,
     events: &'a EventEmitter<'info>,
-    callback_infos: &'a [AccountInfo<'info>],
 }
 
 impl<'info> Processed<'_, 'info> {
@@ -259,11 +289,16 @@ impl<'info> Processed<'_, 'info> {
         }
     }
 
-    fn apply(&self, feed_info: &AccountInfo<'info>, mut feed: Box<FeedData>) -> Result<()> {
+    fn apply(
+        &self,
+        feed_info: &AccountInfo<'info>,
+        feed: &mut FeedData,
+        callback: &mut CallbackScratch<'info>,
+    ) -> Result<()> {
         let report = self.report;
 
         let round_id = match logic::check_report(
-            &feed,
+            feed,
             report.timestamp,
             report.answer,
             self.now,
@@ -277,7 +312,7 @@ impl<'info> Processed<'_, 'info> {
         let accepted = call_callback(
             &self.state,
             &feed.settings,
-            self.callback_infos,
+            callback,
             OnReportCallbackArgs {
                 data_id: report.data_id,
                 round_id,
@@ -299,15 +334,9 @@ impl<'info> Processed<'_, 'info> {
         {
             let mut data = feed_info.try_borrow_mut_data()?;
             let mut ring = RingMut::new(&mut data[..]);
-            logic::store_report(
-                &mut feed,
-                &mut ring,
-                report.timestamp,
-                report.answer,
-                self.now,
-            );
+            logic::store_report(feed, &mut ring, report.timestamp, report.answer, self.now);
         }
-        store(feed_info, &*feed)?;
+        store(feed_info, feed)?;
 
         self.events.emit(&FeedUpdated {
             state: self.state,
