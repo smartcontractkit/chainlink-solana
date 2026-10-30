@@ -284,6 +284,16 @@ describe("data feeds store", function () {
       assert.equal(s.defaultWorkflowMetadata.len.toNumber(), 1);
     });
 
+    it("gives every error its own code", () => {
+      const errors = program.idl.errors!;
+      const codes = errors.map((e) => e.code);
+      assert.equal(new Set(codes).size, codes.length);
+      assert.include(
+        errors.map((e) => e.name),
+        "unauthorized"
+      );
+    });
+
     it("rejects non feed admins", async () => {
       const id = newDataId();
       await expectError(

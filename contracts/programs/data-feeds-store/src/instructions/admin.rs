@@ -183,7 +183,14 @@ pub fn set_callback_program_allowed(
             &ctx.accounts.system_program.to_account_info(),
         )?;
     } else {
+        // an existing entry is rewritten only at the layout this program knows
         require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
+        let existing = CallbackProgram::try_deserialize(&mut &info.try_borrow_data()?[..])?;
+        require_eq!(
+            existing.version,
+            ACCOUNT_VERSION,
+            StoreError::InvalidAccountVersion
+        );
     }
     CallbackProgram {
         version: ACCOUNT_VERSION,

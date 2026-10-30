@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, STORE_AUTHORITY_SEED};
-use crate::error::{AuthError, StoreError};
+use crate::error::StoreError;
 use crate::state::{FeedData, FeedDescription, StoreState};
 
 // Every context that changes state emits CPI events (`#[event_cpi]` adds the event authority PDA
@@ -23,7 +23,7 @@ pub struct Initialize<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct OwnerOnly<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
@@ -33,7 +33,7 @@ pub struct OwnerOnly<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct AcceptOwnership<'info> {
-    #[account(address = state.load()?.proposed_owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.proposed_owner @ StoreError::Unauthorized)]
     pub new_owner: Signer<'info>,
 
     #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
@@ -88,7 +88,7 @@ pub struct OnReport<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct SetCallbackProgramAllowed<'info> {
-    #[account(mut, address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(mut, address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
@@ -139,7 +139,7 @@ pub struct PermissionRead<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RecoverTokens<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
@@ -166,7 +166,7 @@ pub struct RecoverTokens<'info> {
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RecoverNative<'info> {
-    #[account(address = state.load()?.owner @ AuthError::Unauthorized)]
+    #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]

@@ -348,6 +348,50 @@ func TestDataFeedsStore(t *testing.T) {
 	for i, n := range []int{1, 3, 6} {
 		measure(df1Targets[:n], observedAt+uint32(20+i), fmt.Sprintf("%d reports with DF1 write-through", n))
 	}
+
+	// Up to 22 store-only (20 DF1-backed) reports in one on_report, as many as a V0 transaction with
+	// an address lookup table holding every account fits in 1,232 bytes (V1 transactions, not on the local validator yet,
+	// would carry ~25). This measures compute and checks the reports fit the default 32KiB heap: an
+	// overrun panics the program and fails the transaction.
+	for n := byte(len(storeTargets)); n < 22; n++ {
+		storeTargets = append(storeTargets, newFeed(0x40+n, false))
+	}
+	for n := byte(len(df1Targets)); n < 20; n++ {
+		df1Targets = append(df1Targets, newFeed(0x80+n, true))
+	}
+	measureWithTable := func(targets []target, observed uint32, label string) {
+		payload, remaining := payloadAndAccounts(targets, observed)
+		ix := withAccounts(build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID,
+			deployer.PublicKey(), remaining[0].PublicKey, remaining[1].PublicKey, remaining[2].PublicKey)), remaining[3:]...)
+		seen := map[solana.PublicKey]bool{deployer.PublicKey(): true}
+		var entries solana.PublicKeySlice
+		for _, m := range append(ix.Accounts(), solana.Meta(data_feeds_store.ProgramID)) {
+			if !seen[m.PublicKey] {
+				seen[m.PublicKey] = true
+				entries = append(entries, m.PublicKey)
+			}
+		}
+		table, err := common.CreateLookupTable(t.Context(), client, deployer)
+		require.NoError(t, err)
+		for start := 0; start < len(entries); start += 20 {
+			end := min(start+20, len(entries))
+			require.NoError(t, common.ExtendLookupTable(t.Context(), client, table, deployer, entries[start:end]))
+		}
+		require.NoError(t, common.AwaitSlotChange(t.Context(), client))
+		res, err := common.SendAndConfirmWithLookupTables(t.Context(), client, []solana.Instruction{ix}, deployer,
+			rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{table: entries},
+			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
+		require.NoError(t, err, label)
+		t.Logf("direct on_report with a lookup table, %s: %d compute units, %d accounts", label,
+			*res.Meta.ComputeUnitsConsumed, len(entries)+1)
+	}
+	for i, n := range []int{12, 20, 22} {
+		measureWithTable(storeTargets[:n], observedAt+uint32(30+i), fmt.Sprintf("%d store-only reports", n))
+	}
+	// with DF1 write-through each report carries more account indexes: 20 fit 1,232 bytes
+	for i, n := range []int{12, 20} {
+		measureWithTable(df1Targets[:n], observedAt+uint32(40+i), fmt.Sprintf("%d reports with DF1 write-through", n))
+	}
 }
 
 // maxLegacyTxSize is the Solana packet limit on a serialized transaction.
