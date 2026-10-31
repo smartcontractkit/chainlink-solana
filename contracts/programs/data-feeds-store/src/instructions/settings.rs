@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
     common::{
@@ -9,8 +9,8 @@ use crate::{
     data_id,
     error::StoreError,
     event::*,
-    state::{CallbackConfigArgs, CallbackProgram, WorkflowMetadata},
-    utils::{update_settings, validate_workflow_metadata, verify_feed_admin},
+    state::{CallbackConfigArgs, CallbackProgram, FeedData, WorkflowMetadata},
+    utils::{update_settings, validate_workflow_metadata, verify_feed_admin, EventEmitter},
 };
 
 /// Check a program is on the owner's callback allowlist through its allowlist entry account.
@@ -67,8 +67,14 @@ pub fn set_specific_feed_metadata<'info>(
     }
 
     let state_key = ctx.accounts.state.key();
+    // one buffer and one event instruction for the whole batch: the bump allocator never frees
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
     for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        let replaced = update_settings(info, &state_key, id, |settings| {
+        let replaced = update_settings(info, &state_key, id, &mut feed, |settings| {
             let replaced = !settings.specific_workflow_metadata.is_empty();
             settings.specific_workflow_metadata.clear();
             settings
@@ -78,17 +84,19 @@ pub fn set_specific_feed_metadata<'info>(
         })?;
 
         if replaced {
-            emit_cpi!(SpecificFeedMetadataRemoved {
+            events.emit(&SpecificFeedMetadataRemoved {
                 state: state_key,
                 data_id: *id,
-            });
+            })?;
         }
 
-        emit_cpi!(SpecificFeedMetadataSet {
-            state: state_key,
-            data_id: *id,
-            workflow_metadata: workflow_metadata.clone(),
-        });
+        // SpecificFeedMetadataSet, written from the borrowed list instead of a copy per data ID
+        events.emit_with(SpecificFeedMetadataSet::DISCRIMINATOR, |data| {
+            state_key.serialize(data)?;
+            id.serialize(data)?;
+            workflow_metadata.as_slice().serialize(data)?;
+            Ok(())
+        })?;
     }
     Ok(())
 }
@@ -109,8 +117,13 @@ pub fn remove_specific_feed_metadata<'info>(
     );
 
     let state_key = ctx.accounts.state.key();
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
     for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        update_settings(info, &state_key, id, |settings| {
+        update_settings(info, &state_key, id, &mut feed, |settings| {
             require!(
                 !settings.specific_workflow_metadata.is_empty(),
                 StoreError::FeedNotConfigured
@@ -119,10 +132,10 @@ pub fn remove_specific_feed_metadata<'info>(
             Ok(())
         })?;
 
-        emit_cpi!(SpecificFeedMetadataRemoved {
+        events.emit(&SpecificFeedMetadataRemoved {
             state: state_key,
             data_id: *id,
-        });
+        })?;
     }
     Ok(())
 }
@@ -159,6 +172,11 @@ pub fn set_report_callback_configs<'info>(
     let mut program_infos = program_infos.iter();
 
     let state_key = ctx.accounts.state.key();
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
     for ((id, callback), info) in data_ids
         .iter()
         .zip(callbacks.iter())
@@ -178,19 +196,32 @@ pub fn set_report_callback_configs<'info>(
                 callback.accounts.len() <= MAX_CALLBACK_ACCOUNTS,
                 StoreError::MaxEntriesExceeded
             );
-            authority_bump = Pubkey::find_program_address(
+            let (authority, bump) = Pubkey::find_program_address(
                 &[
                     CALLBACK_AUTHORITY_SEED,
                     state_key.as_ref(),
                     callback.program.as_ref(),
                 ],
                 &crate::ID,
-            )
-            .1;
+            );
+            // The program's own signer passed again as a (possibly writable) account would hand the
+            // callee its authority writable. The program itself may appear: Anchor CPI events need
+            // the emitting program as an account, as the DF1 store's callback does.
+            require!(
+                callback.accounts.iter().all(|a| a.pubkey != authority),
+                StoreError::InvalidCallbackConfig
+            );
+            authority_bump = bump;
+        } else {
+            // a disabled callback carries no settings, so the event reports what is stored
+            require!(
+                callback.accounts.is_empty() && !callback.revert_on_failure,
+                StoreError::InvalidCallbackConfig
+            );
         }
 
         let (previous_program, current_program) =
-            update_settings(info, &state_key, id, |settings| {
+            update_settings(info, &state_key, id, &mut feed, |settings| {
                 let previous_program = settings.callback_program;
                 settings.callback_program = callback.program;
                 settings.callback_accounts = [Pubkey::default(); MAX_CALLBACK_ACCOUNTS];
@@ -211,14 +242,15 @@ pub fn set_report_callback_configs<'info>(
                 Ok((previous_program, settings.callback_program))
             })?;
 
-        emit_cpi!(ReportCallbackConfigSet {
-            state: state_key,
-            data_id: *id,
-            previous_program,
-            current_program,
-            accounts: callback.accounts.clone(),
-            revert_on_failure: callback.revert_on_failure,
-        });
+        events.emit_with(ReportCallbackConfigSet::DISCRIMINATOR, |data| {
+            state_key.serialize(data)?;
+            id.serialize(data)?;
+            previous_program.serialize(data)?;
+            current_program.serialize(data)?;
+            callback.accounts.as_slice().serialize(data)?;
+            callback.revert_on_failure.serialize(data)?;
+            Ok(())
+        })?;
     }
     Ok(())
 }

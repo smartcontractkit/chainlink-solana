@@ -294,6 +294,52 @@ describe("data feeds store", function () {
       );
     });
 
+    it("validates the data id in permission checks and descriptions", async () => {
+      await expectError(
+        program.methods
+          .checkFeedPermission(Array.from(withSvrPath(newDataId(), 1)), {
+            allowedSender: forwarderAuthority,
+            allowedWorkflowOwner: Array.from(workflowOwner),
+            allowedWorkflowName: Array.from(workflowName),
+          })
+          .accountsStrict({ state: state.publicKey, feed: null })
+          .view(),
+        "InvalidDataId"
+      );
+      const id = newDataId();
+      await expectError(
+        program.methods
+          .setFeedDescriptions(
+            [Array.from(indexedFeedId(id))],
+            ["ETH\u0000USD"]
+          )
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([
+            meta(pda("feed_description", seed32(indexedFeedId(id)))),
+          ])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "InvalidDescription"
+      );
+    });
+
+    it("rejects ring sizes too large to address", async () => {
+      const id = newDataId();
+      await setupFeed(id);
+      await expectError(
+        program.methods
+          .setMaxStoredReports(
+            [Array.from(id)],
+            [new BN("18446744073709551615")]
+          )
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([meta(feedPda(id))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "InvalidMaxStoredReports"
+      );
+    });
+
     it("rejects non feed admins", async () => {
       const id = newDataId();
       await expectError(
@@ -433,7 +479,12 @@ describe("data feeds store", function () {
         "valid report lands"
       );
 
-      const names = (await cpiEvents(signature)).map((e) => e.name);
+      const events = await cpiEvents(signature);
+      const names = events.map((e) => e.name);
+      // skip events carry the sender: anyone can cause them
+      for (const e of events.filter((e) => e.name.endsWith("Ignored"))) {
+        assert.isTrue(e.data.sender.equals(forwarderAuthority));
+      }
       assert.includeMembers(names, [
         "invalidDataIdIgnored",
         "feedNotInitializedIgnored",
@@ -461,6 +512,62 @@ describe("data feeds store", function () {
         rounds[1].roundId.toNumber(),
         0,
         "no report yet: zero round"
+      );
+    });
+
+    it("reads a batch with a never-created feed as a zero round", async () => {
+      const ids = Array.from({ length: 9 }, () => newDataId());
+      await setupFeed(...ids.slice(0, 5));
+      await setupFeed(...ids.slice(5));
+      const missing = newDataId();
+      const ts = nextTimestamp();
+      await report([{ dataId: ids[0], timestamp: ts, answer: new BN(7) }]);
+
+      const all = [...ids, missing];
+      const rounds = (await program.methods
+        .getLatestRounds(all.map((id) => Array.from(id)))
+        .accountsStrict({ state: state.publicKey })
+        .remainingAccounts(all.map((id) => meta(feedPda(id), false)))
+        .view())!;
+      assert.equal(rounds.length, 10);
+      assert.isTrue(rounds[0].answer.eq(new BN(7)));
+      assert.equal(
+        rounds[9].roundId.toNumber(),
+        0,
+        "never created: zero round"
+      );
+
+      // an empty account that isn't the data ID's feed doesn't stand in for it
+      await expectError(
+        program.methods
+          .getLatestRounds([Array.from(missing)])
+          .accountsStrict({ state: state.publicKey })
+          .remainingAccounts([meta(Keypair.generate().publicKey, false)])
+          .view(),
+        "AccountMismatch"
+      );
+    });
+
+    it("fails a report whose feed is passed read-only", async () => {
+      const id = newDataId();
+      await setupFeed(id);
+      const accounts: AccountMeta[] = [
+        meta(state.publicKey, false),
+        meta(eventAuthority(program.programId), false),
+        meta(program.programId, false),
+        meta(feedPda(id), false),
+      ];
+      await expectError(
+        forwarder.report(
+          program.programId,
+          encodeReports([
+            { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
+          ]),
+          workflowName,
+          workflowOwner,
+          accounts
+        ),
+        "AccountNotWritable"
       );
     });
 
@@ -827,6 +934,51 @@ describe("data feeds store", function () {
       );
       await allowCallbackProgram(dummyReceiver.programId);
       await configureCallback(id, dummyReceiver.programId, [], false);
+    });
+
+    it("rejects unsafe callback configurations", async () => {
+      const id = newDataId();
+      await setupFeed(id);
+      await allowCallbackProgram(dummyReceiver.programId);
+      // the program's own authority among its accounts
+      await expectError(
+        configureCallback(
+          id,
+          dummyReceiver.programId,
+          [
+            {
+              pubkey: callbackAuthority(dummyReceiver.programId),
+              isWritable: true,
+            },
+          ],
+          false
+        ),
+        "InvalidCallbackConfig"
+      );
+      // a disabled callback carries no settings
+      await expectError(
+        program.methods
+          .setReportCallbackConfigs(
+            [Array.from(id)],
+            [
+              {
+                program: PublicKey.default,
+                accounts: [],
+                revertOnFailure: true,
+              },
+            ]
+          )
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([meta(feedPda(id))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "InvalidCallbackConfig"
+      );
+      // the store can't be its own callback
+      await expectError(
+        allowCallbackProgram(program.programId),
+        "InvalidAddress"
+      );
     });
 
     it("gives each callback program its own authority", async () => {

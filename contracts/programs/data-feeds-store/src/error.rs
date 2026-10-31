@@ -59,4 +59,8 @@ pub enum StoreError {
     TooManyDataIds,
     #[msg("The signer is unauthorized")]
     Unauthorized,
+    #[msg("description must not contain NUL bytes")]
+    InvalidDescription,
+    #[msg("invalid report callback config")]
+    InvalidCallbackConfig,
 }

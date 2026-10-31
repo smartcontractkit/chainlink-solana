@@ -195,12 +195,23 @@ impl<'info> EventEmitter<'info> {
     }
 
     pub fn emit<E: AnchorSerialize + Discriminator>(&self, event: &E) -> Result<()> {
+        self.emit_with(E::DISCRIMINATOR, |data| Ok(event.serialize(data)?))
+    }
+
+    /// Emit an event whose fields `write` serializes in order, so large fields can be written from
+    /// borrowed data instead of an owned copy per event. The bytes must match the event struct's
+    /// Borsh encoding (see the tests).
+    pub fn emit_with(
+        &self,
+        discriminator: &[u8],
+        write: impl FnOnce(&mut Vec<u8>) -> Result<()>,
+    ) -> Result<()> {
         let mut ix = self.ix.borrow_mut();
         ix.data.clear();
         ix.data
             .extend_from_slice(anchor_lang::event::EVENT_IX_TAG_LE);
-        ix.data.extend_from_slice(E::DISCRIMINATOR);
-        event.serialize(&mut ix.data)?;
+        ix.data.extend_from_slice(discriminator);
+        write(&mut ix.data)?;
         invoke_signed(
             &ix,
             std::slice::from_ref(&self.authority),
@@ -219,16 +230,18 @@ pub fn load_settings(
     Ok(load_feed(info, state, data_id)?.settings)
 }
 
-/// Update the settings of a data ID in its feed account.
+/// Update the settings of a data ID in its feed account, through `feed`, a buffer the caller
+/// reuses across a batch (the bump allocator never frees).
 pub fn update_settings<R>(
     info: &AccountInfo,
     state: &Pubkey,
     data_id: &[u8; 16],
+    feed: &mut FeedData,
     f: impl FnOnce(&mut DataIdSettings) -> Result<R>,
 ) -> Result<R> {
-    let mut feed = load_feed(info, state, data_id)?;
+    load_feed_into(info, state, data_id, feed)?;
     let result = f(&mut feed.settings)?;
-    store(info, &*feed)?;
+    store(info, feed)?;
     Ok(result)
 }
 
@@ -344,6 +357,8 @@ pub fn encode_description(description: &str) -> Result<[u8; DESCRIPTION_LEN]> {
         bytes.len() <= DESCRIPTION_LEN,
         StoreError::DescriptionTooLong
     );
+    // stored zero padded, so a NUL would cut the description short on read
+    require!(!bytes.contains(&0), StoreError::InvalidDescription);
     let mut out = [0u8; DESCRIPTION_LEN];
     out[..bytes.len()].copy_from_slice(bytes);
     Ok(out)
