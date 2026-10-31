@@ -10,7 +10,7 @@ use crate::{
     error::StoreError,
     event::*,
     state::{feed_account_len, CallbackProgram, WorkflowMetadata},
-    utils::{create_pda_account, validate_workflow_metadata, verify_feed_admin},
+    utils::{create_pda_account, validate_workflow_metadata, verify_feed_admin, EventEmitter},
 };
 
 pub fn initialize(
@@ -38,16 +38,21 @@ pub fn initialize(
         feed_admins.len() <= state.feed_admins.capacity(),
         StoreError::FeedAdminsFull
     );
+    // up to 64 admins: one event instruction for all of them (the bump allocator never frees)
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
     let mut previous = Pubkey::default();
     for admin in feed_admins {
         // sorted for binary search
         require!(previous < admin, StoreError::InvalidAddress);
         state.feed_admins.push(admin);
-        emit_cpi!(FeedAdminSet {
+        events.emit(&FeedAdminSet {
             state: state_key,
             feed_admin: admin,
             is_admin: true,
-        });
+        })?;
         previous = admin;
     }
 
@@ -161,6 +166,8 @@ pub fn set_callback_program_allowed(
 ) -> Result<()> {
     let program = callback_program;
     require_keys_neq!(program, Pubkey::default(), StoreError::InvalidAddress);
+    // calling the store back into itself is a forbidden reentrant call that would abort every report
+    require_keys_neq!(program, crate::ID, StoreError::InvalidAddress);
     let state_key = ctx.accounts.state.key();
     let info = ctx.accounts.allowlist_entry.to_account_info();
     let (address, bump) = Pubkey::find_program_address(

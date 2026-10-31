@@ -8,7 +8,7 @@ use crate::{
     event::*,
     logic::{check_max_stored_reports, MaxStoredReportsError},
     state::{feed_account_len, FeedData},
-    utils::{create_pda_account, load_feed, store, verify_feed_admin},
+    utils::{create_pda_account, load_feed_into, store, verify_feed_admin, EventEmitter},
 };
 
 fn validate_data_id(id: &[u8; 16]) -> Result<()> {
@@ -33,6 +33,12 @@ pub fn init_feeds<'info>(
     );
 
     let state_key = ctx.accounts.state.key();
+    // one buffer and one event instruction for the whole batch: the bump allocator never frees
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
     for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
         validate_data_id(id)?;
 
@@ -42,7 +48,7 @@ pub fn init_feeds<'info>(
         require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
 
         if !info.data_is_empty() {
-            load_feed(info, &state_key, id)?;
+            load_feed_into(info, &state_key, id, &mut feed)?;
             continue;
         }
 
@@ -55,18 +61,18 @@ pub fn init_feeds<'info>(
             &ctx.accounts.system_program.to_account_info(),
         )?;
 
-        let mut feed: Box<FeedData> = bytemuck::zeroed_box();
+        bytemuck::bytes_of_mut(&mut *feed).fill(0);
         feed.version = ACCOUNT_VERSION;
         feed.data_id = seed;
         feed.state = state_key;
         feed.max_stored_reports = max_stored_reports;
         store(info, &*feed)?;
 
-        emit_cpi!(FeedInitialized {
+        events.emit(&FeedInitialized {
             state: state_key,
             data_id: *id,
             max_stored_reports,
-        });
+        })?;
     }
     Ok(())
 }
@@ -92,6 +98,11 @@ pub fn set_max_stored_reports<'info>(
     let state_key = ctx.accounts.state.key();
     let feed_admin = ctx.accounts.feed_admin.to_account_info();
     let rent = Rent::get()?;
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
 
     for ((id, new_max), info) in data_ids
         .iter()
@@ -99,7 +110,7 @@ pub fn set_max_stored_reports<'info>(
         .zip(ctx.remaining_accounts.iter())
     {
         validate_data_id(id)?;
-        let mut feed = load_feed(info, &state_key, id)?;
+        load_feed_into(info, &state_key, id, &mut feed)?;
 
         check_max_stored_reports(&feed, new_max).map_err(|e| match e {
             MaxStoredReportsError::Invalid => StoreError::InvalidMaxStoredReports,
@@ -149,11 +160,11 @@ pub fn set_max_stored_reports<'info>(
         feed.max_stored_reports_configured = 1;
         store(info, &*feed)?;
 
-        emit_cpi!(MaxStoredReportsSet {
+        events.emit(&MaxStoredReportsSet {
             state: state_key,
             data_id: *id,
             max_stored_reports: new_max,
-        });
+        })?;
     }
     Ok(())
 }
@@ -178,13 +189,18 @@ pub fn set_min_max_answers<'info>(
     );
 
     let state_key = ctx.accounts.state.key();
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
     for (i, (id, info)) in data_ids
         .iter()
         .zip(ctx.remaining_accounts.iter())
         .enumerate()
     {
         validate_data_id(id)?;
-        let mut feed = load_feed(info, &state_key, id)?;
+        load_feed_into(info, &state_key, id, &mut feed)?;
         let (min_answer, max_answer) = (min_answers[i], max_answers[i]);
 
         if min_answer == i128::MIN && max_answer == i128::MAX {
@@ -200,12 +216,12 @@ pub fn set_min_max_answers<'info>(
         }
         store(info, &*feed)?;
 
-        emit_cpi!(MinMaxAnswerSet {
+        events.emit(&MinMaxAnswerSet {
             state: state_key,
             data_id: *id,
             min_answer,
             max_answer,
-        });
+        })?;
     }
     Ok(())
 }

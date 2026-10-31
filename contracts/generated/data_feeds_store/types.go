@@ -1122,6 +1122,7 @@ func UnmarshalFeedInitialized(buf []byte) (*FeedInitialized, error) {
 type FeedNotInitializedIgnored struct {
 	State  solanago.PublicKey `json:"state"`
 	DataId [16]uint8          `json:"data_id"`
+	Sender solanago.PublicKey `json:"sender"`
 }
 
 func (obj FeedNotInitializedIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1134,6 +1135,11 @@ func (obj FeedNotInitializedIgnored) MarshalWithEncoder(encoder *binary.Encoder)
 	err = encoder.Encode(obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
+	}
+	// Serialize `Sender`:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
 	}
 	return nil
 }
@@ -1158,6 +1164,11 @@ func (obj *FeedNotInitializedIgnored) UnmarshalWithDecoder(decoder *binary.Decod
 	err = decoder.Decode(&obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
 	}
 	return nil
 }
@@ -1354,9 +1365,12 @@ func UnmarshalFutureReportIgnored(buf []byte) (*FutureReportIgnored, error) {
 	return obj, nil
 }
 
+// The skip events carry the sender: they are emitted before the permission check, so anyone can
+// cause them, and indexers must not take them as coming from a forwarder.
 type InvalidDataIdIgnored struct {
 	State  solanago.PublicKey `json:"state"`
 	DataId [16]uint8          `json:"data_id"`
+	Sender solanago.PublicKey `json:"sender"`
 }
 
 func (obj InvalidDataIdIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1369,6 +1383,11 @@ func (obj InvalidDataIdIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err
 	err = encoder.Encode(obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
+	}
+	// Serialize `Sender`:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
 	}
 	return nil
 }
@@ -1393,6 +1412,11 @@ func (obj *InvalidDataIdIgnored) UnmarshalWithDecoder(decoder *binary.Decoder) (
 	err = decoder.Decode(&obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
 	}
 	return nil
 }

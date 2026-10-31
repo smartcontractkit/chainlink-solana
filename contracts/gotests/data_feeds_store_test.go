@@ -359,16 +359,17 @@ func TestDataFeedsStore(t *testing.T) {
 	for n := byte(len(df1Targets)); n < 20; n++ {
 		df1Targets = append(df1Targets, newFeed(0x80+n, true))
 	}
-	measureWithTable := func(targets []target, observed uint32, label string) {
-		payload, remaining := payloadAndAccounts(targets, observed)
-		ix := withAccounts(build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID,
-			deployer.PublicKey(), remaining[0].PublicKey, remaining[1].PublicKey, remaining[2].PublicKey)), remaining[3:]...)
+	// lookupTable puts every account of the instructions (but the payer) in a new address lookup
+	// table, so the instruction's account count doesn't limit the transaction size.
+	lookupTable := func(ixs ...solana.Instruction) map[solana.PublicKey]solana.PublicKeySlice {
 		seen := map[solana.PublicKey]bool{deployer.PublicKey(): true}
 		var entries solana.PublicKeySlice
-		for _, m := range append(ix.Accounts(), solana.Meta(data_feeds_store.ProgramID)) {
-			if !seen[m.PublicKey] {
-				seen[m.PublicKey] = true
-				entries = append(entries, m.PublicKey)
+		for _, ix := range ixs {
+			for _, m := range append(ix.Accounts(), solana.Meta(ix.ProgramID())) {
+				if !seen[m.PublicKey] {
+					seen[m.PublicKey] = true
+					entries = append(entries, m.PublicKey)
+				}
 			}
 		}
 		table, err := common.CreateLookupTable(t.Context(), client, deployer)
@@ -378,12 +379,20 @@ func TestDataFeedsStore(t *testing.T) {
 			require.NoError(t, common.ExtendLookupTable(t.Context(), client, table, deployer, entries[start:end]))
 		}
 		require.NoError(t, common.AwaitSlotChange(t.Context(), client))
+		return map[solana.PublicKey]solana.PublicKeySlice{table: entries}
+	}
+	sendWithTable := func(ix solana.Instruction, label string) *rpc.GetTransactionResult {
 		res, err := common.SendAndConfirmWithLookupTables(t.Context(), client, []solana.Instruction{ix}, deployer,
-			rpc.CommitmentConfirmed, map[solana.PublicKey]solana.PublicKeySlice{table: entries},
-			common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
+			rpc.CommitmentConfirmed, lookupTable(ix), common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
 		require.NoError(t, err, label)
-		t.Logf("direct on_report with a lookup table, %s: %d compute units, %d accounts", label,
-			*res.Meta.ComputeUnitsConsumed, len(entries)+1)
+		t.Logf("%s: %d compute units, %d accounts", label, *res.Meta.ComputeUnitsConsumed, len(ix.Accounts()))
+		return res
+	}
+	measureWithTable := func(targets []target, observed uint32, label string) {
+		payload, remaining := payloadAndAccounts(targets, observed)
+		ix := withAccounts(build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID,
+			deployer.PublicKey(), remaining[0].PublicKey, remaining[1].PublicKey, remaining[2].PublicKey)), remaining[3:]...)
+		sendWithTable(ix, "direct on_report with a lookup table, "+label)
 	}
 	for i, n := range []int{12, 20, 22} {
 		measureWithTable(storeTargets[:n], observedAt+uint32(30+i), fmt.Sprintf("%d store-only reports", n))
@@ -392,6 +401,50 @@ func TestDataFeedsStore(t *testing.T) {
 	for i, n := range []int{12, 20} {
 		measureWithTable(df1Targets[:n], observedAt+uint32(40+i), fmt.Sprintf("%d reports with DF1 write-through", n))
 	}
+
+	// Admin batches reuse one buffer too: 20 feeds created, then given specific metadata, in one
+	// instruction each.
+	var adminIDs [][16]uint8
+	var adminFeeds []*solana.AccountMeta
+	for n := byte(0); n < 20; n++ {
+		var id [16]uint8
+		copy(id[:], []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xef, 0xc0 + n})
+		adminIDs = append(adminIDs, id)
+		adminFeeds = append(adminFeeds, solana.Meta(feedPDA(id)).WRITE())
+	}
+	sendWithTable(withAccounts(build(data_feeds_store.NewInitFeedsInstruction(adminIDs, deployer.PublicKey(),
+		storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)), adminFeeds...),
+		"init_feeds, 20 feeds")
+	sendWithTable(withAccounts(build(data_feeds_store.NewSetSpecificFeedMetadataInstruction(adminIDs,
+		[]data_feeds_store.WorkflowMetadata{{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner,
+			AllowedWorkflowName: testWorkflowName}},
+		deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
+		adminFeeds...), "set_specific_feed_metadata, 20 feeds")
+
+	// The batch read serves its documented maximum of 31 feeds, the last one never created.
+	readTargets := append(append([]target{}, storeTargets[:22]...), df1Targets[:8]...)
+	readIDs := make([][16]uint8, 0, 31)
+	readFeeds := make([]*solana.AccountMeta, 0, 31)
+	for _, tg := range readTargets {
+		readIDs = append(readIDs, tg.id)
+		readFeeds = append(readFeeds, solana.Meta(tg.feed))
+	}
+	var missing [16]uint8
+	copy(missing[:], []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xfe})
+	readIDs = append(readIDs, missing)
+	readFeeds = append(readFeeds, solana.Meta(feedPDA(missing)))
+	readIx := withAccounts(build(data_feeds_store.NewGetLatestRoundsInstruction(readIDs, storeState.PublicKey())), readFeeds...)
+	tx, err := solana.NewTransaction([]solana.Instruction{readIx}, solana.Hash{}, solana.TransactionPayer(deployer.PublicKey()),
+		solana.TransactionAddressTables(lookupTable(readIx)))
+	require.NoError(t, err)
+	sim, err := client.SimulateTransactionWithOpts(t.Context(), tx, &rpc.SimulateTransactionOpts{
+		SigVerify: false, ReplaceRecentBlockhash: true, Commitment: rpc.CommitmentConfirmed})
+	require.NoError(t, err)
+	require.Nil(t, sim.Value.Err, "logs: %v", sim.Value.Logs)
+	rounds := sim.Value.ReturnData.Data.Content
+	require.Len(t, rounds, 4+31*32, "31 rounds")
+	require.Equal(t, uint64(0), binary.LittleEndian.Uint64(rounds[4+30*32:]), "never created: zero round")
+	t.Logf("get_latest_rounds, 31 feeds: %d compute units", *sim.Value.UnitsConsumed)
 }
 
 // maxLegacyTxSize is the Solana packet limit on a serialized transaction.

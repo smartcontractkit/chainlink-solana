@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
     common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_DESCRIPTION_SEED},
@@ -7,7 +7,7 @@ use crate::{
     error::StoreError,
     event::*,
     state::FeedDescription,
-    utils::{create_pda_account, encode_description, verify_feed_admin},
+    utils::{create_pda_account, encode_description, verify_feed_admin, EventEmitter},
 };
 
 /// Create the description PDA if needed, returning whether it already existed.
@@ -53,6 +53,10 @@ pub fn set_feed_descriptions<'info>(
     );
 
     let state_key = ctx.accounts.state.key();
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
     for ((id, description), info) in indexed_feed_ids
         .iter()
         .zip(descriptions.iter())
@@ -90,11 +94,13 @@ pub fn set_feed_descriptions<'info>(
         }
         .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
 
-        emit_cpi!(FeedDescriptionSet {
-            state: state_key,
-            indexed_feed_id: *id,
-            description: description.clone(),
-        });
+        // FeedDescriptionSet, written from the borrowed description instead of a copy
+        events.emit_with(FeedDescriptionSet::DISCRIMINATOR, |data| {
+            state_key.serialize(data)?;
+            id.serialize(data)?;
+            description.as_str().serialize(data)?;
+            Ok(())
+        })?;
     }
     Ok(())
 }

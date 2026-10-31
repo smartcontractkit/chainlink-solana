@@ -1,8 +1,10 @@
+#[cfg(not(target_os = "solana"))]
+use anchor_lang::solana_program::program::get_return_data;
 use anchor_lang::{
     prelude::*,
     solana_program::{
         instruction::{AccountMeta, Instruction},
-        program::{get_return_data, invoke_signed},
+        program::invoke_signed,
     },
 };
 
@@ -71,6 +73,7 @@ pub fn handler<'info>(
             events.emit(&InvalidDataIdIgnored {
                 state: state_key,
                 data_id: report.data_id,
+                sender,
             })?;
             continue;
         }
@@ -78,6 +81,7 @@ pub fn handler<'info>(
             events.emit(&FeedNotInitializedIgnored {
                 state: state_key,
                 data_id: report.data_id,
+                sender,
             })?;
             continue;
         }
@@ -213,6 +217,12 @@ fn call_callback<'info>(
     let (program, rest) = infos.split_first().unwrap();
     let (authority, callback_accounts) = rest.split_first().unwrap();
 
+    // A callback program that was closed is treated like the EVM store treats a callback address
+    // without code: as a call that returned false, not as a failure that aborts every report.
+    if !program.executable {
+        return Ok(settings.callback_revert_on_failure == 0);
+    }
+
     ix.program_id = settings.callback_program;
     ix.accounts.clear();
     ix.accounts
@@ -244,13 +254,33 @@ fn call_callback<'info>(
         ]],
     )?;
 
-    let accepted = match get_return_data() {
-        Some((program_id, data)) if program_id == settings.callback_program => {
-            bool::try_from_slice(&data).unwrap_or(false)
-        }
-        _ => false,
-    };
+    let accepted = callback_returned_true(&settings.callback_program);
     Ok(accepted || settings.callback_revert_on_failure == 0)
+}
+
+/// Whether the callback program set return data that is exactly Borsh `true`. On chain it reads at
+/// most one byte into the stack through the syscall, so a callback returning up to 1KiB can't
+/// spend the batch's heap (the SDK's `get_return_data` copies it into a heap `Vec`).
+fn callback_returned_true(program: &Pubkey) -> bool {
+    #[cfg(target_os = "solana")]
+    {
+        let mut byte = [0u8; 1];
+        let mut program_id = Pubkey::default();
+        // SAFETY: the syscall writes at most `byte.len()` bytes into `byte` and one pubkey into
+        // `program_id`, and returns the full length of the return data.
+        let len = unsafe {
+            anchor_lang::solana_program::syscalls::sol_get_return_data(
+                byte.as_mut_ptr(),
+                byte.len() as u64,
+                &mut program_id,
+            )
+        };
+        len == 1 && program_id == *program && byte[0] == 1
+    }
+    #[cfg(not(target_os = "solana"))]
+    {
+        matches!(get_return_data(), Some((id, data)) if id == *program && data == [1])
+    }
 }
 
 struct Processed<'a, 'info> {
@@ -307,6 +337,9 @@ impl<'info> Processed<'_, 'info> {
             Ok(round_id) => round_id,
             Err(rejection) => return self.rejected(rejection),
         };
+
+        // Checked before the callback runs, so a read-only feed fails before any callback CPI.
+        require!(feed_info.is_writable, StoreError::AccountNotWritable);
 
         // nothing is written until the callback accepts
         let accepted = call_callback(

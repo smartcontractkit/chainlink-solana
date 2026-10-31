@@ -68,8 +68,12 @@ pub struct FeedData {
 /// Offset of the circular buffer in a feed account.
 pub const FEED_RING_OFFSET: usize = ANCHOR_DISCRIMINATOR + size_of::<FeedData>();
 
+/// Length of a feed account with a ring of `max_stored_reports`, saturating: an absurd ring size
+/// gives an absurd length that every bound check rejects, instead of an overflow panic.
 pub fn feed_account_len(max_stored_reports: u64) -> usize {
-    FEED_RING_OFFSET + max_stored_reports as usize * size_of::<StoredReport>()
+    (max_stored_reports as usize)
+        .saturating_mul(size_of::<StoredReport>())
+        .saturating_add(FEED_RING_OFFSET)
 }
 
 /// One stored round of a feed's history.
