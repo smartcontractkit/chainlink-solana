@@ -4,8 +4,17 @@
 //! The proxy address (its program id and state account) is what stays stable. A read also passes
 //! the accounts of the store behind the proxy: its program, its state and the data ID's feed, which
 //! clients resolve from the proxy state (`store_program`, `store_state`).
+//!
+//! Reads go only to the proxy program this crate is built for ([`DATA_FEEDS_PROXY_ID`]); anyone can
+//! create a proxy state under it, so pin the proxy state you trust. The proxy checks the store
+//! accounts against that state. Each read takes the answer only from the proxy and fails, rather
+//! than panics, on a missing or malformed answer.
+//!
+//! Round IDs are those of the store behind the proxy: they restart if the proxy owner points it to
+//! another store (the proxy emits `StoreSet`), so don't carry round IDs across that change.
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::get_return_data;
 use data_feeds_proxy::cpi::accounts::{Read, ReadScaled};
 
 pub use data_feeds_proxy::state::Round;
@@ -21,6 +30,11 @@ pub fn read<'info>(
     data_id: [u8; 16],
     round_id: Option<u64>,
 ) -> Result<Round> {
+    require_keys_eq!(
+        proxy_program.key(),
+        DATA_FEEDS_PROXY_ID,
+        ErrorCode::InvalidProgramId
+    );
     let ctx = CpiContext::new(
         proxy_program,
         Read {
@@ -30,7 +44,8 @@ pub fn read<'info>(
             feed,
         },
     );
-    Ok(data_feeds_proxy::cpi::read(ctx, data_id, round_id)?.get())
+    data_feeds_proxy::cpi::read(ctx, data_id, round_id)?;
+    returned()
 }
 
 /// Like [`read`], with the answer at `decimals`: at least the data ID's minimum (18 unless an admin
@@ -48,6 +63,11 @@ pub fn read_scaled<'info>(
     decimals: u8,
     round_id: Option<u64>,
 ) -> Result<Round> {
+    require_keys_eq!(
+        proxy_program.key(),
+        DATA_FEEDS_PROXY_ID,
+        ErrorCode::InvalidProgramId
+    );
     let ctx = CpiContext::new(
         proxy_program,
         ReadScaled {
@@ -58,5 +78,22 @@ pub fn read_scaled<'info>(
             feed_config,
         },
     );
-    Ok(data_feeds_proxy::cpi::read_scaled(ctx, data_id, decimals, round_id)?.get())
+    data_feeds_proxy::cpi::read_scaled(ctx, data_id, decimals, round_id)?;
+    returned()
+}
+
+/// The return data of the last call, which must come from the proxy.
+fn returned() -> Result<Round> {
+    match get_return_data() {
+        Some((from, data)) if from == DATA_FEEDS_PROXY_ID => {
+            Round::try_from_slice(&data).map_err(|_| {
+                msg!("Malformed answer from the proxy");
+                ProgramError::InvalidAccountData.into()
+            })
+        }
+        _ => {
+            msg!("No answer from the proxy");
+            Err(ProgramError::IncorrectProgramId.into())
+        }
+    }
 }

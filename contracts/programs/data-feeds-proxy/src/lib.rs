@@ -55,7 +55,9 @@ pub mod data_feeds_proxy {
         admin::set_feed_admin(ctx, feed_admin, is_admin)
     }
 
-    /// Point the proxy at another store, readers keep the proxy address.
+    /// Point the proxy at another store, readers keep the proxy address. Round IDs are the store's,
+    /// so they restart with the new store's rounds: readers that keep round IDs reset them on
+    /// `StoreSet`. The new store must keep answers at 18 decimals, as `read_scaled` assumes.
     pub fn set_store(ctx: Context<SetStore>) -> Result<()> {
         admin::set_store(ctx)
     }
@@ -77,7 +79,8 @@ pub mod data_feeds_proxy {
     // │                          Reads                               │
     // ================================================================
 
-    /// The fewest decimals `read_scaled` serves a data ID at.
+    /// The fewest decimals `read_scaled` serves a data ID at. Without the data ID's `feed_config`
+    /// account this answers 18 even if an admin lowered the minimum, so pass it to get the lower one.
     pub fn get_min_decimals(ctx: Context<GetMinDecimals>, data_id: [u8; 16]) -> Result<u8> {
         admin::get_min_decimals(ctx, data_id)
     }

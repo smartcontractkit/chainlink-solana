@@ -4,7 +4,8 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 pub const ACCOUNT_VERSION: u8 = 1;
 
 /// Decimals of the answers the store's reader interface returns, and the upper bound for the
-/// decimals a caller can ask `read_scaled` for.
+/// decimals a caller can ask `read_scaled` for. The proxy assumes it rather than asking the store,
+/// so a store set behind the proxy must keep answers at 18 decimals.
 pub const STORE_DECIMALS: u8 = 18;
 
 pub const MAX_FEED_ADMINS: usize = 16;
