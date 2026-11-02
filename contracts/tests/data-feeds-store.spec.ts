@@ -2,7 +2,11 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
 import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
+import { execFileSync } from "child_process";
 import { randomBytes } from "crypto";
+import { writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { DataFeedsStore } from "../target/types/data_feeds_store";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { Store } from "../target/types/store";
@@ -979,6 +983,77 @@ describe("data feeds store", function () {
         allowCallbackProgram(program.programId),
         "InvalidAddress"
       );
+    });
+
+    it("aborts reports whose callback program was closed", async () => {
+      // a copy of the mock callback at a new address, closable by the test wallet. It is never
+      // called while deployed (Anchor programs refuse to run at an address other than their
+      // declared id); what matters is how the store treats it once closed.
+      const callbackKey = Keypair.generate();
+      const keyPath = join(tmpdir(), `closed-callback-${Date.now()}.json`);
+      writeFileSync(keyPath, JSON.stringify(Array.from(callbackKey.secretKey)));
+      const cli = (...args: string[]) =>
+        execFileSync(
+          "solana",
+          [
+            ...args,
+            "--url",
+            connection.rpcEndpoint,
+            "--keypair",
+            process.env.ANCHOR_WALLET!,
+          ],
+          { stdio: "pipe" }
+        );
+      cli(
+        "program",
+        "deploy",
+        "--program-id",
+        keyPath,
+        "target/deploy/dummy_receiver.so"
+      );
+      const callback = callbackKey.publicKey;
+
+      const id = newDataId();
+      await setupFeed(id);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(7) },
+      ]);
+      await setCallback(id, callback, [], false);
+
+      // closing the program leaves its account executable, so the store still calls it, and the
+      // failed call aborts the transaction: the report is not stored
+      cli("program", "close", callback.toBase58(), "--bypass-warning");
+      assert.isTrue(
+        (await connection.getAccountInfo(callback))!.executable,
+        "a closed program stays executable"
+      );
+      let error = "";
+      try {
+        await report(
+          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(8) }],
+          new Map([[id.toString("hex"), reportAccountsFor(callback, [])]])
+        );
+      } catch (e: any) {
+        error = [String(e), ...(e?.logs ?? [])].join("\n");
+      }
+      assert.isNotEmpty(error, "the report's transaction aborts");
+      assert.include(error, "Program is not deployed", "aborted by the loader");
+      assert.isTrue((await latestAnswer(id)).eq(new BN(7)), "nothing stored");
+
+      // clearing the callback lets the data id's reports land again
+      await program.methods
+        .setReportCallbackConfigs(
+          [Array.from(id)],
+          [{ program: PublicKey.default, accounts: [], revertOnFailure: false }]
+        )
+        .accountsStrict(adminAccounts())
+        .remainingAccounts([meta(feedPda(id))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(9) },
+      ]);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(9)));
     });
 
     it("gives each callback program its own authority", async () => {
