@@ -97,3 +97,81 @@ fn returned() -> Result<Round> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anchor_lang::solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
+    use std::sync::Mutex;
+
+    static RETURN_DATA: Mutex<Option<(Pubkey, Vec<u8>)>> = Mutex::new(None);
+
+    struct Stubs;
+    impl SyscallStubs for Stubs {
+        fn sol_get_return_data(&self) -> Option<(Pubkey, Vec<u8>)> {
+            RETURN_DATA.lock().unwrap().clone()
+        }
+    }
+
+    #[test]
+    fn takes_the_answer_only_from_the_proxy() {
+        set_syscall_stubs(Box::new(Stubs));
+        let answer = |data: Option<(Pubkey, Vec<u8>)>| {
+            *RETURN_DATA.lock().unwrap() = data;
+            returned()
+        };
+        let round = Round {
+            round_id: 7,
+            answer: -42,
+            observations_timestamp: 1_700_000_000,
+            recorded_timestamp: 1_700_000_001,
+        };
+        let encoded = round.try_to_vec().unwrap();
+        assert_eq!(
+            answer(Some((DATA_FEEDS_PROXY_ID, encoded.clone()))).unwrap(),
+            round
+        );
+        assert_eq!(
+            answer(None).unwrap_err(),
+            ProgramError::IncorrectProgramId.into()
+        );
+        assert_eq!(
+            answer(Some((Pubkey::new_unique(), encoded.clone()))).unwrap_err(),
+            ProgramError::IncorrectProgramId.into()
+        );
+        assert_eq!(
+            answer(Some((DATA_FEEDS_PROXY_ID, encoded[..10].to_vec()))).unwrap_err(),
+            ProgramError::InvalidAccountData.into()
+        );
+    }
+
+    #[test]
+    fn only_calls_the_proxy_it_is_built_for() {
+        let key = Pubkey::new_unique();
+        let mut lamports = 0;
+        let mut data = vec![];
+        let owner = Pubkey::default();
+        let info = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &owner,
+            true,
+            0,
+        );
+        // the program check comes before any account is used, so one account stands in for all
+        let err = read(
+            info.clone(),
+            info.clone(),
+            info.clone(),
+            info.clone(),
+            info,
+            [0; 16],
+            None,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}").contains("InvalidProgramId"), "{err:?}");
+    }
+}
