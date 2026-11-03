@@ -116,20 +116,49 @@ describe("data feeds store", function () {
   let tick = 0;
   const nextTimestamp = () => baseTimestamp + ++tick;
 
-  const initStore = async (defaultMaxStoredReports = 8) => {
-    state = Keypair.generate();
-    await program.methods
+  // Stores live in pre-created state accounts, and only the program's upgrade authority (the
+  // test wallet) initializes them.
+  const programData = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
+  )[0];
+  const createStateAccount = async (
+    account: Keypair,
+    space = program.account.storeState.size
+  ) =>
+    anchor.web3.SystemProgram.createAccount({
+      fromPubkey: provider.publicKey,
+      newAccountPubkey: account.publicKey,
+      space,
+      lamports: await connection.getMinimumBalanceForRentExemption(space),
+      programId: program.programId,
+    });
+  const initializeStore = (
+    owner: PublicKey,
+    account: PublicKey,
+    defaultMaxStoredReports = 8
+  ) =>
+    program.methods
       .initialize(
         [feedAdmin.keypair.publicKey],
         new BN(defaultMaxStoredReports),
         3600
       )
       .accountsStrict({
-        owner: provider.publicKey,
-        state: state.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
+        owner,
+        state: account,
+        programData,
         ...eventAccounts(),
-      })
+      });
+
+  const initStore = async (defaultMaxStoredReports = 8) => {
+    state = Keypair.generate();
+    await initializeStore(
+      provider.publicKey,
+      state.publicKey,
+      defaultMaxStoredReports
+    )
+      .preInstructions([await createStateAccount(state)])
       .signers([state])
       .rpc();
 
@@ -286,6 +315,48 @@ describe("data feeds store", function () {
       assert.equal(s.maxObservationForwardSecs, 3600);
       assert.equal(s.feedAdmins.len.toNumber(), 1);
       assert.equal(s.defaultWorkflowMetadata.len.toNumber(), 1);
+    });
+
+    it("lets only the upgrade authority create stores", async () => {
+      // a second store by the authority, next to the one beforeEach created
+      const second = Keypair.generate();
+      await initializeStore(provider.publicKey, second.publicKey)
+        .preInstructions([await createStateAccount(second)])
+        .signers([second])
+        .rpc();
+      assert.isTrue(
+        (await program.account.storeState.fetch(second.publicKey)).owner.equals(
+          provider.publicKey
+        )
+      );
+
+      // anyone else is refused, even with a well-formed account
+      const other = Keypair.generate();
+      await expectError(
+        initializeStore(feedAdmin.keypair.publicKey, other.publicKey)
+          .preInstructions([await createStateAccount(other)])
+          .signers([other, feedAdmin.keypair])
+          .rpc(),
+        "Unauthorized"
+      );
+      // an account of another size, and a store initialized twice
+      const wrongSize = Keypair.generate();
+      await expectError(
+        initializeStore(provider.publicKey, wrongSize.publicKey)
+          .preInstructions([
+            await createStateAccount(
+              wrongSize,
+              program.account.storeState.size + 8
+            ),
+          ])
+          .signers([wrongSize])
+          .rpc(),
+        "InvalidAccount"
+      );
+      await expectError(
+        initializeStore(provider.publicKey, state.publicKey).rpc(),
+        "ConstraintZero"
+      );
     });
 
     it("gives every error its own code", () => {

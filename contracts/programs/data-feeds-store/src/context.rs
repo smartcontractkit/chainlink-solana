@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, STORE_AUTHORITY_SEED};
@@ -8,16 +8,29 @@ use crate::state::{FeedData, FeedDescription, StoreState};
 // Every context that changes state emits CPI events (`#[event_cpi]` adds the event authority PDA
 // and this program as its last accounts). Every context checks the state's layout version.
 
+/// Only the program's upgrade authority creates stores, so every store under this program ID is
+/// ours. The state account is created beforehand (system `create_account`, owned by this program)
+/// so that `initialize` needs no other signer, e.g. when the authority is an MCMS timelock.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(mut)]
+    /// The program's upgrade authority, the store's first owner
     pub owner: Signer<'info>,
 
-    #[account(init, payer = owner, space = ANCHOR_DISCRIMINATOR + StoreState::INIT_SPACE)]
+    #[account(
+        zero,
+        constraint = state.to_account_info().data_len() == ANCHOR_DISCRIMINATOR + StoreState::INIT_SPACE
+            @ StoreError::InvalidAccount
+    )]
     pub state: AccountLoader<'info, StoreState>,
 
-    pub system_program: Program<'info, System>,
+    #[account(
+        seeds = [crate::ID.as_ref()],
+        bump,
+        seeds::program = bpf_loader_upgradeable::ID,
+        constraint = program_data.upgrade_authority_address == Some(owner.key()) @ StoreError::Unauthorized
+    )]
+    pub program_data: Account<'info, ProgramData>,
 }
 
 #[event_cpi]

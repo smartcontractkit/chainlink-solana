@@ -33,3 +33,8 @@ wallet = "id.json"
 
 [scripts]
 test = "pnpm run test"
+
+[test]
+# Workspace programs are upgradeable by the provider wallet: store and proxy initialize require
+# the program's upgrade authority.
+upgradeable = true

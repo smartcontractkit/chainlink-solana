@@ -32,7 +32,8 @@ pub mod data_feeds_store {
     // │                         Owner                                │
     // ================================================================
 
-    /// Create a store with a dedicated state account. `feed_admins` must be strictly increasing.
+    /// Create a store in a pre-created state account, signed by the program's upgrade authority,
+    /// which becomes the store's owner. `feed_admins` must be strictly increasing.
     pub fn initialize(
         ctx: Context<Initialize>,
         feed_admins: Vec<Pubkey>,
