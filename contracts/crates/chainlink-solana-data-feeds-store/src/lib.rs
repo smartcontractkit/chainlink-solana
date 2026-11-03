@@ -4,8 +4,14 @@
 //!
 //! Proxies read through this interface, so a store version that keeps it can replace the store
 //! behind a proxy. Reads that need other decimals go through the data feeds proxy, not here.
+//!
+//! The store program, its state and the feed accounts come from the caller. Pin the store program
+//! and state you trust (and check `feed` is the data ID's feed of that state, or let the store do
+//! it): any program can answer a read through this interface. Each read takes the answer only from
+//! the program it called and fails, rather than panics, on a missing or malformed answer.
 
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::get_return_data;
 use data_feeds_store::cpi::accounts::{DescriptionRead, FeedRead, FeedsRead};
 
 pub use data_feeds_store::state::ReaderRound;
@@ -18,8 +24,10 @@ pub fn get_latest_round<'info>(
     feed: AccountInfo<'info>,
     data_id: [u8; 16],
 ) -> Result<ReaderRound> {
+    let program = store_program.key();
     let ctx = CpiContext::new(store_program, FeedRead { state, feed });
-    Ok(data_feeds_store::cpi::get_latest_round(ctx, data_id)?.get())
+    data_feeds_store::cpi::get_latest_round(ctx, data_id)?;
+    returned(&program)
 }
 
 /// Latest rounds of up to 31 data IDs, `feeds` in the same order. A feed without a report yields
@@ -30,8 +38,10 @@ pub fn get_latest_rounds<'info>(
     feeds: Vec<AccountInfo<'info>>,
     data_ids: Vec<[u8; 16]>,
 ) -> Result<Vec<ReaderRound>> {
+    let program = store_program.key();
     let ctx = CpiContext::new(store_program, FeedsRead { state }).with_remaining_accounts(feeds);
-    Ok(data_feeds_store::cpi::get_latest_rounds(ctx, data_ids)?.get())
+    data_feeds_store::cpi::get_latest_rounds(ctx, data_ids)?;
+    returned(&program)
 }
 
 /// A stored round of a data ID. Fails with the store's `NoDataPresent` for a round that was never
@@ -43,8 +53,10 @@ pub fn get_round<'info>(
     data_id: [u8; 16],
     round_id: u64,
 ) -> Result<ReaderRound> {
+    let program = store_program.key();
     let ctx = CpiContext::new(store_program, FeedRead { state, feed });
-    Ok(data_feeds_store::cpi::get_round(ctx, data_id, round_id)?.get())
+    data_feeds_store::cpi::get_round(ctx, data_id, round_id)?;
+    returned(&program)
 }
 
 /// Decimals the store keeps answers with.
@@ -53,6 +65,7 @@ pub fn get_decimals<'info>(
     state: AccountInfo<'info>,
     data_id: [u8; 16],
 ) -> Result<u8> {
+    let program = store_program.key();
     let ctx = CpiContext::new(
         store_program,
         DescriptionRead {
@@ -60,7 +73,8 @@ pub fn get_decimals<'info>(
             feed_description: None,
         },
     );
-    Ok(data_feeds_store::cpi::get_decimals(ctx, data_id)?.get())
+    data_feeds_store::cpi::get_decimals(ctx, data_id)?;
+    returned(&program)
 }
 
 /// Description of the feed of a data ID, empty when none is set. Pass the feed description
@@ -71,6 +85,7 @@ pub fn get_description<'info>(
     feed_description: Option<AccountInfo<'info>>,
     data_id: [u8; 16],
 ) -> Result<String> {
+    let program = store_program.key();
     let ctx = CpiContext::new(
         store_program,
         DescriptionRead {
@@ -78,5 +93,59 @@ pub fn get_description<'info>(
             feed_description,
         },
     );
-    Ok(data_feeds_store::cpi::get_description(ctx, data_id)?.get())
+    data_feeds_store::cpi::get_description(ctx, data_id)?;
+    returned(&program)
+}
+
+/// The return data of the last call, which must come from `program`.
+fn returned<T: AnchorDeserialize>(program: &Pubkey) -> Result<T> {
+    match get_return_data() {
+        Some((from, data)) if from == *program => T::try_from_slice(&data).map_err(|_| {
+            msg!("Malformed answer from {}", program);
+            ProgramError::InvalidAccountData.into()
+        }),
+        _ => {
+            msg!("No answer from {}", program);
+            Err(ProgramError::IncorrectProgramId.into())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anchor_lang::solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
+    use std::sync::Mutex;
+
+    static RETURN_DATA: Mutex<Option<(Pubkey, Vec<u8>)>> = Mutex::new(None);
+
+    struct Stubs;
+    impl SyscallStubs for Stubs {
+        fn sol_get_return_data(&self) -> Option<(Pubkey, Vec<u8>)> {
+            RETURN_DATA.lock().unwrap().clone()
+        }
+    }
+
+    #[test]
+    fn takes_the_answer_only_from_the_called_program() {
+        set_syscall_stubs(Box::new(Stubs));
+        let store = Pubkey::new_unique();
+        let answer = |data: Option<(Pubkey, Vec<u8>)>| {
+            *RETURN_DATA.lock().unwrap() = data;
+            returned::<u8>(&store)
+        };
+        assert_eq!(answer(Some((store, vec![18]))).unwrap(), 18);
+        assert_eq!(
+            answer(None).unwrap_err(),
+            ProgramError::IncorrectProgramId.into()
+        );
+        assert_eq!(
+            answer(Some((Pubkey::new_unique(), vec![18]))).unwrap_err(),
+            ProgramError::IncorrectProgramId.into()
+        );
+        assert_eq!(
+            answer(Some((store, vec![]))).unwrap_err(),
+            ProgramError::InvalidAccountData.into()
+        );
+    }
 }

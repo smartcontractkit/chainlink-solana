@@ -11,6 +11,7 @@ name = "chainlink_solana_data_feeds_store"
 
 [features]
 default = []
+idl-build = ["data-feeds-store/idl-build"]
 
 [dependencies]
 anchor-lang = "0.31.0"
