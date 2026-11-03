@@ -112,9 +112,18 @@ func TestDataFeedsStore(t *testing.T) {
 	// the DF1 store's callbacks are signed by its own callback authority, the DF1 feeds' writer
 	df1CallbackAuthority := pda("callback_authority", store.ProgramID.Bytes())
 
+	// a store lives in a pre-created state account (8 byte discriminator + StoreState, 3,200 bytes)
+	// and only the program's upgrade authority, here the deployer, initializes it
+	storeStateSpace := uint64(8 + 3200)
+	storeStateRent, err := client.GetMinimumBalanceForRentExemption(t.Context(), storeStateSpace, rpc.CommitmentConfirmed)
+	require.NoError(t, err)
+	storeProgramData, _, err := solana.FindProgramAddress([][]byte{data_feeds_store.ProgramID.Bytes()}, solana.BPFLoaderUpgradeableProgramID)
+	require.NoError(t, err)
 	send([]solana.Instruction{
+		build(system.NewCreateAccountInstruction(storeStateRent, storeStateSpace, data_feeds_store.ProgramID,
+			deployer.PublicKey(), storeState.PublicKey()).ValidateAndBuild()),
 		build(data_feeds_store.NewInitializeInstruction([]solana.PublicKey{deployer.PublicKey()}, 16, 3600,
-			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
+			deployer.PublicKey(), storeState.PublicKey(), storeProgramData, storeEvents, data_feeds_store.ProgramID)),
 		build(data_feeds_store.NewSetDefaultFeedMetadataInstruction([]data_feeds_store.WorkflowMetadata{
 			{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
 			{AllowedSender: mainnetAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},

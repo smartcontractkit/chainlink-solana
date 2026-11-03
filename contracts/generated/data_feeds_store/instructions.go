@@ -372,7 +372,7 @@ func NewInitFeedsInstruction(
 }
 
 // Builds a "initialize" instruction.
-// Create a store with a dedicated state account. `feed_admins` must be strictly increasing.
+// Create a store in a pre-created state account, signed by the program's upgrade authority, // which becomes the store's owner. `feed_admins` must be strictly increasing.
 func NewInitializeInstruction(
 	// Params:
 	feedAdminsParam []solanago.PublicKey,
@@ -382,7 +382,7 @@ func NewInitializeInstruction(
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	systemProgramAccount solanago.PublicKey,
+	programDataAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -415,12 +415,13 @@ func NewInitializeInstruction(
 
 	// Add the accounts to the instruction.
 	{
-		// Account 0 "owner": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
-		// Account 1 "state": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, true))
-		// Account 2 "system_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 0 "owner": Read-only, Signer, Required
+		// The program's upgrade authority, the store's first owner
+		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
+		// Account 1 "state": Writable, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "program_data": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programDataAccount, false, false))
 		// Account 3 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
 		// Account 4 "program": Read-only, Non-signer, Required
@@ -2134,12 +2135,10 @@ type InitializeInstruction struct {
 
 	// Accounts:
 	Owner          solanago.PublicKey `json:"owner"`
-	OwnerWritable  bool               `json:"owner_writable"`
 	OwnerSigner    bool               `json:"owner_signer"`
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
-	StateSigner    bool               `json:"state_signer"`
-	SystemProgram  solanago.PublicKey `json:"system_program"`
+	ProgramData    solanago.PublicKey `json:"program_data"`
 	EventAuthority solanago.PublicKey `json:"event_authority"`
 	Program        solanago.PublicKey `json:"program"`
 }
@@ -2197,11 +2196,11 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from system_program account index
+	// Decode from program_data account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program_data", err)
 	}
 	indices = append(indices, index)
 	// Decode from event_authority account index
@@ -2239,11 +2238,11 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set system_program account from index
+	// Set program_data account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program_data", len(accountKeys)-1)
 	}
-	obj.SystemProgram = accountKeys[indices[indexOffset]]
+	obj.ProgramData = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -2264,7 +2263,7 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.ProgramData)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys
