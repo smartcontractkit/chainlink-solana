@@ -275,9 +275,18 @@ func TestDataFeedsStore(t *testing.T) {
 		[][]byte{[]byte("feed_config"), proxyState.PublicKey().Bytes(), configSeed[:]}, data_feeds_proxy.ProgramID)
 	require.NoError(t, err)
 	proxyEvents := eventAuthority(data_feeds_proxy.ProgramID)
+	// like the store, a proxy lives in a pre-created state account (8 + 784 bytes) that the program's
+	// upgrade authority initializes
+	proxyStateSpace := uint64(8 + 784)
+	proxyStateRent, err := client.GetMinimumBalanceForRentExemption(t.Context(), proxyStateSpace, rpc.CommitmentConfirmed)
+	require.NoError(t, err)
+	proxyProgramData, _, err := solana.FindProgramAddress([][]byte{data_feeds_proxy.ProgramID.Bytes()}, solana.BPFLoaderUpgradeableProgramID)
+	require.NoError(t, err)
 	send([]solana.Instruction{
+		build(system.NewCreateAccountInstruction(proxyStateRent, proxyStateSpace, data_feeds_proxy.ProgramID,
+			deployer.PublicKey(), proxyState.PublicKey()).ValidateAndBuild()),
 		build(data_feeds_proxy.NewInitializeInstruction(nil, deployer.PublicKey(), proxyState.PublicKey(),
-			data_feeds_store.ProgramID, storeState.PublicKey(), solana.SystemProgramID, proxyEvents, data_feeds_proxy.ProgramID)),
+			proxyProgramData, data_feeds_store.ProgramID, storeState.PublicKey(), proxyEvents, data_feeds_proxy.ProgramID)),
 	}, proxyState)
 	send([]solana.Instruction{
 		build(data_feeds_proxy.NewSetMinDecimalsInstruction(df1[0].id, 8, deployer.PublicKey(), proxyState.PublicKey(),

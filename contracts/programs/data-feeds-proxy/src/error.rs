@@ -21,4 +21,6 @@ pub enum ProxyError {
     InvalidAccountVersion,
     #[msg("The signer is unauthorized")]
     Unauthorized,
+    #[msg("invalid account")]
+    InvalidAccount,
 }

@@ -171,6 +171,47 @@ describe("data feeds proxy", function () {
       .signers([admin.keypair])
       .rpc();
 
+  // Stores and proxies live in pre-created state accounts that only their program's upgrade
+  // authority (the test wallet) initializes.
+  const programData = (programId: PublicKey) =>
+    PublicKey.findProgramAddressSync(
+      [programId.toBuffer()],
+      new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
+    )[0];
+  const createStateAccount = async (
+    account: Keypair,
+    programId: PublicKey,
+    space: number
+  ) =>
+    SystemProgram.createAccount({
+      fromPubkey: provider.publicKey,
+      newAccountPubkey: account.publicKey,
+      space,
+      lamports: await connection.getMinimumBalanceForRentExemption(space),
+      programId,
+    });
+  const initializeProxy = async (
+    account: Keypair,
+    {
+      owner = provider.publicKey,
+      storeStateKey = storeState.publicKey,
+      space = proxy.account.proxyState.size,
+    } = {}
+  ) =>
+    proxy.methods
+      .initialize([])
+      .accountsStrict({
+        ...proxyEvents(),
+        owner,
+        state: account.publicKey,
+        programData: programData(proxy.programId),
+        storeProgram: store.programId,
+        storeState: storeStateKey,
+      })
+      .preInstructions([
+        await createStateAccount(account, proxy.programId, space),
+      ]);
+
   const expectError = async (p: Promise<any>, name: string) => {
     try {
       await p;
@@ -206,8 +247,15 @@ describe("data feeds proxy", function () {
         ...storeEvents(),
         owner: provider.publicKey,
         state: storeState.publicKey,
-        systemProgram: SystemProgram.programId,
+        programData: programData(store.programId),
       })
+      .preInstructions([
+        await createStateAccount(
+          storeState,
+          store.programId,
+          store.account.storeState.size
+        ),
+      ])
       .signers([storeState])
       .rpc();
     const forwarderAuthority = calculateForwarderAuthorityBump(
@@ -237,18 +285,7 @@ describe("data feeds proxy", function () {
 
   beforeEach(async () => {
     proxyState = Keypair.generate();
-    await proxy.methods
-      .initialize([])
-      .accountsStrict({
-        ...proxyEvents(),
-        owner: provider.publicKey,
-        state: proxyState.publicKey,
-        storeProgram: store.programId,
-        storeState: storeState.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([proxyState])
-      .rpc();
+    await (await initializeProxy(proxyState)).signers([proxyState]).rpc();
   });
 
   it("gives every error its own code", () => {
@@ -272,19 +309,51 @@ describe("data feeds proxy", function () {
   it("only points at a state account owned by the store program", async () => {
     const state = Keypair.generate();
     await expectError(
+      (
+        await initializeProxy(state, {
+          storeStateKey: provider.publicKey, // owned by the system program
+        })
+      )
+        .signers([state])
+        .rpc(),
+      "ConstraintOwner"
+    );
+  });
+
+  it("lets only the upgrade authority create proxies", async () => {
+    // anyone else is refused, even with a well-formed account
+    const other = Keypair.generate();
+    await expectError(
+      (await initializeProxy(other, { owner: feedAdmin.keypair.publicKey }))
+        .signers([other, feedAdmin.keypair])
+        .rpc(),
+      "Unauthorized"
+    );
+    // an account of another size, and a proxy initialized twice
+    const wrongSize = Keypair.generate();
+    await expectError(
+      (
+        await initializeProxy(wrongSize, {
+          space: proxy.account.proxyState.size + 8,
+        })
+      )
+        .signers([wrongSize])
+        .rpc(),
+      "InvalidAccount"
+    );
+    await expectError(
       proxy.methods
         .initialize([])
         .accountsStrict({
           ...proxyEvents(),
           owner: provider.publicKey,
-          state: state.publicKey,
+          state: proxyState.publicKey,
+          programData: programData(proxy.programId),
           storeProgram: store.programId,
-          storeState: provider.publicKey, // owned by the system program
-          systemProgram: SystemProgram.programId,
+          storeState: storeState.publicKey,
         })
-        .signers([state])
         .rpc(),
-      "ConstraintOwner"
+      "ConstraintZero"
     );
   });
 

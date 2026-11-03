@@ -50,7 +50,7 @@ func NewAcceptOwnershipInstruction(
 }
 
 // Builds a "get_min_decimals" instruction.
-// The fewest decimals `read_scaled` serves a data ID at.
+// The fewest decimals `read_scaled` serves a data ID at. Without the data ID's `feed_config` // account this answers 18 even if an admin lowered the minimum, so pass it to get the lower one.
 func NewGetMinDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -94,7 +94,7 @@ func NewGetMinDecimalsInstruction(
 }
 
 // Builds a "initialize" instruction.
-// Create a proxy serving reads from a store. `feed_admins` must be strictly increasing.
+// Create a proxy serving reads from a store, in a pre-created state account, signed by the // program's upgrade authority, which becomes the proxy's owner. `feed_admins` must be strictly // increasing.
 func NewInitializeInstruction(
 	// Params:
 	feedAdminsParam []solanago.PublicKey,
@@ -102,9 +102,9 @@ func NewInitializeInstruction(
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
+	programDataAccount solanago.PublicKey,
 	storeProgramAccount solanago.PublicKey,
 	storeStateAccount solanago.PublicKey,
-	systemProgramAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -127,16 +127,17 @@ func NewInitializeInstruction(
 
 	// Add the accounts to the instruction.
 	{
-		// Account 0 "owner": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
-		// Account 1 "state": Writable, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, true))
-		// Account 2 "store_program": Read-only, Non-signer, Required
+		// Account 0 "owner": Read-only, Signer, Required
+		// The program's upgrade authority, the proxy's first owner
+		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
+		// Account 1 "state": Writable, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
+		// Account 2 "program_data": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(programDataAccount, false, false))
+		// Account 3 "store_program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(storeProgramAccount, false, false))
-		// Account 3 "store_state": Read-only, Non-signer, Required
+		// Account 4 "store_state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(storeStateAccount, false, false))
-		// Account 4 "system_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 		// Account 5 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
 		// Account 6 "program": Read-only, Non-signer, Required
@@ -415,7 +416,7 @@ func NewSetMinDecimalsInstruction(
 }
 
 // Builds a "set_store" instruction.
-// Point the proxy at another store, readers keep the proxy address.
+// Point the proxy at another store, readers keep the proxy address. Round IDs are the store's, // so they restart with the new store's rounds: readers that keep round IDs reset them on // `StoreSet`. The new store must keep answers at 18 decimals, as `read_scaled` assumes.
 func NewSetStoreInstruction(
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
@@ -744,14 +745,12 @@ type InitializeInstruction struct {
 
 	// Accounts:
 	Owner          solanago.PublicKey `json:"owner"`
-	OwnerWritable  bool               `json:"owner_writable"`
 	OwnerSigner    bool               `json:"owner_signer"`
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
-	StateSigner    bool               `json:"state_signer"`
+	ProgramData    solanago.PublicKey `json:"program_data"`
 	StoreProgram   solanago.PublicKey `json:"store_program"`
 	StoreState     solanago.PublicKey `json:"store_state"`
-	SystemProgram  solanago.PublicKey `json:"system_program"`
 	EventAuthority solanago.PublicKey `json:"event_authority"`
 	Program        solanago.PublicKey `json:"program"`
 }
@@ -799,6 +798,13 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
+	// Decode from program_data account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "program_data", err)
+	}
+	indices = append(indices, index)
 	// Decode from store_program account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -811,13 +817,6 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 	err = decoder.Decode(&index)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_state", err)
-	}
-	indices = append(indices, index)
-	// Decode from system_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
 	}
 	indices = append(indices, index)
 	// Decode from event_authority account index
@@ -855,6 +854,12 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
+	// Set program_data account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program_data", len(accountKeys)-1)
+	}
+	obj.ProgramData = accountKeys[indices[indexOffset]]
+	indexOffset++
 	// Set store_program account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_program", len(accountKeys)-1)
@@ -866,12 +871,6 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_state", len(accountKeys)-1)
 	}
 	obj.StoreState = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set system_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
-	}
-	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -892,9 +891,9 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
+	keys = append(keys, obj.ProgramData)
 	keys = append(keys, obj.StoreProgram)
 	keys = append(keys, obj.StoreState)
-	keys = append(keys, obj.SystemProgram)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys

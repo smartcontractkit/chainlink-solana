@@ -31,7 +31,9 @@ pub mod data_feeds_proxy {
     // │                         Owner                                │
     // ================================================================
 
-    /// Create a proxy serving reads from a store. `feed_admins` must be strictly increasing.
+    /// Create a proxy serving reads from a store, in a pre-created state account, signed by the
+    /// program's upgrade authority, which becomes the proxy's owner. `feed_admins` must be strictly
+    /// increasing.
     pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
         admin::initialize(ctx, feed_admins)
     }
