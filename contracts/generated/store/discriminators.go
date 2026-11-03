@@ -11,7 +11,10 @@ var (
 )
 
 // Event discriminators
-var ()
+var (
+	Event_CacheRoundSkipped   = [8]byte{154, 210, 240, 31, 219, 179, 43, 165}
+	Event_CacheRoundSubmitted = [8]byte{95, 37, 69, 24, 168, 122, 94, 246}
+)
 
 // Instruction discriminators
 var (
@@ -21,6 +24,7 @@ var (
 	Instruction_CreateFeed                  = [8]byte{173, 86, 95, 94, 13, 193, 67, 180}
 	Instruction_Initialize                  = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
 	Instruction_LowerFlag                   = [8]byte{253, 79, 240, 163, 36, 124, 157, 111}
+	Instruction_OnReportCallback            = [8]byte{3, 132, 93, 104, 23, 223, 163, 62}
 	Instruction_Query                       = [8]byte{39, 251, 130, 159, 46, 136, 164, 169}
 	Instruction_SetLoweringAccessController = [8]byte{207, 68, 147, 34, 164, 94, 189, 113}
 	Instruction_SetValidatorConfig          = [8]byte{87, 248, 224, 193, 17, 41, 80, 250}

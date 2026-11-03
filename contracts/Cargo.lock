@@ -590,6 +590,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chainlink_solana_data_feeds_store"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "data-feeds-store",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -715,6 +723,17 @@ dependencies = [
  "keystone-forwarder",
  "static_assertions",
  "store",
+]
+
+[[package]]
+name = "data-feeds-store"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "arrayvec 1.0.1",
+ "bytemuck",
+ "static_assertions",
 ]
 
 [[package]]

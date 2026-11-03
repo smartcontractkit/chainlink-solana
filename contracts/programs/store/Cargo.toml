@@ -16,7 +16,7 @@ default = []
 idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
-anchor-lang = "0.31.0"
+anchor-lang = { version = "0.31.0", features = ["event-cpi"] }
 access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
 bytemuck = "1.7.2"
 
