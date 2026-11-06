@@ -20,7 +20,6 @@ import (
 	solprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/solana"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/retry"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/client"
-	"github.com/smartcontractkit/chainlink-solana/pkg/solana/fees"
 	logpollertypes "github.com/smartcontractkit/chainlink-solana/pkg/solana/logpoller/types"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/txm/utils"
 )
@@ -382,11 +381,7 @@ func (ss *solanaService) SubmitTransaction(ctx context.Context, req commonsol.Su
 	}
 
 	tx.Message.RecentBlockhash = blockhash.Value.Blockhash
-	enqueue := ss.chain.TxManager().Enqueue
-	if tx.Message.GetVersion() == solana.MessageVersionV1 {
-		enqueue = ss.chain.TxManager().EnqueueV1
-	}
-	err = enqueue(ctx, feePayer.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
+	err = ss.chain.TxManager().Enqueue(ctx, feePayer.String(), tx, &transactionID, blockhash.Value.LastValidBlockHeight, cfg...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue transaction: %w", err)
 	}
@@ -709,6 +704,7 @@ func convertMessage(m solana.Message) commonsol.Message {
 		RecentBlockhash:     commonsol.Hash(m.RecentBlockhash),
 		Instructions:        make([]commonsol.CompiledInstruction, len(m.Instructions)),
 		AddressTableLookups: convertAddressTableLookupSlice(m.AddressTableLookups),
+		TransactionConfig:   convertTransactionConfig(m.TransactionConfig),
 	}
 
 	for i, pk := range m.AccountKeys {
@@ -719,38 +715,32 @@ func convertMessage(m solana.Message) commonsol.Message {
 		out.Instructions[i] = convertCompiledInstruction(ix)
 	}
 
-	// Callers only control compute unit limit. Surface the v1 inline limit as a
-	// SetComputeUnitLimit instruction so existing readers do not need TransactionConfig.
-	if m.GetVersion() == solana.MessageVersionV1 && m.TransactionConfig.ComputeUnitLimit != nil {
-		appendComputeUnitLimitInstruction(&out, *m.TransactionConfig.ComputeUnitLimit)
-	}
-
 	return out
 }
 
-func appendComputeUnitLimitInstruction(msg *commonsol.Message, limit uint32) {
-	programIdx := -1
-	budget := commonsol.PublicKey(fees.ComputeBudgetProgram)
-	for i, k := range msg.AccountKeys {
-		if k == budget {
-			programIdx = i
-			break
-		}
+func convertTransactionConfig(cfg solana.TransactionConfig) commonsol.TransactionConfig {
+	return commonsol.TransactionConfig{
+		PriorityFee:                 cloneUint64(cfg.PriorityFee),
+		ComputeUnitLimit:            cloneUint32(cfg.ComputeUnitLimit),
+		LoadedAccountsDataSizeLimit: cloneUint32(cfg.LoadedAccountsDataSizeLimit),
+		HeapSize:                    cloneUint32(cfg.HeapSize),
 	}
-	if programIdx < 0 {
-		msg.AccountKeys = append(msg.AccountKeys, budget)
-		programIdx = len(msg.AccountKeys) - 1
-		msg.Header.NumReadonlyUnsignedAccounts++
-	}
+}
 
-	data, err := fees.ComputeUnitLimit(limit).Data()
-	if err != nil {
-		return
+func cloneUint32(v *uint32) *uint32 {
+	if v == nil {
+		return nil
 	}
-	msg.Instructions = append(msg.Instructions, commonsol.CompiledInstruction{
-		ProgramIDIndex: uint16(programIdx), //nolint:gosec // account key count is bounded by the transaction
-		Data:           data,
-	})
+	c := *v
+	return &c
+}
+
+func cloneUint64(v *uint64) *uint64 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 func convertAddressTableLookupSlice(in []solana.MessageAddressTableLookup) commonsol.MessageAddressTableLookupSlice {

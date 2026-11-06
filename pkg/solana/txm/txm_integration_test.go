@@ -102,10 +102,11 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 			txID := tc.name
 			tx, lastValidBlockHeight := createTransaction(ctx, t, client, senderPubKey, receiverPubKey, amount, tc.useValidBlockHash)
 			if tc.enqueueV1 {
-				require.NoError(t, txmInstance.EnqueueV1(ctx, "", tx, &txID, lastValidBlockHeight))
-			} else {
-				require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
+				v1Tx, v1Err := toV1Tx(*tx)
+				require.NoError(t, v1Err)
+				tx = &v1Tx
 			}
+			require.NoError(t, txmInstance.Enqueue(ctx, "", tx, &txID, lastValidBlockHeight))
 
 			// Wait for the transaction to reach the expected status
 			waitForStatus(t, txmInstance, txID, tc.expectTransactionStatus, 60*time.Second, 1*time.Second)
@@ -124,6 +125,7 @@ func TestTxm_Integration_ExpirationRebroadcast(t *testing.T) {
 				require.Equal(t, solana.MessageVersionV1, onchainTx.Message.GetVersion())
 				require.NotNil(t, onchainTx.Message.TransactionConfig.ComputeUnitLimit)
 				require.NotNil(t, onchainTx.Message.TransactionConfig.PriorityFee)
+				require.NotNil(t, onchainTx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
 			}
 
 			// Verify balances

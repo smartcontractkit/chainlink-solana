@@ -68,6 +68,51 @@ func TestToV1Tx(t *testing.T) {
 	})
 }
 
+func TestApplyComputeBudget(t *testing.T) {
+	t.Parallel()
+
+	t.Run("legacy tx gets ComputeBudget instructions", func(t *testing.T) {
+		tx := newTransferTx(t, solanaGo.PublicKey{1})
+		originalIxs := len(tx.Message.Instructions)
+		require.NoError(t, applyComputeBudget(tx, 100_000, 1_000))
+		require.Greater(t, len(tx.Message.Instructions), originalIxs)
+		require.Nil(t, tx.Message.TransactionConfig.ComputeUnitLimit)
+		require.Nil(t, tx.Message.TransactionConfig.PriorityFee)
+	})
+
+	t.Run("v1 tx gets inline TransactionConfig", func(t *testing.T) {
+		tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+		require.NoError(t, err)
+		originalIxs := tx.Message.Instructions
+		require.NoError(t, applyComputeBudget(&tx, 100_000, 1_000))
+		require.Equal(t, originalIxs, tx.Message.Instructions)
+		require.Equal(t, uint32(100_000), *tx.Message.TransactionConfig.ComputeUnitLimit)
+		require.Equal(t, uint64(100), *tx.Message.TransactionConfig.PriorityFee)
+		require.Equal(t, uint32(MaxLoadedAccountsDataSizeLimit), *tx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
+	})
+}
+
+func TestPrepareTxForSimulation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("v1 sets max CU and data-size limits", func(t *testing.T) {
+		tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+		require.NoError(t, err)
+		require.NoError(t, prepareTxForSimulation(&tx))
+		require.Equal(t, uint32(MaxComputeUnitLimit), *tx.Message.TransactionConfig.ComputeUnitLimit)
+		require.Equal(t, uint32(MaxLoadedAccountsDataSizeLimit), *tx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
+	})
+
+	t.Run("v1 preserves an existing data-size limit", func(t *testing.T) {
+		tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+		require.NoError(t, err)
+		tx.Message.TransactionConfig = tx.Message.TransactionConfig.WithLoadedAccountsDataSizeLimit(1_000_000)
+		require.NoError(t, prepareTxForSimulation(&tx))
+		require.Equal(t, uint32(MaxComputeUnitLimit), *tx.Message.TransactionConfig.ComputeUnitLimit)
+		require.Equal(t, uint32(1_000_000), *tx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
+	})
+}
+
 func TestV1PriorityFee(t *testing.T) {
 	t.Parallel()
 	require.Equal(t, uint64(0), v1PriorityFee(0, 200_000))
@@ -109,6 +154,8 @@ func TestTxm_BuildTx_V1(t *testing.T) {
 	require.Equal(t, uint64(100), *txCfg.PriorityFee)
 	require.NotNil(t, txCfg.HeapSize, "caller provided config values should be preserved")
 	require.Equal(t, uint32(64*1024), *txCfg.HeapSize)
+	require.NotNil(t, txCfg.LoadedAccountsDataSizeLimit)
+	require.Equal(t, uint32(MaxLoadedAccountsDataSizeLimit), *txCfg.LoadedAccountsDataSizeLimit)
 
 	wire, err := built.MarshalBinary()
 	require.NoError(t, err)
@@ -151,6 +198,9 @@ func TestTxm_EstimateComputeUnitLimit_V1(t *testing.T) {
 		if assert.NotNil(t, simTx.Message.TransactionConfig.ComputeUnitLimit) {
 			assert.Equal(t, uint32(MaxComputeUnitLimit), *simTx.Message.TransactionConfig.ComputeUnitLimit)
 		}
+		if assert.NotNil(t, simTx.Message.TransactionConfig.LoadedAccountsDataSizeLimit) {
+			assert.Equal(t, uint32(MaxLoadedAccountsDataSizeLimit), *simTx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
+		}
 	}).Return(&rpc.SimulateTransactionResult{UnitsConsumed: &used}, nil).Once()
 
 	limit, err := txm.EstimateComputeUnitLimit(t.Context(), &v1Tx, "")
@@ -159,7 +209,7 @@ func TestTxm_EstimateComputeUnitLimit_V1(t *testing.T) {
 	require.Nil(t, v1Tx.Message.TransactionConfig.ComputeUnitLimit, "estimation must not mutate the tx")
 }
 
-func TestTxm_EnqueueV1(t *testing.T) {
+func TestTxm_Enqueue_V1(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
@@ -174,14 +224,17 @@ func TestTxm_EnqueueV1(t *testing.T) {
 	txm, err := NewTxm("enqueue_v1_test", utils.NewStaticLoader[client.ReaderWriter](mc), nil, cfg, ks, logger.Test(t))
 	require.NoError(t, err)
 
-	require.ErrorContains(t, txm.EnqueueV1(ctx, "", newTransferTx(t, solanaGo.PublicKey{1}), nil, 100), "not started")
+	v1Tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+	require.NoError(t, err)
+	require.ErrorContains(t, txm.Enqueue(ctx, "", &v1Tx, nil, 100), "not started")
 
 	require.NoError(t, txm.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
 
 	t.Run("sends v1 tx", func(t *testing.T) {
-		tx := newTransferTx(t, solanaGo.PublicKey{1})
-		original := utils.DeepCopyTx(*tx)
+		tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+		require.NoError(t, err)
+		original := utils.DeepCopyTx(tx)
 
 		var once sync.Once
 		sent := make(chan solanaGo.Transaction, 1)
@@ -190,8 +243,8 @@ func TestTxm_EnqueueV1(t *testing.T) {
 		}).Return(solanaGo.Signature{4}, nil)
 
 		txID := uuid.NewString()
-		require.NoError(t, txm.EnqueueV1(ctx, "", tx, &txID, 100))
-		require.Equal(t, original, *tx, "EnqueueV1 must not mutate the caller's tx")
+		require.NoError(t, txm.Enqueue(ctx, "", &tx, &txID, 100))
+		require.Equal(t, original, tx, "Enqueue must not mutate the caller's tx")
 
 		select {
 		case sentTx := <-sent:
@@ -200,6 +253,7 @@ func TestTxm_EnqueueV1(t *testing.T) {
 			require.NotNil(t, sentTx.Message.TransactionConfig.ComputeUnitLimit)
 			require.Equal(t, cfg.ComputeUnitLimitDefault(), *sentTx.Message.TransactionConfig.ComputeUnitLimit)
 			require.NotNil(t, sentTx.Message.TransactionConfig.PriorityFee)
+			require.NotNil(t, sentTx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
 			_, err := sentTx.MarshalBinary()
 			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
@@ -211,11 +265,12 @@ func TestTxm_EnqueueV1(t *testing.T) {
 		require.Equal(t, commontypes.Pending, status)
 	})
 
-	t.Run("rejects invalid tx", func(t *testing.T) {
-		require.ErrorContains(t, txm.EnqueueV1(ctx, "", nil, nil, 100), "tx is nil pointer")
+	t.Run("rejects invalid v1 tx", func(t *testing.T) {
+		require.ErrorContains(t, txm.Enqueue(ctx, "", nil, nil, 100), "tx is nil pointer")
 
-		tx := newTransferTx(t, solanaGo.PublicKey{1})
-		require.NoError(t, fees.SetComputeUnitLimit(tx, 1_000))
-		require.ErrorContains(t, txm.EnqueueV1(ctx, "", tx, nil, 100), "ComputeBudget instructions are not supported")
+		tx, err := toV1Tx(*newTransferTx(t, solanaGo.PublicKey{1}))
+		require.NoError(t, err)
+		require.NoError(t, fees.SetComputeUnitLimit(&tx, 1_000))
+		require.ErrorContains(t, txm.Enqueue(ctx, "", &tx, nil, 100), "ComputeBudget instructions are not supported")
 	})
 }
