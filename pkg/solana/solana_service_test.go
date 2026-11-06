@@ -120,7 +120,7 @@ func Test_Converters(t *testing.T) {
 		require.NoError(t, err)
 
 		got := convertMessage(decoded.Message)
-		require.Equal(t, len(decoded.Message.Instructions), len(got.Instructions))
+		require.Len(t, decoded.Message.Instructions, len(got.Instructions))
 		require.NotNil(t, got.TransactionConfig.ComputeUnitLimit)
 		require.Equal(t, uint32(150_000), *got.TransactionConfig.ComputeUnitLimit)
 		require.NotNil(t, got.TransactionConfig.PriorityFee)

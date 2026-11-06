@@ -254,8 +254,8 @@ func TestTxm_Enqueue_V1(t *testing.T) {
 			require.Equal(t, cfg.ComputeUnitLimitDefault(), *sentTx.Message.TransactionConfig.ComputeUnitLimit)
 			require.NotNil(t, sentTx.Message.TransactionConfig.PriorityFee)
 			require.NotNil(t, sentTx.Message.TransactionConfig.LoadedAccountsDataSizeLimit)
-			_, err := sentTx.MarshalBinary()
-			require.NoError(t, err)
+			_, err2 := sentTx.MarshalBinary()
+			require.NoError(t, err2)
 		case <-time.After(5 * time.Second):
 			t.Fatal("tx was not sent")
 		}

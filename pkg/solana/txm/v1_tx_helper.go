@@ -1,6 +1,7 @@
 package txm
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -30,7 +31,7 @@ func isV1Tx(tx *solanaGo.Transaction) bool {
 // without a separate EnqueueV1 entrypoint.
 func validateV1Tx(tx solanaGo.Transaction) error {
 	if len(tx.Message.AddressTableLookups) > 0 {
-		return fmt.Errorf("address table lookups are not supported in v1 transactions")
+		return errors.New("address table lookups are not supported in v1 transactions")
 	}
 	for i, ix := range tx.Message.Instructions {
 		if int(ix.ProgramIDIndex) < len(tx.Message.AccountKeys) && tx.Message.AccountKeys[ix.ProgramIDIndex].Equals(fees.ComputeBudgetProgram) {
@@ -67,10 +68,7 @@ func applyComputeBudget(tx *solanaGo.Transaction, computeUnitLimit uint32, compu
 			return fmt.Errorf("failed to add compute unit limit instruction: %w", err)
 		}
 	}
-	if err := fees.SetComputeUnitPrice(tx, computeUnitPrice); err != nil {
-		return err
-	}
-	return nil
+	return fees.SetComputeUnitPrice(tx, computeUnitPrice)
 }
 
 // prepareTxForSimulation sets the runtime-max compute budget so simulation is not
