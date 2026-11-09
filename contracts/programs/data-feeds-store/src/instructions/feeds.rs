@@ -6,9 +6,13 @@ use crate::{
     data_id,
     error::StoreError,
     event::*,
+    instructions::descriptions::emit_description_set,
     logic::{check_max_stored_reports, MaxStoredReportsError},
     state::{feed_account_len, FeedData},
-    utils::{create_pda_account, load_feed_into, store, verify_feed_admin, EventEmitter},
+    utils::{
+        create_pda_account, encode_description, load_feed_into, store, verify_feed_admin,
+        EventEmitter,
+    },
 };
 
 fn validate_data_id(id: &[u8; 16]) -> Result<()> {
@@ -16,19 +20,19 @@ fn validate_data_id(id: &[u8; 16]) -> Result<()> {
     Ok(())
 }
 
-/// Create the feed accounts of data IDs with the store's default ring size. Accounts
-/// that already exist are left untouched. Feeds are never closed, as on the EVM store where a
-/// feed's storage is never deleted: retiring a feed means removing what writes it (workflow
-/// metadata) and its callback.
+/// Create the feed accounts of data IDs with the store's default ring size and their descriptions
+/// (an empty string for none). Accounts that already exist are left untouched, including their
+/// description. Feeds are never closed, as on the EVM store where a feed's storage is never
+/// deleted: retiring a feed means removing what writes it (workflow metadata) and its callback.
 pub fn init_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
+    descriptions: Vec<String>,
 ) -> Result<()> {
     let state = ctx.accounts.state.load()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
-    require_eq!(
-        data_ids.len(),
-        ctx.remaining_accounts.len(),
+    require!(
+        data_ids.len() == descriptions.len() && data_ids.len() == ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
@@ -39,8 +43,14 @@ pub fn init_feeds<'info>(
         ctx.bumps.event_authority,
     );
     let mut feed: Box<FeedData> = bytemuck::zeroed_box();
-    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
+    for ((id, description), info) in data_ids
+        .iter()
+        .zip(descriptions.iter())
+        .zip(ctx.remaining_accounts.iter())
+    {
         validate_data_id(id)?;
+        // checked for existing feeds too, so a batch is valid or invalid as a whole
+        let encoded = encode_description(description)?;
 
         let seed = data_id::to_seed(id);
         let (address, bump) =
@@ -66,6 +76,7 @@ pub fn init_feeds<'info>(
         feed.data_id = seed;
         feed.state = state_key;
         feed.max_stored_reports = max_stored_reports;
+        feed.description = encoded;
         store(info, &*feed)?;
 
         events.emit(&FeedInitialized {
@@ -73,6 +84,9 @@ pub fn init_feeds<'info>(
             data_id: *id,
             max_stored_reports,
         })?;
+        if !description.is_empty() {
+            emit_description_set(&events, &state_key, id, description)?;
+        }
     }
     Ok(())
 }

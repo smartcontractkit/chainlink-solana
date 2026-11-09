@@ -57,12 +57,6 @@ const withInstance = (id: Buffer, instance: number) => {
 };
 // accounts key data ids zero padded to 32 bytes
 const seed32 = (id: Buffer) => Buffer.concat([id, Buffer.alloc(16)]);
-const indexedFeedId = (id: Buffer) => {
-  const out = Buffer.from(id);
-  out[11] = 0;
-  out.fill(0, 12);
-  return out;
-};
 
 describe("data feeds store", function () {
   this.timeout(60_000);
@@ -195,7 +189,10 @@ describe("data feeds store", function () {
   // a feed account per data id, which also holds the data id's settings
   const setupFeed = async (...dataIds: Buffer[]) => {
     await program.methods
-      .initFeeds(dataIds.map((id) => Array.from(id)))
+      .initFeeds(
+        dataIds.map((id) => Array.from(id)),
+        dataIds.map(() => "")
+      )
       .accountsStrict(adminAccounts())
       .remainingAccounts(dataIds.map((id) => meta(feedPda(id))))
       .signers([feedAdmin.keypair])
@@ -382,19 +379,22 @@ describe("data feeds store", function () {
         "InvalidDataId"
       );
       const id = newDataId();
+      await setupFeed(id);
       await expectError(
         program.methods
-          .setFeedDescriptions(
-            [Array.from(indexedFeedId(id))],
-            ["ETH\u0000USD"]
-          )
+          .setFeedDescriptions([Array.from(id)], ["ETH\u0000USD"])
           .accountsStrict(adminAccounts())
-          .remainingAccounts([
-            meta(pda("feed_description", seed32(indexedFeedId(id)))),
-          ])
+          .remainingAccounts([meta(feedPda(id))])
           .signers([feedAdmin.keypair])
           .rpc(),
         "InvalidDescription"
+      );
+      await expectError(
+        program.methods
+          .getDescription(Array.from(withSvrPath(id, 1)))
+          .accountsStrict({ state: state.publicKey, feed: feedPda(id) })
+          .view(),
+        "InvalidDataId"
       );
     });
 
@@ -419,7 +419,7 @@ describe("data feeds store", function () {
       const id = newDataId();
       await expectError(
         program.methods
-          .initFeeds([Array.from(id)])
+          .initFeeds([Array.from(id)], [""])
           .accountsStrict({ ...adminAccounts(), feedAdmin: provider.publicKey })
           .remainingAccounts([meta(feedPda(id))])
           .rpc(),
@@ -432,7 +432,7 @@ describe("data feeds store", function () {
       for (const bad of [Buffer.alloc(16), withSvrPath(id, 1)]) {
         await expectError(
           program.methods
-            .initFeeds([Array.from(bad)])
+            .initFeeds([Array.from(bad)], [""])
             .accountsStrict(adminAccounts())
             .remainingAccounts([meta(feedPda(bad))])
             .signers([feedAdmin.keypair])
@@ -442,39 +442,86 @@ describe("data feeds store", function () {
       }
     });
 
-    it("sets descriptions shared by every instance of a feed", async () => {
+    it("keeps a description in each feed account", async () => {
       const id = newDataId();
-      const feedDescription = pda(
-        "feed_description",
-        seed32(indexedFeedId(id))
-      );
-
-      await program.methods
-        .setFeedDescriptions([Array.from(indexedFeedId(id))], ["ETH/USD"])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedDescription)])
-        .signers([feedAdmin.keypair])
-        .rpc();
-
-      const description = (dataId: Buffer, account: PublicKey | null) =>
+      const other = withInstance(id, 3);
+      const description = (dataId: Buffer) =>
         program.methods
           .getDescription(Array.from(dataId))
-          .accountsStrict({ state: state.publicKey, feedDescription: account })
+          .accountsStrict({ state: state.publicKey, feed: feedPda(dataId) })
           .view();
-      assert.equal(await description(id, feedDescription), "ETH/USD");
-      assert.equal(
-        await description(withInstance(id, 3), feedDescription),
-        "ETH/USD",
-        "another instance of the feed"
+
+      // set when the feed is created, also checked for feeds that already exist
+      await program.methods
+        .initFeeds([Array.from(id), Array.from(other)], ["ETH / USD", ""])
+        .accountsStrict(adminAccounts())
+        .remainingAccounts([meta(feedPda(id)), meta(feedPda(other))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+      assert.equal(await description(id), "ETH / USD");
+      assert.equal(await description(other), "", "another instance, none set");
+      await expectError(
+        program.methods
+          .initFeeds([Array.from(id)], ["x".repeat(65)])
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([meta(feedPda(id))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "DescriptionTooLong"
       );
-      assert.equal(await description(id, null), "", "no description account");
+      assert.equal(
+        await description(id),
+        "ETH / USD",
+        "existing feed untouched"
+      );
+
+      // updated and cleared later, per feed
+      await program.methods
+        .setFeedDescriptions(
+          [Array.from(id), Array.from(other)],
+          ["", "ETH / USD (2)"]
+        )
+        .accountsStrict(adminAccounts())
+        .remainingAccounts([meta(feedPda(id)), meta(feedPda(other))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+      assert.equal(await description(id), "");
+      assert.equal(await description(other), "ETH / USD (2)");
+
+      // only into the data id's own feed of this store
+      await expectError(
+        program.methods
+          .setFeedDescriptions([Array.from(id)], ["BTC / USD"])
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([meta(feedPda(other))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "AccountMismatch"
+      );
+      await expectError(
+        program.methods
+          .getDescription(Array.from(id))
+          .accountsStrict({ state: state.publicKey, feed: feedPda(other) })
+          .view(),
+        "AccountMismatch"
+      );
+      const missing = newDataId();
+      await expectError(
+        program.methods
+          .setFeedDescriptions([Array.from(missing)], ["BTC / USD"])
+          .accountsStrict(adminAccounts())
+          .remainingAccounts([meta(feedPda(missing))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "InvalidAccount"
+      );
     });
 
     it("serves the stored decimals", async () => {
       assert.equal(
         await program.methods
           .getDecimals(Array.from(newDataId()))
-          .accountsStrict({ state: state.publicKey, feedDescription: null })
+          .accountsStrict({ state: state.publicKey })
           .view(),
         18
       );

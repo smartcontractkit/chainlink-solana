@@ -8,12 +8,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{ACCOUNT_VERSION, FEED_SEED, MAX_BATCH_READ, STORED_DECIMALS},
-    context::{DescriptionRead, FeedRead, FeedsRead, PermissionRead},
+    common::{FEED_SEED, MAX_BATCH_READ, STORED_DECIMALS},
+    context::{FeedRead, FeedsRead, PermissionRead},
     data_id,
     error::StoreError,
     logic::{self, LatestReport},
-    state::{FeedData, FeedDescription, ReaderRound, StoreState, WorkflowMetadata},
+    state::{FeedData, ReaderRound, StoreState, WorkflowMetadata},
     utils::{
         decode_description, has_permission, is_uninitialized, load_boxed, load_feed,
         load_feed_into, load_settings, RingRef,
@@ -101,33 +101,17 @@ pub fn get_round(ctx: Context<FeedRead>, data_id: [u8; 16], round_id: u64) -> Re
 }
 
 /// Decimals reports are stored with.
-pub fn get_decimals(_ctx: Context<DescriptionRead>, data_id: [u8; 16]) -> Result<u8> {
+pub fn get_decimals(_ctx: Context<FeedsRead>, data_id: [u8; 16]) -> Result<u8> {
     check_data_id(&data_id)?;
     Ok(STORED_DECIMALS)
 }
 
-/// The description of the feed a data ID belongs to, empty when none is set. The description
-/// account is optional so readers that do not need it do not pay for it.
-pub fn get_description(ctx: Context<DescriptionRead>, data_id: [u8; 16]) -> Result<String> {
+/// The description of a data ID's feed, empty when none is set.
+pub fn get_description(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<String> {
     check_data_id(&data_id)?;
-    match ctx.accounts.feed_description.as_deref() {
-        None => Ok(String::new()),
-        Some(description) => {
-            let FeedDescription {
-                version,
-                state,
-                indexed_feed_id,
-                description,
-            } = description;
-            require_eq!(*version, ACCOUNT_VERSION, StoreError::InvalidAccountVersion);
-            require!(
-                *state == ctx.accounts.state.key()
-                    && *indexed_feed_id == data_id::to_seed(&data_id::to_indexed_feed_id(&data_id)),
-                StoreError::AccountMismatch
-            );
-            Ok(decode_description(description))
-        }
-    }
+    let info = ctx.accounts.feed.to_account_info();
+    let feed = load_feed(&info, &ctx.accounts.state.key(), &data_id)?;
+    Ok(decode_description(&feed.description))
 }
 
 /// Whether a workflow may write a data ID, through its feed-specific metadata when configured and

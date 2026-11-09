@@ -12,7 +12,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::get_return_data;
-use data_feeds_store::cpi::accounts::{DescriptionRead, FeedRead, FeedsRead};
+use data_feeds_store::cpi::accounts::{FeedRead, FeedsRead};
 
 pub use data_feeds_store::state::ReaderRound;
 pub use data_feeds_store::ID as DATA_FEEDS_STORE_ID;
@@ -66,33 +66,20 @@ pub fn get_decimals<'info>(
     data_id: [u8; 16],
 ) -> Result<u8> {
     let program = store_program.key();
-    let ctx = CpiContext::new(
-        store_program,
-        DescriptionRead {
-            state,
-            feed_description: None,
-        },
-    );
+    let ctx = CpiContext::new(store_program, FeedsRead { state });
     data_feeds_store::cpi::get_decimals(ctx, data_id)?;
     returned(&program)
 }
 
-/// Description of the feed of a data ID, empty when none is set. Pass the feed description
-/// account to get it.
+/// Description of the feed of a data ID, empty when none is set.
 pub fn get_description<'info>(
     store_program: AccountInfo<'info>,
     state: AccountInfo<'info>,
-    feed_description: Option<AccountInfo<'info>>,
+    feed: AccountInfo<'info>,
     data_id: [u8; 16],
 ) -> Result<String> {
     let program = store_program.key();
-    let ctx = CpiContext::new(
-        store_program,
-        DescriptionRead {
-            state,
-            feed_description,
-        },
-    );
+    let ctx = CpiContext::new(store_program, FeedRead { state, feed });
     data_feeds_store::cpi::get_description(ctx, data_id)?;
     returned(&program)
 }

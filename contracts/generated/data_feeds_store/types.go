@@ -672,7 +672,10 @@ type FeedData struct {
 	MinAnswer          binary.Int128  `json:"min_answer"`
 	MaxAnswer          binary.Int128  `json:"max_answer"`
 	Settings           DataIdSettings `json:"settings"`
-	Reserved           [48]uint8      `json:"_reserved"`
+
+	// UTF-8 description of the feed, e.g. "ETH / USD", zero padded, empty when none is set
+	Description [64]uint8 `json:"description"`
+	Reserved    [48]uint8 `json:"_reserved"`
 }
 
 func (obj FeedData) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -760,6 +763,11 @@ func (obj FeedData) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	err = encoder.Encode(obj.Settings)
 	if err != nil {
 		return errors.NewField("Settings", err)
+	}
+	// Serialize `Description`:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
 	}
 	// Serialize `Reserved`:
 	err = encoder.Encode(obj.Reserved)
@@ -865,6 +873,11 @@ func (obj *FeedData) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	if err != nil {
 		return errors.NewField("Settings", err)
 	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
+	}
 	// Deserialize `Reserved`:
 	err = decoder.Decode(&obj.Reserved)
 	if err != nil {
@@ -890,97 +903,10 @@ func UnmarshalFeedData(buf []byte) (*FeedData, error) {
 	return obj, nil
 }
 
-// Description shared by every instance of a feed, keyed by indexed feed ID.
-type FeedDescription struct {
-	Version uint8              `json:"version"`
-	State   solanago.PublicKey `json:"state"`
-
-	// Indexed feed ID zero padded to 32 bytes
-	IndexedFeedId [32]uint8 `json:"indexed_feed_id"`
-
-	// UTF-8, zero padded
-	Description [64]uint8 `json:"description"`
-}
-
-func (obj FeedDescription) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `IndexedFeedId`:
-	err = encoder.Encode(obj.IndexedFeedId)
-	if err != nil {
-		return errors.NewField("IndexedFeedId", err)
-	}
-	// Serialize `Description`:
-	err = encoder.Encode(obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj FeedDescription) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedDescription: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *FeedDescription) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `IndexedFeedId`:
-	err = decoder.Decode(&obj.IndexedFeedId)
-	if err != nil {
-		return errors.NewField("IndexedFeedId", err)
-	}
-	// Deserialize `Description`:
-	err = decoder.Decode(&obj.Description)
-	if err != nil {
-		return errors.NewField("Description", err)
-	}
-	return nil
-}
-
-func (obj *FeedDescription) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedDescription: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalFeedDescription(buf []byte) (*FeedDescription, error) {
-	obj := new(FeedDescription)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
 type FeedDescriptionSet struct {
-	State         solanago.PublicKey `json:"state"`
-	IndexedFeedId [16]uint8          `json:"indexed_feed_id"`
-	Description   string             `json:"description"`
+	State       solanago.PublicKey `json:"state"`
+	DataId      [16]uint8          `json:"data_id"`
+	Description string             `json:"description"`
 }
 
 func (obj FeedDescriptionSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -989,10 +915,10 @@ func (obj FeedDescriptionSet) MarshalWithEncoder(encoder *binary.Encoder) (err e
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `IndexedFeedId`:
-	err = encoder.Encode(obj.IndexedFeedId)
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
 	if err != nil {
-		return errors.NewField("IndexedFeedId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Serialize `Description`:
 	err = encoder.Encode(obj.Description)
@@ -1018,10 +944,10 @@ func (obj *FeedDescriptionSet) UnmarshalWithDecoder(decoder *binary.Decoder) (er
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `IndexedFeedId`:
-	err = decoder.Decode(&obj.IndexedFeedId)
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
 	if err != nil {
-		return errors.NewField("IndexedFeedId", err)
+		return errors.NewField("DataId", err)
 	}
 	// Deserialize `Description`:
 	err = decoder.Decode(&obj.Description)

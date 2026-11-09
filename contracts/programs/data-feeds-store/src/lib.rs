@@ -107,12 +107,14 @@ pub mod data_feeds_store {
         admin::set_max_observation_forward_duration(ctx, max_observation_forward_secs)
     }
 
-    /// Create feed accounts (remaining accounts: feed PDAs).
+    /// Create feed accounts with their descriptions, empty for none (remaining accounts: feed
+    /// PDAs).
     pub fn init_feeds<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,
+        descriptions: Vec<String>,
     ) -> Result<()> {
-        feeds::init_feeds(ctx, data_ids)
+        feeds::init_feeds(ctx, data_ids, descriptions)
     }
 
     /// Set ring sizes (remaining accounts: feed PDAs).
@@ -161,13 +163,13 @@ pub mod data_feeds_store {
         settings::set_report_callback_configs(ctx, data_ids, callbacks)
     }
 
-    /// Set feed descriptions (remaining accounts: feed description PDAs).
+    /// Set feed descriptions, empty to clear (remaining accounts: feed PDAs).
     pub fn set_feed_descriptions<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-        indexed_feed_ids: Vec<[u8; 16]>,
+        data_ids: Vec<[u8; 16]>,
         descriptions: Vec<String>,
     ) -> Result<()> {
-        descriptions::set_feed_descriptions(ctx, indexed_feed_ids, descriptions)
+        descriptions::set_feed_descriptions(ctx, data_ids, descriptions)
     }
 
     // ================================================================
@@ -213,12 +215,12 @@ pub mod data_feeds_store {
     }
 
     /// Decimals reports are stored with.
-    pub fn get_decimals(ctx: Context<DescriptionRead>, data_id: [u8; 16]) -> Result<u8> {
+    pub fn get_decimals(ctx: Context<FeedsRead>, data_id: [u8; 16]) -> Result<u8> {
         reads::get_decimals(ctx, data_id)
     }
 
     /// Description of the feed of a data ID, empty when none is set.
-    pub fn get_description(ctx: Context<DescriptionRead>, data_id: [u8; 16]) -> Result<String> {
+    pub fn get_description(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<String> {
         reads::get_description(ctx, data_id)
     }
 

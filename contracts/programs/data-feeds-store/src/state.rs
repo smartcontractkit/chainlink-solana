@@ -62,6 +62,8 @@ pub struct FeedData {
     pub min_answer: i128,
     pub max_answer: i128,
     pub settings: DataIdSettings,
+    /// UTF-8 description of the feed, e.g. "ETH / USD", zero padded, empty when none is set
+    pub description: [u8; DESCRIPTION_LEN],
     pub _reserved: [u8; 48],
 }
 
@@ -122,18 +124,6 @@ impl DataIdSettings {
     }
 }
 
-/// Description shared by every instance of a feed, keyed by indexed feed ID.
-#[account]
-#[derive(InitSpace)]
-pub struct FeedDescription {
-    pub version: u8,
-    pub state: Pubkey,
-    /// Indexed feed ID zero padded to 32 bytes
-    pub indexed_feed_id: [u8; 32],
-    /// UTF-8, zero padded
-    pub description: [u8; DESCRIPTION_LEN],
-}
-
 /// Owner-managed allowlist entry: whether a program may be configured as a report callback.
 #[account]
 #[derive(InitSpace)]
@@ -175,7 +165,7 @@ pub struct WorkflowMetadata {
 
 const_assert_eq!(size_of::<StoreState>(), 3200);
 const_assert_eq!(size_of::<DataIdSettings>(), 1168);
-const_assert_eq!(size_of::<FeedData>(), 1376);
+const_assert_eq!(size_of::<FeedData>(), 1440);
 const_assert_eq!(size_of::<StoredReport>(), 32);
 // Offsets clients decode feed accounts by (add 8 for the discriminator); `state` is the
 // getProgramAccounts filter for a store's feeds.
@@ -184,6 +174,7 @@ const_assert_eq!(std::mem::offset_of!(FeedData, state), 48);
 const_assert_eq!(std::mem::offset_of!(FeedData, round_id), 80);
 const_assert_eq!(std::mem::offset_of!(FeedData, latest_answer), 112);
 const_assert_eq!(std::mem::offset_of!(FeedData, settings), 160);
+const_assert_eq!(std::mem::offset_of!(FeedData, description), 1328);
 
 // ================================================================
 // │                     Instruction arguments                    │

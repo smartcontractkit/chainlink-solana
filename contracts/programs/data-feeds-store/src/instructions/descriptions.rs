@@ -1,45 +1,19 @@
 use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
-    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_DESCRIPTION_SEED},
     context::FeedAdminAccounts,
     data_id,
     error::StoreError,
     event::*,
-    state::FeedDescription,
-    utils::{create_pda_account, encode_description, verify_feed_admin, EventEmitter},
+    state::FeedData,
+    utils::{encode_description, load_feed_into, store, verify_feed_admin, EventEmitter},
 };
 
-/// Create the description PDA if needed, returning whether it already existed.
-fn ensure_account<'info>(
-    ctx: &Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    info: &AccountInfo<'info>,
-    seed: &[u8],
-    key: &[u8],
-    space: usize,
-) -> Result<bool> {
-    let state_key = ctx.accounts.state.key();
-    let (address, bump) =
-        Pubkey::find_program_address(&[seed, state_key.as_ref(), key], &crate::ID);
-    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
-
-    if !info.data_is_empty() {
-        return Ok(true);
-    }
-    create_pda_account(
-        space,
-        &[seed, state_key.as_ref(), key, &[bump]],
-        &ctx.accounts.feed_admin.to_account_info(),
-        info,
-        &ctx.accounts.system_program.to_account_info(),
-    )?;
-    Ok(false)
-}
-
-/// Set descriptions shared by every instance of a feed, e.g. "ETH/USD".
+/// Set the descriptions of feeds, e.g. "ETH / USD", in their feed accounts (an empty string clears
+/// one). Each data ID's feed keeps its own description, also across instances of a feed.
 pub fn set_feed_descriptions<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    indexed_feed_ids: Vec<[u8; 16]>,
+    data_ids: Vec<[u8; 16]>,
     descriptions: Vec<String>,
 ) -> Result<()> {
     verify_feed_admin(
@@ -47,8 +21,7 @@ pub fn set_feed_descriptions<'info>(
         &ctx.accounts.state.load()?.feed_admins,
     )?;
     require!(
-        indexed_feed_ids.len() == descriptions.len()
-            && indexed_feed_ids.len() == ctx.remaining_accounts.len(),
+        data_ids.len() == descriptions.len() && data_ids.len() == ctx.remaining_accounts.len(),
         StoreError::ArrayLengthMismatch
     );
 
@@ -57,50 +30,33 @@ pub fn set_feed_descriptions<'info>(
         ctx.accounts.event_authority.to_account_info(),
         ctx.bumps.event_authority,
     );
-    for ((id, description), info) in indexed_feed_ids
+    // one buffer for the whole batch: the bump allocator never frees
+    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
+    for ((id, description), info) in data_ids
         .iter()
         .zip(descriptions.iter())
         .zip(ctx.remaining_accounts.iter())
     {
-        require!(
-            data_id::is_valid_indexed_feed_id(id),
-            StoreError::InvalidDataId
-        );
-        let encoded = encode_description(description)?;
-        let seed = data_id::to_seed(id);
-        let existed = ensure_account(
-            &ctx,
-            info,
-            FEED_DESCRIPTION_SEED,
-            &seed,
-            ANCHOR_DISCRIMINATOR + FeedDescription::INIT_SPACE,
-        )?;
-        if existed {
-            // an existing description is rewritten only at the layout this program knows
-            require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
-            let current = FeedDescription::try_deserialize(&mut &info.try_borrow_data()?[..])?;
-            require_eq!(
-                current.version,
-                ACCOUNT_VERSION,
-                StoreError::InvalidAccountVersion
-            );
-        }
-
-        FeedDescription {
-            version: ACCOUNT_VERSION,
-            state: state_key,
-            indexed_feed_id: seed,
-            description: encoded,
-        }
-        .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
-
-        // FeedDescriptionSet, written from the borrowed description instead of a copy
-        events.emit_with(FeedDescriptionSet::DISCRIMINATOR, |data| {
-            state_key.serialize(data)?;
-            id.serialize(data)?;
-            description.as_str().serialize(data)?;
-            Ok(())
-        })?;
+        require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
+        load_feed_into(info, &state_key, id, &mut feed)?;
+        feed.description = encode_description(description)?;
+        store(info, &*feed)?;
+        emit_description_set(&events, &state_key, id, description)?;
     }
     Ok(())
+}
+
+/// FeedDescriptionSet, written from the borrowed description instead of a copy.
+pub fn emit_description_set(
+    events: &EventEmitter<'_>,
+    state: &Pubkey,
+    data_id: &[u8; 16],
+    description: &str,
+) -> Result<()> {
+    events.emit_with(FeedDescriptionSet::DISCRIMINATOR, |data| {
+        state.serialize(data)?;
+        data_id.serialize(data)?;
+        description.serialize(data)?;
+        Ok(())
+    })
 }

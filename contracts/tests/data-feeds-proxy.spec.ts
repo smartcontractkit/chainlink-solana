@@ -101,7 +101,7 @@ describe("data feeds proxy", function () {
   const feedWithRounds = async (...answers: BN[]) => {
     const id = newDataId();
     await store.methods
-      .initFeeds([Array.from(id)])
+      .initFeeds([Array.from(id)], [""])
       .accountsStrict({
         ...storeEvents(),
         feedAdmin: feedAdmin.keypair.publicKey,

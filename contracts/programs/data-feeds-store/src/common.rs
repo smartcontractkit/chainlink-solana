@@ -41,4 +41,3 @@ pub const CALLBACK_AUTHORITY_SEED: &[u8] = b"callback_authority";
 /// Owner-managed allowlist entry of a callback program: `[seed, state, program]`.
 pub const CALLBACK_PROGRAM_SEED: &[u8] = b"callback_program";
 pub const FEED_SEED: &[u8] = b"feed";
-pub const FEED_DESCRIPTION_SEED: &[u8] = b"feed_description";

@@ -3,7 +3,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, STORE_AUTHORITY_SEED};
 use crate::error::StoreError;
-use crate::state::{FeedData, FeedDescription, StoreState};
+use crate::state::{FeedData, StoreState};
 
 // Every context that changes state emits CPI events (`#[event_cpi]` adds the event authority PDA
 // and this program as its last accounts). Every context checks the state's layout version.
@@ -130,14 +130,6 @@ pub struct FeedRead<'info> {
 pub struct FeedsRead<'info> {
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
-}
-
-#[derive(Accounts)]
-pub struct DescriptionRead<'info> {
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
-    pub state: AccountLoader<'info, StoreState>,
-
-    pub feed_description: Option<Account<'info, FeedDescription>>,
 }
 
 #[derive(Accounts)]

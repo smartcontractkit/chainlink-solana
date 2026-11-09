@@ -87,7 +87,7 @@ pub struct MinMaxAnswerSet {
 #[event]
 pub struct FeedDescriptionSet {
     pub state: Pubkey,
-    pub indexed_feed_id: [u8; 16],
+    pub data_id: [u8; 16],
     pub description: String,
 }
 
@@ -219,7 +219,7 @@ mod tests {
         description.serialize(&mut manual).unwrap();
         let event = FeedDescriptionSet {
             state,
-            indexed_feed_id: id,
+            data_id: id,
             description: description.to_string(),
         };
         assert_eq!(manual, event.data());

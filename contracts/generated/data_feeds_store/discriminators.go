@@ -5,9 +5,8 @@ package data_feeds_store
 
 // Account discriminators
 var (
-	Account_FeedData        = [8]byte{162, 107, 82, 18, 92, 193, 22, 129}
-	Account_FeedDescription = [8]byte{175, 131, 176, 46, 74, 131, 63, 107}
-	Account_StoreState      = [8]byte{216, 96, 91, 102, 135, 35, 32, 195}
+	Account_FeedData   = [8]byte{162, 107, 82, 18, 92, 193, 22, 129}
+	Account_StoreState = [8]byte{216, 96, 91, 102, 135, 35, 32, 195}
 )
 
 // Event discriminators

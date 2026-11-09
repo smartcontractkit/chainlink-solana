@@ -8,11 +8,9 @@
 //!        +---------------+--------+-----------+----------+----------+
 //! ```
 //!
-//!   data ID            SVR path ID zero (non-zero SVR path IDs are reserved, not supported yet)
-//!   indexed feed ID    SVR path ID, instance and reserved bytes zero
-//!
-//! Reserved bytes carry no invariant on a data ID, two data IDs differing only there keep separate
-//! histories. An indexed feed ID drops them along with the path and the instance.
+//! The store serves data IDs with a zero SVR path ID: non-zero SVR path IDs are reserved, not
+//! supported yet. The instance and the reserved bytes carry no invariant: two data IDs differing
+//! only there are separate feeds with separate histories (and descriptions).
 
 pub type DataId = [u8; 16];
 
@@ -22,8 +20,6 @@ pub type DataId = [u8; 16];
 pub type DataIdSeed = [u8; 32];
 
 const SVR_PATH: std::ops::Range<usize> = 9..11;
-const INSTANCE: usize = 11;
-const RESERVED: std::ops::Range<usize> = 12..16;
 
 pub fn is_zero(data_id: &DataId) -> bool {
     *data_id == [0; 16]
@@ -42,27 +38,9 @@ pub fn has_svr_path(data_id: &DataId) -> bool {
     data_id[SVR_PATH] != [0, 0]
 }
 
-/// The indexed feed ID of the feed a data ID belongs to, dropping the SVR path ID, the instance
-/// and the reserved bytes.
-pub fn to_indexed_feed_id(data_id: &DataId) -> DataId {
-    let mut id = *data_id;
-    id[SVR_PATH].fill(0);
-    id[INSTANCE] = 0;
-    id[RESERVED].fill(0);
-    id
-}
-
 /// Whether a data ID is one the store serves: not zero, with a zero SVR path ID.
 pub fn is_valid_data_id(data_id: &DataId) -> bool {
     !is_zero(data_id) && !has_svr_path(data_id)
-}
-
-/// Whether a data ID is a valid indexed feed ID: SVR path ID, instance and reserved bytes zero.
-pub fn is_valid_indexed_feed_id(data_id: &DataId) -> bool {
-    !is_zero(data_id)
-        && !has_svr_path(data_id)
-        && data_id[INSTANCE] == 0
-        && data_id[RESERVED] == [0; 4]
 }
 
 #[cfg(test)]
@@ -93,22 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn indexed_feed_id() {
-        let full = id(FEED, 3, [1, 0], 4, [9, 9, 9, 9]);
-        assert_eq!(to_indexed_feed_id(&full), id(FEED, 3, [0, 0], 0, [0; 4]));
-        assert!(is_valid_indexed_feed_id(&id(FEED, 3, [0, 0], 0, [0; 4])));
-        assert!(!is_valid_indexed_feed_id(&id(FEED, 3, [0, 0], 1, [0; 4])));
-        assert!(!is_valid_indexed_feed_id(&id(
-            FEED,
-            3,
-            [0, 0],
-            0,
-            [0, 0, 0, 1]
-        )));
-        assert!(!is_valid_indexed_feed_id(&id(FEED, 3, [0, 1], 0, [0; 4])));
-    }
-
-    #[test]
     fn seed_zero_pads_the_data_id() {
         let full = id(FEED, 3, [0, 0], 4, [9, 9, 9, 9]);
         let seed = to_seed(&full);
@@ -124,6 +86,6 @@ mod tests {
             a, b,
             "two IDs differing only in the reserved bytes are distinct"
         );
-        assert_eq!(to_indexed_feed_id(&a), to_indexed_feed_id(&b));
+        assert!(is_valid_data_id(&a) && is_valid_data_id(&b));
     }
 }

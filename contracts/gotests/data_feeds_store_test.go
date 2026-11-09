@@ -154,7 +154,7 @@ func TestDataFeedsStore(t *testing.T) {
 		copy(id[:], []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, n})
 		tg := target{id: id, feed: feedPDA(id)}
 		send([]solana.Instruction{
-			withAccounts(build(data_feeds_store.NewInitFeedsInstruction([][16]uint8{id}, deployer.PublicKey(), storeState.PublicKey(),
+			withAccounts(build(data_feeds_store.NewInitFeedsInstruction([][16]uint8{id}, []string{""}, deployer.PublicKey(), storeState.PublicKey(),
 				solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
 				solana.Meta(tg.feed).WRITE()),
 		})
@@ -423,14 +423,16 @@ func TestDataFeedsStore(t *testing.T) {
 	// Admin batches reuse one buffer too: 20 feeds created, then given specific metadata, in one
 	// instruction each.
 	var adminIDs [][16]uint8
+	var adminDescriptions []string
 	var adminFeeds []*solana.AccountMeta
 	for n := byte(0); n < 20; n++ {
 		var id [16]uint8
 		copy(id[:], []byte{0x00, 0x03, 0xaa, 0xbb, 0xcc, 0xdd, 0xef, 0xc0 + n})
 		adminIDs = append(adminIDs, id)
+		adminDescriptions = append(adminDescriptions, fmt.Sprintf("F%02d / USD", n))
 		adminFeeds = append(adminFeeds, solana.Meta(feedPDA(id)).WRITE())
 	}
-	sendWithTable(withAccounts(build(data_feeds_store.NewInitFeedsInstruction(adminIDs, deployer.PublicKey(),
+	sendWithTable(withAccounts(build(data_feeds_store.NewInitFeedsInstruction(adminIDs, adminDescriptions, deployer.PublicKey(),
 		storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)), adminFeeds...),
 		"init_feeds, 20 feeds")
 	sendWithTable(withAccounts(build(data_feeds_store.NewSetSpecificFeedMetadataInstruction(adminIDs,

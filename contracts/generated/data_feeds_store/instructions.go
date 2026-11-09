@@ -107,7 +107,6 @@ func NewGetDecimalsInstruction(
 
 	// Accounts:
 	stateAccount solanago.PublicKey,
-	feedDescriptionAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -130,8 +129,6 @@ func NewGetDecimalsInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "feed_description": Read-only, Non-signer, Optional
-		accounts__.Append(solanago.NewAccountMeta(feedDescriptionAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -150,7 +147,7 @@ func NewGetDescriptionInstruction(
 
 	// Accounts:
 	stateAccount solanago.PublicKey,
-	feedDescriptionAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -173,8 +170,9 @@ func NewGetDescriptionInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "feed_description": Read-only, Non-signer, Optional
-		accounts__.Append(solanago.NewAccountMeta(feedDescriptionAccount, false, false))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -320,10 +318,11 @@ func NewGetRoundInstruction(
 }
 
 // Builds a "init_feeds" instruction.
-// Create feed accounts (remaining accounts: feed PDAs).
+// Create feed accounts with their descriptions, empty for none (remaining accounts: feed // PDAs).
 func NewInitFeedsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
+	descriptionsParam []string,
 
 	// Accounts:
 	feedAdminAccount solanago.PublicKey,
@@ -345,6 +344,11 @@ func NewInitFeedsInstruction(
 		err = enc__.Encode(dataIdsParam)
 		if err != nil {
 			return nil, errors.NewField("dataIdsParam", err)
+		}
+		// Serialize `descriptionsParam`:
+		err = enc__.Encode(descriptionsParam)
+		if err != nil {
+			return nil, errors.NewField("descriptionsParam", err)
 		}
 	}
 	accounts__ := solanago.AccountMetaSlice{}
@@ -839,10 +843,10 @@ func NewSetFeedAdminInstruction(
 }
 
 // Builds a "set_feed_descriptions" instruction.
-// Set feed descriptions (remaining accounts: feed description PDAs).
+// Set feed descriptions, empty to clear (remaining accounts: feed PDAs).
 func NewSetFeedDescriptionsInstruction(
 	// Params:
-	indexedFeedIdsParam [][16]uint8,
+	dataIdsParam [][16]uint8,
 	descriptionsParam []string,
 
 	// Accounts:
@@ -861,10 +865,10 @@ func NewSetFeedDescriptionsInstruction(
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
 	{
-		// Serialize `indexedFeedIdsParam`:
-		err = enc__.Encode(indexedFeedIdsParam)
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
 		if err != nil {
-			return nil, errors.NewField("indexedFeedIdsParam", err)
+			return nil, errors.NewField("dataIdsParam", err)
 		}
 		// Serialize `descriptionsParam`:
 		err = enc__.Encode(descriptionsParam)
@@ -1474,9 +1478,7 @@ type GetDecimalsInstruction struct {
 	DataId [16]uint8 `json:"data_id"`
 
 	// Accounts:
-	State                   solanago.PublicKey `json:"state"`
-	FeedDescription         solanago.PublicKey `json:"feed_description"`
-	FeedDescriptionOptional bool               `json:"feed_description_optional"`
+	State solanago.PublicKey `json:"state"`
 }
 
 func (obj *GetDecimalsInstruction) GetDiscriminator() []byte {
@@ -1515,20 +1517,13 @@ func (obj *GetDecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8,
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from feed_description account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_description", err)
-	}
-	indices = append(indices, index)
 	return indices, nil
 }
 
 func (obj *GetDecimalsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 2 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	if len(indices) != 1 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 1, len(indices))
 	}
 	indexOffset := 0
 	// Set state account from index
@@ -1537,19 +1532,12 @@ func (obj *GetDecimalsInstruction) PopulateFromAccountIndices(indices []uint8, a
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set feed_description account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_description", len(accountKeys)-1)
-	}
-	obj.FeedDescription = accountKeys[indices[indexOffset]]
-	indexOffset++
 	return nil
 }
 
 func (obj *GetDecimalsInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.FeedDescription)
 	return keys
 }
 
@@ -1578,9 +1566,8 @@ type GetDescriptionInstruction struct {
 	DataId [16]uint8 `json:"data_id"`
 
 	// Accounts:
-	State                   solanago.PublicKey `json:"state"`
-	FeedDescription         solanago.PublicKey `json:"feed_description"`
-	FeedDescriptionOptional bool               `json:"feed_description_optional"`
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
 }
 
 func (obj *GetDescriptionInstruction) GetDiscriminator() []byte {
@@ -1619,11 +1606,11 @@ func (obj *GetDescriptionInstruction) UnmarshalAccountIndices(buf []byte) ([]uin
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from feed_description account index
+	// Decode from feed account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_description", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
 	}
 	indices = append(indices, index)
 	return indices, nil
@@ -1641,11 +1628,11 @@ func (obj *GetDescriptionInstruction) PopulateFromAccountIndices(indices []uint8
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set feed_description account from index
+	// Set feed account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_description", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
 	}
-	obj.FeedDescription = accountKeys[indices[indexOffset]]
+	obj.Feed = accountKeys[indices[indexOffset]]
 	indexOffset++
 	return nil
 }
@@ -1653,7 +1640,7 @@ func (obj *GetDescriptionInstruction) PopulateFromAccountIndices(indices []uint8
 func (obj *GetDescriptionInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.FeedDescription)
+	keys = append(keys, obj.Feed)
 	return keys
 }
 
@@ -1979,7 +1966,8 @@ func UnmarshalGetRoundInstruction(buf []byte) (*GetRoundInstruction, error) {
 }
 
 type InitFeedsInstruction struct {
-	DataIds [][16]uint8 `json:"data_ids"`
+	DataIds      [][16]uint8 `json:"data_ids"`
+	Descriptions []string    `json:"descriptions"`
 
 	// Accounts:
 	FeedAdmin         solanago.PublicKey `json:"feed_admin"`
@@ -2008,6 +1996,11 @@ func (obj *InitFeedsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) e
 	}
 	// Deserialize `DataIds`:
 	err = decoder.Decode(&obj.DataIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Descriptions`:
+	err = decoder.Decode(&obj.Descriptions)
 	if err != nil {
 		return err
 	}
@@ -3436,8 +3429,8 @@ func UnmarshalSetFeedAdminInstruction(buf []byte) (*SetFeedAdminInstruction, err
 }
 
 type SetFeedDescriptionsInstruction struct {
-	IndexedFeedIds [][16]uint8 `json:"indexed_feed_ids"`
-	Descriptions   []string    `json:"descriptions"`
+	DataIds      [][16]uint8 `json:"data_ids"`
+	Descriptions []string    `json:"descriptions"`
 
 	// Accounts:
 	FeedAdmin         solanago.PublicKey `json:"feed_admin"`
@@ -3464,8 +3457,8 @@ func (obj *SetFeedDescriptionsInstruction) UnmarshalWithDecoder(decoder *binary.
 	if discriminator != Instruction_SetFeedDescriptions {
 		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetFeedDescriptionsInstruction", Instruction_SetFeedDescriptions, discriminator)
 	}
-	// Deserialize `IndexedFeedIds`:
-	err = decoder.Decode(&obj.IndexedFeedIds)
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
 	if err != nil {
 		return err
 	}

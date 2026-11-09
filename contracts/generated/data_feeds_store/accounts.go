@@ -22,13 +22,6 @@ func ParseAnyAccount(accountData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal account as FeedData: %w", err)
 		}
 		return value, nil
-	case Account_FeedDescription:
-		value := new(FeedDescription)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal account as FeedDescription: %w", err)
-		}
-		return value, nil
 	case Account_StoreState:
 		value := new(StoreState)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -54,23 +47,6 @@ func ParseAccount_FeedData(accountData []byte) (*FeedData, error) {
 	err = acc.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal account of type FeedData: %w", err)
-	}
-	return acc, nil
-}
-
-func ParseAccount_FeedDescription(accountData []byte) (*FeedDescription, error) {
-	decoder := binary.NewBorshDecoder(accountData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Account_FeedDescription {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Account_FeedDescription, binary.FormatDiscriminator(discriminator))
-	}
-	acc := new(FeedDescription)
-	err = acc.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal account of type FeedDescription: %w", err)
 	}
 	return acc, nil
 }
