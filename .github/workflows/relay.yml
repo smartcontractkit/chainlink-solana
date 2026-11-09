@@ -35,6 +35,8 @@ jobs:
           echo "if this fails run 'make generate' to fix"
           git diff --stat --exit-code
       - name: Install Solana CLI
+        env:
+            SOLANA_VERSION: v4.2.2
         run: ./scripts/install-solana-ci.sh
       - name: Build
         run: go build ./pkg/...
