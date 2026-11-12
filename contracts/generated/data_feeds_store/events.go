@@ -50,13 +50,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedAdminSet: %w", err)
 		}
 		return value, nil
-	case Event_FeedCreationSkipped:
-		value := new(FeedCreationSkipped)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as FeedCreationSkipped: %w", err)
-		}
-		return value, nil
 	case Event_FeedDescriptionSet:
 		value := new(FeedDescriptionSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -69,6 +62,13 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedFrozenSet: %w", err)
+		}
+		return value, nil
+	case Event_FeedNotInitializedIgnored:
+		value := new(FeedNotInitializedIgnored)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as FeedNotInitializedIgnored: %w", err)
 		}
 		return value, nil
 	case Event_FeedUpdated:
@@ -132,6 +132,13 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as MaxStoredReportsSet: %w", err)
+		}
+		return value, nil
+	case Event_MinDecimalsSet:
+		value := new(MinDecimalsSet)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as MinDecimalsSet: %w", err)
 		}
 		return value, nil
 	case Event_MinMaxAnswerSet:
@@ -280,23 +287,6 @@ func ParseEvent_FeedAdminSet(eventData []byte) (*FeedAdminSet, error) {
 	return event, nil
 }
 
-func ParseEvent_FeedCreationSkipped(eventData []byte) (*FeedCreationSkipped, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_FeedCreationSkipped {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedCreationSkipped, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(FeedCreationSkipped)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type FeedCreationSkipped: %w", err)
-	}
-	return event, nil
-}
-
 func ParseEvent_FeedDescriptionSet(eventData []byte) (*FeedDescriptionSet, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -327,6 +317,23 @@ func ParseEvent_FeedFrozenSet(eventData []byte) (*FeedFrozenSet, error) {
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type FeedFrozenSet: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_FeedNotInitializedIgnored(eventData []byte) (*FeedNotInitializedIgnored, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_FeedNotInitializedIgnored {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedNotInitializedIgnored, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(FeedNotInitializedIgnored)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedNotInitializedIgnored: %w", err)
 	}
 	return event, nil
 }
@@ -480,6 +487,23 @@ func ParseEvent_MaxStoredReportsSet(eventData []byte) (*MaxStoredReportsSet, err
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type MaxStoredReportsSet: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_MinDecimalsSet(eventData []byte) (*MinDecimalsSet, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_MinDecimalsSet {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_MinDecimalsSet, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(MinDecimalsSet)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type MinDecimalsSet: %w", err)
 	}
 	return event, nil
 }

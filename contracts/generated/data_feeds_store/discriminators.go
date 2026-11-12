@@ -5,7 +5,7 @@ package data_feeds_store
 
 // Account discriminators
 var (
-	Account_FeedConfig = [8]byte{75, 97, 12, 15, 89, 221, 78, 71}
+	Account_Feed       = [8]byte{69, 191, 16, 227, 132, 187, 84, 227}
 	Account_StoreState = [8]byte{216, 96, 91, 102, 135, 35, 32, 195}
 )
 
@@ -16,9 +16,9 @@ var (
 	Event_Df1FeedSet                                  = [8]byte{240, 128, 248, 162, 174, 142, 147, 7}
 	Event_Df1WriteSkipped                             = [8]byte{246, 212, 115, 127, 120, 144, 94, 138}
 	Event_FeedAdminSet                                = [8]byte{34, 71, 225, 118, 151, 185, 149, 144}
-	Event_FeedCreationSkipped                         = [8]byte{190, 187, 80, 147, 210, 10, 152, 173}
 	Event_FeedDescriptionSet                          = [8]byte{204, 4, 197, 215, 180, 77, 137, 82}
 	Event_FeedFrozenSet                               = [8]byte{224, 38, 175, 246, 77, 12, 164, 232}
+	Event_FeedNotInitializedIgnored                   = [8]byte{93, 168, 81, 77, 76, 3, 181, 171}
 	Event_FeedUpdated                                 = [8]byte{200, 60, 190, 86, 247, 9, 50, 81}
 	Event_FeedWritesDisabledIgnored                   = [8]byte{239, 159, 239, 87, 175, 122, 3, 127}
 	Event_FeedWritesDisabledSet                       = [8]byte{172, 0, 243, 31, 50, 174, 58, 138}
@@ -28,6 +28,7 @@ var (
 	Event_InvalidUpdatePermission                     = [8]byte{140, 196, 100, 239, 180, 175, 183, 154}
 	Event_MaxObservationForwardDurationSecondsUpdated = [8]byte{21, 34, 81, 2, 208, 208, 147, 222}
 	Event_MaxStoredReportsSet                         = [8]byte{17, 12, 52, 44, 242, 141, 146, 135}
+	Event_MinDecimalsSet                              = [8]byte{245, 240, 25, 167, 15, 238, 169, 56}
 	Event_MinMaxAnswerSet                             = [8]byte{211, 78, 9, 218, 192, 44, 136, 221}
 	Event_OwnershipTransferRequested                  = [8]byte{79, 54, 99, 123, 57, 244, 134, 35}
 	Event_OwnershipTransferred                        = [8]byte{172, 61, 205, 183, 250, 50, 38, 98}
@@ -42,7 +43,12 @@ var (
 var (
 	Instruction_AcceptOwnership                  = [8]byte{172, 23, 43, 13, 238, 213, 85, 150}
 	Instruction_CheckFeedPermission              = [8]byte{27, 200, 93, 229, 253, 200, 18, 191}
+	Instruction_Decimals                         = [8]byte{10, 13, 54, 47, 194, 114, 117, 185}
+	Instruction_Description                      = [8]byte{210, 239, 109, 163, 118, 93, 134, 75}
+	Instruction_GetMinDecimals                   = [8]byte{33, 252, 139, 15, 240, 33, 41, 72}
+	Instruction_GetRound                         = [8]byte{38, 203, 121, 16, 1, 137, 65, 163}
 	Instruction_Initialize                       = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
+	Instruction_LatestRound                      = [8]byte{77, 10, 222, 196, 50, 115, 238, 22}
 	Instruction_OnReport                         = [8]byte{214, 173, 18, 221, 173, 148, 151, 208}
 	Instruction_RecoverNative                    = [8]byte{69, 102, 250, 101, 197, 55, 113, 4}
 	Instruction_RecoverTokens                    = [8]byte{156, 18, 205, 212, 197, 254, 126, 142}
@@ -53,8 +59,10 @@ var (
 	Instruction_SetFeedDescriptions              = [8]byte{154, 207, 197, 50, 43, 120, 101, 198}
 	Instruction_SetFeedFrozen                    = [8]byte{252, 200, 81, 10, 228, 254, 20, 124}
 	Instruction_SetFeedWritesDisabled            = [8]byte{130, 122, 143, 71, 158, 161, 216, 226}
+	Instruction_SetFeeds                         = [8]byte{159, 12, 251, 93, 171, 89, 138, 64}
 	Instruction_SetMaxObservationForwardDuration = [8]byte{233, 9, 168, 103, 236, 111, 38, 73}
 	Instruction_SetMaxStoredReports              = [8]byte{20, 146, 17, 61, 33, 203, 64, 68}
+	Instruction_SetMinDecimals                   = [8]byte{17, 255, 197, 7, 99, 199, 231, 242}
 	Instruction_SetMinMaxAnswers                 = [8]byte{243, 255, 180, 93, 224, 128, 31, 118}
 	Instruction_SetSpecificFeedMetadata          = [8]byte{35, 65, 227, 238, 243, 106, 223, 104}
 	Instruction_TransferOwnership                = [8]byte{65, 177, 215, 73, 53, 45, 99, 47}

@@ -1,46 +1,23 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use data_feeds_proxy::{
-    common::{MAX_ACCOUNT_DATA_INCREASE, MIN_MAX_STORED_REPORTS},
-    state::feed_account_len,
-};
-
 use crate::{
     common::{
-        ACCOUNT_VERSION, DF1_WRITER_SEED, FEED_WRITER_SEED, MAX_WORKFLOW_METADATAS,
-        STORE_AUTHORITY_SEED,
+        ACCOUNT_VERSION, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE, MAX_WORKFLOW_METADATAS,
+        MIN_MAX_STORED_REPORTS, STORE_AUTHORITY_SEED,
     },
     context::*,
     error::StoreError,
     event::*,
-    state::WorkflowMetadata,
+    state::{feed_account_len, StoreConfig, WorkflowMetadata},
     utils::{validate_workflow_metadata, verify_feed_admin, EventEmitter},
 };
-
-/// What a store is created with.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
-pub struct StoreConfig {
-    /// Strictly increasing
-    pub feed_admins: Vec<Pubkey>,
-    /// Ring size of the feeds the store creates
-    pub default_max_stored_reports: u64,
-    pub max_observation_forward_secs: u32,
-    /// Proxy program owning the feed accounts
-    pub proxy_program: Pubkey,
-    /// Proxy state that trusts (or will trust) this store's `feed_writer`
-    pub proxy_state: Pubkey,
-    /// DF1 store program whose feeds this store can keep written
-    pub df1_program: Pubkey,
-}
 
 pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
     let StoreConfig {
         feed_admins,
         default_max_stored_reports,
         max_observation_forward_secs,
-        proxy_program,
-        proxy_state,
         df1_program,
     } = config;
     require!(
@@ -48,9 +25,7 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
             && feed_account_len(default_max_stored_reports) <= MAX_ACCOUNT_DATA_INCREASE,
         StoreError::InvalidMaxStoredReports
     );
-    for key in [proxy_program, proxy_state, df1_program] {
-        require_keys_neq!(key, Pubkey::default(), StoreError::InvalidAddress);
-    }
+    require_keys_neq!(df1_program, Pubkey::default(), StoreError::InvalidAddress);
 
     let state_key = ctx.accounts.state.key();
     let state = &mut ctx.accounts.state.load_init()?;
@@ -58,13 +33,10 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
     state.owner = ctx.accounts.owner.key();
     state.default_max_stored_reports = default_max_stored_reports;
     state.max_observation_forward_secs = max_observation_forward_secs;
-    state.proxy_program = proxy_program;
-    state.proxy_state = proxy_state;
     state.df1_program = df1_program;
     let bump =
         |seed: &[u8]| Pubkey::find_program_address(&[seed, state_key.as_ref()], &crate::ID).1;
     state.store_authority_bump = bump(STORE_AUTHORITY_SEED);
-    state.feed_writer_bump = bump(FEED_WRITER_SEED);
     state.df1_writer_bump = bump(DF1_WRITER_SEED);
 
     require!(
@@ -93,8 +65,6 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
         state: state_key,
         default_max_stored_reports,
         max_observation_forward_secs,
-        proxy_program,
-        proxy_state,
         df1_program,
     });
     Ok(())
@@ -228,7 +198,7 @@ pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
     Ok(())
 }
 
-/// Recover native SOL from the vault, e.g. what feed creation no longer needs.
+/// Recover native SOL sent to the store authority.
 pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
     require!(
         amount <= ctx.accounts.store_authority.lamports(),

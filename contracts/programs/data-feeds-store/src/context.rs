@@ -1,11 +1,9 @@
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::common::{
-    ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_WRITER_SEED, FEED_WRITER_SEED, STORE_AUTHORITY_SEED,
-};
+use crate::common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_WRITER_SEED, STORE_AUTHORITY_SEED};
 use crate::error::StoreError;
-use crate::state::{FeedConfig, StoreState};
+use crate::state::{Feed, StoreState};
 
 // Every context that changes state emits CPI events (`#[event_cpi]` adds the event authority PDA
 // and this program as its last accounts). Every context checks the state's layout version.
@@ -65,42 +63,16 @@ pub struct FeedAdminState<'info> {
     pub state: AccountLoader<'info, StoreState>,
 }
 
-/// Feed admin changes to feed configs passed as remaining accounts. The feed admin pays for configs
-/// that are created.
+/// Feed admin changes to feeds passed as remaining accounts. The feed admin pays for feeds that
+/// are created or grown.
 #[event_cpi]
 #[derive(Accounts)]
-pub struct FeedAdminConfigs<'info> {
+pub struct FeedAdminAccounts<'info> {
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
-
-    pub system_program: Program<'info, System>,
-}
-
-/// Feed admin changes to proxy feeds passed as remaining accounts, made by the store's
-/// `feed_writer` through the proxy. The feed admin pays for feeds that are created or grown.
-#[event_cpi]
-#[derive(Accounts)]
-pub struct FeedAdminProxy<'info> {
-    #[account(mut)]
-    pub feed_admin: Signer<'info>,
-
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
-    pub state: AccountLoader<'info, StoreState>,
-
-    /// CHECK: the proxy program this store writes
-    #[account(executable, address = state.load()?.proxy_program @ StoreError::AccountMismatch)]
-    pub proxy_program: UncheckedAccount<'info>,
-
-    /// CHECK: the proxy state trusting this store, checked by the proxy
-    #[account(address = state.load()?.proxy_state @ StoreError::AccountMismatch)]
-    pub proxy_state: UncheckedAccount<'info>,
-
-    /// CHECK: the store's signer towards the proxy
-    #[account(seeds = [FEED_WRITER_SEED, state.key().as_ref()], bump = state.load()?.feed_writer_bump)]
-    pub feed_writer: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -119,18 +91,6 @@ pub struct OnReport<'info> {
     /// Version checked in the handler, which loads it once for every report
     pub state: AccountLoader<'info, StoreState>,
 
-    /// CHECK: the proxy program this store writes
-    #[account(address = state.load()?.proxy_program @ StoreError::AccountMismatch)]
-    pub proxy_program: UncheckedAccount<'info>,
-
-    /// CHECK: the proxy state trusting this store, checked by the proxy
-    #[account(address = state.load()?.proxy_state @ StoreError::AccountMismatch)]
-    pub proxy_state: UncheckedAccount<'info>,
-
-    /// CHECK: the store's signer towards the proxy
-    #[account(seeds = [FEED_WRITER_SEED, state.key().as_ref()], bump = state.load()?.feed_writer_bump)]
-    pub feed_writer: UncheckedAccount<'info>,
-
     /// CHECK: the DF1 program, when a report's feed is kept written in DF1
     #[account(address = state.load()?.df1_program @ StoreError::AccountMismatch)]
     pub df1_program: Option<UncheckedAccount<'info>>,
@@ -138,18 +98,20 @@ pub struct OnReport<'info> {
     /// CHECK: the store's signer towards DF1, when a report's feed is kept written in DF1
     #[account(seeds = [DF1_WRITER_SEED, state.key().as_ref()], bump = state.load()?.df1_writer_bump)]
     pub df1_writer: Option<UncheckedAccount<'info>>,
-
-    /// CHECK: the vault paying for feeds created by their first report, when one is created
-    #[account(mut, seeds = [STORE_AUTHORITY_SEED, state.key().as_ref()], bump = state.load()?.store_authority_bump)]
-    pub vault: Option<UncheckedAccount<'info>>,
-
-    /// When a feed is created
-    pub system_program: Option<Program<'info, System>>,
     // event authority and program (`#[event_cpi]`), then the remaining accounts, one group per
     // report in report order:
-    //   the data ID's proxy feed (writable)
-    //   the data ID's feed config (writable when it doesn't exist yet)
-    //   the DF1 feed (writable), when the feed config links one
+    //   the data ID's feed (writable)
+    //   the DF1 feed (writable), when the feed links one
+}
+
+/// Reads of one feed.
+#[derive(Accounts)]
+pub struct FeedRead<'info> {
+    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    pub state: AccountLoader<'info, StoreState>,
+
+    /// Feed of the data ID, matched against the state and the data ID in the handler
+    pub feed: AccountLoader<'info, Feed>,
 }
 
 /// Whether a workflow may write a data ID.
@@ -158,8 +120,8 @@ pub struct PermissionRead<'info> {
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
-    /// Config of the data ID, the default metadata applies when omitted
-    pub feed_config: Option<AccountLoader<'info, FeedConfig>>,
+    /// Feed of the data ID, the default metadata applies when omitted
+    pub feed: Option<AccountLoader<'info, Feed>>,
 }
 
 #[event_cpi]
@@ -198,7 +160,7 @@ pub struct RecoverNative<'info> {
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
-    /// CHECK: the vault, holding SOL for feed creation and SOL sent to the store
+    /// CHECK: PDA holding native SOL sent to the store
     #[account(
         mut,
         seeds = [STORE_AUTHORITY_SEED, state.key().as_ref()],

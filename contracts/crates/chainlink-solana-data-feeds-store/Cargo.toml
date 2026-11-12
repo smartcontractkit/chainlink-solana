@@ -1,13 +1,13 @@
 [package]
-name = "chainlink_solana_data_feeds_proxy"
-description = "Readers for the Chainlink Data Feeds proxy on Solana"
+name = "chainlink_solana_data_feeds_store"
+description = "Readers for the Chainlink Data Feeds store on Solana"
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "chainlink_solana_data_feeds_proxy"
+name = "chainlink_solana_data_feeds_store"
 
 [features]
 default = []
@@ -15,7 +15,7 @@ default = []
 [dependencies]
 anchor-lang = "0.31.0"
 bytemuck = { version = "1.20.0", features = ["derive", "min_const_generics", "extern_crate_alloc"] }
-data-feeds-proxy = { path = "../../programs/data-feeds-proxy", features = ["cpi"] }
+data-feeds-store = { path = "../../programs/data-feeds-store", features = ["cpi"] }
 
 [lints]
 workspace = true

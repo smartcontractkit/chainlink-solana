@@ -1,20 +1,17 @@
 //! Events mirror the EVM `DataFeedsStore` where it has them, each also carries the store state
 //! account. They are emitted as CPI events: a self-invoke the event authority PDA signs, carried in
 //! the transaction's inner instructions, so they cannot be lost to log truncation when one
-//! `on_report` applies many reports. Feed changes the store makes through the proxy are reported
-//! here: the proxy emits no events for them.
+//! `on_report` applies many reports.
 
 use anchor_lang::prelude::*;
 
-use crate::state::{Df1SkipReason, FeedCreationSkipReason, WorkflowMetadata};
+use crate::state::{Df1SkipReason, WorkflowMetadata};
 
 #[event]
 pub struct StoreInitialized {
     pub state: Pubkey,
     pub default_max_stored_reports: u64,
     pub max_observation_forward_secs: u32,
-    pub proxy_program: Pubkey,
-    pub proxy_state: Pubkey,
     pub df1_program: Pubkey,
 }
 
@@ -64,8 +61,7 @@ pub struct MaxObservationForwardDurationSecondsUpdated {
     pub new_duration: u32,
 }
 
-/// Feeds' proxy accounts were created, by their first report or a feed admin setting. One event per
-/// instruction: a transaction carries at most 64 instructions, events and inner calls included.
+/// Feeds were created by a feed admin setting, the feed admin paying their rent.
 #[event]
 pub struct FeedsCreated {
     pub state: Pubkey,
@@ -93,6 +89,13 @@ pub struct FeedDescriptionSet {
     pub state: Pubkey,
     pub data_id: [u8; 16],
     pub description: String,
+}
+
+#[event]
+pub struct MinDecimalsSet {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+    pub min_decimals: u8,
 }
 
 /// Reads of the feed were frozen or unfrozen.
@@ -181,18 +184,17 @@ pub struct Df1WriteSkipped {
     pub reason: Df1SkipReason,
 }
 
-/// A permitted report for a new data ID was skipped because its feed could not be created.
-#[event]
-pub struct FeedCreationSkipped {
-    pub state: Pubkey,
-    pub data_id: [u8; 16],
-    pub reason: FeedCreationSkipReason,
-}
-
 /// The skip events below carry the sender: they are emitted before the permission check, so anyone
 /// can cause them, and indexers must not take them as coming from a forwarder.
 #[event]
 pub struct InvalidDataIdIgnored {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+    pub sender: Pubkey,
+}
+
+#[event]
+pub struct FeedNotInitializedIgnored {
     pub state: Pubkey,
     pub data_id: [u8; 16],
     pub sender: Pubkey,

@@ -3,26 +3,32 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 /// Version written to every account the program creates, bumped on layout changes.
 pub const ACCOUNT_VERSION: u8 = 1;
 
-/// Decimals every report answer has, and the proxy stores.
+/// Decimals every answer is stored with, and the most decimals a read can ask for.
 pub const STORED_DECIMALS: u8 = 18;
 
 pub const MAX_FEED_ADMINS: usize = 64;
 
 pub const MAX_WORKFLOW_METADATAS: usize = 16;
 
+/// Max UTF-8 bytes of a feed description.
+pub const DESCRIPTION_LEN: usize = 64;
+
+/// Keep at least 2 stored rounds so a previous round stays readable.
+pub const MIN_MAX_STORED_REPORTS: u64 = 2;
+
+/// Accounts created or grown inside a program can change by at most 10KiB per instruction.
+pub const MAX_ACCOUNT_DATA_INCREASE: usize = 10_240;
+
 pub const ZERO_ADDRESS: [u8; 20] = [0; 20];
 
 pub const ZERO_NAME: [u8; 10] = [0; 10];
 
-/// System account holding the store's SOL: it pays the rent of feeds created by their first report,
-/// and holds tokens and SOL the owner can recover. Only this program can sign for it.
+/// A data ID's feed: `[seed, state, data ID zero padded to 32 bytes]`.
+pub const FEED_SEED: &[u8] = b"feed";
+/// PDA owning tokens and SOL sent to the store, recoverable by the owner. It signs nothing else.
 pub const STORE_AUTHORITY_SEED: &[u8] = b"store_authority";
-/// The store's signer towards the proxy, the proxy's trusted writer: `[seed, state]`.
-pub const FEED_WRITER_SEED: &[u8] = b"feed_writer";
 /// The store's signer towards DF1, set as the writer of DF1 feeds it keeps written: `[seed, state]`.
 pub const DF1_WRITER_SEED: &[u8] = b"df1_writer";
-/// A data ID's write settings: `[seed, state, data ID zero padded to 32 bytes]`.
-pub const FEED_CONFIG_SEED: &[u8] = b"feed_config";
 
 /// The DF1 store's `Transmissions` feed accounts and `submit` instruction, as deployed. The store
 /// checks everything `submit` could fail on before calling it.

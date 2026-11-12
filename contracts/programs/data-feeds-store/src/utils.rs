@@ -12,17 +12,22 @@ use anchor_lang::{
 use bytemuck::Pod;
 
 use crate::{
-    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_CONFIG_SEED, ZERO_ADDRESS, ZERO_NAME},
+    common::{
+        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, FEED_SEED, ZERO_ADDRESS, ZERO_NAME,
+    },
     data_id,
     error::StoreError,
-    state::{AccountList, FeedConfig, WorkflowMetadata},
+    logic::Ring,
+    state::{
+        feed_account_len, AccountList, Feed, StoredReport, WorkflowMetadata, FEED_RING_OFFSET,
+    },
 };
 
 /// Create a program owned PDA, topping up an account someone pre-funded (a plain `create_account`
-/// would fail on it). `signers` are the PDA's seeds, and the payer's when the payer is a PDA too.
+/// would fail on it). `payer` must already be a signer of this instruction.
 pub fn create_pda_account<'info>(
     space: usize,
-    signers: &[&[&[u8]]],
+    seeds: &[&[u8]],
     payer: &AccountInfo<'info>,
     to_account: &AccountInfo<'info>,
     system_program: &AccountInfo<'info>,
@@ -40,28 +45,43 @@ pub fn create_pda_account<'info>(
                 &crate::ID,
             ),
             &[payer.clone(), to_account.clone(), system_program.clone()],
-            signers,
+            &[seeds],
         )?;
         return Ok(());
     }
 
     let required_lamports = rent.saturating_sub(current_lamports);
     if required_lamports > 0 {
-        invoke_signed(
-            &system_instruction::transfer(payer.key, to_account.key, required_lamports),
-            &[payer.clone(), to_account.clone(), system_program.clone()],
-            signers,
+        anchor_lang::system_program::transfer(
+            CpiContext::new(
+                system_program.clone(),
+                anchor_lang::system_program::Transfer {
+                    from: payer.clone(),
+                    to: to_account.clone(),
+                },
+            ),
+            required_lamports,
         )?;
     }
-    invoke_signed(
-        &system_instruction::allocate(to_account.key, space as u64),
-        &[to_account.clone(), system_program.clone()],
-        signers,
+    anchor_lang::system_program::allocate(
+        CpiContext::new(
+            system_program.clone(),
+            anchor_lang::system_program::Allocate {
+                account_to_allocate: to_account.clone(),
+            },
+        )
+        .with_signer(&[seeds]),
+        space as u64,
     )?;
-    invoke_signed(
-        &system_instruction::assign(to_account.key, &crate::ID),
-        &[to_account.clone(), system_program.clone()],
-        signers,
+    anchor_lang::system_program::assign(
+        CpiContext::new(
+            system_program.clone(),
+            anchor_lang::system_program::Assign {
+                account_to_assign: to_account.clone(),
+            },
+        )
+        .with_signer(&[seeds]),
+        &crate::ID,
     )?;
     Ok(())
 }
@@ -82,94 +102,139 @@ pub fn load_boxed<T: Pod + Discriminator>(info: &AccountInfo) -> Result<Box<T>> 
     Ok(value)
 }
 
-/// Write a zero-copy account's discriminator and data.
-pub fn store<T: Pod + Discriminator>(info: &AccountInfo, value: &T) -> Result<()> {
-    require!(info.is_writable, StoreError::AccountNotWritable);
-    let mut data = info.try_borrow_mut_data()?;
-    data[..ANCHOR_DISCRIMINATOR].copy_from_slice(T::DISCRIMINATOR);
-    data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<T>()]
-        .copy_from_slice(bytemuck::bytes_of(value));
-    Ok(())
-}
-
 /// Whether an account was never created.
 pub fn is_uninitialized(info: &AccountInfo) -> bool {
     *info.owner == System::id() && info.data_is_empty()
 }
 
-/// The feed config address of a data ID and its bump.
-pub fn feed_config_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
+/// The feed address of a data ID under a store state, and its bump.
+pub fn feed_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[FEED_CONFIG_SEED, state.as_ref(), &data_id::to_seed(data_id)],
+        &[FEED_SEED, state.as_ref(), &data_id::to_seed(data_id)],
         &crate::ID,
     )
 }
 
-/// Load a feed config of `state` and `data_id` into an existing buffer, checking its version. Batches
-/// reuse one buffer: the program's bump allocator never frees.
-pub fn load_config_into(
-    info: &AccountInfo,
+/// Decode a feed header from a feed account's data, checking the discriminator, version, store
+/// state, data ID and that its ring fits. Shared by the program and readers decoding accounts.
+pub fn decode_feed_into(
+    data: &[u8],
     state: &Pubkey,
     data_id: &[u8; 16],
-    config: &mut FeedConfig,
+    feed: &mut Feed,
 ) -> Result<()> {
-    require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
-    {
-        let data = info.try_borrow_data()?;
-        require!(
-            data.len() >= ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>()
-                && &data[..ANCHOR_DISCRIMINATOR] == FeedConfig::DISCRIMINATOR,
-            StoreError::InvalidAccount
-        );
-        bytemuck::bytes_of_mut(config).copy_from_slice(
-            &data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>()],
-        );
-    }
+    require!(
+        data.len() >= ANCHOR_DISCRIMINATOR + size_of::<Feed>()
+            && &data[..ANCHOR_DISCRIMINATOR] == Feed::DISCRIMINATOR,
+        StoreError::InvalidAccount
+    );
+    bytemuck::bytes_of_mut(feed)
+        .copy_from_slice(&data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<Feed>()]);
     require_eq!(
-        config.version,
+        feed.version,
         ACCOUNT_VERSION,
         StoreError::InvalidAccountVersion
     );
     require!(
-        config.state == *state && config.data_id == data_id::to_seed(data_id),
+        feed.state == *state
+            && feed.data_id == data_id::to_seed(data_id)
+            && data.len() >= feed_account_len(feed.max_stored_reports),
         StoreError::AccountMismatch
     );
     Ok(())
 }
 
-/// A new, empty feed config of `state` and `data_id`.
-pub fn new_config(state: &Pubkey, data_id: &[u8; 16], config: &mut FeedConfig) {
-    bytemuck::bytes_of_mut(config).fill(0);
-    config.version = ACCOUNT_VERSION;
-    config.data_id = data_id::to_seed(data_id);
-    config.state = *state;
-}
-
-/// Load a data ID's feed config, creating it at its PDA first when it doesn't exist, `payer` (a
-/// signer of this instruction) paying the rent.
-pub fn load_or_create_config<'info>(
-    info: &AccountInfo<'info>,
+/// Load a feed header of this program into an existing buffer: the bump allocator never frees,
+/// so batches reuse one buffer.
+pub fn load_feed_into(
+    info: &AccountInfo,
     state: &Pubkey,
     data_id: &[u8; 16],
-    payer: &AccountInfo<'info>,
-    system_program: &AccountInfo<'info>,
-    config: &mut FeedConfig,
+    feed: &mut Feed,
 ) -> Result<()> {
-    if !is_uninitialized(info) {
-        return load_config_into(info, state, data_id, config);
+    require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
+    decode_feed_into(&info.try_borrow_data()?, state, data_id, feed)
+}
+
+/// Write a feed header back.
+pub fn store_feed(info: &AccountInfo, feed: &Feed) -> Result<()> {
+    require!(info.is_writable, StoreError::AccountNotWritable);
+    let mut data = info.try_borrow_mut_data()?;
+    data[..ANCHOR_DISCRIMINATOR].copy_from_slice(Feed::DISCRIMINATOR);
+    data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<Feed>()]
+        .copy_from_slice(bytemuck::bytes_of(feed));
+    Ok(())
+}
+
+fn ring_offset(slot: u64) -> usize {
+    FEED_RING_OFFSET + slot as usize * size_of::<StoredReport>()
+}
+
+/// Circular buffer over a feed account's data (the whole account data, header included).
+pub struct RingMut<'a> {
+    data: &'a mut [u8],
+}
+
+impl<'a> RingMut<'a> {
+    pub fn new(data: &'a mut [u8]) -> Self {
+        Self { data }
     }
-    let (address, bump) = feed_config_address(state, data_id);
-    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
-    let seed = data_id::to_seed(data_id);
-    create_pda_account(
-        ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>(),
-        &[&[FEED_CONFIG_SEED, state.as_ref(), &seed, &[bump]]],
-        payer,
-        info,
-        system_program,
-    )?;
-    new_config(state, data_id, config);
-    store(info, config)
+}
+
+impl Ring for RingMut<'_> {
+    fn get(&self, slot: u64) -> StoredReport {
+        let offset = ring_offset(slot);
+        bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
+    }
+
+    fn set(&mut self, slot: u64, report: StoredReport) {
+        let offset = ring_offset(slot);
+        self.data[offset..offset + size_of::<StoredReport>()]
+            .copy_from_slice(bytemuck::bytes_of(&report));
+    }
+}
+
+/// Read-only circular buffer over a feed account's data.
+pub struct RingRef<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> RingRef<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Self { data }
+    }
+}
+
+impl Ring for RingRef<'_> {
+    fn get(&self, slot: u64) -> StoredReport {
+        let offset = ring_offset(slot);
+        bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
+    }
+
+    fn set(&mut self, _slot: u64, _report: StoredReport) {
+        unreachable!("read-only ring")
+    }
+}
+
+pub fn encode_description(description: &str) -> Result<[u8; DESCRIPTION_LEN]> {
+    let bytes = description.as_bytes();
+    require!(
+        bytes.len() <= DESCRIPTION_LEN,
+        StoreError::DescriptionTooLong
+    );
+    // stored zero padded, so a NUL would cut the description short on read
+    require!(!bytes.contains(&0), StoreError::InvalidDescription);
+    let mut out = [0u8; DESCRIPTION_LEN];
+    out[..bytes.len()].copy_from_slice(bytes);
+    Ok(out)
+}
+
+pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
+    let end = description
+        .iter()
+        .position(|b| *b == 0)
+        .unwrap_or(DESCRIPTION_LEN);
+    String::from_utf8_lossy(&description[..end]).into_owned()
 }
 
 /// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke

@@ -431,6 +431,316 @@ func UnmarshalDf1WriteSkipped(buf []byte) (*Df1WriteSkipped, error) {
 	return obj, nil
 }
 
+// One feed: its latest round, how it is read and how it is written, followed in the account by a
+// circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` at slot `r % max_stored_reports`.
+// This is the account readers pass, and its layout is public: fields only move with a version bump.
+type Feed struct {
+	Version uint8 `json:"version"`
+
+	// Reads refuse the feed while set, writes continue
+	Frozen uint8 `json:"frozen"`
+
+	// Fewest decimals a read may ask for
+	MinDecimals uint8 `json:"min_decimals"`
+
+	// Reports are skipped for every workflow while set, reads continue
+	WritesDisabled              uint8  `json:"writes_disabled"`
+	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
+	LatestRecordedTimestamp     uint32 `json:"latest_recorded_timestamp"`
+
+	// Whether an accepted answer range is set, unbounded otherwise
+	MinMaxConfigured uint8 `json:"min_max_configured"`
+
+	// The DF1 write-through is skipped while set, the round is still stored
+	Df1WriteDisabled uint8    `json:"df1_write_disabled"`
+	Padding0         [2]uint8 `json:"_padding0"`
+
+	// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
+	DataId [32]uint8 `json:"data_id"`
+
+	// Store state the feed belongs to
+	State solanago.PublicKey `json:"state"`
+
+	// Latest round ID, 0 before the first round
+	RoundId uint64 `json:"round_id"`
+
+	// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
+	// (`visibleRoundId`), so SVR can be added without moving the fields below.
+	Reserved0          [8]uint8 `json:"_reserved0"`
+	MaxStoredReports   uint64   `json:"max_stored_reports"`
+	LatestRecordedSlot uint64   `json:"latest_recorded_slot"`
+
+	// Latest answer with `STORED_DECIMALS`
+	LatestAnswer binary.Int128 `json:"latest_answer"`
+
+	// UTF-8 description, e.g. "ETH / USD", zero padded, empty when none is set
+	Description [64]uint8 `json:"description"`
+
+	// DF1 feed account kept written with this data ID's rounds, default for none
+	Df1Feed   solanago.PublicKey `json:"df1_feed"`
+	MinAnswer binary.Int128      `json:"min_answer"`
+	MaxAnswer binary.Int128      `json:"max_answer"`
+
+	// Workflows allowed to write this data ID, the store's default workflows when empty
+	SpecificWorkflowMetadata WorkflowMetadataList `json:"specific_workflow_metadata"`
+	Reserved                 [72]uint8            `json:"_reserved"`
+}
+
+func (obj Feed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `Version`:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Serialize `Frozen`:
+	err = encoder.Encode(obj.Frozen)
+	if err != nil {
+		return errors.NewField("Frozen", err)
+	}
+	// Serialize `MinDecimals`:
+	err = encoder.Encode(obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	// Serialize `WritesDisabled`:
+	err = encoder.Encode(obj.WritesDisabled)
+	if err != nil {
+		return errors.NewField("WritesDisabled", err)
+	}
+	// Serialize `LatestObservationsTimestamp`:
+	err = encoder.Encode(obj.LatestObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("LatestObservationsTimestamp", err)
+	}
+	// Serialize `LatestRecordedTimestamp`:
+	err = encoder.Encode(obj.LatestRecordedTimestamp)
+	if err != nil {
+		return errors.NewField("LatestRecordedTimestamp", err)
+	}
+	// Serialize `MinMaxConfigured`:
+	err = encoder.Encode(obj.MinMaxConfigured)
+	if err != nil {
+		return errors.NewField("MinMaxConfigured", err)
+	}
+	// Serialize `Df1WriteDisabled`:
+	err = encoder.Encode(obj.Df1WriteDisabled)
+	if err != nil {
+		return errors.NewField("Df1WriteDisabled", err)
+	}
+	// Serialize `Padding0`:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Serialize `Reserved0`:
+	err = encoder.Encode(obj.Reserved0)
+	if err != nil {
+		return errors.NewField("Reserved0", err)
+	}
+	// Serialize `MaxStoredReports`:
+	err = encoder.Encode(obj.MaxStoredReports)
+	if err != nil {
+		return errors.NewField("MaxStoredReports", err)
+	}
+	// Serialize `LatestRecordedSlot`:
+	err = encoder.Encode(obj.LatestRecordedSlot)
+	if err != nil {
+		return errors.NewField("LatestRecordedSlot", err)
+	}
+	// Serialize `LatestAnswer`:
+	err = encoder.Encode(obj.LatestAnswer)
+	if err != nil {
+		return errors.NewField("LatestAnswer", err)
+	}
+	// Serialize `Description`:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
+	}
+	// Serialize `Df1Feed`:
+	err = encoder.Encode(obj.Df1Feed)
+	if err != nil {
+		return errors.NewField("Df1Feed", err)
+	}
+	// Serialize `MinAnswer`:
+	err = encoder.Encode(obj.MinAnswer)
+	if err != nil {
+		return errors.NewField("MinAnswer", err)
+	}
+	// Serialize `MaxAnswer`:
+	err = encoder.Encode(obj.MaxAnswer)
+	if err != nil {
+		return errors.NewField("MaxAnswer", err)
+	}
+	// Serialize `SpecificWorkflowMetadata`:
+	err = encoder.Encode(obj.SpecificWorkflowMetadata)
+	if err != nil {
+		return errors.NewField("SpecificWorkflowMetadata", err)
+	}
+	// Serialize `Reserved`:
+	err = encoder.Encode(obj.Reserved)
+	if err != nil {
+		return errors.NewField("Reserved", err)
+	}
+	return nil
+}
+
+func (obj Feed) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding Feed: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *Feed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return errors.NewField("Version", err)
+	}
+	// Deserialize `Frozen`:
+	err = decoder.Decode(&obj.Frozen)
+	if err != nil {
+		return errors.NewField("Frozen", err)
+	}
+	// Deserialize `MinDecimals`:
+	err = decoder.Decode(&obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	// Deserialize `WritesDisabled`:
+	err = decoder.Decode(&obj.WritesDisabled)
+	if err != nil {
+		return errors.NewField("WritesDisabled", err)
+	}
+	// Deserialize `LatestObservationsTimestamp`:
+	err = decoder.Decode(&obj.LatestObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("LatestObservationsTimestamp", err)
+	}
+	// Deserialize `LatestRecordedTimestamp`:
+	err = decoder.Decode(&obj.LatestRecordedTimestamp)
+	if err != nil {
+		return errors.NewField("LatestRecordedTimestamp", err)
+	}
+	// Deserialize `MinMaxConfigured`:
+	err = decoder.Decode(&obj.MinMaxConfigured)
+	if err != nil {
+		return errors.NewField("MinMaxConfigured", err)
+	}
+	// Deserialize `Df1WriteDisabled`:
+	err = decoder.Decode(&obj.Df1WriteDisabled)
+	if err != nil {
+		return errors.NewField("Df1WriteDisabled", err)
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Deserialize `Reserved0`:
+	err = decoder.Decode(&obj.Reserved0)
+	if err != nil {
+		return errors.NewField("Reserved0", err)
+	}
+	// Deserialize `MaxStoredReports`:
+	err = decoder.Decode(&obj.MaxStoredReports)
+	if err != nil {
+		return errors.NewField("MaxStoredReports", err)
+	}
+	// Deserialize `LatestRecordedSlot`:
+	err = decoder.Decode(&obj.LatestRecordedSlot)
+	if err != nil {
+		return errors.NewField("LatestRecordedSlot", err)
+	}
+	// Deserialize `LatestAnswer`:
+	err = decoder.Decode(&obj.LatestAnswer)
+	if err != nil {
+		return errors.NewField("LatestAnswer", err)
+	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
+	}
+	// Deserialize `Df1Feed`:
+	err = decoder.Decode(&obj.Df1Feed)
+	if err != nil {
+		return errors.NewField("Df1Feed", err)
+	}
+	// Deserialize `MinAnswer`:
+	err = decoder.Decode(&obj.MinAnswer)
+	if err != nil {
+		return errors.NewField("MinAnswer", err)
+	}
+	// Deserialize `MaxAnswer`:
+	err = decoder.Decode(&obj.MaxAnswer)
+	if err != nil {
+		return errors.NewField("MaxAnswer", err)
+	}
+	// Deserialize `SpecificWorkflowMetadata`:
+	err = decoder.Decode(&obj.SpecificWorkflowMetadata)
+	if err != nil {
+		return errors.NewField("SpecificWorkflowMetadata", err)
+	}
+	// Deserialize `Reserved`:
+	err = decoder.Decode(&obj.Reserved)
+	if err != nil {
+		return errors.NewField("Reserved", err)
+	}
+	return nil
+}
+
+func (obj *Feed) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling Feed: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalFeed(buf []byte) (*Feed, error) {
+	obj := new(Feed)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type FeedAdminSet struct {
 	State     solanago.PublicKey `json:"state"`
 	FeedAdmin solanago.PublicKey `json:"feed_admin"`
@@ -495,292 +805,6 @@ func (obj *FeedAdminSet) Unmarshal(buf []byte) error {
 
 func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
 	obj := new(FeedAdminSet)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-// Write settings of one data ID. A data ID without one is written through the default workflow
-// metadata only, and gets one when its feed is created or a feed admin first configures it.
-type FeedConfig struct {
-	Version uint8 `json:"version"`
-
-	// Reports for the data ID are skipped for every workflow while set, reads continue
-	WritesDisabled uint8 `json:"writes_disabled"`
-
-	// Whether an accepted answer range is set, unbounded otherwise
-	MinMaxConfigured uint8 `json:"min_max_configured"`
-
-	// The DF1 write-through is skipped while set, the round is still stored
-	Df1WriteDisabled uint8    `json:"df1_write_disabled"`
-	Padding0         [4]uint8 `json:"_padding0"`
-
-	// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
-	DataId [32]uint8          `json:"data_id"`
-	State  solanago.PublicKey `json:"state"`
-
-	// DF1 feed account kept written with this data ID's rounds, default for none
-	Df1Feed   solanago.PublicKey `json:"df1_feed"`
-	Padding1  [8]uint8           `json:"_padding1"`
-	MinAnswer binary.Int128      `json:"min_answer"`
-	MaxAnswer binary.Int128      `json:"max_answer"`
-
-	// Workflows allowed to write this data ID, the store's default workflows when empty
-	SpecificWorkflowMetadata WorkflowMetadataList `json:"specific_workflow_metadata"`
-	Reserved                 [56]uint8            `json:"_reserved"`
-}
-
-func (obj FeedConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Version`:
-	err = encoder.Encode(obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Serialize `WritesDisabled`:
-	err = encoder.Encode(obj.WritesDisabled)
-	if err != nil {
-		return errors.NewField("WritesDisabled", err)
-	}
-	// Serialize `MinMaxConfigured`:
-	err = encoder.Encode(obj.MinMaxConfigured)
-	if err != nil {
-		return errors.NewField("MinMaxConfigured", err)
-	}
-	// Serialize `Df1WriteDisabled`:
-	err = encoder.Encode(obj.Df1WriteDisabled)
-	if err != nil {
-		return errors.NewField("Df1WriteDisabled", err)
-	}
-	// Serialize `Padding0`:
-	err = encoder.Encode(obj.Padding0)
-	if err != nil {
-		return errors.NewField("Padding0", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `Df1Feed`:
-	err = encoder.Encode(obj.Df1Feed)
-	if err != nil {
-		return errors.NewField("Df1Feed", err)
-	}
-	// Serialize `Padding1`:
-	err = encoder.Encode(obj.Padding1)
-	if err != nil {
-		return errors.NewField("Padding1", err)
-	}
-	// Serialize `MinAnswer`:
-	err = encoder.Encode(obj.MinAnswer)
-	if err != nil {
-		return errors.NewField("MinAnswer", err)
-	}
-	// Serialize `MaxAnswer`:
-	err = encoder.Encode(obj.MaxAnswer)
-	if err != nil {
-		return errors.NewField("MaxAnswer", err)
-	}
-	// Serialize `SpecificWorkflowMetadata`:
-	err = encoder.Encode(obj.SpecificWorkflowMetadata)
-	if err != nil {
-		return errors.NewField("SpecificWorkflowMetadata", err)
-	}
-	// Serialize `Reserved`:
-	err = encoder.Encode(obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
-	}
-	return nil
-}
-
-func (obj FeedConfig) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedConfig: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *FeedConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Version`:
-	err = decoder.Decode(&obj.Version)
-	if err != nil {
-		return errors.NewField("Version", err)
-	}
-	// Deserialize `WritesDisabled`:
-	err = decoder.Decode(&obj.WritesDisabled)
-	if err != nil {
-		return errors.NewField("WritesDisabled", err)
-	}
-	// Deserialize `MinMaxConfigured`:
-	err = decoder.Decode(&obj.MinMaxConfigured)
-	if err != nil {
-		return errors.NewField("MinMaxConfigured", err)
-	}
-	// Deserialize `Df1WriteDisabled`:
-	err = decoder.Decode(&obj.Df1WriteDisabled)
-	if err != nil {
-		return errors.NewField("Df1WriteDisabled", err)
-	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
-	if err != nil {
-		return errors.NewField("Padding0", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `Df1Feed`:
-	err = decoder.Decode(&obj.Df1Feed)
-	if err != nil {
-		return errors.NewField("Df1Feed", err)
-	}
-	// Deserialize `Padding1`:
-	err = decoder.Decode(&obj.Padding1)
-	if err != nil {
-		return errors.NewField("Padding1", err)
-	}
-	// Deserialize `MinAnswer`:
-	err = decoder.Decode(&obj.MinAnswer)
-	if err != nil {
-		return errors.NewField("MinAnswer", err)
-	}
-	// Deserialize `MaxAnswer`:
-	err = decoder.Decode(&obj.MaxAnswer)
-	if err != nil {
-		return errors.NewField("MaxAnswer", err)
-	}
-	// Deserialize `SpecificWorkflowMetadata`:
-	err = decoder.Decode(&obj.SpecificWorkflowMetadata)
-	if err != nil {
-		return errors.NewField("SpecificWorkflowMetadata", err)
-	}
-	// Deserialize `Reserved`:
-	err = decoder.Decode(&obj.Reserved)
-	if err != nil {
-		return errors.NewField("Reserved", err)
-	}
-	return nil
-}
-
-func (obj *FeedConfig) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedConfig: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalFeedConfig(buf []byte) (*FeedConfig, error) {
-	obj := new(FeedConfig)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-// Why a feed was not created by its first report.
-type FeedCreationSkipReason binary.BorshEnum
-
-const (
-	FeedCreationSkipReason_VaultNotPassed FeedCreationSkipReason = iota
-	FeedCreationSkipReason_InsufficientVaultBalance
-)
-
-func (value FeedCreationSkipReason) String() string {
-	switch value {
-	case FeedCreationSkipReason_VaultNotPassed:
-		return "VaultNotPassed"
-	case FeedCreationSkipReason_InsufficientVaultBalance:
-		return "InsufficientVaultBalance"
-	default:
-		return ""
-	}
-}
-
-// A permitted report for a new data ID was skipped because its feed could not be created.
-type FeedCreationSkipped struct {
-	State  solanago.PublicKey     `json:"state"`
-	DataId [16]uint8              `json:"data_id"`
-	Reason FeedCreationSkipReason `json:"reason"`
-}
-
-func (obj FeedCreationSkipped) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Serialize `Reason`:
-	err = encoder.Encode(obj.Reason)
-	if err != nil {
-		return errors.NewField("Reason", err)
-	}
-	return nil
-}
-
-func (obj FeedCreationSkipped) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedCreationSkipped: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *FeedCreationSkipped) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return errors.NewField("DataId", err)
-	}
-	// Deserialize `Reason`:
-	err = decoder.Decode(&obj.Reason)
-	if err != nil {
-		return errors.NewField("Reason", err)
-	}
-	return nil
-}
-
-func (obj *FeedCreationSkipped) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedCreationSkipped: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalFeedCreationSkipped(buf []byte) (*FeedCreationSkipped, error) {
-	obj := new(FeedCreationSkipped)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -924,6 +948,77 @@ func (obj *FeedFrozenSet) Unmarshal(buf []byte) error {
 
 func UnmarshalFeedFrozenSet(buf []byte) (*FeedFrozenSet, error) {
 	obj := new(FeedFrozenSet)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type FeedNotInitializedIgnored struct {
+	State  solanago.PublicKey `json:"state"`
+	DataId [16]uint8          `json:"data_id"`
+	Sender solanago.PublicKey `json:"sender"`
+}
+
+func (obj FeedNotInitializedIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Serialize `Sender`:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
+	}
+	return nil
+}
+
+func (obj FeedNotInitializedIgnored) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding FeedNotInitializedIgnored: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *FeedNotInitializedIgnored) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return errors.NewField("Sender", err)
+	}
+	return nil
+}
+
+func (obj *FeedNotInitializedIgnored) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling FeedNotInitializedIgnored: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalFeedNotInitializedIgnored(buf []byte) (*FeedNotInitializedIgnored, error) {
+	obj := new(FeedNotInitializedIgnored)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -1167,8 +1262,7 @@ func UnmarshalFeedWritesDisabledSet(buf []byte) (*FeedWritesDisabledSet, error) 
 	return obj, nil
 }
 
-// Feeds' proxy accounts were created, by their first report or a feed admin setting. One event per
-// instruction: a transaction carries at most 64 instructions, events and inner calls included.
+// Feeds were created by a feed admin setting, the feed admin paying their rent.
 type FeedsCreated struct {
 	State            solanago.PublicKey `json:"state"`
 	DataIds          [][16]uint8        `json:"data_ids"`
@@ -1619,6 +1713,77 @@ func UnmarshalMaxStoredReportsSet(buf []byte) (*MaxStoredReportsSet, error) {
 	return obj, nil
 }
 
+type MinDecimalsSet struct {
+	State       solanago.PublicKey `json:"state"`
+	DataId      [16]uint8          `json:"data_id"`
+	MinDecimals uint8              `json:"min_decimals"`
+}
+
+func (obj MinDecimalsSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Serialize `DataId`:
+	err = encoder.Encode(obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Serialize `MinDecimals`:
+	err = encoder.Encode(obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	return nil
+}
+
+func (obj MinDecimalsSet) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding MinDecimalsSet: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *MinDecimalsSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return errors.NewField("State", err)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return errors.NewField("DataId", err)
+	}
+	// Deserialize `MinDecimals`:
+	err = decoder.Decode(&obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	return nil
+}
+
+func (obj *MinDecimalsSet) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling MinDecimalsSet: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalMinDecimalsSet(buf []byte) (*MinDecimalsSet, error) {
+	obj := new(MinDecimalsSet)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type MinMaxAnswerSet struct {
 	State     solanago.PublicKey `json:"state"`
 	DataId    [16]uint8          `json:"data_id"`
@@ -1836,6 +2001,93 @@ func (obj *OwnershipTransferred) Unmarshal(buf []byte) error {
 
 func UnmarshalOwnershipTransferred(buf []byte) (*OwnershipTransferred, error) {
 	obj := new(OwnershipTransferred)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// A round as returned by reads, with the answer at the decimals the reader asked for.
+type Round struct {
+	RoundId uint64        `json:"round_id"`
+	Answer  binary.Int128 `json:"answer"`
+
+	// Offchain observations timestamp
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+
+	// Onchain recorded timestamp
+	RecordedTimestamp uint32 `json:"recorded_timestamp"`
+}
+
+func (obj Round) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Serialize `Answer`:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Serialize `ObservationsTimestamp`:
+	err = encoder.Encode(obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Serialize `RecordedTimestamp`:
+	err = encoder.Encode(obj.RecordedTimestamp)
+	if err != nil {
+		return errors.NewField("RecordedTimestamp", err)
+	}
+	return nil
+}
+
+func (obj Round) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding Round: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *Round) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	// Deserialize `ObservationsTimestamp`:
+	err = decoder.Decode(&obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Deserialize `RecordedTimestamp`:
+	err = decoder.Decode(&obj.RecordedTimestamp)
+	if err != nil {
+		return errors.NewField("RecordedTimestamp", err)
+	}
+	return nil
+}
+
+func (obj *Round) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling Round: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalRound(buf []byte) (*Round, error) {
+	obj := new(Round)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -2065,12 +2317,6 @@ type StoreConfig struct {
 	DefaultMaxStoredReports   uint64 `json:"default_max_stored_reports"`
 	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
 
-	// Proxy program owning the feed accounts
-	ProxyProgram solanago.PublicKey `json:"proxy_program"`
-
-	// Proxy state that trusts (or will trust) this store's `feed_writer`
-	ProxyState solanago.PublicKey `json:"proxy_state"`
-
 	// DF1 store program whose feeds this store can keep written
 	Df1Program solanago.PublicKey `json:"df1_program"`
 }
@@ -2090,16 +2336,6 @@ func (obj StoreConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	err = encoder.Encode(obj.MaxObservationForwardSecs)
 	if err != nil {
 		return errors.NewField("MaxObservationForwardSecs", err)
-	}
-	// Serialize `ProxyProgram`:
-	err = encoder.Encode(obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Serialize `ProxyState`:
-	err = encoder.Encode(obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
 	}
 	// Serialize `Df1Program`:
 	err = encoder.Encode(obj.Df1Program)
@@ -2135,16 +2371,6 @@ func (obj *StoreConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error
 	if err != nil {
 		return errors.NewField("MaxObservationForwardSecs", err)
 	}
-	// Deserialize `ProxyProgram`:
-	err = decoder.Decode(&obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Deserialize `ProxyState`:
-	err = decoder.Decode(&obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
-	}
 	// Deserialize `Df1Program`:
 	err = decoder.Decode(&obj.Df1Program)
 	if err != nil {
@@ -2174,8 +2400,6 @@ type StoreInitialized struct {
 	State                     solanago.PublicKey `json:"state"`
 	DefaultMaxStoredReports   uint64             `json:"default_max_stored_reports"`
 	MaxObservationForwardSecs uint32             `json:"max_observation_forward_secs"`
-	ProxyProgram              solanago.PublicKey `json:"proxy_program"`
-	ProxyState                solanago.PublicKey `json:"proxy_state"`
 	Df1Program                solanago.PublicKey `json:"df1_program"`
 }
 
@@ -2194,16 +2418,6 @@ func (obj StoreInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err err
 	err = encoder.Encode(obj.MaxObservationForwardSecs)
 	if err != nil {
 		return errors.NewField("MaxObservationForwardSecs", err)
-	}
-	// Serialize `ProxyProgram`:
-	err = encoder.Encode(obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Serialize `ProxyState`:
-	err = encoder.Encode(obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
 	}
 	// Serialize `Df1Program`:
 	err = encoder.Encode(obj.Df1Program)
@@ -2239,16 +2453,6 @@ func (obj *StoreInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err 
 	if err != nil {
 		return errors.NewField("MaxObservationForwardSecs", err)
 	}
-	// Deserialize `ProxyProgram`:
-	err = decoder.Decode(&obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Deserialize `ProxyState`:
-	err = decoder.Decode(&obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
-	}
 	// Deserialize `Df1Program`:
 	err = decoder.Decode(&obj.Df1Program)
 	if err != nil {
@@ -2274,19 +2478,17 @@ func UnmarshalStoreInitialized(buf []byte) (*StoreInitialized, error) {
 	return obj, nil
 }
 
-// Store instance: ownership, admins, the proxy it writes, the DF1 program it keeps written and the
-// defaults applied to every feed.
+// Store instance: ownership, admins, the DF1 program it keeps written and the defaults applied to
+// every feed.
 type StoreState struct {
 	Version uint8 `json:"version"`
 
-	// Bump of the store authority PDA, the vault paying for feeds created by their first report
+	// Bump of the store authority PDA, which only holds recoverable tokens and SOL
 	StoreAuthorityBump uint8 `json:"store_authority_bump"`
-
-	// Bump of the `feed_writer` PDA, the proxy's trusted writer
-	FeedWriterBump uint8 `json:"feed_writer_bump"`
 
 	// Bump of the `df1_writer` PDA, the writer of DF1 feeds this store keeps written
 	Df1WriterBump uint8 `json:"df1_writer_bump"`
+	Padding0      uint8 `json:"_padding0"`
 
 	// Maximum seconds a report's observation timestamp may lead the clock before it is ignored
 	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
@@ -2295,12 +2497,6 @@ type StoreState struct {
 	DefaultMaxStoredReports uint64             `json:"default_max_stored_reports"`
 	Owner                   solanago.PublicKey `json:"owner"`
 	ProposedOwner           solanago.PublicKey `json:"proposed_owner"`
-
-	// Proxy program owning the feed accounts
-	ProxyProgram solanago.PublicKey `json:"proxy_program"`
-
-	// Proxy state trusting this store's `feed_writer`
-	ProxyState solanago.PublicKey `json:"proxy_state"`
 
 	// DF1 store program whose feeds this store can keep written
 	Df1Program solanago.PublicKey `json:"df1_program"`
@@ -2322,15 +2518,15 @@ func (obj StoreState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("StoreAuthorityBump", err)
 	}
-	// Serialize `FeedWriterBump`:
-	err = encoder.Encode(obj.FeedWriterBump)
-	if err != nil {
-		return errors.NewField("FeedWriterBump", err)
-	}
 	// Serialize `Df1WriterBump`:
 	err = encoder.Encode(obj.Df1WriterBump)
 	if err != nil {
 		return errors.NewField("Df1WriterBump", err)
+	}
+	// Serialize `Padding0`:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
 	}
 	// Serialize `MaxObservationForwardSecs`:
 	err = encoder.Encode(obj.MaxObservationForwardSecs)
@@ -2351,16 +2547,6 @@ func (obj StoreState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
-	}
-	// Serialize `ProxyProgram`:
-	err = encoder.Encode(obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Serialize `ProxyState`:
-	err = encoder.Encode(obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
 	}
 	// Serialize `Df1Program`:
 	err = encoder.Encode(obj.Df1Program)
@@ -2406,15 +2592,15 @@ func (obj *StoreState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	if err != nil {
 		return errors.NewField("StoreAuthorityBump", err)
 	}
-	// Deserialize `FeedWriterBump`:
-	err = decoder.Decode(&obj.FeedWriterBump)
-	if err != nil {
-		return errors.NewField("FeedWriterBump", err)
-	}
 	// Deserialize `Df1WriterBump`:
 	err = decoder.Decode(&obj.Df1WriterBump)
 	if err != nil {
 		return errors.NewField("Df1WriterBump", err)
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
 	}
 	// Deserialize `MaxObservationForwardSecs`:
 	err = decoder.Decode(&obj.MaxObservationForwardSecs)
@@ -2435,16 +2621,6 @@ func (obj *StoreState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
-	}
-	// Deserialize `ProxyProgram`:
-	err = decoder.Decode(&obj.ProxyProgram)
-	if err != nil {
-		return errors.NewField("ProxyProgram", err)
-	}
-	// Deserialize `ProxyState`:
-	err = decoder.Decode(&obj.ProxyState)
-	if err != nil {
-		return errors.NewField("ProxyState", err)
 	}
 	// Deserialize `Df1Program`:
 	err = decoder.Decode(&obj.Df1Program)
