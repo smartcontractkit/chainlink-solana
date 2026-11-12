@@ -49,15 +49,164 @@ func NewAcceptOwnershipInstruction(
 	), nil
 }
 
+// Builds a "create_feeds" instruction.
+// Create feeds (remaining accounts: their PDAs), existing ones are left as they are.
+func NewCreateFeedsInstruction(
+	// Params:
+	dataIdsParam [][16]uint8,
+	bumpsParam []byte,
+	maxStoredReportsParam uint64,
+
+	// Accounts:
+	writerAccount solanago.PublicKey,
+	stateAccount solanago.PublicKey,
+	payerAccount solanago.PublicKey,
+	systemProgramAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_CreateFeeds[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdsParam", err)
+		}
+		// Serialize `bumpsParam`:
+		err = enc__.Encode(bumpsParam)
+		if err != nil {
+			return nil, errors.NewField("bumpsParam", err)
+		}
+		// Serialize `maxStoredReportsParam`:
+		err = enc__.Encode(maxStoredReportsParam)
+		if err != nil {
+			return nil, errors.NewField("maxStoredReportsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "writer": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(writerAccount, false, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 2 "payer": Writable, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(payerAccount, true, true))
+		// Account 3 "system_program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "decimals" instruction.
+// Decimals answers are stored with (18), the most a read can ask for.
+func NewDecimalsInstruction(
+	// Params:
+	dataIdParam [16]uint8,
+
+	// Accounts:
+	stateAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_Decimals[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdParam`:
+		err = enc__.Encode(dataIdParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "description" instruction.
+// Description of a data ID's feed, empty when none is set.
+func NewDescriptionInstruction(
+	// Params:
+	dataIdParam [16]uint8,
+
+	// Accounts:
+	stateAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_Description[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdParam`:
+		err = enc__.Encode(dataIdParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
 // Builds a "get_min_decimals" instruction.
-// The fewest decimals `read_scaled` serves a data ID at. Without the data ID's `feed_config` // account this answers 18 even if an admin lowered the minimum, so pass it to get the lower one.
+// The fewest decimals reads of a data ID may ask for.
 func NewGetMinDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
 
 	// Accounts:
 	stateAccount solanago.PublicKey,
-	feedConfigAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
@@ -80,9 +229,94 @@ func NewGetMinDecimalsInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "feed_config": Read-only, Non-signer, Optional
-		// Settings of the data ID, the stored decimals apply when omitted
-		accounts__.Append(solanago.NewAccountMeta(feedConfigAccount, false, false))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "get_round" instruction.
+// A stored round of a data ID, as `latest_round`.
+func NewGetRoundInstruction(
+	// Params:
+	dataIdParam [16]uint8,
+	roundIdParam uint64,
+	decimalsParam uint8,
+
+	// Accounts:
+	stateAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_GetRound[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdParam`:
+		err = enc__.Encode(dataIdParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdParam", err)
+		}
+		// Serialize `roundIdParam`:
+		err = enc__.Encode(roundIdParam)
+		if err != nil {
+			return nil, errors.NewField("roundIdParam", err)
+		}
+		// Serialize `decimalsParam`:
+		err = enc__.Encode(decimalsParam)
+		if err != nil {
+			return nil, errors.NewField("decimalsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "get_store" instruction.
+// The trusted store's signer.
+func NewGetStoreInstruction(
+	stateAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_GetStore[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -94,17 +328,15 @@ func NewGetMinDecimalsInstruction(
 }
 
 // Builds a "initialize" instruction.
-// Create a proxy serving reads from a store, in a pre-created state account, signed by the // program's upgrade authority, which becomes the proxy's owner. `feed_admins` must be strictly // increasing.
+// Create a proxy trusting `writer` (the store's signer), in a pre-created state account, // signed by the program's upgrade authority, which becomes the proxy's owner.
 func NewInitializeInstruction(
 	// Params:
-	feedAdminsParam []solanago.PublicKey,
+	writerParam solanago.PublicKey,
 
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	programDataAccount solanago.PublicKey,
-	storeProgramAccount solanago.PublicKey,
-	storeStateAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -117,10 +349,10 @@ func NewInitializeInstruction(
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
 	{
-		// Serialize `feedAdminsParam`:
-		err = enc__.Encode(feedAdminsParam)
+		// Serialize `writerParam`:
+		err = enc__.Encode(writerParam)
 		if err != nil {
-			return nil, errors.NewField("feedAdminsParam", err)
+			return nil, errors.NewField("writerParam", err)
 		}
 	}
 	accounts__ := solanago.AccountMetaSlice{}
@@ -134,13 +366,9 @@ func NewInitializeInstruction(
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
 		// Account 2 "program_data": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programDataAccount, false, false))
-		// Account 3 "store_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeProgramAccount, false, false))
-		// Account 4 "store_state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeStateAccount, false, false))
-		// Account 5 "event_authority": Read-only, Non-signer, Required
+		// Account 3 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
-		// Account 6 "program": Read-only, Non-signer, Required
+		// Account 4 "program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
@@ -152,94 +380,22 @@ func NewInitializeInstruction(
 	), nil
 }
 
-// Builds a "read" instruction.
-// The latest round of a data ID, or the round with `round_id`, with the store's 18 decimals.
-func NewReadInstruction(
-	// Params:
-	dataIdParam [16]uint8,
-	roundIdParam *uint64,
-
-	// Accounts:
-	stateAccount solanago.PublicKey,
-	storeProgramAccount solanago.PublicKey,
-	storeStateAccount solanago.PublicKey,
-	feedAccount solanago.PublicKey,
-) (solanago.Instruction, error) {
-	buf__ := new(bytes.Buffer)
-	enc__ := binary.NewBorshEncoder(buf__)
-
-	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_Read[:], false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
-	}
-	{
-		// Serialize `dataIdParam`:
-		err = enc__.Encode(dataIdParam)
-		if err != nil {
-			return nil, errors.NewField("dataIdParam", err)
-		}
-		// Serialize `roundIdParam` (optional):
-		{
-			if roundIdParam == nil {
-				err = enc__.WriteOption(false)
-				if err != nil {
-					return nil, errors.NewOption("roundIdParam", fmt.Errorf("error while encoding optionality: %w", err))
-				}
-			} else {
-				err = enc__.WriteOption(true)
-				if err != nil {
-					return nil, errors.NewOption("roundIdParam", fmt.Errorf("error while encoding optionality: %w", err))
-				}
-				err = enc__.Encode(roundIdParam)
-				if err != nil {
-					return nil, errors.NewField("roundIdParam", err)
-				}
-			}
-		}
-	}
-	accounts__ := solanago.AccountMetaSlice{}
-
-	// Add the accounts to the instruction.
-	{
-		// Account 0 "state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "store_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeProgramAccount, false, false))
-		// Account 2 "store_state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeStateAccount, false, false))
-		// Account 3 "feed": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
-	}
-
-	// Create the instruction.
-	return solanago.NewInstruction(
-		ProgramID,
-		accounts__,
-		buf__.Bytes(),
-	), nil
-}
-
-// Builds a "read_scaled" instruction.
-// Like `read`, with the answer at `decimals`: at least the data ID's minimum and at most 18. // Fails if a non-zero answer would round to zero.
-func NewReadScaledInstruction(
+// Builds a "latest_round" instruction.
+// The latest round of a data ID with the answer at `decimals`: at least the feed's minimum, // at most 18. Fails for a frozen feed, or if a non-zero answer would round to zero.
+func NewLatestRoundInstruction(
 	// Params:
 	dataIdParam [16]uint8,
 	decimalsParam uint8,
-	roundIdParam *uint64,
 
 	// Accounts:
 	stateAccount solanago.PublicKey,
-	storeProgramAccount solanago.PublicKey,
-	storeStateAccount solanago.PublicKey,
 	feedAccount solanago.PublicKey,
-	feedConfigAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
 
 	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_ReadScaled[:], false)
+	err := enc__.WriteBytes(Instruction_LatestRound[:], false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
@@ -254,24 +410,6 @@ func NewReadScaledInstruction(
 		if err != nil {
 			return nil, errors.NewField("decimalsParam", err)
 		}
-		// Serialize `roundIdParam` (optional):
-		{
-			if roundIdParam == nil {
-				err = enc__.WriteOption(false)
-				if err != nil {
-					return nil, errors.NewOption("roundIdParam", fmt.Errorf("error while encoding optionality: %w", err))
-				}
-			} else {
-				err = enc__.WriteOption(true)
-				if err != nil {
-					return nil, errors.NewOption("roundIdParam", fmt.Errorf("error while encoding optionality: %w", err))
-				}
-				err = enc__.Encode(roundIdParam)
-				if err != nil {
-					return nil, errors.NewField("roundIdParam", err)
-				}
-			}
-		}
 	}
 	accounts__ := solanago.AccountMetaSlice{}
 
@@ -279,15 +417,9 @@ func NewReadScaledInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "store_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeProgramAccount, false, false))
-		// Account 2 "store_state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeStateAccount, false, false))
-		// Account 3 "feed": Read-only, Non-signer, Required
+		// Account 1 "feed": Read-only, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
-		// Account 4 "feed_config": Read-only, Non-signer, Optional
-		// Settings of the data ID, the stored decimals are the minimum when omitted
-		accounts__.Append(solanago.NewAccountMeta(feedConfigAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -298,51 +430,149 @@ func NewReadScaledInstruction(
 	), nil
 }
 
-// Builds a "set_feed_admin" instruction.
-// Grant or revoke the permission to set minimum decimals.
-func NewSetFeedAdminInstruction(
+// Builds a "set_feed_descriptions" instruction.
+// Set feed descriptions, empty to clear (remaining accounts: the feeds).
+func NewSetFeedDescriptionsInstruction(
 	// Params:
-	feedAdminParam solanago.PublicKey,
-	isAdminParam bool,
+	dataIdsParam [][16]uint8,
+	descriptionsParam []string,
 
 	// Accounts:
-	ownerAccount solanago.PublicKey,
+	writerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	eventAuthorityAccount solanago.PublicKey,
-	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
 	buf__ := new(bytes.Buffer)
 	enc__ := binary.NewBorshEncoder(buf__)
 
 	// Encode the instruction discriminator.
-	err := enc__.WriteBytes(Instruction_SetFeedAdmin[:], false)
+	err := enc__.WriteBytes(Instruction_SetFeedDescriptions[:], false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
 	{
-		// Serialize `feedAdminParam`:
-		err = enc__.Encode(feedAdminParam)
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
 		if err != nil {
-			return nil, errors.NewField("feedAdminParam", err)
+			return nil, errors.NewField("dataIdsParam", err)
 		}
-		// Serialize `isAdminParam`:
-		err = enc__.Encode(isAdminParam)
+		// Serialize `descriptionsParam`:
+		err = enc__.Encode(descriptionsParam)
 		if err != nil {
-			return nil, errors.NewField("isAdminParam", err)
+			return nil, errors.NewField("descriptionsParam", err)
 		}
 	}
 	accounts__ := solanago.AccountMetaSlice{}
 
 	// Add the accounts to the instruction.
 	{
-		// Account 0 "owner": Read-only, Signer, Required
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
-		// Account 1 "state": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
-		// Account 2 "event_authority": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
-		// Account 3 "program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
+		// Account 0 "writer": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(writerAccount, false, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "set_feed_frozen" instruction.
+// Freeze or unfreeze reads of feeds (remaining accounts: the feeds).
+func NewSetFeedFrozenInstruction(
+	// Params:
+	dataIdsParam [][16]uint8,
+	frozenParam bool,
+
+	// Accounts:
+	writerAccount solanago.PublicKey,
+	stateAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_SetFeedFrozen[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdsParam", err)
+		}
+		// Serialize `frozenParam`:
+		err = enc__.Encode(frozenParam)
+		if err != nil {
+			return nil, errors.NewField("frozenParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "writer": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(writerAccount, false, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "set_max_stored_reports" instruction.
+// Grow feed rings (remaining accounts: the feeds).
+func NewSetMaxStoredReportsInstruction(
+	// Params:
+	dataIdsParam [][16]uint8,
+	maxStoredReportsParam []uint64,
+
+	// Accounts:
+	writerAccount solanago.PublicKey,
+	stateAccount solanago.PublicKey,
+	payerAccount solanago.PublicKey,
+	systemProgramAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_SetMaxStoredReports[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `dataIdsParam`:
+		err = enc__.Encode(dataIdsParam)
+		if err != nil {
+			return nil, errors.NewField("dataIdsParam", err)
+		}
+		// Serialize `maxStoredReportsParam`:
+		err = enc__.Encode(maxStoredReportsParam)
+		if err != nil {
+			return nil, errors.NewField("maxStoredReportsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "writer": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(writerAccount, false, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
+		// Account 2 "payer": Writable, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(payerAccount, true, true))
+		// Account 3 "system_program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -354,17 +584,16 @@ func NewSetFeedAdminInstruction(
 }
 
 // Builds a "set_min_decimals" instruction.
-// Set the fewest decimals `read_scaled` serves a data ID at, the stored decimals by default.
+// Set the fewest decimals reads of a data ID may ask for, the stored decimals by default.
 func NewSetMinDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
 	minDecimalsParam uint8,
 
 	// Accounts:
-	adminAccount solanago.PublicKey,
+	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	feedConfigAccount solanago.PublicKey,
-	systemProgramAccount solanago.PublicKey,
+	feedAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -392,18 +621,16 @@ func NewSetMinDecimalsInstruction(
 
 	// Add the accounts to the instruction.
 	{
-		// Account 0 "admin": Writable, Signer, Required
-		// The owner or a feed admin, checked in the handler
-		accounts__.Append(solanago.NewAccountMeta(adminAccount, true, true))
+		// Account 0 "owner": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
 		// Account 1 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 2 "feed_config": Writable, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(feedConfigAccount, true, false))
-		// Account 3 "system_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
-		// Account 4 "event_authority": Read-only, Non-signer, Required
+		// Account 2 "feed": Writable, Non-signer, Required
+		// Feed of the data ID, matched against the state and the data ID in the handler
+		accounts__.Append(solanago.NewAccountMeta(feedAccount, true, false))
+		// Account 3 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
-		// Account 5 "program": Read-only, Non-signer, Required
+		// Account 4 "program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
@@ -416,12 +643,14 @@ func NewSetMinDecimalsInstruction(
 }
 
 // Builds a "set_store" instruction.
-// Point the proxy at another store, readers keep the proxy address. Round IDs are the store's, // so they restart with the new store's rounds: readers that keep round IDs reset them on // `StoreSet`. The new store must keep answers at 18 decimals, as `read_scaled` assumes.
+// Replace the trusted store's signer. Feeds, history and round IDs carry on.
 func NewSetStoreInstruction(
+	// Params:
+	writerParam solanago.PublicKey,
+
+	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
-	storeProgramAccount solanago.PublicKey,
-	storeStateAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -433,6 +662,13 @@ func NewSetStoreInstruction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
+	{
+		// Serialize `writerParam`:
+		err = enc__.Encode(writerParam)
+		if err != nil {
+			return nil, errors.NewField("writerParam", err)
+		}
+	}
 	accounts__ := solanago.AccountMetaSlice{}
 
 	// Add the accounts to the instruction.
@@ -441,13 +677,9 @@ func NewSetStoreInstruction(
 		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
 		// Account 1 "state": Writable, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
-		// Account 2 "store_program": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeProgramAccount, false, false))
-		// Account 3 "store_state": Read-only, Non-signer, Required
-		accounts__.Append(solanago.NewAccountMeta(storeStateAccount, false, false))
-		// Account 4 "event_authority": Read-only, Non-signer, Required
+		// Account 2 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
-		// Account 5 "program": Read-only, Non-signer, Required
+		// Account 3 "program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
@@ -498,6 +730,49 @@ func NewTransferOwnershipInstruction(
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
 		// Account 3 "program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
+	}
+
+	// Create the instruction.
+	return solanago.NewInstruction(
+		ProgramID,
+		accounts__,
+		buf__.Bytes(),
+	), nil
+}
+
+// Builds a "write_rounds" instruction.
+// Append one round per feed (remaining accounts: the feeds, in order).
+func NewWriteRoundsInstruction(
+	// Params:
+	roundsParam []NewRound,
+
+	// Accounts:
+	writerAccount solanago.PublicKey,
+	stateAccount solanago.PublicKey,
+) (solanago.Instruction, error) {
+	buf__ := new(bytes.Buffer)
+	enc__ := binary.NewBorshEncoder(buf__)
+
+	// Encode the instruction discriminator.
+	err := enc__.WriteBytes(Instruction_WriteRounds[:], false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
+	}
+	{
+		// Serialize `roundsParam`:
+		err = enc__.Encode(roundsParam)
+		if err != nil {
+			return nil, errors.NewField("roundsParam", err)
+		}
+	}
+	accounts__ := solanago.AccountMetaSlice{}
+
+	// Add the accounts to the instruction.
+	{
+		// Account 0 "writer": Read-only, Signer, Required
+		accounts__.Append(solanago.NewAccountMeta(writerAccount, false, true))
+		// Account 1 "state": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 	}
 
 	// Create the instruction.
@@ -636,13 +911,366 @@ func UnmarshalAcceptOwnershipInstruction(buf []byte) (*AcceptOwnershipInstructio
 	return obj, nil
 }
 
+type CreateFeedsInstruction struct {
+	DataIds          [][16]uint8 `json:"data_ids"`
+	Bumps            []byte      `json:"bumps"`
+	MaxStoredReports uint64      `json:"max_stored_reports"`
+
+	// Accounts:
+	Writer        solanago.PublicKey `json:"writer"`
+	WriterSigner  bool               `json:"writer_signer"`
+	State         solanago.PublicKey `json:"state"`
+	Payer         solanago.PublicKey `json:"payer"`
+	PayerWritable bool               `json:"payer_writable"`
+	PayerSigner   bool               `json:"payer_signer"`
+	SystemProgram solanago.PublicKey `json:"system_program"`
+}
+
+func (obj *CreateFeedsInstruction) GetDiscriminator() []byte {
+	return Instruction_CreateFeeds[:]
+}
+
+// UnmarshalWithDecoder unmarshals the CreateFeedsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *CreateFeedsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "CreateFeedsInstruction", err)
+	}
+	if discriminator != Instruction_CreateFeeds {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "CreateFeedsInstruction", Instruction_CreateFeeds, discriminator)
+	}
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Bumps`:
+	err = decoder.Decode(&obj.Bumps)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxStoredReports`:
+	err = decoder.Decode(&obj.MaxStoredReports)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *CreateFeedsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from writer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "writer", err)
+	}
+	indices = append(indices, index)
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from payer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "payer", err)
+	}
+	indices = append(indices, index)
+	// Decode from system_program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *CreateFeedsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
+	}
+	indexOffset := 0
+	// Set writer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "writer", len(accountKeys)-1)
+	}
+	obj.Writer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set payer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "payer", len(accountKeys)-1)
+	}
+	obj.Payer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set system_program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
+	}
+	obj.SystemProgram = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *CreateFeedsInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Writer)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.Payer)
+	keys = append(keys, obj.SystemProgram)
+	return keys
+}
+
+// Unmarshal unmarshals the CreateFeedsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *CreateFeedsInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling CreateFeedsInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalCreateFeedsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalCreateFeedsInstruction(buf []byte) (*CreateFeedsInstruction, error) {
+	obj := new(CreateFeedsInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type DecimalsInstruction struct {
+	DataId [16]uint8 `json:"data_id"`
+
+	// Accounts:
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
+}
+
+func (obj *DecimalsInstruction) GetDiscriminator() []byte {
+	return Instruction_Decimals[:]
+}
+
+// UnmarshalWithDecoder unmarshals the DecimalsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *DecimalsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "DecimalsInstruction", err)
+	}
+	if discriminator != Instruction_Decimals {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "DecimalsInstruction", Instruction_Decimals, discriminator)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from feed account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *DecimalsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set feed account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
+	}
+	obj.Feed = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *DecimalsInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.Feed)
+	return keys
+}
+
+// Unmarshal unmarshals the DecimalsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *DecimalsInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling DecimalsInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalDecimalsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalDecimalsInstruction(buf []byte) (*DecimalsInstruction, error) {
+	obj := new(DecimalsInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type DescriptionInstruction struct {
+	DataId [16]uint8 `json:"data_id"`
+
+	// Accounts:
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
+}
+
+func (obj *DescriptionInstruction) GetDiscriminator() []byte {
+	return Instruction_Description[:]
+}
+
+// UnmarshalWithDecoder unmarshals the DescriptionInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *DescriptionInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "DescriptionInstruction", err)
+	}
+	if discriminator != Instruction_Description {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "DescriptionInstruction", Instruction_Description, discriminator)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DescriptionInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from feed account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *DescriptionInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set feed account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
+	}
+	obj.Feed = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *DescriptionInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.Feed)
+	return keys
+}
+
+// Unmarshal unmarshals the DescriptionInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *DescriptionInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling DescriptionInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalDescriptionInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalDescriptionInstruction(buf []byte) (*DescriptionInstruction, error) {
+	obj := new(DescriptionInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type GetMinDecimalsInstruction struct {
 	DataId [16]uint8 `json:"data_id"`
 
 	// Accounts:
-	State              solanago.PublicKey `json:"state"`
-	FeedConfig         solanago.PublicKey `json:"feed_config"`
-	FeedConfigOptional bool               `json:"feed_config_optional"`
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
 }
 
 func (obj *GetMinDecimalsInstruction) GetDiscriminator() []byte {
@@ -681,11 +1309,11 @@ func (obj *GetMinDecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uin
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from feed_config account index
+	// Decode from feed account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_config", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
 	}
 	indices = append(indices, index)
 	return indices, nil
@@ -703,11 +1331,11 @@ func (obj *GetMinDecimalsInstruction) PopulateFromAccountIndices(indices []uint8
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set feed_config account from index
+	// Set feed account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_config", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
 	}
-	obj.FeedConfig = accountKeys[indices[indexOffset]]
+	obj.Feed = accountKeys[indices[indexOffset]]
 	indexOffset++
 	return nil
 }
@@ -715,7 +1343,7 @@ func (obj *GetMinDecimalsInstruction) PopulateFromAccountIndices(indices []uint8
 func (obj *GetMinDecimalsInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.FeedConfig)
+	keys = append(keys, obj.Feed)
 	return keys
 }
 
@@ -740,8 +1368,204 @@ func UnmarshalGetMinDecimalsInstruction(buf []byte) (*GetMinDecimalsInstruction,
 	return obj, nil
 }
 
+type GetRoundInstruction struct {
+	DataId   [16]uint8 `json:"data_id"`
+	RoundId  uint64    `json:"round_id"`
+	Decimals uint8     `json:"decimals"`
+
+	// Accounts:
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
+}
+
+func (obj *GetRoundInstruction) GetDiscriminator() []byte {
+	return Instruction_GetRound[:]
+}
+
+// UnmarshalWithDecoder unmarshals the GetRoundInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *GetRoundInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "GetRoundInstruction", err)
+	}
+	if discriminator != Instruction_GetRound {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "GetRoundInstruction", Instruction_GetRound, discriminator)
+	}
+	// Deserialize `DataId`:
+	err = decoder.Decode(&obj.DataId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Decimals`:
+	err = decoder.Decode(&obj.Decimals)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *GetRoundInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from feed account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *GetRoundInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set feed account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
+	}
+	obj.Feed = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *GetRoundInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.Feed)
+	return keys
+}
+
+// Unmarshal unmarshals the GetRoundInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *GetRoundInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling GetRoundInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalGetRoundInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalGetRoundInstruction(buf []byte) (*GetRoundInstruction, error) {
+	obj := new(GetRoundInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type GetStoreInstruction struct {
+
+	// Accounts:
+	State solanago.PublicKey `json:"state"`
+}
+
+func (obj *GetStoreInstruction) GetDiscriminator() []byte {
+	return Instruction_GetStore[:]
+}
+
+// UnmarshalWithDecoder unmarshals the GetStoreInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *GetStoreInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "GetStoreInstruction", err)
+	}
+	if discriminator != Instruction_GetStore {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "GetStoreInstruction", Instruction_GetStore, discriminator)
+	}
+	return nil
+}
+
+func (obj *GetStoreInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *GetStoreInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 1 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 1, len(indices))
+	}
+	indexOffset := 0
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *GetStoreInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.State)
+	return keys
+}
+
+// Unmarshal unmarshals the GetStoreInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *GetStoreInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling GetStoreInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalGetStoreInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalGetStoreInstruction(buf []byte) (*GetStoreInstruction, error) {
+	obj := new(GetStoreInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 type InitializeInstruction struct {
-	FeedAdmins []solanago.PublicKey `json:"feed_admins"`
+	Writer solanago.PublicKey `json:"writer"`
 
 	// Accounts:
 	Owner          solanago.PublicKey `json:"owner"`
@@ -749,8 +1573,6 @@ type InitializeInstruction struct {
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
 	ProgramData    solanago.PublicKey `json:"program_data"`
-	StoreProgram   solanago.PublicKey `json:"store_program"`
-	StoreState     solanago.PublicKey `json:"store_state"`
 	EventAuthority solanago.PublicKey `json:"event_authority"`
 	Program        solanago.PublicKey `json:"program"`
 }
@@ -770,8 +1592,8 @@ func (obj *InitializeInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) 
 	if discriminator != Instruction_Initialize {
 		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeInstruction", Instruction_Initialize, discriminator)
 	}
-	// Deserialize `FeedAdmins`:
-	err = decoder.Decode(&obj.FeedAdmins)
+	// Deserialize `Writer`:
+	err = decoder.Decode(&obj.Writer)
 	if err != nil {
 		return err
 	}
@@ -805,20 +1627,6 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "program_data", err)
 	}
 	indices = append(indices, index)
-	// Decode from store_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_program", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_state", err)
-	}
-	indices = append(indices, index)
 	// Decode from event_authority account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -838,8 +1646,8 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 
 func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 7 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 7, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -859,18 +1667,6 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program_data", len(accountKeys)-1)
 	}
 	obj.ProgramData = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_program", len(accountKeys)-1)
-	}
-	obj.StoreProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_state", len(accountKeys)-1)
-	}
-	obj.StoreState = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -892,8 +1688,6 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.ProgramData)
-	keys = append(keys, obj.StoreProgram)
-	keys = append(keys, obj.StoreState)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys
@@ -920,181 +1714,29 @@ func UnmarshalInitializeInstruction(buf []byte) (*InitializeInstruction, error) 
 	return obj, nil
 }
 
-type ReadInstruction struct {
-	DataId  [16]uint8 `json:"data_id"`
-	RoundId *uint64   `json:"round_id"`
-
-	// Accounts:
-	State        solanago.PublicKey `json:"state"`
-	StoreProgram solanago.PublicKey `json:"store_program"`
-	StoreState   solanago.PublicKey `json:"store_state"`
-	Feed         solanago.PublicKey `json:"feed"`
-}
-
-func (obj *ReadInstruction) GetDiscriminator() []byte {
-	return Instruction_Read[:]
-}
-
-// UnmarshalWithDecoder unmarshals the ReadInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *ReadInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
-	var err error
-	// Read the discriminator and check it against the expected value:
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "ReadInstruction", err)
-	}
-	if discriminator != Instruction_Read {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "ReadInstruction", Instruction_Read, discriminator)
-	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `RoundId`:
-	{
-		ok, err := decoder.ReadOption()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.RoundId)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (obj *ReadInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
-	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
-	decoder := binary.NewBorshDecoder(buf)
-	indices := make([]uint8, 0)
-	index := uint8(0)
-	var err error
-	// Decode from state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_program", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_state", err)
-	}
-	indices = append(indices, index)
-	// Decode from feed account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
-	}
-	indices = append(indices, index)
-	return indices, nil
-}
-
-func (obj *ReadInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
-	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 4 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
-	}
-	indexOffset := 0
-	// Set state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
-	}
-	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_program", len(accountKeys)-1)
-	}
-	obj.StoreProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_state", len(accountKeys)-1)
-	}
-	obj.StoreState = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set feed account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
-	}
-	obj.Feed = accountKeys[indices[indexOffset]]
-	indexOffset++
-	return nil
-}
-
-func (obj *ReadInstruction) GetAccountKeys() []solanago.PublicKey {
-	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.State)
-	keys = append(keys, obj.StoreProgram)
-	keys = append(keys, obj.StoreState)
-	keys = append(keys, obj.Feed)
-	return keys
-}
-
-// Unmarshal unmarshals the ReadInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *ReadInstruction) Unmarshal(buf []byte) error {
-	var err error
-	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling ReadInstruction: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalReadInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalReadInstruction(buf []byte) (*ReadInstruction, error) {
-	obj := new(ReadInstruction)
-	var err error
-	err = obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type ReadScaledInstruction struct {
+type LatestRoundInstruction struct {
 	DataId   [16]uint8 `json:"data_id"`
 	Decimals uint8     `json:"decimals"`
-	RoundId  *uint64   `json:"round_id"`
 
 	// Accounts:
-	State              solanago.PublicKey `json:"state"`
-	StoreProgram       solanago.PublicKey `json:"store_program"`
-	StoreState         solanago.PublicKey `json:"store_state"`
-	Feed               solanago.PublicKey `json:"feed"`
-	FeedConfig         solanago.PublicKey `json:"feed_config"`
-	FeedConfigOptional bool               `json:"feed_config_optional"`
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
 }
 
-func (obj *ReadScaledInstruction) GetDiscriminator() []byte {
-	return Instruction_ReadScaled[:]
+func (obj *LatestRoundInstruction) GetDiscriminator() []byte {
+	return Instruction_LatestRound[:]
 }
 
-// UnmarshalWithDecoder unmarshals the ReadScaledInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *ReadScaledInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+// UnmarshalWithDecoder unmarshals the LatestRoundInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *LatestRoundInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
 	var err error
 	// Read the discriminator and check it against the expected value:
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "ReadScaledInstruction", err)
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "LatestRoundInstruction", err)
 	}
-	if discriminator != Instruction_ReadScaled {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "ReadScaledInstruction", Instruction_ReadScaled, discriminator)
+	if discriminator != Instruction_LatestRound {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "LatestRoundInstruction", Instruction_LatestRound, discriminator)
 	}
 	// Deserialize `DataId`:
 	err = decoder.Decode(&obj.DataId)
@@ -1106,23 +1748,10 @@ func (obj *ReadScaledInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `RoundId`:
-	{
-		ok, err := decoder.ReadOption()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.RoundId)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
-func (obj *ReadScaledInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+func (obj *LatestRoundInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
 	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
 	decoder := binary.NewBorshDecoder(buf)
 	indices := make([]uint8, 0)
@@ -1133,20 +1762,6 @@ func (obj *ReadScaledInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 	err = decoder.Decode(&index)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_program", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_state", err)
 	}
 	indices = append(indices, index)
 	// Decode from feed account index
@@ -1156,20 +1771,13 @@ func (obj *ReadScaledInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
 	}
 	indices = append(indices, index)
-	// Decode from feed_config account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_config", err)
-	}
-	indices = append(indices, index)
 	return indices, nil
 }
 
-func (obj *ReadScaledInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+func (obj *LatestRoundInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 5 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
 	}
 	indexOffset := 0
 	// Set state account from index
@@ -1178,56 +1786,35 @@ func (obj *ReadScaledInstruction) PopulateFromAccountIndices(indices []uint8, ac
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set store_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_program", len(accountKeys)-1)
-	}
-	obj.StoreProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_state", len(accountKeys)-1)
-	}
-	obj.StoreState = accountKeys[indices[indexOffset]]
-	indexOffset++
 	// Set feed account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
 	}
 	obj.Feed = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set feed_config account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_config", len(accountKeys)-1)
-	}
-	obj.FeedConfig = accountKeys[indices[indexOffset]]
-	indexOffset++
 	return nil
 }
 
-func (obj *ReadScaledInstruction) GetAccountKeys() []solanago.PublicKey {
+func (obj *LatestRoundInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.StoreProgram)
-	keys = append(keys, obj.StoreState)
 	keys = append(keys, obj.Feed)
-	keys = append(keys, obj.FeedConfig)
 	return keys
 }
 
-// Unmarshal unmarshals the ReadScaledInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *ReadScaledInstruction) Unmarshal(buf []byte) error {
+// Unmarshal unmarshals the LatestRoundInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *LatestRoundInstruction) Unmarshal(buf []byte) error {
 	var err error
 	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling ReadScaledInstruction: %w", err)
+		return fmt.Errorf("error while unmarshaling LatestRoundInstruction: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalReadScaledInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalReadScaledInstruction(buf []byte) (*ReadScaledInstruction, error) {
-	obj := new(ReadScaledInstruction)
+// UnmarshalLatestRoundInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalLatestRoundInstruction(buf []byte) (*LatestRoundInstruction, error) {
+	obj := new(LatestRoundInstruction)
 	var err error
 	err = obj.Unmarshal(buf)
 	if err != nil {
@@ -1236,58 +1823,55 @@ func UnmarshalReadScaledInstruction(buf []byte) (*ReadScaledInstruction, error) 
 	return obj, nil
 }
 
-type SetFeedAdminInstruction struct {
-	FeedAdmin solanago.PublicKey `json:"feed_admin"`
-	IsAdmin   bool               `json:"is_admin"`
+type SetFeedDescriptionsInstruction struct {
+	DataIds      [][16]uint8 `json:"data_ids"`
+	Descriptions []string    `json:"descriptions"`
 
 	// Accounts:
-	Owner          solanago.PublicKey `json:"owner"`
-	OwnerSigner    bool               `json:"owner_signer"`
-	State          solanago.PublicKey `json:"state"`
-	StateWritable  bool               `json:"state_writable"`
-	EventAuthority solanago.PublicKey `json:"event_authority"`
-	Program        solanago.PublicKey `json:"program"`
+	Writer       solanago.PublicKey `json:"writer"`
+	WriterSigner bool               `json:"writer_signer"`
+	State        solanago.PublicKey `json:"state"`
 }
 
-func (obj *SetFeedAdminInstruction) GetDiscriminator() []byte {
-	return Instruction_SetFeedAdmin[:]
+func (obj *SetFeedDescriptionsInstruction) GetDiscriminator() []byte {
+	return Instruction_SetFeedDescriptions[:]
 }
 
-// UnmarshalWithDecoder unmarshals the SetFeedAdminInstruction from Borsh-encoded bytes prefixed with its discriminator.
-func (obj *SetFeedAdminInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+// UnmarshalWithDecoder unmarshals the SetFeedDescriptionsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *SetFeedDescriptionsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
 	var err error
 	// Read the discriminator and check it against the expected value:
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
-		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "SetFeedAdminInstruction", err)
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "SetFeedDescriptionsInstruction", err)
 	}
-	if discriminator != Instruction_SetFeedAdmin {
-		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetFeedAdminInstruction", Instruction_SetFeedAdmin, discriminator)
+	if discriminator != Instruction_SetFeedDescriptions {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetFeedDescriptionsInstruction", Instruction_SetFeedDescriptions, discriminator)
 	}
-	// Deserialize `FeedAdmin`:
-	err = decoder.Decode(&obj.FeedAdmin)
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
 	if err != nil {
 		return err
 	}
-	// Deserialize `IsAdmin`:
-	err = decoder.Decode(&obj.IsAdmin)
+	// Deserialize `Descriptions`:
+	err = decoder.Decode(&obj.Descriptions)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *SetFeedAdminInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+func (obj *SetFeedDescriptionsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
 	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
 	decoder := binary.NewBorshDecoder(buf)
 	indices := make([]uint8, 0)
 	index := uint8(0)
 	var err error
-	// Decode from owner account index
+	// Decode from writer account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "owner", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "writer", err)
 	}
 	indices = append(indices, index)
 	// Decode from state account index
@@ -1297,34 +1881,20 @@ func (obj *SetFeedAdminInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from event_authority account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "event_authority", err)
-	}
-	indices = append(indices, index)
-	// Decode from program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "program", err)
-	}
-	indices = append(indices, index)
 	return indices, nil
 }
 
-func (obj *SetFeedAdminInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+func (obj *SetFeedDescriptionsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 4 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
 	}
 	indexOffset := 0
-	// Set owner account from index
+	// Set writer account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "owner", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "writer", len(accountKeys)-1)
 	}
-	obj.Owner = accountKeys[indices[indexOffset]]
+	obj.Writer = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set state account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -1332,43 +1902,281 @@ func (obj *SetFeedAdminInstruction) PopulateFromAccountIndices(indices []uint8, 
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set event_authority account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "event_authority", len(accountKeys)-1)
-	}
-	obj.EventAuthority = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program", len(accountKeys)-1)
-	}
-	obj.Program = accountKeys[indices[indexOffset]]
-	indexOffset++
 	return nil
 }
 
-func (obj *SetFeedAdminInstruction) GetAccountKeys() []solanago.PublicKey {
+func (obj *SetFeedDescriptionsInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.Owner)
+	keys = append(keys, obj.Writer)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.EventAuthority)
-	keys = append(keys, obj.Program)
 	return keys
 }
 
-// Unmarshal unmarshals the SetFeedAdminInstruction from Borsh-encoded bytes prefixed with the discriminator.
-func (obj *SetFeedAdminInstruction) Unmarshal(buf []byte) error {
+// Unmarshal unmarshals the SetFeedDescriptionsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *SetFeedDescriptionsInstruction) Unmarshal(buf []byte) error {
 	var err error
 	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling SetFeedAdminInstruction: %w", err)
+		return fmt.Errorf("error while unmarshaling SetFeedDescriptionsInstruction: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalSetFeedAdminInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
-func UnmarshalSetFeedAdminInstruction(buf []byte) (*SetFeedAdminInstruction, error) {
-	obj := new(SetFeedAdminInstruction)
+// UnmarshalSetFeedDescriptionsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalSetFeedDescriptionsInstruction(buf []byte) (*SetFeedDescriptionsInstruction, error) {
+	obj := new(SetFeedDescriptionsInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type SetFeedFrozenInstruction struct {
+	DataIds [][16]uint8 `json:"data_ids"`
+	Frozen  bool        `json:"frozen"`
+
+	// Accounts:
+	Writer       solanago.PublicKey `json:"writer"`
+	WriterSigner bool               `json:"writer_signer"`
+	State        solanago.PublicKey `json:"state"`
+}
+
+func (obj *SetFeedFrozenInstruction) GetDiscriminator() []byte {
+	return Instruction_SetFeedFrozen[:]
+}
+
+// UnmarshalWithDecoder unmarshals the SetFeedFrozenInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *SetFeedFrozenInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "SetFeedFrozenInstruction", err)
+	}
+	if discriminator != Instruction_SetFeedFrozen {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetFeedFrozenInstruction", Instruction_SetFeedFrozen, discriminator)
+	}
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Frozen`:
+	err = decoder.Decode(&obj.Frozen)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SetFeedFrozenInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from writer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "writer", err)
+	}
+	indices = append(indices, index)
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *SetFeedFrozenInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set writer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "writer", len(accountKeys)-1)
+	}
+	obj.Writer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *SetFeedFrozenInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Writer)
+	keys = append(keys, obj.State)
+	return keys
+}
+
+// Unmarshal unmarshals the SetFeedFrozenInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *SetFeedFrozenInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling SetFeedFrozenInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalSetFeedFrozenInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalSetFeedFrozenInstruction(buf []byte) (*SetFeedFrozenInstruction, error) {
+	obj := new(SetFeedFrozenInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type SetMaxStoredReportsInstruction struct {
+	DataIds          [][16]uint8 `json:"data_ids"`
+	MaxStoredReports []uint64    `json:"max_stored_reports"`
+
+	// Accounts:
+	Writer        solanago.PublicKey `json:"writer"`
+	WriterSigner  bool               `json:"writer_signer"`
+	State         solanago.PublicKey `json:"state"`
+	Payer         solanago.PublicKey `json:"payer"`
+	PayerWritable bool               `json:"payer_writable"`
+	PayerSigner   bool               `json:"payer_signer"`
+	SystemProgram solanago.PublicKey `json:"system_program"`
+}
+
+func (obj *SetMaxStoredReportsInstruction) GetDiscriminator() []byte {
+	return Instruction_SetMaxStoredReports[:]
+}
+
+// UnmarshalWithDecoder unmarshals the SetMaxStoredReportsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *SetMaxStoredReportsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "SetMaxStoredReportsInstruction", err)
+	}
+	if discriminator != Instruction_SetMaxStoredReports {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetMaxStoredReportsInstruction", Instruction_SetMaxStoredReports, discriminator)
+	}
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxStoredReports`:
+	err = decoder.Decode(&obj.MaxStoredReports)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SetMaxStoredReportsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from writer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "writer", err)
+	}
+	indices = append(indices, index)
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	// Decode from payer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "payer", err)
+	}
+	indices = append(indices, index)
+	// Decode from system_program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *SetMaxStoredReportsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
+	}
+	indexOffset := 0
+	// Set writer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "writer", len(accountKeys)-1)
+	}
+	obj.Writer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set payer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "payer", len(accountKeys)-1)
+	}
+	obj.Payer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set system_program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
+	}
+	obj.SystemProgram = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *SetMaxStoredReportsInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Writer)
+	keys = append(keys, obj.State)
+	keys = append(keys, obj.Payer)
+	keys = append(keys, obj.SystemProgram)
+	return keys
+}
+
+// Unmarshal unmarshals the SetMaxStoredReportsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *SetMaxStoredReportsInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling SetMaxStoredReportsInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalSetMaxStoredReportsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalSetMaxStoredReportsInstruction(buf []byte) (*SetMaxStoredReportsInstruction, error) {
+	obj := new(SetMaxStoredReportsInstruction)
 	var err error
 	err = obj.Unmarshal(buf)
 	if err != nil {
@@ -1382,15 +2190,13 @@ type SetMinDecimalsInstruction struct {
 	MinDecimals uint8     `json:"min_decimals"`
 
 	// Accounts:
-	Admin              solanago.PublicKey `json:"admin"`
-	AdminWritable      bool               `json:"admin_writable"`
-	AdminSigner        bool               `json:"admin_signer"`
-	State              solanago.PublicKey `json:"state"`
-	FeedConfig         solanago.PublicKey `json:"feed_config"`
-	FeedConfigWritable bool               `json:"feed_config_writable"`
-	SystemProgram      solanago.PublicKey `json:"system_program"`
-	EventAuthority     solanago.PublicKey `json:"event_authority"`
-	Program            solanago.PublicKey `json:"program"`
+	Owner          solanago.PublicKey `json:"owner"`
+	OwnerSigner    bool               `json:"owner_signer"`
+	State          solanago.PublicKey `json:"state"`
+	Feed           solanago.PublicKey `json:"feed"`
+	FeedWritable   bool               `json:"feed_writable"`
+	EventAuthority solanago.PublicKey `json:"event_authority"`
+	Program        solanago.PublicKey `json:"program"`
 }
 
 func (obj *SetMinDecimalsInstruction) GetDiscriminator() []byte {
@@ -1427,11 +2233,11 @@ func (obj *SetMinDecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uin
 	indices := make([]uint8, 0)
 	index := uint8(0)
 	var err error
-	// Decode from admin account index
+	// Decode from owner account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "admin", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "owner", err)
 	}
 	indices = append(indices, index)
 	// Decode from state account index
@@ -1441,18 +2247,11 @@ func (obj *SetMinDecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uin
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from feed_config account index
+	// Decode from feed account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed_config", err)
-	}
-	indices = append(indices, index)
-	// Decode from system_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "feed", err)
 	}
 	indices = append(indices, index)
 	// Decode from event_authority account index
@@ -1474,15 +2273,15 @@ func (obj *SetMinDecimalsInstruction) UnmarshalAccountIndices(buf []byte) ([]uin
 
 func (obj *SetMinDecimalsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 6 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 6, len(indices))
+	if len(indices) != 5 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
 	}
 	indexOffset := 0
-	// Set admin account from index
+	// Set owner account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "admin", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "owner", len(accountKeys)-1)
 	}
-	obj.Admin = accountKeys[indices[indexOffset]]
+	obj.Owner = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set state account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -1490,17 +2289,11 @@ func (obj *SetMinDecimalsInstruction) PopulateFromAccountIndices(indices []uint8
 	}
 	obj.State = accountKeys[indices[indexOffset]]
 	indexOffset++
-	// Set feed_config account from index
+	// Set feed account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed_config", len(accountKeys)-1)
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "feed", len(accountKeys)-1)
 	}
-	obj.FeedConfig = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set system_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
-	}
-	obj.SystemProgram = accountKeys[indices[indexOffset]]
+	obj.Feed = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -1519,10 +2312,9 @@ func (obj *SetMinDecimalsInstruction) PopulateFromAccountIndices(indices []uint8
 
 func (obj *SetMinDecimalsInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
-	keys = append(keys, obj.Admin)
+	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.FeedConfig)
-	keys = append(keys, obj.SystemProgram)
+	keys = append(keys, obj.Feed)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys
@@ -1550,14 +2342,13 @@ func UnmarshalSetMinDecimalsInstruction(buf []byte) (*SetMinDecimalsInstruction,
 }
 
 type SetStoreInstruction struct {
+	Writer solanago.PublicKey `json:"writer"`
 
 	// Accounts:
 	Owner          solanago.PublicKey `json:"owner"`
 	OwnerSigner    bool               `json:"owner_signer"`
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
-	StoreProgram   solanago.PublicKey `json:"store_program"`
-	StoreState     solanago.PublicKey `json:"store_state"`
 	EventAuthority solanago.PublicKey `json:"event_authority"`
 	Program        solanago.PublicKey `json:"program"`
 }
@@ -1568,6 +2359,7 @@ func (obj *SetStoreInstruction) GetDiscriminator() []byte {
 
 // UnmarshalWithDecoder unmarshals the SetStoreInstruction from Borsh-encoded bytes prefixed with its discriminator.
 func (obj *SetStoreInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
 	// Read the discriminator and check it against the expected value:
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
@@ -1575,6 +2367,11 @@ func (obj *SetStoreInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) er
 	}
 	if discriminator != Instruction_SetStore {
 		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "SetStoreInstruction", Instruction_SetStore, discriminator)
+	}
+	// Deserialize `Writer`:
+	err = decoder.Decode(&obj.Writer)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -1599,20 +2396,6 @@ func (obj *SetStoreInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, er
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
 	}
 	indices = append(indices, index)
-	// Decode from store_program account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_program", err)
-	}
-	indices = append(indices, index)
-	// Decode from store_state account index
-	index = uint8(0)
-	err = decoder.Decode(&index)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode %s account index: %w", "store_state", err)
-	}
-	indices = append(indices, index)
 	// Decode from event_authority account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -1632,8 +2415,8 @@ func (obj *SetStoreInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, er
 
 func (obj *SetStoreInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 6 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 6, len(indices))
+	if len(indices) != 4 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 4, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -1647,18 +2430,6 @@ func (obj *SetStoreInstruction) PopulateFromAccountIndices(indices []uint8, acco
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
 	}
 	obj.State = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_program account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_program", len(accountKeys)-1)
-	}
-	obj.StoreProgram = accountKeys[indices[indexOffset]]
-	indexOffset++
-	// Set store_state account from index
-	if indices[indexOffset] >= uint8(len(accountKeys)) {
-		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "store_state", len(accountKeys)-1)
-	}
-	obj.StoreState = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -1679,8 +2450,6 @@ func (obj *SetStoreInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys := make([]solanago.PublicKey, 0)
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
-	keys = append(keys, obj.StoreProgram)
-	keys = append(keys, obj.StoreState)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys
@@ -1842,6 +2611,110 @@ func UnmarshalTransferOwnershipInstruction(buf []byte) (*TransferOwnershipInstru
 	return obj, nil
 }
 
+type WriteRoundsInstruction struct {
+	Rounds []NewRound `json:"rounds"`
+
+	// Accounts:
+	Writer       solanago.PublicKey `json:"writer"`
+	WriterSigner bool               `json:"writer_signer"`
+	State        solanago.PublicKey `json:"state"`
+}
+
+func (obj *WriteRoundsInstruction) GetDiscriminator() []byte {
+	return Instruction_WriteRounds[:]
+}
+
+// UnmarshalWithDecoder unmarshals the WriteRoundsInstruction from Borsh-encoded bytes prefixed with its discriminator.
+func (obj *WriteRoundsInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) error {
+	var err error
+	// Read the discriminator and check it against the expected value:
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return fmt.Errorf("failed to read instruction discriminator for %s: %w", "WriteRoundsInstruction", err)
+	}
+	if discriminator != Instruction_WriteRounds {
+		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "WriteRoundsInstruction", Instruction_WriteRounds, discriminator)
+	}
+	// Deserialize `Rounds`:
+	err = decoder.Decode(&obj.Rounds)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *WriteRoundsInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, error) {
+	// UnmarshalAccountIndices decodes account indices from Borsh-encoded bytes
+	decoder := binary.NewBorshDecoder(buf)
+	indices := make([]uint8, 0)
+	index := uint8(0)
+	var err error
+	// Decode from writer account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "writer", err)
+	}
+	indices = append(indices, index)
+	// Decode from state account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "state", err)
+	}
+	indices = append(indices, index)
+	return indices, nil
+}
+
+func (obj *WriteRoundsInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
+	// PopulateFromAccountIndices sets account public keys from indices and account keys array
+	if len(indices) != 2 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 2, len(indices))
+	}
+	indexOffset := 0
+	// Set writer account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "writer", len(accountKeys)-1)
+	}
+	obj.Writer = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set state account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "state", len(accountKeys)-1)
+	}
+	obj.State = accountKeys[indices[indexOffset]]
+	indexOffset++
+	return nil
+}
+
+func (obj *WriteRoundsInstruction) GetAccountKeys() []solanago.PublicKey {
+	keys := make([]solanago.PublicKey, 0)
+	keys = append(keys, obj.Writer)
+	keys = append(keys, obj.State)
+	return keys
+}
+
+// Unmarshal unmarshals the WriteRoundsInstruction from Borsh-encoded bytes prefixed with the discriminator.
+func (obj *WriteRoundsInstruction) Unmarshal(buf []byte) error {
+	var err error
+	err = obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling WriteRoundsInstruction: %w", err)
+	}
+	return nil
+}
+
+// UnmarshalWriteRoundsInstruction unmarshals the instruction from Borsh-encoded bytes prefixed with the discriminator.
+func UnmarshalWriteRoundsInstruction(buf []byte) (*WriteRoundsInstruction, error) {
+	obj := new(WriteRoundsInstruction)
+	var err error
+	err = obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 // Instruction interface defines common methods for all instruction types
 type Instruction interface {
 	GetDiscriminator() []byte
@@ -1885,12 +2758,102 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 			}
 		}
 		return instruction, nil
+	case Instruction_CreateFeeds:
+		instruction := new(CreateFeedsInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as CreateFeedsInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_Decimals:
+		instruction := new(DecimalsInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as DecimalsInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_Description:
+		instruction := new(DescriptionInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as DescriptionInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
 	case Instruction_GetMinDecimals:
 		instruction := new(GetMinDecimalsInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as GetMinDecimalsInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_GetRound:
+		instruction := new(GetRoundInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as GetRoundInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_GetStore:
+		instruction := new(GetStoreInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as GetStoreInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -1921,12 +2884,12 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 			}
 		}
 		return instruction, nil
-	case Instruction_Read:
-		instruction := new(ReadInstruction)
+	case Instruction_LatestRound:
+		instruction := new(LatestRoundInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as ReadInstruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal instruction as LatestRoundInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -1939,12 +2902,12 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 			}
 		}
 		return instruction, nil
-	case Instruction_ReadScaled:
-		instruction := new(ReadScaledInstruction)
+	case Instruction_SetFeedDescriptions:
+		instruction := new(SetFeedDescriptionsInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as ReadScaledInstruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal instruction as SetFeedDescriptionsInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -1957,12 +2920,30 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 			}
 		}
 		return instruction, nil
-	case Instruction_SetFeedAdmin:
-		instruction := new(SetFeedAdminInstruction)
+	case Instruction_SetFeedFrozen:
+		instruction := new(SetFeedFrozenInstruction)
 		decoder := binary.NewBorshDecoder(instructionData)
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal instruction as SetFeedAdminInstruction: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal instruction as SetFeedFrozenInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_SetMaxStoredReports:
+		instruction := new(SetMaxStoredReportsInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as SetMaxStoredReportsInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
@@ -2017,6 +2998,24 @@ func ParseInstruction(instructionData []byte, accountIndicesData []byte, account
 		err := instruction.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal instruction as TransferOwnershipInstruction: %w", err)
+		}
+		if accountIndicesData != nil && len(accountIndicesData) > 0 {
+			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal account indices: %w", err)
+			}
+			err = instruction.PopulateFromAccountIndices(indices, accountKeys)
+			if err != nil {
+				return nil, fmt.Errorf("failed to populate accounts: %w", err)
+			}
+		}
+		return instruction, nil
+	case Instruction_WriteRounds:
+		instruction := new(WriteRoundsInstruction)
+		decoder := binary.NewBorshDecoder(instructionData)
+		err := instruction.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal instruction as WriteRoundsInstruction: %w", err)
 		}
 		if accountIndicesData != nil && len(accountIndicesData) > 0 {
 			indices, err := instruction.UnmarshalAccountIndices(accountIndicesData)

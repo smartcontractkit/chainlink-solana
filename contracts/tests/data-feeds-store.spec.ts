@@ -1,16 +1,18 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
-import { AccountMeta, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  AccountMeta,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { assert } from "chai";
-import { execFileSync } from "child_process";
 import { randomBytes } from "crypto";
-import { writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
 import { DataFeedsStore } from "../target/types/data_feeds_store";
+import { DataFeedsProxy } from "../target/types/data_feeds_proxy";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
 import { Store } from "../target/types/store";
-import { DummyReceiver } from "../target/types/dummy_receiver";
 import {
   calculateForwarderAuthorityBump,
   Forwarder,
@@ -50,55 +52,57 @@ const withSvrPath = (id: Buffer, path: number) => {
   out.writeUInt16BE(path, 9);
   return out;
 };
-const withInstance = (id: Buffer, instance: number) => {
-  const out = Buffer.from(id);
-  out[11] = instance;
-  return out;
-};
 // accounts key data ids zero padded to 32 bytes
 const seed32 = (id: Buffer) => Buffer.concat([id, Buffer.alloc(16)]);
 
 describe("data feeds store", function () {
-  this.timeout(60_000);
+  this.timeout(90_000);
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const connection = provider.connection;
 
   const program = anchor.workspace.DataFeedsStore as Program<DataFeedsStore>;
+  const proxy = anchor.workspace.DataFeedsProxy as Program<DataFeedsProxy>;
   const forwarderProgram = anchor.workspace
     .KeystoneForwarder as Program<KeystoneForwarder>;
-  const storeProgram = anchor.workspace.Store as Program<Store>;
-  const dummyReceiver = anchor.workspace
-    .DummyReceiver as Program<DummyReceiver>;
+  const df1 = anchor.workspace.Store as Program<Store>;
 
   let feedAdmin: Signer;
   let forwarder: Forwarder;
+  let otherForwarder: Forwarder;
   let forwarderAuthority: PublicKey;
   let state: Keypair;
+  let proxyState: Keypair;
   const workflowOwner = randomBytes(20);
   const workflowName = randomBytes(10);
 
-  const pda = (seed: string, ...keys: Buffer[]) =>
+  const storePda = (seed: string, ...keys: Buffer[]) =>
     PublicKey.findProgramAddressSync(
       [Buffer.from(seed), state.publicKey.toBuffer(), ...keys],
       program.programId
     )[0];
-  const feedPda = (id: Buffer) => pda("feed", seed32(id));
-  const callbackAuthority = (callbackProgram: PublicKey) =>
-    pda("callback_authority", callbackProgram.toBuffer());
-  const callbackProgramEntry = (callbackProgram: PublicKey) =>
-    pda("callback_program", callbackProgram.toBuffer());
-  // CPI events: #[event_cpi] contexts take the event authority PDA and the program
+  const feedConfig = (id: Buffer) => storePda("feed_config", seed32(id));
+  const vault = () => storePda("store_authority");
+  const feedWriter = (s = state.publicKey) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("feed_writer"), s.toBuffer()],
+      program.programId
+    )[0];
+  const df1Writer = () => storePda("df1_writer");
+  const proxyFeed = (id: Buffer) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("feed"), proxyState.publicKey.toBuffer(), seed32(id)],
+      proxy.programId
+    )[0];
   const eventAuthority = (programId: PublicKey) =>
     PublicKey.findProgramAddressSync(
       [Buffer.from("__event_authority")],
       programId
     )[0];
-  const eventAccounts = () => ({
-    eventAuthority: eventAuthority(program.programId),
-    program: program.programId,
+  const eventAccounts = (programId = program.programId) => ({
+    eventAuthority: eventAuthority(programId),
+    program: programId,
   });
-
   const meta = (pubkey: PublicKey, isWritable = true): AccountMeta => ({
     pubkey,
     isSigner: false,
@@ -110,66 +114,82 @@ describe("data feeds store", function () {
   let tick = 0;
   const nextTimestamp = () => baseTimestamp + ++tick;
 
-  // Stores live in pre-created state accounts, and only the program's upgrade authority (the
-  // test wallet) initializes them.
-  const programData = PublicKey.findProgramAddressSync(
-    [program.programId.toBuffer()],
-    new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
-  )[0];
-  const createStateAccount = async (
+  const loader = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
+  const programData = (programId: PublicKey) =>
+    PublicKey.findProgramAddressSync([programId.toBuffer()], loader)[0];
+  const createAccount = async (
     account: Keypair,
-    space = program.account.storeState.size
+    space: number,
+    programId: PublicKey
   ) =>
-    anchor.web3.SystemProgram.createAccount({
+    SystemProgram.createAccount({
       fromPubkey: provider.publicKey,
       newAccountPubkey: account.publicKey,
       space,
       lamports: await connection.getMinimumBalanceForRentExemption(space),
-      programId: program.programId,
+      programId,
     });
-  const initializeStore = (
-    owner: PublicKey,
-    account: PublicKey,
-    defaultMaxStoredReports = 8
-  ) =>
+  const initializeStore = (owner: PublicKey, account: PublicKey) =>
     program.methods
-      .initialize(
-        [feedAdmin.keypair.publicKey],
-        new BN(defaultMaxStoredReports),
-        3600
-      )
+      .initialize({
+        feedAdmins: [feedAdmin.keypair.publicKey],
+        defaultMaxStoredReports: new BN(4),
+        maxObservationForwardSecs: 3600,
+        proxyProgram: proxy.programId,
+        proxyState: proxyState.publicKey,
+        df1Program: df1.programId,
+      })
       .accountsStrict({
         owner,
         state: account,
-        programData,
+        programData: programData(program.programId),
         ...eventAccounts(),
       });
+  const fundVault = async (lamports = LAMPORTS_PER_SOL) =>
+    provider.sendAndConfirm(
+      new anchor.web3.Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: provider.publicKey,
+          toPubkey: vault(),
+          lamports,
+        })
+      )
+    );
 
-  const initStore = async (defaultMaxStoredReports = 8) => {
+  // a proxy trusting a new store, with a funded vault and the forwarder as default workflow
+  const initStore = async () => {
     state = Keypair.generate();
-    await initializeStore(
-      provider.publicKey,
-      state.publicKey,
-      defaultMaxStoredReports
-    )
-      .preInstructions([await createStateAccount(state)])
+    proxyState = Keypair.generate();
+    await proxy.methods
+      .initialize(feedWriter())
+      .accountsStrict({
+        owner: provider.publicKey,
+        state: proxyState.publicKey,
+        programData: programData(proxy.programId),
+        ...eventAccounts(proxy.programId),
+      })
+      .preInstructions([
+        await createAccount(
+          proxyState,
+          proxy.account.proxyState.size,
+          proxy.programId
+        ),
+      ])
+      .signers([proxyState])
+      .rpc();
+    await initializeStore(provider.publicKey, state.publicKey)
+      .preInstructions([
+        await createAccount(
+          state,
+          program.account.storeState.size,
+          program.programId
+        ),
+      ])
       .signers([state])
       .rpc();
-
-    forwarderAuthority = calculateForwarderAuthorityBump(
-      forwarder.state.publicKey,
-      program.programId,
-      forwarderProgram.programId
-    )[0];
-
+    await fundVault();
     await program.methods
-      .setDefaultFeedMetadata([
-        {
-          allowedSender: forwarderAuthority,
-          allowedWorkflowOwner: Array.from(workflowOwner),
-          allowedWorkflowName: Array.from(workflowName),
-        },
-      ])
+      .setDefaultFeedMetadata([workflow()])
       .accountsStrict({
         feedAdmin: feedAdmin.keypair.publicKey,
         state: state.publicKey,
@@ -178,70 +198,85 @@ describe("data feeds store", function () {
       .signers([feedAdmin.keypair])
       .rpc();
   };
+  const workflow = (name = workflowName) => ({
+    allowedSender: forwarderAuthority,
+    allowedWorkflowOwner: Array.from(workflowOwner),
+    allowedWorkflowName: Array.from(name),
+  });
 
-  const adminAccounts = () => ({
-    feedAdmin: feedAdmin.keypair.publicKey,
+  const configAccounts = (admin = feedAdmin.keypair.publicKey) => ({
+    feedAdmin: admin,
     state: state.publicKey,
-    systemProgram: anchor.web3.SystemProgram.programId,
+    systemProgram: SystemProgram.programId,
+    ...eventAccounts(),
+  });
+  const proxyAccounts = (admin = feedAdmin.keypair.publicKey) => ({
+    feedAdmin: admin,
+    state: state.publicKey,
+    proxyProgram: proxy.programId,
+    proxyState: proxyState.publicKey,
+    feedWriter: feedWriter(),
+    systemProgram: SystemProgram.programId,
     ...eventAccounts(),
   });
 
-  // a feed account per data id, which also holds the data id's settings
-  const setupFeed = async (...dataIds: Buffer[]) => {
-    await program.methods
-      .initFeeds(
-        dataIds.map((id) => Array.from(id)),
-        dataIds.map(() => "")
-      )
-      .accountsStrict(adminAccounts())
-      .remainingAccounts(dataIds.map((id) => meta(feedPda(id))))
-      .signers([feedAdmin.keypair])
-      .rpc();
+  // Fixed accounts after the forwarder's, then per report: the proxy feed, the feed config and the
+  // linked DF1 feed. Optional accounts (DF1 when a feed is linked, the vault when one may be
+  // created) not passed are the program id. Legacy transactions keep test batches small.
+  type ReportOpts = {
+    df1Feeds?: Map<string, PublicKey>;
+    passDf1?: boolean;
+    passVault?: boolean;
+    via?: Forwarder;
+    accounts?: (r: Report) => AccountMeta[];
   };
-
-  // per report: the feed of its data id, then callback program, its callback authority and the
-  // configured accounts if a callback is configured
-  const report = async (
-    reports: Report[],
-    callbackAccounts: Map<string, AccountMeta[]> = new Map(),
-    via: Forwarder = forwarder
-  ) => {
+  const reportAccounts = (reports: Report[], opts: ReportOpts = {}) => {
+    const none = meta(program.programId, false);
+    const passDf1 = opts.passDf1 ?? opts.df1Feeds !== undefined;
+    const passVault = opts.passVault ?? true;
     const accounts: AccountMeta[] = [
       meta(state.publicKey, false),
+      meta(proxy.programId, false),
+      meta(proxyState.publicKey, false),
+      meta(feedWriter(), false),
+      passDf1 ? meta(df1.programId, false) : none,
+      passDf1 ? meta(df1Writer(), false) : none,
+      passVault ? meta(vault()) : none,
+      passVault ? meta(SystemProgram.programId, false) : none,
       meta(eventAuthority(program.programId), false),
       meta(program.programId, false),
     ];
     for (const r of reports) {
-      accounts.push(meta(feedPda(r.dataId)));
-      accounts.push(...(callbackAccounts.get(r.dataId.toString("hex")) ?? []));
+      if (opts.accounts) {
+        accounts.push(...opts.accounts(r));
+        continue;
+      }
+      accounts.push(meta(proxyFeed(r.dataId)), meta(feedConfig(r.dataId)));
+      const linked = opts.df1Feeds?.get(r.dataId.toString("hex"));
+      if (linked) accounts.push(meta(linked));
     }
-    const { result } = await via.report(
+    return accounts;
+  };
+  const report = async (reports: Report[], opts: ReportOpts = {}) => {
+    const { result } = await (opts.via ?? forwarder).report(
       program.programId,
       encodeReports(reports),
       workflowName,
       workflowOwner,
-      accounts
+      reportAccounts(reports, opts)
     );
     return result;
   };
 
-  // the reader interface
-  const readAccounts = (id: Buffer) => ({
-    state: state.publicKey,
-    feed: feedPda(id),
-  });
-  const readLatest = async (id: Buffer) =>
-    (await program.methods
-      .getLatestRound(Array.from(id))
-      .accountsStrict(readAccounts(id))
+  // reads through the proxy
+  const readLatest = async (id: Buffer, decimals = 18) =>
+    (await proxy.methods
+      .latestRound(Array.from(id), decimals)
+      .accountsStrict({ state: proxyState.publicKey, feed: proxyFeed(id) })
       .view())!;
-  const readRound = async (id: Buffer, round: number) =>
-    (await program.methods
-      .getRound(Array.from(id), new BN(round))
-      .accountsStrict(readAccounts(id))
-      .view())!;
-  const latestAnswer = async (id: Buffer) =>
-    (await readLatest(id)).answer as BN;
+  const latestAnswer = async (id: Buffer) => (await readLatest(id)).answer as BN;
+  const exists = async (key: PublicKey) =>
+    (await connection.getAccountInfo(key)) !== null;
 
   // CPI events of the store in a transaction, decoded from its inner instructions
   const cpiEvents = async (signature: string) => {
@@ -270,6 +305,8 @@ describe("data feeds store", function () {
     }
     return events;
   };
+  const eventNames = async (signature: string) =>
+    (await cpiEvents(signature)).map((e) => e.name);
 
   const expectError = async (p: Promise<any>, name: string) => {
     try {
@@ -291,64 +328,54 @@ describe("data feeds store", function () {
 
   before(async () => {
     [feedAdmin] = await newSigners(connection, 1);
-
     forwarder = new Forwarder(forwarderProgram, provider)
       .withState(Keypair.generate())
       .withOracles(1, 21, 1);
     await forwarder.initialize();
     await forwarder.initOraclesConfig();
+    otherForwarder = new Forwarder(forwarderProgram, provider)
+      .withState(Keypair.generate())
+      .withOracles(1, 22, 1);
+    await otherForwarder.initialize();
+    await otherForwarder.initOraclesConfig();
+    forwarderAuthority = calculateForwarderAuthorityBump(
+      forwarder.state.publicKey,
+      program.programId,
+      forwarderProgram.programId
+    )[0];
 
     const slot = await connection.getSlot();
-    baseTimestamp = (await connection.getBlockTime(slot)) - 600;
+    baseTimestamp = (await connection.getBlockTime(slot))! - 600;
   });
+  beforeEach(initStore);
 
   describe("configuration", function () {
-    beforeEach(async () => initStore());
-
     it("initializes", async () => {
       const s = await program.account.storeState.fetch(state.publicKey);
       assert.isTrue(s.owner.equals(provider.publicKey));
-      assert.equal(s.defaultMaxStoredReports.toNumber(), 8);
+      assert.equal(s.defaultMaxStoredReports.toNumber(), 4);
       assert.equal(s.maxObservationForwardSecs, 3600);
+      assert.isTrue(s.proxyProgram.equals(proxy.programId));
+      assert.isTrue(s.proxyState.equals(proxyState.publicKey));
+      assert.isTrue(s.df1Program.equals(df1.programId));
       assert.equal(s.feedAdmins.len.toNumber(), 1);
       assert.equal(s.defaultWorkflowMetadata.len.toNumber(), 1);
     });
 
     it("lets only the upgrade authority create stores", async () => {
-      // a second store by the authority, next to the one beforeEach created
-      const second = Keypair.generate();
-      await initializeStore(provider.publicKey, second.publicKey)
-        .preInstructions([await createStateAccount(second)])
-        .signers([second])
-        .rpc();
-      assert.isTrue(
-        (await program.account.storeState.fetch(second.publicKey)).owner.equals(
-          provider.publicKey
-        )
-      );
-
-      // anyone else is refused, even with a well-formed account
       const other = Keypair.generate();
       await expectError(
         initializeStore(feedAdmin.keypair.publicKey, other.publicKey)
-          .preInstructions([await createStateAccount(other)])
+          .preInstructions([
+            await createAccount(
+              other,
+              program.account.storeState.size,
+              program.programId
+            ),
+          ])
           .signers([other, feedAdmin.keypair])
           .rpc(),
         "Unauthorized"
-      );
-      // an account of another size, and a store initialized twice
-      const wrongSize = Keypair.generate();
-      await expectError(
-        initializeStore(provider.publicKey, wrongSize.publicKey)
-          .preInstructions([
-            await createStateAccount(
-              wrongSize,
-              program.account.storeState.size + 8
-            ),
-          ])
-          .signers([wrongSize])
-          .rpc(),
-        "InvalidAccount"
       );
       await expectError(
         initializeStore(provider.publicKey, state.publicKey).rpc(),
@@ -357,445 +384,351 @@ describe("data feeds store", function () {
     });
 
     it("gives every error its own code", () => {
-      const errors = program.idl.errors!;
-      const codes = errors.map((e) => e.code);
+      const codes = program.idl.errors!.map((e) => e.code);
       assert.equal(new Set(codes).size, codes.length);
-      assert.include(
-        errors.map((e) => e.name),
-        "unauthorized"
-      );
     });
 
-    it("validates the data id in permission checks and descriptions", async () => {
-      await expectError(
-        program.methods
-          .checkFeedPermission(Array.from(withSvrPath(newDataId(), 1)), {
-            allowedSender: forwarderAuthority,
-            allowedWorkflowOwner: Array.from(workflowOwner),
-            allowedWorkflowName: Array.from(workflowName),
-          })
-          .accountsStrict({ state: state.publicKey, feed: null })
-          .view(),
-        "InvalidDataId"
-      );
-      const id = newDataId();
-      await setupFeed(id);
-      await expectError(
-        program.methods
-          .setFeedDescriptions([Array.from(id)], ["ETH\u0000USD"])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "InvalidDescription"
-      );
-      await expectError(
-        program.methods
-          .getDescription(Array.from(withSvrPath(id, 1)))
-          .accountsStrict({ state: state.publicKey, feed: feedPda(id) })
-          .view(),
-        "InvalidDataId"
-      );
-    });
-
-    it("rejects ring sizes too large to address", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      await expectError(
-        program.methods
-          .setMaxStoredReports(
-            [Array.from(id)],
-            [new BN("18446744073709551615")]
-          )
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "InvalidMaxStoredReports"
-      );
-    });
-
-    it("rejects non feed admins", async () => {
+    it("rejects non feed admins and invalid data ids", async () => {
       const id = newDataId();
       await expectError(
         program.methods
-          .initFeeds([Array.from(id)], [""])
-          .accountsStrict({ ...adminAccounts(), feedAdmin: provider.publicKey })
-          .remainingAccounts([meta(feedPda(id))])
+          .setFeedDescriptions([Array.from(id)], ["ETH / USD"])
+          .accountsStrict(proxyAccounts(provider.publicKey))
+          .remainingAccounts([meta(proxyFeed(id))])
           .rpc(),
         "Unauthorized"
       );
+      await expectError(
+        program.methods
+          .setFeedWritesDisabled([Array.from(Buffer.alloc(16))], true)
+          .accountsStrict(configAccounts())
+          .remainingAccounts([meta(feedConfig(Buffer.alloc(16)))])
+          .signers([feedAdmin.keypair])
+          .rpc(),
+        "InvalidDataId"
+      );
     });
 
-    it("rejects the zero data id and reserved SVR path ids", async () => {
+    it("sets descriptions through the proxy, creating the feed", async () => {
       const id = newDataId();
-      for (const bad of [Buffer.alloc(16), withSvrPath(id, 1)]) {
-        await expectError(
-          program.methods
-            .initFeeds([Array.from(bad)], [""])
-            .accountsStrict(adminAccounts())
-            .remainingAccounts([meta(feedPda(bad))])
-            .signers([feedAdmin.keypair])
-            .rpc(),
-          "InvalidDataId"
-        );
-      }
-    });
-
-    it("keeps a description in each feed account", async () => {
-      const id = newDataId();
-      const other = withInstance(id, 3);
-      const description = (dataId: Buffer) =>
+      const describe = (dataId: Buffer, text: string, feed = proxyFeed(dataId)) =>
         program.methods
-          .getDescription(Array.from(dataId))
-          .accountsStrict({ state: state.publicKey, feed: feedPda(dataId) })
-          .view();
-
-      // set when the feed is created, also checked for feeds that already exist
-      await program.methods
-        .initFeeds([Array.from(id), Array.from(other)], ["ETH / USD", ""])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id)), meta(feedPda(other))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      assert.equal(await description(id), "ETH / USD");
-      assert.equal(await description(other), "", "another instance, none set");
-      await expectError(
-        program.methods
-          .initFeeds([Array.from(id)], ["x".repeat(65)])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
+          .setFeedDescriptions([Array.from(dataId)], [text])
+          .accountsStrict(proxyAccounts())
+          .remainingAccounts([meta(feed)])
           .signers([feedAdmin.keypair])
-          .rpc(),
-        "DescriptionTooLong"
-      );
+          .rpc();
+      const signature = await describe(id, "ETH / USD");
+      assert.includeMembers(await eventNames(signature), [
+        "feedsCreated",
+        "feedDescriptionSet",
+      ]);
       assert.equal(
-        await description(id),
-        "ETH / USD",
-        "existing feed untouched"
-      );
-
-      // updated and cleared later, per feed
-      await program.methods
-        .setFeedDescriptions(
-          [Array.from(id), Array.from(other)],
-          ["", "ETH / USD (2)"]
-        )
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id)), meta(feedPda(other))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      assert.equal(await description(id), "");
-      assert.equal(await description(other), "ETH / USD (2)");
-
-      // only into the data id's own feed of this store
-      await expectError(
-        program.methods
-          .setFeedDescriptions([Array.from(id)], ["BTC / USD"])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(other))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "AccountMismatch"
-      );
-      await expectError(
-        program.methods
-          .getDescription(Array.from(id))
-          .accountsStrict({ state: state.publicKey, feed: feedPda(other) })
+        await proxy.methods
+          .description(Array.from(id))
+          .accountsStrict({ state: proxyState.publicKey, feed: proxyFeed(id) })
           .view(),
-        "AccountMismatch"
+        "ETH / USD"
       );
-      const missing = newDataId();
+      await describe(id, "");
+      await expectError(describe(id, "ETH\u0000USD"), "InvalidDescription");
+      // the feed's first report creates the config the description call didn't
+      assert.isFalse(await exists(feedConfig(id)));
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      assert.isTrue(await exists(feedConfig(id)));
+      assert.equal((await readLatest(id)).roundId.toNumber(), 1);
       await expectError(
-        program.methods
-          .setFeedDescriptions([Array.from(missing)], ["BTC / USD"])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(missing))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "InvalidAccount"
-      );
-    });
-
-    it("serves the stored decimals", async () => {
-      assert.equal(
-        await program.methods
-          .getDecimals(Array.from(newDataId()))
-          .accountsStrict({ state: state.publicKey })
-          .view(),
-        18
+        describe(id, "x", proxyFeed(newDataId())),
+        "AccountMismatch"
       );
     });
 
     it("checks feed permissions", async () => {
       const id = newDataId();
-      await setupFeed(id);
-      const workflow = {
-        allowedSender: forwarderAuthority,
-        allowedWorkflowOwner: Array.from(workflowOwner),
-        allowedWorkflowName: Array.from(workflowName),
-      };
-      const check = () =>
+      const check = (config: PublicKey | null) =>
         program.methods
-          .checkFeedPermission(Array.from(id), workflow)
-          .accountsStrict({ state: state.publicKey, feed: feedPda(id) })
+          .checkFeedPermission(Array.from(id), workflow())
+          .accountsStrict({ state: state.publicKey, feedConfig: config })
           .view();
-
-      assert.isTrue(await check(), "default metadata");
-
+      assert.isTrue(await check(null), "default metadata");
       await program.methods
-        .setSpecificFeedMetadata(
-          [Array.from(id)],
-          [{ ...workflow, allowedWorkflowName: Array.from(randomBytes(10)) }]
-        )
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
+        .setSpecificFeedMetadata([Array.from(id)], [workflow(randomBytes(10))])
+        .accountsStrict(configAccounts())
+        .remainingAccounts([meta(feedConfig(id))])
         .signers([feedAdmin.keypair])
         .rpc();
-      assert.isFalse(await check(), "specific metadata replaces the default");
+      assert.isFalse(
+        await check(feedConfig(id)),
+        "specific metadata replaces the default"
+      );
+      assert.isFalse(await exists(proxyFeed(id)), "only the config was made");
     });
   });
 
   describe("reports", function () {
-    beforeEach(async () => initStore(4));
-
-    it("stores reports and serves rounds at 18 decimals", async () => {
-      const a = newDataId();
-      const b = newDataId();
-      await setupFeed(a, b);
-      await expectError(readLatest(a), "NoDataPresent");
-
-      const tsA = nextTimestamp();
-      const tsB = nextTimestamp();
-      await report([
-        { dataId: a, timestamp: tsA, answer: new BN(1234).mul(E18).divn(100) },
-        { dataId: b, timestamp: tsB, answer: new BN(-5).mul(E18) },
-      ]);
-
-      const round = await readLatest(a);
-      assert.equal(round.roundId.toNumber(), 1);
-      assert.isTrue(round.answer.eq(new BN(1234).mul(E18).divn(100)));
-      assert.equal(round.observationsTimestamp, tsA);
-      assert.isAbove(round.recordedTimestamp, 0);
-      assert.isTrue(
-        (await latestAnswer(b)).eq(new BN(-5).mul(E18)),
-        "negative"
-      );
-      assert.equal((await readLatest(b)).observationsTimestamp, tsB);
-    });
-
-    it("skips invalid data ids and uninitialized feeds without failing the batch", async () => {
-      const valid = newDataId();
-      const uninitialized = newDataId();
-      const svr = withSvrPath(newDataId(), 1);
-      await setupFeed(valid);
-
+    it("creates a feed on its first report, paid by the vault", async () => {
+      const id = newDataId();
+      const before = await connection.getBalance(vault());
       const ts = nextTimestamp();
       const signature = await report([
-        { dataId: svr, timestamp: ts, answer: new BN(1) },
-        { dataId: uninitialized, timestamp: ts, answer: new BN(2) },
-        { dataId: valid, timestamp: ts, answer: new BN(3) },
+        { dataId: id, timestamp: ts, answer: new BN(1234).mul(E18).divn(100) },
       ]);
-      assert.isTrue(
-        (await latestAnswer(valid)).eq(new BN(3)),
-        "valid report lands"
-      );
-
-      const events = await cpiEvents(signature);
-      const names = events.map((e) => e.name);
-      // skip events carry the sender: anyone can cause them
-      for (const e of events.filter((e) => e.name.endsWith("Ignored"))) {
-        assert.isTrue(e.data.sender.equals(forwarderAuthority));
-      }
-      assert.includeMembers(names, [
-        "invalidDataIdIgnored",
-        "feedNotInitializedIgnored",
+      assert.includeMembers(await eventNames(signature), [
+        "feedsCreated",
         "feedUpdated",
       ]);
+      assert.isBelow(await connection.getBalance(vault()), before);
+
+      const round = await readLatest(id);
+      assert.equal(round.roundId.toNumber(), 1);
+      assert.equal(round.observationsTimestamp, ts);
+      assert.isTrue(round.answer.eq(new BN(1234).mul(E18).divn(100)));
+      const feed = await proxy.account.feed.fetch(proxyFeed(id));
+      assert.equal(feed.maxStoredReports.toNumber(), 4, "the default ring");
+      assert.isTrue(await exists(feedConfig(id)));
+
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(-5).mul(E18) },
+      ]);
+      assert.equal((await readLatest(id)).roundId.toNumber(), 2);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(-5).mul(E18)));
     });
 
-    it("reads the latest rounds of several data ids", async () => {
-      const a = newDataId();
-      const b = newDataId();
-      await setupFeed(a, b);
-      const ts = nextTimestamp();
-      await report([{ dataId: a, timestamp: ts, answer: new BN(42) }]);
-
-      const rounds = (await program.methods
-        .getLatestRounds([Array.from(a), Array.from(b)])
-        .accountsStrict({ state: state.publicKey })
-        .remainingAccounts([meta(feedPda(a), false), meta(feedPda(b), false)])
-        .view())!;
-      assert.equal(rounds.length, 2);
-      assert.equal(rounds[0].roundId.toNumber(), 1);
-      assert.isTrue(rounds[0].answer.eq(new BN(42)));
-      assert.equal(rounds[0].observationsTimestamp, ts);
-      assert.equal(
-        rounds[1].roundId.toNumber(),
-        0,
-        "no report yet: zero round"
+    it("creates nothing for workflows that may not write", async () => {
+      const id = newDataId();
+      const signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }],
+        { via: otherForwarder }
       );
+      assert.include(await eventNames(signature), "invalidUpdatePermission");
+      assert.isFalse(await exists(proxyFeed(id)));
+      assert.isFalse(await exists(feedConfig(id)));
     });
 
-    it("reads a batch with a never-created feed as a zero round", async () => {
-      const ids = Array.from({ length: 9 }, () => newDataId());
-      await setupFeed(...ids.slice(0, 5));
-      await setupFeed(...ids.slice(5));
-      const missing = newDataId();
-      const ts = nextTimestamp();
-      await report([{ dataId: ids[0], timestamp: ts, answer: new BN(7) }]);
+    it("skips new feeds it can't pay for, the rest of the batch lands", async () => {
+      const [existing, fresh] = [newDataId(), newDataId()];
+      await report([{ dataId: existing, timestamp: nextTimestamp(), answer: new BN(1) }]);
 
-      const all = [...ids, missing];
-      const rounds = (await program.methods
-        .getLatestRounds(all.map((id) => Array.from(id)))
-        .accountsStrict({ state: state.publicKey })
-        .remainingAccounts(all.map((id) => meta(feedPda(id), false)))
-        .view())!;
-      assert.equal(rounds.length, 10);
-      assert.isTrue(rounds[0].answer.eq(new BN(7)));
-      assert.equal(
-        rounds[9].roundId.toNumber(),
-        0,
-        "never created: zero round"
+      // vault not passed
+      let signature = await report(
+        [
+          { dataId: fresh, timestamp: nextTimestamp(), answer: new BN(2) },
+          { dataId: existing, timestamp: nextTimestamp(), answer: new BN(3) },
+        ],
+        { passVault: false }
       );
+      let events = await cpiEvents(signature);
+      const skipped = events.find((e) => e.name === "feedCreationSkipped");
+      assert.deepEqual(skipped?.data.reason, { vaultNotPassed: {} });
+      assert.isTrue((await latestAnswer(existing)).eq(new BN(3)));
+      assert.isFalse(await exists(proxyFeed(fresh)));
 
-      // an empty account that isn't the data ID's feed doesn't stand in for it
+      // vault emptied
+      const balance = await connection.getBalance(vault());
+      await program.methods
+        .recoverNative(new BN(balance))
+        .accountsStrict({
+          owner: provider.publicKey,
+          state: state.publicKey,
+          storeAuthority: vault(),
+          to: provider.publicKey,
+          systemProgram: SystemProgram.programId,
+          ...eventAccounts(),
+        })
+        .rpc();
+      signature = await report([
+        { dataId: fresh, timestamp: nextTimestamp(), answer: new BN(2) },
+      ]);
+      events = await cpiEvents(signature);
+      assert.deepEqual(
+        events.find((e) => e.name === "feedCreationSkipped")?.data.reason,
+        { insufficientVaultBalance: {} }
+      );
+      assert.isFalse(await exists(proxyFeed(fresh)));
+    });
+
+    it("refuses a feed config left out or replaced", async () => {
+      const [id, other] = [newDataId(), newDataId()];
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await report([{ dataId: other, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      // an empty account where the data id's config is: it can't stand for "no config"
       await expectError(
-        program.methods
-          .getLatestRounds([Array.from(missing)])
-          .accountsStrict({ state: state.publicKey })
-          .remainingAccounts([meta(Keypair.generate().publicKey, false)])
-          .view(),
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
+          accounts: (r) => [meta(proxyFeed(r.dataId)), meta(Keypair.generate().publicKey)],
+        }),
+        "AccountMismatch"
+      );
+      // another data id's config
+      await expectError(
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
+          accounts: (r) => [meta(proxyFeed(r.dataId)), meta(feedConfig(other))],
+        }),
+        "AccountMismatch"
+      );
+      // another data id's proxy feed
+      await expectError(
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
+          accounts: (r) => [meta(proxyFeed(other)), meta(feedConfig(r.dataId))],
+        }),
         "AccountMismatch"
       );
     });
 
-    it("fails a report whose feed is passed read-only", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      const accounts: AccountMeta[] = [
-        meta(state.publicKey, false),
-        meta(eventAuthority(program.programId), false),
-        meta(program.programId, false),
-        meta(feedPda(id), false),
+    it("skips invalid, future, stale and out of range reports", async () => {
+      const [a, b] = [newDataId(), newDataId()];
+      const ts = nextTimestamp();
+      await report([{ dataId: a, timestamp: ts, answer: new BN(1) }]);
+      await program.methods
+        .setMinMaxAnswers([Array.from(b)], [new BN(-10)], [new BN(10)])
+        .accountsStrict(configAccounts())
+        .remainingAccounts([meta(feedConfig(b))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+
+      const invalid = await report([
+        { dataId: withSvrPath(newDataId(), 1), timestamp: nextTimestamp(), answer: new BN(1) },
+      ]);
+      const first = await report([
+        { dataId: a, timestamp: ts, answer: new BN(2) },
+        { dataId: a, timestamp: baseTimestamp + 1_000_000, answer: new BN(3) },
+      ]);
+      const second = await report([
+        { dataId: b, timestamp: nextTimestamp(), answer: new BN(11) },
+        { dataId: b, timestamp: nextTimestamp(), answer: new BN(9) },
+      ]);
+      const names = [
+        ...(await eventNames(invalid)),
+        ...(await eventNames(first)),
+        ...(await eventNames(second)),
       ];
+      assert.includeMembers(names, [
+        "invalidDataIdIgnored",
+        "staleReport",
+        "futureReportIgnored",
+        "answerOutOfMinMaxRange",
+        "feedUpdated",
+      ]);
+      assert.isTrue((await latestAnswer(a)).eq(new BN(1)), "a untouched");
+      assert.isTrue((await latestAnswer(b)).eq(new BN(9)), "in range lands");
+    });
+
+    it("applies several reports of one feed in a batch in order", async () => {
+      const id = newDataId();
+      const [t1, t2] = [nextTimestamp(), nextTimestamp()];
+      const signature = await report([
+        { dataId: id, timestamp: t1, answer: new BN(1) },
+        { dataId: id, timestamp: t2, answer: new BN(2) },
+        { dataId: id, timestamp: t1, answer: new BN(3) },
+      ]);
+      const events = await cpiEvents(signature);
+      const updated = events.filter((e) => e.name === "feedUpdated");
+      assert.deepEqual(
+        updated.map((e) => e.data.roundId.toNumber()),
+        [1, 2]
+      );
+      assert.include(events.map((e) => e.name), "staleReport");
+      const latest = await readLatest(id);
+      assert.equal(latest.roundId.toNumber(), 2);
+      assert.isTrue(latest.answer.eq(new BN(2)));
+    });
+
+    it("disables writes for every workflow, reads continue", async () => {
+      const id = newDataId();
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      const disable = (dataId: Buffer, disabled: boolean) =>
+        program.methods
+          .setFeedWritesDisabled([Array.from(dataId)], disabled)
+          .accountsStrict(configAccounts())
+          .remainingAccounts([meta(feedConfig(dataId))])
+          .signers([feedAdmin.keypair])
+          .rpc();
+      await disable(id, true);
+      let signature = await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(2) },
+      ]);
+      assert.include(await eventNames(signature), "feedWritesDisabledIgnored");
+      assert.isTrue((await latestAnswer(id)).eq(new BN(1)), "still readable");
+
+      // also with feed-specific workflows
+      await program.methods
+        .setSpecificFeedMetadata([Array.from(id)], [workflow()])
+        .accountsStrict(configAccounts())
+        .remainingAccounts([meta(feedConfig(id))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+      signature = await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(2) },
+      ]);
+      assert.include(await eventNames(signature), "feedWritesDisabledIgnored");
+
+      await disable(id, false);
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3) }]);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(3)));
+
+      // a data id disabled before its first report is never created
+      const blocked = newDataId();
+      await disable(blocked, true);
+      await report([{ dataId: blocked, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      assert.isFalse(await exists(proxyFeed(blocked)));
+    });
+
+    it("freezes reads, writes continue", async () => {
+      const id = newDataId();
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      const freeze = (frozen: boolean) =>
+        program.methods
+          .setFeedFrozen([Array.from(id)], frozen)
+          .accountsStrict(proxyAccounts())
+          .remainingAccounts([meta(proxyFeed(id))])
+          .signers([feedAdmin.keypair])
+          .rpc();
+      await freeze(true);
+      await expectError(readLatest(id), "FeedFrozen");
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }]);
+      await freeze(false);
+      assert.equal((await readLatest(id)).roundId.toNumber(), 2);
+    });
+
+    it("grows a feed's history through the proxy", async () => {
+      const id = newDataId();
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await program.methods
+        .setMaxStoredReports([Array.from(id)], [new BN(6)])
+        .accountsStrict(proxyAccounts())
+        .remainingAccounts([meta(proxyFeed(id))])
+        .signers([feedAdmin.keypair])
+        .rpc();
+      const feed = await proxy.account.feed.fetch(proxyFeed(id));
+      assert.equal(feed.maxStoredReports.toNumber(), 6);
+    });
+
+    it("fails a report whose proxy feed is passed read-only", async () => {
+      const id = newDataId();
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
       await expectError(
-        forwarder.report(
-          program.programId,
-          encodeReports([
-            { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
-          ]),
-          workflowName,
-          workflowOwner,
-          accounts
-        ),
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
+          accounts: (r) => [meta(proxyFeed(r.dataId), false), meta(feedConfig(r.dataId))],
+        }),
         "AccountNotWritable"
       );
     });
 
-    it("keeps history in a ring", async () => {
+    it("hands over to a new store, round ids carry on", async () => {
       const id = newDataId();
-      await setupFeed(id);
-      for (let i = 1; i <= 5; i++) {
-        await report([
-          { dataId: id, timestamp: nextTimestamp(), answer: new BN(i) },
-        ]);
-      }
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      const oldState = state;
 
-      assert.isTrue((await readRound(id, 5)).answer.eq(new BN(5)));
-      assert.isTrue((await readRound(id, 2)).answer.eq(new BN(2)));
-      assert.equal((await readLatest(id)).roundId.toNumber(), 5);
-      await expectError(readRound(id, 1), "NoDataPresent"); // evicted from a ring of 4
-      await expectError(readRound(id, 6), "NoDataPresent"); // not yet written
-      await expectError(readRound(id, 0), "NoDataPresent");
-    });
-
-    it("skips stale, out of range and unpermitted reports", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      const ts = nextTimestamp();
-      await report([{ dataId: id, timestamp: ts, answer: new BN(10) }]);
-
-      await report([{ dataId: id, timestamp: ts, answer: new BN(11) }]);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(10)), "stale");
-
-      await program.methods
-        .setMinMaxAnswers([Array.from(id)], [new BN(0)], [new BN(100)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(101) },
-      ]);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(10)), "out of range");
-
-      await program.methods
-        .setSpecificFeedMetadata(
-          [Array.from(id)],
-          [
-            {
-              allowedSender: forwarderAuthority,
-              allowedWorkflowOwner: Array.from(workflowOwner),
-              allowedWorkflowName: Array.from(randomBytes(10)),
-            },
-          ]
-        )
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(50) },
-      ]);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(10)), "not permitted");
-
-      await program.methods
-        .removeSpecificFeedMetadata([Array.from(id)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(50) },
-      ]);
-      assert.isTrue(
-        (await latestAnswer(id)).eq(new BN(50)),
-        "default metadata again"
-      );
-    });
-
-    it("accepts any forwarder in the allowed workflows, e.g. one per zone", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      const zoneB = new Forwarder(forwarderProgram, provider)
-        .withState(Keypair.generate())
-        .withOracles(1, 21, 1);
-      await zoneB.initialize();
-      await zoneB.initOraclesConfig();
-      const zoneBAuthority = calculateForwarderAuthorityBump(
-        zoneB.state.publicKey,
-        program.programId,
-        forwarderProgram.programId
-      )[0];
-
-      await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(7) }],
-        new Map(),
-        zoneB
-      );
-      await expectError(readLatest(id), "NoDataPresent"); // a forwarder outside the allowed workflows is skipped
-
-      const workflow = (allowedSender: PublicKey) => ({
-        allowedSender,
-        allowedWorkflowOwner: Array.from(workflowOwner),
-        allowedWorkflowName: Array.from(workflowName),
-      });
-      await program.methods
-        .setDefaultFeedMetadata([
-          workflow(forwarderAuthority),
-          workflow(zoneBAuthority),
+      // a second store writing the same proxy
+      state = Keypair.generate();
+      await initializeStore(provider.publicKey, state.publicKey)
+        .preInstructions([
+          await createAccount(state, program.account.storeState.size, program.programId),
         ])
+        .signers([state])
+        .rpc();
+      await fundVault();
+      await program.methods
+        .setDefaultFeedMetadata([workflow()])
         .accountsStrict({
           feedAdmin: feedAdmin.keypair.publicKey,
           state: state.publicKey,
@@ -803,410 +736,149 @@ describe("data feeds store", function () {
         })
         .signers([feedAdmin.keypair])
         .rpc();
-      await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(8) }],
-        new Map(),
-        zoneB
-      );
-      assert.isTrue((await latestAnswer(id)).eq(new BN(8)), "zone B");
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(9) },
-      ]);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(9)), "zone A");
-    });
-
-    it("grows the ring before it wraps", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
-      ]);
-
-      await program.methods
-        .setMaxStoredReports([Array.from(id)], [new BN(64)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
+      await proxy.methods
+        .setStore(feedWriter())
+        .accountsStrict({
+          owner: provider.publicKey,
+          state: proxyState.publicKey,
+          ...eventAccounts(proxy.programId),
+        })
         .rpc();
-      const feed = await program.account.feedData.fetch(feedPda(id));
-      assert.equal(feed.maxStoredReports.toNumber(), 64);
 
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }]);
+      assert.equal((await readLatest(id)).roundId.toNumber(), 2, "no restart");
+
+      // the old store can no longer write
+      const newState = state;
+      state = oldState;
       await expectError(
-        program.methods
-          .setMaxStoredReports([Array.from(id)], [new BN(32)])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "MaxStoredReportsNotIncreased"
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3) }]),
+        "Unauthorized"
       );
-
-      assert.isTrue(
-        (await readRound(id, 1)).answer.eq(new BN(1)),
-        "history survives the resize"
-      );
+      state = newState;
     });
   });
 
-  describe("report callbacks", function () {
-    beforeEach(async () => initStore(16));
-
-    const allowCallbackProgram = (programId: PublicKey, allowed = true) =>
-      program.methods
-        .setCallbackProgramAllowed(programId, allowed)
-        .accountsStrict({
-          owner: provider.publicKey,
-          state: state.publicKey,
-          allowlistEntry: callbackProgramEntry(programId),
-          systemProgram: anchor.web3.SystemProgram.programId,
-          ...eventAccounts(),
-        })
-        .rpc();
-    const configureCallback = (
-      dataId: Buffer,
-      programId: PublicKey,
-      accounts: { pubkey: PublicKey; isWritable: boolean }[],
-      revertOnFailure: boolean
-    ) =>
-      program.methods
-        .setReportCallbackConfigs(
-          [Array.from(dataId)],
-          [{ program: programId, accounts, revertOnFailure }]
-        )
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([
-          meta(feedPda(dataId)),
-          meta(programId, false),
-          meta(callbackProgramEntry(programId), false),
-        ])
-        .signers([feedAdmin.keypair])
-        .rpc();
-    const setCallback = async (
-      dataId: Buffer,
-      programId: PublicKey,
-      accounts: { pubkey: PublicKey; isWritable: boolean }[],
-      revertOnFailure: boolean
-    ) => {
-      await allowCallbackProgram(programId);
-      return configureCallback(dataId, programId, accounts, revertOnFailure);
-    };
-    // the DF1 store's callback emits CPI events: its event authority and program follow the feed
-    const legacyCallbackAccounts = (legacy: PublicKey) => [
-      { pubkey: legacy, isWritable: true },
-      { pubkey: eventAuthority(storeProgram.programId), isWritable: false },
-      { pubkey: storeProgram.programId, isWritable: false },
-    ];
-    const reportAccountsFor = (
-      programId: PublicKey,
-      accounts: { pubkey: PublicKey; isWritable: boolean }[]
-    ) => [
-      meta(programId, false),
-      meta(callbackAuthority(programId), false),
-      ...accounts.map((a) => meta(a.pubkey, a.isWritable)),
-    ];
-
+  describe("DF1 write-through", function () {
     // DF1 feed with a single-slot live buffer
-    const createLegacyFeed = async (decimals: number) => {
+    const createDf1Feed = async (decimals: number) => {
       const feed = Keypair.generate();
-      await storeProgram.methods
-        .createFeed("legacy feed", decimals, 1, 1)
+      await df1.methods
+        .createFeed("df1 feed", decimals, 1, 1)
         .accounts({ feed: feed.publicKey, authority: provider.publicKey })
         .signers([feed])
         .preInstructions([
-          await storeProgram.account.transmissions.createInstruction(
-            feed,
-            8 + 192 + 48
-          ),
+          await df1.account.transmissions.createInstruction(feed, 8 + 192 + 48),
         ])
         .rpc();
       return feed.publicKey;
     };
     const setWriter = (feed: PublicKey, writer: PublicKey) =>
-      storeProgram.methods
+      df1.methods
         .setWriter(writer)
-        .accounts({
-          feed,
-          owner: provider.publicKey,
-          authority: provider.publicKey,
-        })
+        .accounts({ feed, owner: provider.publicKey, authority: provider.publicKey })
         .rpc();
-    const legacyRound = async (feed: PublicKey) => {
-      const header = await storeProgram.account.transmissions.fetch(feed);
-      const live = (await connection.getAccountInfo(feed)).data.subarray(
-        200,
-        248
-      );
+    const df1Round = async (feed: PublicKey) => {
+      const header = await df1.account.transmissions.fetch(feed);
+      const live = (await connection.getAccountInfo(feed))!.data.subarray(200, 248);
       return {
         roundId: header.latestRoundId,
         timestamp: live.readUInt32LE(8),
         answer: new BN(live.subarray(16, 32), "le").fromTwos(128),
       };
     };
-
-    it("writes through to a repointed DF1 feed", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      const legacy = await createLegacyFeed(8);
-      await setCallback(
-        id,
-        storeProgram.programId,
-        legacyCallbackAccounts(legacy),
-        false
-      );
-      const callbackAccounts = new Map([
-        [
-          id.toString("hex"),
-          reportAccountsFor(
-            storeProgram.programId,
-            legacyCallbackAccounts(legacy)
-          ),
-        ],
-      ]);
-
-      // writer still OCR2: the store is written, the legacy feed is skipped
-      await report(
-        [
-          {
-            dataId: id,
-            timestamp: nextTimestamp(),
-            answer: new BN(2).mul(E18),
-          },
-        ],
-        callbackAccounts
-      );
-      assert.isTrue((await latestAnswer(id)).eq(new BN(2).mul(E18)));
-      assert.equal((await legacyRound(legacy)).roundId, 0);
-
-      // repoint the legacy feed to the DF1 store program's callback authority
-      await setWriter(legacy, callbackAuthority(storeProgram.programId));
-      const ts = nextTimestamp();
-      await report(
-        [{ dataId: id, timestamp: ts, answer: new BN(105).mul(E18).divn(100) }],
-        callbackAccounts
-      );
-      const round = await legacyRound(legacy);
-      assert.equal(round.roundId, 1);
-      assert.equal(round.timestamp, ts);
-      assert.isTrue(
-        round.answer.eq(new BN(105).mul(E8).divn(100)),
-        "rescaled to the feed decimals"
-      );
-
-      // rollback: point the writer elsewhere
-      await setWriter(legacy, Keypair.generate().publicKey);
-      await report(
-        [
-          {
-            dataId: id,
-            timestamp: nextTimestamp(),
-            answer: new BN(4).mul(E18),
-          },
-        ],
-        callbackAccounts
-      );
-      assert.equal((await legacyRound(legacy)).roundId, 1);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(4).mul(E18)));
-    });
-
-    it("drops reports a callback rejects when configured to", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      const callbackAccounts = new Map([
-        [id.toString("hex"), reportAccountsFor(dummyReceiver.programId, [])],
-      ]);
-
-      // the mock callback rejects negative answers
-      await setCallback(id, dummyReceiver.programId, [], true);
-      await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(5) }],
-        callbackAccounts
-      );
-      await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(-5) }],
-        callbackAccounts
-      );
-      assert.isTrue(
-        (await latestAnswer(id)).eq(new BN(5)),
-        "rejected report dropped"
-      );
-
-      await setCallback(id, dummyReceiver.programId, [], false);
-      await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(-6) }],
-        callbackAccounts
-      );
-      assert.isTrue(
-        (await latestAnswer(id)).eq(new BN(-6)),
-        "rejection ignored"
-      );
-    });
-
-    it("only configures callback programs the owner allowed", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      await expectError(
-        configureCallback(id, dummyReceiver.programId, [], false),
-        "ReportCallbackNotAllowed"
-      );
-      await allowCallbackProgram(dummyReceiver.programId);
-      await allowCallbackProgram(dummyReceiver.programId, false);
-      await expectError(
-        configureCallback(id, dummyReceiver.programId, [], false),
-        "ReportCallbackNotAllowed"
-      );
-      await allowCallbackProgram(dummyReceiver.programId);
-      await configureCallback(id, dummyReceiver.programId, [], false);
-    });
-
-    it("rejects unsafe callback configurations", async () => {
-      const id = newDataId();
-      await setupFeed(id);
-      await allowCallbackProgram(dummyReceiver.programId);
-      // the program's own authority among its accounts
-      await expectError(
-        configureCallback(
-          id,
-          dummyReceiver.programId,
-          [
-            {
-              pubkey: callbackAuthority(dummyReceiver.programId),
-              isWritable: true,
-            },
-          ],
-          false
-        ),
-        "InvalidCallbackConfig"
-      );
-      // a disabled callback carries no settings
-      await expectError(
-        program.methods
-          .setReportCallbackConfigs(
-            [Array.from(id)],
-            [
-              {
-                program: PublicKey.default,
-                accounts: [],
-                revertOnFailure: true,
-              },
-            ]
-          )
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
-        "InvalidCallbackConfig"
-      );
-      // the store can't be its own callback
-      await expectError(
-        allowCallbackProgram(program.programId),
-        "InvalidAddress"
-      );
-    });
-
-    it("aborts reports whose callback program was closed", async () => {
-      // a copy of the mock callback at a new address, closable by the test wallet. It is never
-      // called while deployed (Anchor programs refuse to run at an address other than their
-      // declared id); what matters is how the store treats it once closed.
-      const callbackKey = Keypair.generate();
-      const keyPath = join(tmpdir(), `closed-callback-${Date.now()}.json`);
-      writeFileSync(keyPath, JSON.stringify(Array.from(callbackKey.secretKey)));
-      const cli = (...args: string[]) =>
-        execFileSync(
-          "solana",
-          [
-            ...args,
-            "--url",
-            connection.rpcEndpoint,
-            "--keypair",
-            process.env.ANCHOR_WALLET!,
-          ],
-          { stdio: "pipe" }
-        );
-      cli(
-        "program",
-        "deploy",
-        "--program-id",
-        keyPath,
-        "target/deploy/dummy_receiver.so"
-      );
-      const callback = callbackKey.publicKey;
-
-      const id = newDataId();
-      await setupFeed(id);
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(7) },
-      ]);
-      await setCallback(id, callback, [], false);
-
-      // closing the program leaves its account executable, so the store still calls it, and the
-      // failed call aborts the transaction: the report is not stored
-      cli("program", "close", callback.toBase58(), "--bypass-warning");
-      assert.isTrue(
-        (await connection.getAccountInfo(callback))!.executable,
-        "a closed program stays executable"
-      );
-      let error = "";
-      try {
-        await report(
-          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(8) }],
-          new Map([[id.toString("hex"), reportAccountsFor(callback, [])]])
-        );
-      } catch (e: any) {
-        error = [String(e), ...(e?.logs ?? [])].join("\n");
-      }
-      assert.isNotEmpty(error, "the report's transaction aborts");
-      assert.include(error, "Program is not deployed", "aborted by the loader");
-      assert.isTrue((await latestAnswer(id)).eq(new BN(7)), "nothing stored");
-
-      // clearing the callback lets the data id's reports land again
-      await program.methods
-        .setReportCallbackConfigs(
-          [Array.from(id)],
-          [{ program: PublicKey.default, accounts: [], revertOnFailure: false }]
+    const link = (id: Buffer, feed: PublicKey, disabled = false) =>
+      program.methods
+        .setDf1Feeds([Array.from(id)], [feed], [disabled])
+        .accountsStrict(configAccounts())
+        .remainingAccounts(
+          feed.equals(PublicKey.default)
+            ? [meta(feedConfig(id))]
+            : [meta(feedConfig(id)), meta(feed, false)]
         )
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
         .signers([feedAdmin.keypair])
         .rpc();
-      await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(9) },
-      ]);
-      assert.isTrue((await latestAnswer(id)).eq(new BN(9)));
+    const skipReason = async (signature: string) =>
+      (await cpiEvents(signature)).find((e) => e.name === "df1WriteSkipped")?.data
+        .reason;
+
+    it("keeps a linked DF1 feed written once it is the writer", async () => {
+      const id = newDataId();
+      const legacy = await createDf1Feed(8);
+      await link(id, legacy);
+      const df1Feeds = new Map([[id.toString("hex"), legacy]]);
+
+      // writer still OCR2: the round is stored, DF1 is skipped
+      let signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2).mul(E18) }],
+        { df1Feeds }
+      );
+      assert.deepEqual(await skipReason(signature), { notWriter: {} });
+      assert.isTrue((await latestAnswer(id)).eq(new BN(2).mul(E18)));
+      assert.equal((await df1Round(legacy)).roundId, 0);
+
+      // cutover
+      await setWriter(legacy, df1Writer());
+      const ts = nextTimestamp();
+      signature = await report(
+        [{ dataId: id, timestamp: ts, answer: new BN(105).mul(E18).divn(100) }],
+        { df1Feeds }
+      );
+      let round = await df1Round(legacy);
+      assert.equal(round.roundId, 1);
+      assert.equal(round.timestamp, ts);
+      assert.isTrue(round.answer.eq(new BN(105).mul(E8).divn(100)), "rescaled");
+
+      // not passed: DF1 skipped, the round still stored
+      signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3).mul(E18) }],
+        { df1Feeds, passDf1: false }
+      );
+      assert.deepEqual(await skipReason(signature), { notPassed: {} });
+      assert.isTrue((await latestAnswer(id)).eq(new BN(3).mul(E18)));
+
+      // DF1 already has a newer round
+      await setWriter(legacy, provider.publicKey);
+      await df1.methods
+        .submit({ timestamp: new BN(baseTimestamp + 100_000), answer: new BN(1) })
+        .accounts({ feed: legacy, authority: provider.publicKey })
+        .rpc();
+      await setWriter(legacy, df1Writer());
+      signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(4).mul(E18) }],
+        { df1Feeds }
+      );
+      assert.deepEqual(await skipReason(signature), { stale: {} });
+
+      // disabled
+      await link(id, legacy, true);
+      signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(5).mul(E18) }],
+        { df1Feeds }
+      );
+      assert.deepEqual(await skipReason(signature), { disabled: {} });
+      round = await df1Round(legacy);
+      assert.equal(round.roundId, 2, "only the direct submit since");
+
+      // rollback is DF1's set_writer; unlinking drops the account from reports
+      await link(id, PublicKey.default);
+      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(6).mul(E18) }]);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(6).mul(E18)));
     });
 
-    it("gives each callback program its own authority", async () => {
-      // a DF1 feed whose writer is another callback program's authority is not written by the
-      // DF1 store's callback: one program's signer never acts for another
+    it("requires the linked DF1 feed in reports", async () => {
       const id = newDataId();
-      await setupFeed(id);
-      const legacy = await createLegacyFeed(8);
-      await setWriter(legacy, callbackAuthority(dummyReceiver.programId));
-      await setCallback(
-        id,
-        storeProgram.programId,
-        legacyCallbackAccounts(legacy),
-        false
+      const legacy = await createDf1Feed(8);
+      await link(id, legacy);
+      await expectError(
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]),
+        "InvalidAccountCount"
       );
-      await report(
-        [
-          {
-            dataId: id,
-            timestamp: nextTimestamp(),
-            answer: new BN(3).mul(E18),
-          },
-        ],
-        new Map([
-          [
-            id.toString("hex"),
-            reportAccountsFor(
-              storeProgram.programId,
-              legacyCallbackAccounts(legacy)
-            ),
-          ],
-        ])
-      );
-      assert.isTrue((await latestAnswer(id)).eq(new BN(3).mul(E18)));
-      assert.equal((await legacyRound(legacy)).roundId, 0, "DF1 feed skipped");
+    });
+
+    it("only links DF1 feeds submit can write", async () => {
+      const id = newDataId();
+      await expectError(link(id, proxyState.publicKey), "InvalidDf1Feed");
     });
   });
 });

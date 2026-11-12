@@ -11,174 +11,120 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 )
 
-// Fixed size list of public keys
-type AccountList struct {
-	Xs  [16]solanago.PublicKey `json:"xs"`
-	Len uint64                 `json:"len"`
-}
+// One feed: its latest round and settings, followed in the account by a circular buffer of
+// `max_stored_reports` [`StoredReport`]s, round `r` at slot `r % max_stored_reports`. This is the
+// account readers pass, and its layout is public: fields only move with a version bump.
+type Feed struct {
+	Version uint8 `json:"version"`
 
-func (obj AccountList) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `Xs`:
-	err = encoder.Encode(obj.Xs)
-	if err != nil {
-		return errors.NewField("Xs", err)
-	}
-	// Serialize `Len`:
-	err = encoder.Encode(obj.Len)
-	if err != nil {
-		return errors.NewField("Len", err)
-	}
-	return nil
-}
+	// Reads refuse the feed while set, writes continue
+	Frozen uint8 `json:"frozen"`
 
-func (obj AccountList) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding AccountList: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *AccountList) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `Xs`:
-	err = decoder.Decode(&obj.Xs)
-	if err != nil {
-		return errors.NewField("Xs", err)
-	}
-	// Deserialize `Len`:
-	err = decoder.Decode(&obj.Len)
-	if err != nil {
-		return errors.NewField("Len", err)
-	}
-	return nil
-}
-
-func (obj *AccountList) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling AccountList: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalAccountList(buf []byte) (*AccountList, error) {
-	obj := new(AccountList)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-type FeedAdminSet struct {
-	State     solanago.PublicKey `json:"state"`
-	FeedAdmin solanago.PublicKey `json:"feed_admin"`
-	IsAdmin   bool               `json:"is_admin"`
-}
-
-func (obj FeedAdminSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Serialize `FeedAdmin`:
-	err = encoder.Encode(obj.FeedAdmin)
-	if err != nil {
-		return errors.NewField("FeedAdmin", err)
-	}
-	// Serialize `IsAdmin`:
-	err = encoder.Encode(obj.IsAdmin)
-	if err != nil {
-		return errors.NewField("IsAdmin", err)
-	}
-	return nil
-}
-
-func (obj FeedAdminSet) Marshal() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	encoder := binary.NewBorshEncoder(buf)
-	err := obj.MarshalWithEncoder(encoder)
-	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedAdminSet: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func (obj *FeedAdminSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return errors.NewField("State", err)
-	}
-	// Deserialize `FeedAdmin`:
-	err = decoder.Decode(&obj.FeedAdmin)
-	if err != nil {
-		return errors.NewField("FeedAdmin", err)
-	}
-	// Deserialize `IsAdmin`:
-	err = decoder.Decode(&obj.IsAdmin)
-	if err != nil {
-		return errors.NewField("IsAdmin", err)
-	}
-	return nil
-}
-
-func (obj *FeedAdminSet) Unmarshal(buf []byte) error {
-	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
-	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedAdminSet: %w", err)
-	}
-	return nil
-}
-
-func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
-	obj := new(FeedAdminSet)
-	err := obj.Unmarshal(buf)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
-}
-
-// Per data ID settings. A data ID without one has the strictest minimum, the stored decimals.
-type FeedConfig struct {
-	Version uint8              `json:"version"`
-	State   solanago.PublicKey `json:"state"`
+	// Fewest decimals a read may ask for
+	MinDecimals                 uint8    `json:"min_decimals"`
+	Padding0                    uint8    `json:"_padding0"`
+	LatestObservationsTimestamp uint32   `json:"latest_observations_timestamp"`
+	LatestRecordedTimestamp     uint32   `json:"latest_recorded_timestamp"`
+	Padding1                    [4]uint8 `json:"_padding1"`
 
 	// Data ID zero padded to 32 bytes
 	DataId [32]uint8 `json:"data_id"`
 
-	// Fewest decimals `read_scaled` serves this data ID at, at most the stored decimals
-	MinDecimals uint8 `json:"min_decimals"`
+	// Proxy state the feed belongs to
+	State solanago.PublicKey `json:"state"`
 
-	// Room for later per-feed read settings, e.g. the EVM store's SVR fallback time and sync
-	// iterations if SVR is added
-	Reserved [32]uint8 `json:"_reserved"`
+	// Latest round ID, 0 before the first round
+	RoundId uint64 `json:"round_id"`
+
+	// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
+	// (`visibleRoundId`), so SVR can be added without moving the fields below.
+	Reserved0          [8]uint8 `json:"_reserved0"`
+	MaxStoredReports   uint64   `json:"max_stored_reports"`
+	LatestRecordedSlot uint64   `json:"latest_recorded_slot"`
+
+	// Latest answer with `STORED_DECIMALS`
+	LatestAnswer binary.Int128 `json:"latest_answer"`
+
+	// UTF-8 description, e.g. "ETH / USD", zero padded, empty when none is set
+	Description [64]uint8 `json:"description"`
+	Reserved    [64]uint8 `json:"_reserved"`
 }
 
-func (obj FeedConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+func (obj Feed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	// Serialize `Version`:
 	err = encoder.Encode(obj.Version)
 	if err != nil {
 		return errors.NewField("Version", err)
 	}
-	// Serialize `State`:
-	err = encoder.Encode(obj.State)
+	// Serialize `Frozen`:
+	err = encoder.Encode(obj.Frozen)
 	if err != nil {
-		return errors.NewField("State", err)
+		return errors.NewField("Frozen", err)
+	}
+	// Serialize `MinDecimals`:
+	err = encoder.Encode(obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	// Serialize `Padding0`:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
+	// Serialize `LatestObservationsTimestamp`:
+	err = encoder.Encode(obj.LatestObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("LatestObservationsTimestamp", err)
+	}
+	// Serialize `LatestRecordedTimestamp`:
+	err = encoder.Encode(obj.LatestRecordedTimestamp)
+	if err != nil {
+		return errors.NewField("LatestRecordedTimestamp", err)
+	}
+	// Serialize `Padding1`:
+	err = encoder.Encode(obj.Padding1)
+	if err != nil {
+		return errors.NewField("Padding1", err)
 	}
 	// Serialize `DataId`:
 	err = encoder.Encode(obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
 	}
-	// Serialize `MinDecimals`:
-	err = encoder.Encode(obj.MinDecimals)
+	// Serialize `State`:
+	err = encoder.Encode(obj.State)
 	if err != nil {
-		return errors.NewField("MinDecimals", err)
+		return errors.NewField("State", err)
+	}
+	// Serialize `RoundId`:
+	err = encoder.Encode(obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Serialize `Reserved0`:
+	err = encoder.Encode(obj.Reserved0)
+	if err != nil {
+		return errors.NewField("Reserved0", err)
+	}
+	// Serialize `MaxStoredReports`:
+	err = encoder.Encode(obj.MaxStoredReports)
+	if err != nil {
+		return errors.NewField("MaxStoredReports", err)
+	}
+	// Serialize `LatestRecordedSlot`:
+	err = encoder.Encode(obj.LatestRecordedSlot)
+	if err != nil {
+		return errors.NewField("LatestRecordedSlot", err)
+	}
+	// Serialize `LatestAnswer`:
+	err = encoder.Encode(obj.LatestAnswer)
+	if err != nil {
+		return errors.NewField("LatestAnswer", err)
+	}
+	// Serialize `Description`:
+	err = encoder.Encode(obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
 	}
 	// Serialize `Reserved`:
 	err = encoder.Encode(obj.Reserved)
@@ -188,36 +134,91 @@ func (obj FeedConfig) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	return nil
 }
 
-func (obj FeedConfig) Marshal() ([]byte, error) {
+func (obj Feed) Marshal() ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	encoder := binary.NewBorshEncoder(buf)
 	err := obj.MarshalWithEncoder(encoder)
 	if err != nil {
-		return nil, fmt.Errorf("error while encoding FeedConfig: %w", err)
+		return nil, fmt.Errorf("error while encoding Feed: %w", err)
 	}
 	return buf.Bytes(), nil
 }
 
-func (obj *FeedConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+func (obj *Feed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
 	if err != nil {
 		return errors.NewField("Version", err)
 	}
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
+	// Deserialize `Frozen`:
+	err = decoder.Decode(&obj.Frozen)
 	if err != nil {
-		return errors.NewField("State", err)
+		return errors.NewField("Frozen", err)
+	}
+	// Deserialize `MinDecimals`:
+	err = decoder.Decode(&obj.MinDecimals)
+	if err != nil {
+		return errors.NewField("MinDecimals", err)
+	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
+	// Deserialize `LatestObservationsTimestamp`:
+	err = decoder.Decode(&obj.LatestObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("LatestObservationsTimestamp", err)
+	}
+	// Deserialize `LatestRecordedTimestamp`:
+	err = decoder.Decode(&obj.LatestRecordedTimestamp)
+	if err != nil {
+		return errors.NewField("LatestRecordedTimestamp", err)
+	}
+	// Deserialize `Padding1`:
+	err = decoder.Decode(&obj.Padding1)
+	if err != nil {
+		return errors.NewField("Padding1", err)
 	}
 	// Deserialize `DataId`:
 	err = decoder.Decode(&obj.DataId)
 	if err != nil {
 		return errors.NewField("DataId", err)
 	}
-	// Deserialize `MinDecimals`:
-	err = decoder.Decode(&obj.MinDecimals)
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
 	if err != nil {
-		return errors.NewField("MinDecimals", err)
+		return errors.NewField("State", err)
+	}
+	// Deserialize `RoundId`:
+	err = decoder.Decode(&obj.RoundId)
+	if err != nil {
+		return errors.NewField("RoundId", err)
+	}
+	// Deserialize `Reserved0`:
+	err = decoder.Decode(&obj.Reserved0)
+	if err != nil {
+		return errors.NewField("Reserved0", err)
+	}
+	// Deserialize `MaxStoredReports`:
+	err = decoder.Decode(&obj.MaxStoredReports)
+	if err != nil {
+		return errors.NewField("MaxStoredReports", err)
+	}
+	// Deserialize `LatestRecordedSlot`:
+	err = decoder.Decode(&obj.LatestRecordedSlot)
+	if err != nil {
+		return errors.NewField("LatestRecordedSlot", err)
+	}
+	// Deserialize `LatestAnswer`:
+	err = decoder.Decode(&obj.LatestAnswer)
+	if err != nil {
+		return errors.NewField("LatestAnswer", err)
+	}
+	// Deserialize `Description`:
+	err = decoder.Decode(&obj.Description)
+	if err != nil {
+		return errors.NewField("Description", err)
 	}
 	// Deserialize `Reserved`:
 	err = decoder.Decode(&obj.Reserved)
@@ -227,16 +228,16 @@ func (obj *FeedConfig) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	return nil
 }
 
-func (obj *FeedConfig) Unmarshal(buf []byte) error {
+func (obj *Feed) Unmarshal(buf []byte) error {
 	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
 	if err != nil {
-		return fmt.Errorf("error while unmarshaling FeedConfig: %w", err)
+		return fmt.Errorf("error while unmarshaling Feed: %w", err)
 	}
 	return nil
 }
 
-func UnmarshalFeedConfig(buf []byte) (*FeedConfig, error) {
-	obj := new(FeedConfig)
+func UnmarshalFeed(buf []byte) (*Feed, error) {
+	obj := new(Feed)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -308,6 +309,70 @@ func (obj *MinDecimalsSet) Unmarshal(buf []byte) error {
 
 func UnmarshalMinDecimalsSet(buf []byte) (*MinDecimalsSet, error) {
 	obj := new(MinDecimalsSet)
+	err := obj.Unmarshal(buf)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+// A round to append, written by the store.
+type NewRound struct {
+	// Offchain observations timestamp, must be newer than the feed's latest
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+
+	// Answer with `STORED_DECIMALS`
+	Answer binary.Int128 `json:"answer"`
+}
+
+func (obj NewRound) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
+	// Serialize `ObservationsTimestamp`:
+	err = encoder.Encode(obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Serialize `Answer`:
+	err = encoder.Encode(obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	return nil
+}
+
+func (obj NewRound) Marshal() ([]byte, error) {
+	buf := bytes.NewBuffer(nil)
+	encoder := binary.NewBorshEncoder(buf)
+	err := obj.MarshalWithEncoder(encoder)
+	if err != nil {
+		return nil, fmt.Errorf("error while encoding NewRound: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (obj *NewRound) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
+	// Deserialize `ObservationsTimestamp`:
+	err = decoder.Decode(&obj.ObservationsTimestamp)
+	if err != nil {
+		return errors.NewField("ObservationsTimestamp", err)
+	}
+	// Deserialize `Answer`:
+	err = decoder.Decode(&obj.Answer)
+	if err != nil {
+		return errors.NewField("Answer", err)
+	}
+	return nil
+}
+
+func (obj *NewRound) Unmarshal(buf []byte) error {
+	err := obj.UnmarshalWithDecoder(binary.NewBorshDecoder(buf))
+	if err != nil {
+		return fmt.Errorf("error while unmarshaling NewRound: %w", err)
+	}
+	return nil
+}
+
+func UnmarshalNewRound(buf []byte) (*NewRound, error) {
+	obj := new(NewRound)
 	err := obj.Unmarshal(buf)
 	if err != nil {
 		return nil, err
@@ -458,9 +523,8 @@ func UnmarshalOwnershipTransferred(buf []byte) (*OwnershipTransferred, error) {
 }
 
 type ProxyInitialized struct {
-	State        solanago.PublicKey `json:"state"`
-	StoreProgram solanago.PublicKey `json:"store_program"`
-	StoreState   solanago.PublicKey `json:"store_state"`
+	State  solanago.PublicKey `json:"state"`
+	Writer solanago.PublicKey `json:"writer"`
 }
 
 func (obj ProxyInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -469,15 +533,10 @@ func (obj ProxyInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err err
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `StoreProgram`:
-	err = encoder.Encode(obj.StoreProgram)
+	// Serialize `Writer`:
+	err = encoder.Encode(obj.Writer)
 	if err != nil {
-		return errors.NewField("StoreProgram", err)
-	}
-	// Serialize `StoreState`:
-	err = encoder.Encode(obj.StoreState)
-	if err != nil {
-		return errors.NewField("StoreState", err)
+		return errors.NewField("Writer", err)
 	}
 	return nil
 }
@@ -498,15 +557,10 @@ func (obj *ProxyInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err 
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `StoreProgram`:
-	err = decoder.Decode(&obj.StoreProgram)
+	// Deserialize `Writer`:
+	err = decoder.Decode(&obj.Writer)
 	if err != nil {
-		return errors.NewField("StoreProgram", err)
-	}
-	// Deserialize `StoreState`:
-	err = decoder.Decode(&obj.StoreState)
-	if err != nil {
-		return errors.NewField("StoreState", err)
+		return errors.NewField("Writer", err)
 	}
 	return nil
 }
@@ -528,25 +582,17 @@ func UnmarshalProxyInitialized(buf []byte) (*ProxyInitialized, error) {
 	return obj, nil
 }
 
-// Proxy instance: ownership, admins and the store reads are served from. The address of this
-// account and the program id are what readers integrate with, the store behind them can change.
+// Proxy instance: its owner and the one store trusted to write its feeds. The program ID, this
+// account and the feed accounts under it are what readers integrate with.
 type ProxyState struct {
 	Version       uint8              `json:"version"`
 	Padding0      [7]uint8           `json:"_padding0"`
 	Owner         solanago.PublicKey `json:"owner"`
 	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
 
-	// Program of the store reads are served from
-	StoreProgram solanago.PublicKey `json:"store_program"`
-
-	// State account of that store
-	StoreState solanago.PublicKey `json:"store_state"`
-
-	// Admins allowed to set per-feed minimum decimals
-	FeedAdmins AccountList `json:"feed_admins"`
-
-	// Room for later settings, e.g. serving some data IDs from another program
-	Reserved [128]uint8 `json:"_reserved"`
+	// The store's signer, the only key that can create, configure and write feeds
+	Writer   solanago.PublicKey `json:"writer"`
+	Reserved [128]uint8         `json:"_reserved"`
 }
 
 func (obj ProxyState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -570,20 +616,10 @@ func (obj ProxyState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
 	}
-	// Serialize `StoreProgram`:
-	err = encoder.Encode(obj.StoreProgram)
+	// Serialize `Writer`:
+	err = encoder.Encode(obj.Writer)
 	if err != nil {
-		return errors.NewField("StoreProgram", err)
-	}
-	// Serialize `StoreState`:
-	err = encoder.Encode(obj.StoreState)
-	if err != nil {
-		return errors.NewField("StoreState", err)
-	}
-	// Serialize `FeedAdmins`:
-	err = encoder.Encode(obj.FeedAdmins)
-	if err != nil {
-		return errors.NewField("FeedAdmins", err)
+		return errors.NewField("Writer", err)
 	}
 	// Serialize `Reserved`:
 	err = encoder.Encode(obj.Reserved)
@@ -624,20 +660,10 @@ func (obj *ProxyState) UnmarshalWithDecoder(decoder *binary.Decoder) (err error)
 	if err != nil {
 		return errors.NewField("ProposedOwner", err)
 	}
-	// Deserialize `StoreProgram`:
-	err = decoder.Decode(&obj.StoreProgram)
+	// Deserialize `Writer`:
+	err = decoder.Decode(&obj.Writer)
 	if err != nil {
-		return errors.NewField("StoreProgram", err)
-	}
-	// Deserialize `StoreState`:
-	err = decoder.Decode(&obj.StoreState)
-	if err != nil {
-		return errors.NewField("StoreState", err)
-	}
-	// Deserialize `FeedAdmins`:
-	err = decoder.Decode(&obj.FeedAdmins)
-	if err != nil {
-		return errors.NewField("FeedAdmins", err)
+		return errors.NewField("Writer", err)
 	}
 	// Deserialize `Reserved`:
 	err = decoder.Decode(&obj.Reserved)
@@ -664,8 +690,7 @@ func UnmarshalProxyState(buf []byte) (*ProxyState, error) {
 	return obj, nil
 }
 
-// A round as returned by the proxy. `read` returns the store's answer as is, with the store's
-// 18 decimals, `read_scaled` returns it with the requested decimals.
+// A round as returned by reads, with the answer at the decimals the reader asked for.
 type Round struct {
 	RoundId uint64        `json:"round_id"`
 	Answer  binary.Int128 `json:"answer"`
@@ -753,11 +778,9 @@ func UnmarshalRound(buf []byte) (*Round, error) {
 }
 
 type StoreSet struct {
-	State           solanago.PublicKey `json:"state"`
-	PreviousProgram solanago.PublicKey `json:"previous_program"`
-	PreviousState   solanago.PublicKey `json:"previous_state"`
-	NewProgram      solanago.PublicKey `json:"new_program"`
-	NewState        solanago.PublicKey `json:"new_state"`
+	State          solanago.PublicKey `json:"state"`
+	PreviousWriter solanago.PublicKey `json:"previous_writer"`
+	NewWriter      solanago.PublicKey `json:"new_writer"`
 }
 
 func (obj StoreSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -766,25 +789,15 @@ func (obj StoreSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `PreviousProgram`:
-	err = encoder.Encode(obj.PreviousProgram)
+	// Serialize `PreviousWriter`:
+	err = encoder.Encode(obj.PreviousWriter)
 	if err != nil {
-		return errors.NewField("PreviousProgram", err)
+		return errors.NewField("PreviousWriter", err)
 	}
-	// Serialize `PreviousState`:
-	err = encoder.Encode(obj.PreviousState)
+	// Serialize `NewWriter`:
+	err = encoder.Encode(obj.NewWriter)
 	if err != nil {
-		return errors.NewField("PreviousState", err)
-	}
-	// Serialize `NewProgram`:
-	err = encoder.Encode(obj.NewProgram)
-	if err != nil {
-		return errors.NewField("NewProgram", err)
-	}
-	// Serialize `NewState`:
-	err = encoder.Encode(obj.NewState)
-	if err != nil {
-		return errors.NewField("NewState", err)
+		return errors.NewField("NewWriter", err)
 	}
 	return nil
 }
@@ -805,25 +818,15 @@ func (obj *StoreSet) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `PreviousProgram`:
-	err = decoder.Decode(&obj.PreviousProgram)
+	// Deserialize `PreviousWriter`:
+	err = decoder.Decode(&obj.PreviousWriter)
 	if err != nil {
-		return errors.NewField("PreviousProgram", err)
+		return errors.NewField("PreviousWriter", err)
 	}
-	// Deserialize `PreviousState`:
-	err = decoder.Decode(&obj.PreviousState)
+	// Deserialize `NewWriter`:
+	err = decoder.Decode(&obj.NewWriter)
 	if err != nil {
-		return errors.NewField("PreviousState", err)
-	}
-	// Deserialize `NewProgram`:
-	err = decoder.Decode(&obj.NewProgram)
-	if err != nil {
-		return errors.NewField("NewProgram", err)
-	}
-	// Deserialize `NewState`:
-	err = decoder.Decode(&obj.NewState)
-	if err != nil {
-		return errors.NewField("NewState", err)
+		return errors.NewField("NewWriter", err)
 	}
 	return nil
 }

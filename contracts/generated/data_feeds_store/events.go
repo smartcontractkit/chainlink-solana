@@ -22,18 +22,25 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as AnswerOutOfMinMaxRange: %w", err)
 		}
 		return value, nil
-	case Event_CallbackProgramAllowedSet:
-		value := new(CallbackProgramAllowedSet)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as CallbackProgramAllowedSet: %w", err)
-		}
-		return value, nil
 	case Event_DefaultFeedMetadataSet:
 		value := new(DefaultFeedMetadataSet)
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as DefaultFeedMetadataSet: %w", err)
+		}
+		return value, nil
+	case Event_Df1FeedSet:
+		value := new(Df1FeedSet)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as Df1FeedSet: %w", err)
+		}
+		return value, nil
+	case Event_Df1WriteSkipped:
+		value := new(Df1WriteSkipped)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as Df1WriteSkipped: %w", err)
 		}
 		return value, nil
 	case Event_FeedAdminSet:
@@ -43,6 +50,13 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedAdminSet: %w", err)
 		}
 		return value, nil
+	case Event_FeedCreationSkipped:
+		value := new(FeedCreationSkipped)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as FeedCreationSkipped: %w", err)
+		}
+		return value, nil
 	case Event_FeedDescriptionSet:
 		value := new(FeedDescriptionSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -50,18 +64,11 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedDescriptionSet: %w", err)
 		}
 		return value, nil
-	case Event_FeedInitialized:
-		value := new(FeedInitialized)
+	case Event_FeedFrozenSet:
+		value := new(FeedFrozenSet)
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as FeedInitialized: %w", err)
-		}
-		return value, nil
-	case Event_FeedNotInitializedIgnored:
-		value := new(FeedNotInitializedIgnored)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as FeedNotInitializedIgnored: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal event as FeedFrozenSet: %w", err)
 		}
 		return value, nil
 	case Event_FeedUpdated:
@@ -69,6 +76,27 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as FeedUpdated: %w", err)
+		}
+		return value, nil
+	case Event_FeedWritesDisabledIgnored:
+		value := new(FeedWritesDisabledIgnored)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as FeedWritesDisabledIgnored: %w", err)
+		}
+		return value, nil
+	case Event_FeedWritesDisabledSet:
+		value := new(FeedWritesDisabledSet)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as FeedWritesDisabledSet: %w", err)
+		}
+		return value, nil
+	case Event_FeedsCreated:
+		value := new(FeedsCreated)
+		err := value.UnmarshalWithDecoder(decoder)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event as FeedsCreated: %w", err)
 		}
 		return value, nil
 	case Event_FutureReportIgnored:
@@ -125,20 +153,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 		err := value.UnmarshalWithDecoder(decoder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal event as OwnershipTransferred: %w", err)
-		}
-		return value, nil
-	case Event_ReportCallbackConfigSet:
-		value := new(ReportCallbackConfigSet)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as ReportCallbackConfigSet: %w", err)
-		}
-		return value, nil
-	case Event_ReportCallbackRejected:
-		value := new(ReportCallbackRejected)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as ReportCallbackRejected: %w", err)
 		}
 		return value, nil
 	case Event_SpecificFeedMetadataRemoved:
@@ -198,23 +212,6 @@ func ParseEvent_AnswerOutOfMinMaxRange(eventData []byte) (*AnswerOutOfMinMaxRang
 	return event, nil
 }
 
-func ParseEvent_CallbackProgramAllowedSet(eventData []byte) (*CallbackProgramAllowedSet, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_CallbackProgramAllowedSet {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_CallbackProgramAllowedSet, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(CallbackProgramAllowedSet)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type CallbackProgramAllowedSet: %w", err)
-	}
-	return event, nil
-}
-
 func ParseEvent_DefaultFeedMetadataSet(eventData []byte) (*DefaultFeedMetadataSet, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -228,6 +225,40 @@ func ParseEvent_DefaultFeedMetadataSet(eventData []byte) (*DefaultFeedMetadataSe
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type DefaultFeedMetadataSet: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_Df1FeedSet(eventData []byte) (*Df1FeedSet, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_Df1FeedSet {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_Df1FeedSet, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(Df1FeedSet)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type Df1FeedSet: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_Df1WriteSkipped(eventData []byte) (*Df1WriteSkipped, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_Df1WriteSkipped {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_Df1WriteSkipped, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(Df1WriteSkipped)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type Df1WriteSkipped: %w", err)
 	}
 	return event, nil
 }
@@ -249,6 +280,23 @@ func ParseEvent_FeedAdminSet(eventData []byte) (*FeedAdminSet, error) {
 	return event, nil
 }
 
+func ParseEvent_FeedCreationSkipped(eventData []byte) (*FeedCreationSkipped, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_FeedCreationSkipped {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedCreationSkipped, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(FeedCreationSkipped)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedCreationSkipped: %w", err)
+	}
+	return event, nil
+}
+
 func ParseEvent_FeedDescriptionSet(eventData []byte) (*FeedDescriptionSet, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
@@ -266,36 +314,19 @@ func ParseEvent_FeedDescriptionSet(eventData []byte) (*FeedDescriptionSet, error
 	return event, nil
 }
 
-func ParseEvent_FeedInitialized(eventData []byte) (*FeedInitialized, error) {
+func ParseEvent_FeedFrozenSet(eventData []byte) (*FeedFrozenSet, error) {
 	decoder := binary.NewBorshDecoder(eventData)
 	discriminator, err := decoder.ReadDiscriminator()
 	if err != nil {
 		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
 	}
-	if discriminator != Event_FeedInitialized {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedInitialized, binary.FormatDiscriminator(discriminator))
+	if discriminator != Event_FeedFrozenSet {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedFrozenSet, binary.FormatDiscriminator(discriminator))
 	}
-	event := new(FeedInitialized)
+	event := new(FeedFrozenSet)
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type FeedInitialized: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_FeedNotInitializedIgnored(eventData []byte) (*FeedNotInitializedIgnored, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_FeedNotInitializedIgnored {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedNotInitializedIgnored, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(FeedNotInitializedIgnored)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type FeedNotInitializedIgnored: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedFrozenSet: %w", err)
 	}
 	return event, nil
 }
@@ -313,6 +344,57 @@ func ParseEvent_FeedUpdated(eventData []byte) (*FeedUpdated, error) {
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type FeedUpdated: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_FeedWritesDisabledIgnored(eventData []byte) (*FeedWritesDisabledIgnored, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_FeedWritesDisabledIgnored {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedWritesDisabledIgnored, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(FeedWritesDisabledIgnored)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedWritesDisabledIgnored: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_FeedWritesDisabledSet(eventData []byte) (*FeedWritesDisabledSet, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_FeedWritesDisabledSet {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedWritesDisabledSet, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(FeedWritesDisabledSet)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedWritesDisabledSet: %w", err)
+	}
+	return event, nil
+}
+
+func ParseEvent_FeedsCreated(eventData []byte) (*FeedsCreated, error) {
+	decoder := binary.NewBorshDecoder(eventData)
+	discriminator, err := decoder.ReadDiscriminator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
+	}
+	if discriminator != Event_FeedsCreated {
+		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedsCreated, binary.FormatDiscriminator(discriminator))
+	}
+	event := new(FeedsCreated)
+	err = event.UnmarshalWithDecoder(decoder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event of type FeedsCreated: %w", err)
 	}
 	return event, nil
 }
@@ -449,40 +531,6 @@ func ParseEvent_OwnershipTransferred(eventData []byte) (*OwnershipTransferred, e
 	err = event.UnmarshalWithDecoder(decoder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal event of type OwnershipTransferred: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_ReportCallbackConfigSet(eventData []byte) (*ReportCallbackConfigSet, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_ReportCallbackConfigSet {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_ReportCallbackConfigSet, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(ReportCallbackConfigSet)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type ReportCallbackConfigSet: %w", err)
-	}
-	return event, nil
-}
-
-func ParseEvent_ReportCallbackRejected(eventData []byte) (*ReportCallbackRejected, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_ReportCallbackRejected {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_ReportCallbackRejected, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(ReportCallbackRejected)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type ReportCallbackRejected: %w", err)
 	}
 	return event, nil
 }

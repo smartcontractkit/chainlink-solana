@@ -1,34 +1,79 @@
-//! CPI accessors for the Chainlink Data Feeds proxy. One proxy serves every feed: pass the data ID
-//! and, for `read_scaled`, the decimals you want.
+//! Readers for the Chainlink Data Feeds proxy on Solana. One proxy owns every feed account: pass
+//! the data ID's feed account and the decimals you want, at least the feed's minimum and at most 18.
 //!
-//! The proxy address (its program id and state account) is what stays stable. A read also passes
-//! the accounts of the store behind the proxy: its program, its state and the data ID's feed, which
-//! clients resolve from the proxy state (`store_program`, `store_state`).
+//! Two ways to read the same data:
+//! - **Decode the feed account** ([`read_latest_round`], [`read_round`]): no call to another
+//!   program. The account must be owned by the proxy program this crate is built for
+//!   ([`DATA_FEEDS_PROXY_ID`]) and belong to the proxy state you pass; anyone can create a proxy
+//!   state under the program, so pin the one you trust.
+//! - **Call the proxy** ([`latest_round`], [`get_round`]): one call, the proxy checks the account.
 //!
-//! Reads go only to the proxy program this crate is built for ([`DATA_FEEDS_PROXY_ID`]); anyone can
-//! create a proxy state under it, so pin the proxy state you trust. The proxy checks the store
-//! accounts against that state. Each read takes the answer only from the proxy and fails, rather
-//! than panics, on a missing or malformed answer.
-//!
-//! Round IDs are those of the store behind the proxy: they restart if the proxy owner points it to
-//! another store (the proxy emits `StoreSet`), so don't carry round IDs across that change.
+//! Both refuse a frozen feed, decimals below the feed's minimum, and a non-zero answer that would
+//! round to zero. Round IDs keep increasing for the life of a feed, also when the store writing it
+//! is replaced.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::get_return_data;
-use data_feeds_proxy::cpi::accounts::{Read, ReadScaled};
+use data_feeds_proxy::{
+    common::data_id_seed,
+    cpi::accounts::FeedRead,
+    error::ProxyError,
+    logic,
+    reads::to_round,
+    state::Feed,
+    utils::{decode_feed_into, RingRef},
+};
 
+pub use data_feeds_proxy::common::{feed_address, STORED_DECIMALS};
+pub use data_feeds_proxy::logic::scale;
 pub use data_feeds_proxy::state::Round;
 pub use data_feeds_proxy::ID as DATA_FEEDS_PROXY_ID;
 
-/// The latest round of a data ID, or the round with `round_id`, with the store's 18 decimals.
-pub fn read<'info>(
+fn decode<'a>(
+    feed: &'a AccountInfo,
+    proxy_state: &Pubkey,
+    data_id: &[u8; 16],
+) -> Result<(Box<Feed>, std::cell::Ref<'a, &'a mut [u8]>)> {
+    require_keys_eq!(*feed.owner, DATA_FEEDS_PROXY_ID, ProxyError::InvalidAccount);
+    let data = feed.try_borrow_data()?;
+    let mut header: Box<Feed> = bytemuck::zeroed_box();
+    decode_feed_into(&data, proxy_state, &data_id_seed(data_id), &mut header)?;
+    Ok((header, data))
+}
+
+/// The latest round of a data ID at `decimals`, decoded from its feed account.
+pub fn read_latest_round(
+    feed: &AccountInfo,
+    proxy_state: &Pubkey,
+    data_id: [u8; 16],
+    decimals: u8,
+) -> Result<Round> {
+    let (header, _) = decode(feed, proxy_state, &data_id)?;
+    let round = logic::latest_round(&header).ok_or(ProxyError::NoDataPresent)?;
+    to_round(&header, round, decimals)
+}
+
+/// A stored round of a data ID at `decimals`, decoded from its feed account.
+pub fn read_round(
+    feed: &AccountInfo,
+    proxy_state: &Pubkey,
+    data_id: [u8; 16],
+    round_id: u64,
+    decimals: u8,
+) -> Result<Round> {
+    let (header, data) = decode(feed, proxy_state, &data_id)?;
+    let round = logic::stored_round(round_id, &header, &RingRef::new(&data[..]))
+        .ok_or(ProxyError::NoDataPresent)?;
+    to_round(&header, round, decimals)
+}
+
+/// The latest round of a data ID at `decimals`, through a call to the proxy.
+pub fn latest_round<'info>(
     proxy_program: AccountInfo<'info>,
     proxy_state: AccountInfo<'info>,
-    store_program: AccountInfo<'info>,
-    store_state: AccountInfo<'info>,
     feed: AccountInfo<'info>,
     data_id: [u8; 16],
-    round_id: Option<u64>,
+    decimals: u8,
 ) -> Result<Round> {
     require_keys_eq!(
         proxy_program.key(),
@@ -37,31 +82,23 @@ pub fn read<'info>(
     );
     let ctx = CpiContext::new(
         proxy_program,
-        Read {
+        FeedRead {
             state: proxy_state,
-            store_program,
-            store_state,
             feed,
         },
     );
-    data_feeds_proxy::cpi::read(ctx, data_id, round_id)?;
+    data_feeds_proxy::cpi::latest_round(ctx, data_id, decimals)?;
     returned()
 }
 
-/// Like [`read`], with the answer at `decimals`: at least the data ID's minimum (18 unless an admin
-/// lowered it, pass its `feed_config` account to use a lower one) and at most 18. Fails if a
-/// non-zero answer would round to zero.
-#[allow(clippy::too_many_arguments)]
-pub fn read_scaled<'info>(
+/// A stored round of a data ID at `decimals`, through a call to the proxy.
+pub fn get_round<'info>(
     proxy_program: AccountInfo<'info>,
     proxy_state: AccountInfo<'info>,
-    store_program: AccountInfo<'info>,
-    store_state: AccountInfo<'info>,
     feed: AccountInfo<'info>,
-    feed_config: Option<AccountInfo<'info>>,
     data_id: [u8; 16],
+    round_id: u64,
     decimals: u8,
-    round_id: Option<u64>,
 ) -> Result<Round> {
     require_keys_eq!(
         proxy_program.key(),
@@ -70,15 +107,12 @@ pub fn read_scaled<'info>(
     );
     let ctx = CpiContext::new(
         proxy_program,
-        ReadScaled {
+        FeedRead {
             state: proxy_state,
-            store_program,
-            store_state,
             feed,
-            feed_config,
         },
     );
-    data_feeds_proxy::cpi::read_scaled(ctx, data_id, decimals, round_id)?;
+    data_feeds_proxy::cpi::get_round(ctx, data_id, round_id, decimals)?;
     returned()
 }
 
@@ -102,6 +136,8 @@ fn returned() -> Result<Round> {
 mod tests {
     use super::*;
     use anchor_lang::solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
+    use anchor_lang::Discriminator;
+    use data_feeds_proxy::state::{feed_account_len, StoredReport, FEED_RING_OFFSET};
     use std::sync::Mutex;
 
     static RETURN_DATA: Mutex<Option<(Pubkey, Vec<u8>)>> = Mutex::new(None);
@@ -145,33 +181,110 @@ mod tests {
         );
     }
 
+    const E18: i128 = 1_000_000_000_000_000_000;
+
+    /// A feed account with rounds 1..=3 (answers 100, 200, 300 with 18 decimals).
+    fn feed_account(state: &Pubkey, data_id: &[u8; 16], frozen: bool) -> Vec<u8> {
+        let max = 4;
+        let mut data = vec![0u8; feed_account_len(max)];
+        let mut header: Feed = bytemuck::Zeroable::zeroed();
+        header.version = 1;
+        header.frozen = frozen as u8;
+        header.min_decimals = 8;
+        header.data_id = data_id_seed(data_id);
+        header.state = *state;
+        header.max_stored_reports = max;
+        for r in 1..=3u64 {
+            let report = StoredReport {
+                answer: r as i128 * 100 * E18,
+                observations_timestamp: r as u32 * 10,
+                recorded_timestamp: r as u32 * 10 + 1,
+                recorded_slot: r,
+            };
+            let offset = FEED_RING_OFFSET + (r % max) as usize * 32;
+            data[offset..offset + 32].copy_from_slice(bytemuck::bytes_of(&report));
+        }
+        header.round_id = 3;
+        header.latest_answer = 300 * E18;
+        header.latest_observations_timestamp = 30;
+        header.latest_recorded_timestamp = 31;
+        data[..8].copy_from_slice(Feed::DISCRIMINATOR);
+        data[8..8 + 256].copy_from_slice(bytemuck::bytes_of(&header));
+        data
+    }
+
     #[test]
-    fn only_calls_the_proxy_it_is_built_for() {
-        let key = Pubkey::new_unique();
+    fn decodes_feed_accounts() {
+        let (key, state) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let id = [1u8; 16];
         let mut lamports = 0;
-        let mut data = vec![];
-        let owner = Pubkey::default();
+        let mut data = feed_account(&state, &id, false);
         let info = AccountInfo::new(
             &key,
             false,
             false,
             &mut lamports,
             &mut data,
-            &owner,
-            true,
+            &DATA_FEEDS_PROXY_ID,
+            false,
             0,
         );
-        // the program check comes before any account is used, so one account stands in for all
-        let err = read(
-            info.clone(),
-            info.clone(),
-            info.clone(),
-            info.clone(),
-            info,
-            [0; 16],
-            None,
-        )
-        .unwrap_err();
-        assert!(format!("{err:?}").contains("InvalidProgramId"), "{err:?}");
+        let latest = read_latest_round(&info, &state, id, 8).unwrap();
+        assert_eq!((latest.round_id, latest.answer), (3, 300_00000000));
+        let round = read_round(&info, &state, id, 2, 18).unwrap();
+        assert_eq!(
+            (round.round_id, round.answer, round.observations_timestamp),
+            (2, 200 * E18, 20)
+        );
+        assert!(
+            read_latest_round(&info, &state, id, 7).is_err(),
+            "below the minimum"
+        );
+        assert!(
+            read_latest_round(&info, &Pubkey::new_unique(), id, 8).is_err(),
+            "other proxy"
+        );
+        assert!(
+            read_latest_round(&info, &state, [2u8; 16], 8).is_err(),
+            "other data ID"
+        );
+        assert!(
+            read_round(&info, &state, id, 4, 8).is_err(),
+            "no such round"
+        );
+    }
+
+    #[test]
+    fn refuses_frozen_feeds_and_other_owners() {
+        let (key, state) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let id = [1u8; 16];
+        let mut lamports = 0;
+        let mut data = feed_account(&state, &id, true);
+        let frozen = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &DATA_FEEDS_PROXY_ID,
+            false,
+            0,
+        );
+        assert!(read_latest_round(&frozen, &state, id, 8).is_err());
+
+        let mut lamports = 0;
+        let mut data = feed_account(&state, &id, false);
+        let other = Pubkey::new_unique();
+        let foreign = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut data,
+            &other,
+            false,
+            0,
+        );
+        assert!(read_latest_round(&foreign, &state, id, 8).is_err());
     }
 }

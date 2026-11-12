@@ -1,54 +1,59 @@
+//! Feed admin settings kept in feed configs (remaining accounts: the data IDs' feed config PDAs, in
+//! order). A config that doesn't exist yet is created, the feed admin paying, so a data ID can be
+//! configured before its first report.
+
 use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
-    common::{
-        ACCOUNT_VERSION, CALLBACK_AUTHORITY_SEED, CALLBACK_PROGRAM_SEED, MAX_CALLBACK_ACCOUNTS,
-        MAX_WORKFLOW_METADATAS,
-    },
-    context::FeedAdminAccounts,
-    data_id,
+    common::MAX_WORKFLOW_METADATAS,
+    context::FeedAdminConfigs,
+    df1,
     error::StoreError,
     event::*,
-    state::{CallbackConfigArgs, CallbackProgram, FeedData, WorkflowMetadata},
-    utils::{update_settings, validate_workflow_metadata, verify_feed_admin, EventEmitter},
+    state::{FeedConfig, WorkflowMetadata},
+    utils::{
+        load_or_create_config, store, validate_data_id, validate_workflow_metadata,
+        verify_feed_admin, EventEmitter,
+    },
 };
 
-/// Check a program is on the owner's callback allowlist through its allowlist entry account.
-fn require_allowed(state: &Pubkey, program: &Pubkey, entry: &AccountInfo) -> Result<()> {
-    let (address, _) = Pubkey::find_program_address(
-        &[CALLBACK_PROGRAM_SEED, state.as_ref(), program.as_ref()],
-        &crate::ID,
-    );
-    require_keys_eq!(address, *entry.key, StoreError::AccountMismatch);
-    require!(
-        *entry.owner == crate::ID && !entry.data_is_empty(),
-        StoreError::ReportCallbackNotAllowed
-    );
-    let allowed = CallbackProgram::try_deserialize(&mut &entry.try_borrow_data()?[..])?;
-    require_eq!(
-        allowed.version,
-        ACCOUNT_VERSION,
-        StoreError::InvalidAccountVersion
-    );
-    require!(
-        allowed.allowed && allowed.state == *state && allowed.program == *program,
-        StoreError::ReportCallbackNotAllowed
-    );
-    Ok(())
-}
-
-/// Set the workflows allowed to write the given data IDs, replacing any previous feed-specific
-/// metadata. Data IDs without feed-specific metadata use the store's default metadata. Remaining
-/// accounts are the feeds of the data IDs in order.
-pub fn set_specific_feed_metadata<'info>(
-    ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-    data_ids: Vec<[u8; 16]>,
-    workflow_metadata: Vec<WorkflowMetadata>,
+/// Run `f` on each data ID's config, loading or creating it and writing it back.
+fn update_configs<'info>(
+    ctx: &Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+    data_ids: &[[u8; 16]],
+    infos: &'info [AccountInfo<'info>],
+    mut f: impl FnMut(usize, &[u8; 16], &mut FeedConfig, &EventEmitter<'info>) -> Result<()>,
 ) -> Result<()> {
     verify_feed_admin(
         &ctx.accounts.feed_admin,
         &ctx.accounts.state.load()?.feed_admins,
     )?;
+    require_eq!(data_ids.len(), infos.len(), StoreError::ArrayLengthMismatch);
+    let state_key = ctx.accounts.state.key();
+    let payer = ctx.accounts.feed_admin.to_account_info();
+    let system_program = ctx.accounts.system_program.to_account_info();
+    // one buffer and one event instruction for the whole batch: the bump allocator never frees
+    let events = EventEmitter::new(
+        ctx.accounts.event_authority.to_account_info(),
+        ctx.bumps.event_authority,
+    );
+    let mut config: Box<FeedConfig> = bytemuck::zeroed_box();
+    for (i, (id, info)) in data_ids.iter().zip(infos.iter()).enumerate() {
+        validate_data_id(id)?;
+        load_or_create_config(info, &state_key, id, &payer, &system_program, &mut config)?;
+        f(i, id, &mut config, &events)?;
+        store(info, &*config)?;
+    }
+    Ok(())
+}
+
+/// Set the workflows allowed to write the given data IDs, replacing any previous feed-specific
+/// metadata. Data IDs without feed-specific metadata use the store's default metadata.
+pub fn set_specific_feed_metadata<'info>(
+    ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+    data_ids: Vec<[u8; 16]>,
+    workflow_metadata: Vec<WorkflowMetadata>,
+) -> Result<()> {
     require!(
         !data_ids.is_empty() && !workflow_metadata.is_empty(),
         StoreError::EmptyConfig
@@ -57,200 +62,167 @@ pub fn set_specific_feed_metadata<'info>(
         workflow_metadata.len() <= MAX_WORKFLOW_METADATAS,
         StoreError::MaxEntriesExceeded
     );
-    require_eq!(
-        data_ids.len(),
-        ctx.remaining_accounts.len(),
-        StoreError::ArrayLengthMismatch
-    );
     for metadata in workflow_metadata.iter() {
         validate_workflow_metadata(metadata)?;
     }
-
     let state_key = ctx.accounts.state.key();
-    // one buffer and one event instruction for the whole batch: the bump allocator never frees
-    let events = EventEmitter::new(
-        ctx.accounts.event_authority.to_account_info(),
-        ctx.bumps.event_authority,
-    );
-    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
-    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        let replaced = update_settings(info, &state_key, id, &mut feed, |settings| {
-            let replaced = !settings.specific_workflow_metadata.is_empty();
-            settings.specific_workflow_metadata.clear();
-            settings
-                .specific_workflow_metadata
-                .extend(&workflow_metadata);
-            Ok(replaced)
-        })?;
-
-        if replaced {
-            events.emit(&SpecificFeedMetadataRemoved {
-                state: state_key,
-                data_id: *id,
-            })?;
-        }
-
-        // SpecificFeedMetadataSet, written from the borrowed list instead of a copy per data ID
-        events.emit_with(SpecificFeedMetadataSet::DISCRIMINATOR, |data| {
-            state_key.serialize(data)?;
-            id.serialize(data)?;
-            workflow_metadata.as_slice().serialize(data)?;
-            Ok(())
-        })?;
-    }
-    Ok(())
+    update_configs(
+        &ctx,
+        &data_ids,
+        ctx.remaining_accounts,
+        |_, id, config, events| {
+            if !config.specific_workflow_metadata.is_empty() {
+                events.emit(&SpecificFeedMetadataRemoved {
+                    state: state_key,
+                    data_id: *id,
+                })?;
+            }
+            config.specific_workflow_metadata.clear();
+            config.specific_workflow_metadata.extend(&workflow_metadata);
+            // SpecificFeedMetadataSet, written from the borrowed list instead of a copy per data ID
+            events.emit_with(SpecificFeedMetadataSet::DISCRIMINATOR, |data| {
+                state_key.serialize(data)?;
+                id.serialize(data)?;
+                workflow_metadata.as_slice().serialize(data)?;
+                Ok(())
+            })
+        },
+    )
 }
 
 /// Remove feed-specific workflow metadata, the data IDs fall back to the default metadata.
 pub fn remove_specific_feed_metadata<'info>(
-    ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+    ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
     data_ids: Vec<[u8; 16]>,
 ) -> Result<()> {
-    verify_feed_admin(
-        &ctx.accounts.feed_admin,
-        &ctx.accounts.state.load()?.feed_admins,
-    )?;
-    require_eq!(
-        data_ids.len(),
-        ctx.remaining_accounts.len(),
-        StoreError::ArrayLengthMismatch
-    );
-
     let state_key = ctx.accounts.state.key();
-    let events = EventEmitter::new(
-        ctx.accounts.event_authority.to_account_info(),
-        ctx.bumps.event_authority,
-    );
-    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
-    for (id, info) in data_ids.iter().zip(ctx.remaining_accounts.iter()) {
-        update_settings(info, &state_key, id, &mut feed, |settings| {
+    update_configs(
+        &ctx,
+        &data_ids,
+        ctx.remaining_accounts,
+        |_, id, config, events| {
             require!(
-                !settings.specific_workflow_metadata.is_empty(),
+                !config.specific_workflow_metadata.is_empty(),
                 StoreError::FeedNotConfigured
             );
-            settings.specific_workflow_metadata.clear();
-            Ok(())
-        })?;
-
-        events.emit(&SpecificFeedMetadataRemoved {
-            state: state_key,
-            data_id: *id,
-        })?;
-    }
-    Ok(())
+            config.specific_workflow_metadata.clear();
+            events.emit(&SpecificFeedMetadataRemoved {
+                state: state_key,
+                data_id: *id,
+            })
+        },
+    )
 }
 
-/// Configure report callbacks. Remaining accounts are the feeds of the data IDs in order, followed
-/// by the callback program account and its allowlist entry of every enabled (non-default program)
-/// callback in order. Only programs the owner allowed can be configured. Each program is called
-/// with its own callback authority PDA as signer, so it can never act as another program's.
-pub fn set_report_callback_configs<'info>(
-    ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+/// Set the accepted answer range of feeds, the (i128::MIN, i128::MAX) pair clears the range.
+pub fn set_min_max_answers<'info>(
+    ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
     data_ids: Vec<[u8; 16]>,
-    callbacks: Vec<CallbackConfigArgs>,
+    min_answers: Vec<i128>,
+    max_answers: Vec<i128>,
 ) -> Result<()> {
-    verify_feed_admin(
-        &ctx.accounts.feed_admin,
-        &ctx.accounts.state.load()?.feed_admins,
-    )?;
-    require_eq!(
-        data_ids.len(),
-        callbacks.len(),
+    require!(
+        data_ids.len() == min_answers.len() && data_ids.len() == max_answers.len(),
         StoreError::ArrayLengthMismatch
     );
+    let state_key = ctx.accounts.state.key();
+    update_configs(
+        &ctx,
+        &data_ids,
+        ctx.remaining_accounts,
+        |i, id, config, events| {
+            let (min_answer, max_answer) = (min_answers[i], max_answers[i]);
+            if min_answer == i128::MIN && max_answer == i128::MAX {
+                // unbounded pair, same as never configured
+                config.min_max_configured = 0;
+                config.min_answer = 0;
+                config.max_answer = 0;
+            } else {
+                require!(min_answer <= max_answer, StoreError::InvalidMinMaxRange);
+                config.min_max_configured = 1;
+                config.min_answer = min_answer;
+                config.max_answer = max_answer;
+            }
+            events.emit(&MinMaxAnswerSet {
+                state: state_key,
+                data_id: *id,
+                min_answer,
+                max_answer,
+            })
+        },
+    )
+}
 
-    let enabled = callbacks
+/// Disable or enable writes of feeds: while disabled, every workflow's reports for the data ID are
+/// skipped (default and feed-specific alike) and reads keep serving the last round. Disabling a data
+/// ID whose feed doesn't exist yet keeps its first report from creating it.
+pub fn set_feed_writes_disabled<'info>(
+    ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+    data_ids: Vec<[u8; 16]>,
+    disabled: bool,
+) -> Result<()> {
+    let state_key = ctx.accounts.state.key();
+    update_configs(
+        &ctx,
+        &data_ids,
+        ctx.remaining_accounts,
+        |_, id, config, events| {
+            config.writes_disabled = disabled as u8;
+            events.emit(&FeedWritesDisabledSet {
+                state: state_key,
+                data_id: *id,
+                disabled,
+            })
+        },
+    )
+}
+
+/// Link data IDs to the DF1 feeds this store keeps written with their rounds (default pubkey
+/// unlinks), and enable or disable that write. Remaining accounts: the feed configs, then each
+/// linked DF1 feed account in order, which must be a DF1 feed `submit` can write. A DF1 feed should
+/// be linked from one data ID only; the deployment tooling checks that across configs.
+pub fn set_df1_feeds<'info>(
+    ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+    data_ids: Vec<[u8; 16]>,
+    df1_feeds: Vec<Pubkey>,
+    write_disabled: Vec<bool>,
+) -> Result<()> {
+    require!(
+        data_ids.len() == df1_feeds.len() && data_ids.len() == write_disabled.len(),
+        StoreError::ArrayLengthMismatch
+    );
+    let linked = df1_feeds
         .iter()
-        .filter(|c| c.program != Pubkey::default())
+        .filter(|feed| **feed != Pubkey::default())
         .count();
     require_eq!(
         ctx.remaining_accounts.len(),
-        data_ids.len() + 2 * enabled,
+        data_ids.len() + linked,
         StoreError::InvalidAccountCount
     );
-    let (settings_infos, program_infos) = ctx.remaining_accounts.split_at(data_ids.len());
-    let mut program_infos = program_infos.iter();
-
-    let state_key = ctx.accounts.state.key();
-    let events = EventEmitter::new(
-        ctx.accounts.event_authority.to_account_info(),
-        ctx.bumps.event_authority,
-    );
-    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
-    for ((id, callback), info) in data_ids
-        .iter()
-        .zip(callbacks.iter())
-        .zip(settings_infos.iter())
-    {
-        require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
-        // A callback that could never run is rejected here instead of failing every report.
-        let mut authority_bump = 0;
-        if callback.program != Pubkey::default() {
-            let program = program_infos.next().unwrap();
+    let (configs, df1_infos) = ctx.remaining_accounts.split_at(data_ids.len());
+    let mut df1_infos = df1_infos.iter();
+    let (state_key, df1_program) = {
+        let state = ctx.accounts.state.load()?;
+        (ctx.accounts.state.key(), state.df1_program)
+    };
+    update_configs(&ctx, &data_ids, configs, |i, id, config, events| {
+        let df1_feed = df1_feeds[i];
+        if df1_feed != Pubkey::default() {
+            let info = df1_infos.next().unwrap();
+            require_keys_eq!(*info.key, df1_feed, StoreError::AccountMismatch);
             require!(
-                program.key() == callback.program && program.executable,
-                StoreError::ReportCallbackNoContract
-            );
-            require_allowed(&state_key, &callback.program, program_infos.next().unwrap())?;
-            require!(
-                callback.accounts.len() <= MAX_CALLBACK_ACCOUNTS,
-                StoreError::MaxEntriesExceeded
-            );
-            let (authority, bump) = Pubkey::find_program_address(
-                &[
-                    CALLBACK_AUTHORITY_SEED,
-                    state_key.as_ref(),
-                    callback.program.as_ref(),
-                ],
-                &crate::ID,
-            );
-            // The program's own signer passed again as a (possibly writable) account would hand the
-            // callee its authority writable. The program itself may appear: Anchor CPI events need
-            // the emitting program as an account, as the DF1 store's callback does.
-            require!(
-                callback.accounts.iter().all(|a| a.pubkey != authority),
-                StoreError::InvalidCallbackConfig
-            );
-            authority_bump = bump;
-        } else {
-            // a disabled callback carries no settings, so the event reports what is stored
-            require!(
-                callback.accounts.is_empty() && !callback.revert_on_failure,
-                StoreError::InvalidCallbackConfig
+                df1::check_layout(info, &df1_program).is_ok(),
+                StoreError::InvalidDf1Feed
             );
         }
-
-        let (previous_program, current_program) =
-            update_settings(info, &state_key, id, &mut feed, |settings| {
-                let previous_program = settings.callback_program;
-                settings.callback_program = callback.program;
-                settings.callback_accounts = [Pubkey::default(); MAX_CALLBACK_ACCOUNTS];
-                settings.callback_accounts_len = 0;
-                settings.callback_writable_mask = 0;
-                settings.callback_revert_on_failure = 0;
-                settings.callback_authority_bump = authority_bump;
-                if callback.program != Pubkey::default() {
-                    settings.callback_revert_on_failure = callback.revert_on_failure as u8;
-                    settings.callback_accounts_len = callback.accounts.len() as u8;
-                    for (i, account) in callback.accounts.iter().enumerate() {
-                        settings.callback_accounts[i] = account.pubkey;
-                        if account.is_writable {
-                            settings.callback_writable_mask |= 1 << i;
-                        }
-                    }
-                }
-                Ok((previous_program, settings.callback_program))
-            })?;
-
-        events.emit_with(ReportCallbackConfigSet::DISCRIMINATOR, |data| {
-            state_key.serialize(data)?;
-            id.serialize(data)?;
-            previous_program.serialize(data)?;
-            current_program.serialize(data)?;
-            callback.accounts.as_slice().serialize(data)?;
-            callback.revert_on_failure.serialize(data)?;
-            Ok(())
-        })?;
-    }
-    Ok(())
+        config.df1_feed = df1_feed;
+        config.df1_write_disabled = write_disabled[i] as u8;
+        events.emit(&Df1FeedSet {
+            state: state_key,
+            data_id: *id,
+            df1_feed,
+            write_disabled: write_disabled[i],
+        })
+    })
 }

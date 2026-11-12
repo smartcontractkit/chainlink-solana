@@ -12,20 +12,17 @@ use anchor_lang::{
 use bytemuck::Pod;
 
 use crate::{
-    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, ZERO_ADDRESS, ZERO_NAME},
+    common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, FEED_CONFIG_SEED, ZERO_ADDRESS, ZERO_NAME},
     data_id,
     error::StoreError,
-    logic::Ring,
-    state::{
-        feed_account_len, AccountList, DataIdSettings, FeedData, StoredReport, WorkflowMetadata,
-        FEED_RING_OFFSET,
-    },
+    state::{AccountList, FeedConfig, WorkflowMetadata},
 };
 
-/// Create a program owned PDA, topping up an account that was pre-funded.
+/// Create a program owned PDA, topping up an account someone pre-funded (a plain `create_account`
+/// would fail on it). `signers` are the PDA's seeds, and the payer's when the payer is a PDA too.
 pub fn create_pda_account<'info>(
     space: usize,
-    seeds: &[&[u8]],
+    signers: &[&[&[u8]]],
     payer: &AccountInfo<'info>,
     to_account: &AccountInfo<'info>,
     system_program: &AccountInfo<'info>,
@@ -43,62 +40,34 @@ pub fn create_pda_account<'info>(
                 &crate::ID,
             ),
             &[payer.clone(), to_account.clone(), system_program.clone()],
-            &[seeds],
+            signers,
         )?;
         return Ok(());
     }
 
     let required_lamports = rent.saturating_sub(current_lamports);
     if required_lamports > 0 {
-        anchor_lang::system_program::transfer(
-            CpiContext::new(
-                system_program.clone(),
-                anchor_lang::system_program::Transfer {
-                    from: payer.clone(),
-                    to: to_account.clone(),
-                },
-            ),
-            required_lamports,
+        invoke_signed(
+            &system_instruction::transfer(payer.key, to_account.key, required_lamports),
+            &[payer.clone(), to_account.clone(), system_program.clone()],
+            signers,
         )?;
     }
-    anchor_lang::system_program::allocate(
-        CpiContext::new(
-            system_program.clone(),
-            anchor_lang::system_program::Allocate {
-                account_to_allocate: to_account.clone(),
-            },
-        )
-        .with_signer(&[seeds]),
-        space as u64,
+    invoke_signed(
+        &system_instruction::allocate(to_account.key, space as u64),
+        &[to_account.clone(), system_program.clone()],
+        signers,
     )?;
-    anchor_lang::system_program::assign(
-        CpiContext::new(
-            system_program.clone(),
-            anchor_lang::system_program::Assign {
-                account_to_assign: to_account.clone(),
-            },
-        )
-        .with_signer(&[seeds]),
-        &crate::ID,
+    invoke_signed(
+        &system_instruction::assign(to_account.key, &crate::ID),
+        &[to_account.clone(), system_program.clone()],
+        signers,
     )?;
     Ok(())
 }
 
-/// Read a zero-copy account by value, checking owner and discriminator. Alignment agnostic.
-pub fn load<T: Pod + Discriminator>(info: &AccountInfo) -> Result<T> {
-    require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
-    let data = info.try_borrow_data()?;
-    require!(
-        data.len() >= ANCHOR_DISCRIMINATOR + size_of::<T>()
-            && &data[..ANCHOR_DISCRIMINATOR] == T::DISCRIMINATOR,
-        StoreError::InvalidAccount
-    );
-    Ok(bytemuck::pod_read_unaligned(
-        &data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<T>()],
-    ))
-}
-
-/// Like [`load`] but on the heap, for accounts too large for the 4KiB stack frame.
+/// Like reading a zero-copy account, but by value on the heap, checking owner and discriminator.
+/// For accounts too large for the 4KiB stack frame. Alignment agnostic.
 pub fn load_boxed<T: Pod + Discriminator>(info: &AccountInfo) -> Result<Box<T>> {
     require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
     let data = info.try_borrow_data()?;
@@ -123,51 +92,84 @@ pub fn store<T: Pod + Discriminator>(info: &AccountInfo, value: &T) -> Result<()
     Ok(())
 }
 
-/// Load a feed header belonging to `state` and `data_id`, checking its version and that its ring
-/// fits.
-pub fn load_feed(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Result<Box<FeedData>> {
-    let mut feed: Box<FeedData> = bytemuck::zeroed_box();
-    load_feed_into(info, state, data_id, &mut feed)?;
-    Ok(feed)
+/// Whether an account was never created.
+pub fn is_uninitialized(info: &AccountInfo) -> bool {
+    *info.owner == System::id() && info.data_is_empty()
 }
 
-/// [`load_feed`] into an existing buffer. `on_report` reuses one buffer for every report: the
-/// program's bump allocator never frees, so a fresh box per report would run a batch out of heap.
-pub fn load_feed_into(
+/// The feed config address of a data ID and its bump.
+pub fn feed_config_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[FEED_CONFIG_SEED, state.as_ref(), &data_id::to_seed(data_id)],
+        &crate::ID,
+    )
+}
+
+/// Load a feed config of `state` and `data_id` into an existing buffer, checking its version. Batches
+/// reuse one buffer: the program's bump allocator never frees.
+pub fn load_config_into(
     info: &AccountInfo,
     state: &Pubkey,
     data_id: &[u8; 16],
-    feed: &mut FeedData,
+    config: &mut FeedConfig,
 ) -> Result<()> {
     require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
     {
         let data = info.try_borrow_data()?;
         require!(
-            data.len() >= ANCHOR_DISCRIMINATOR + size_of::<FeedData>()
-                && &data[..ANCHOR_DISCRIMINATOR] == FeedData::DISCRIMINATOR,
+            data.len() >= ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>()
+                && &data[..ANCHOR_DISCRIMINATOR] == FeedConfig::DISCRIMINATOR,
             StoreError::InvalidAccount
         );
-        bytemuck::bytes_of_mut(feed).copy_from_slice(
-            &data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<FeedData>()],
+        bytemuck::bytes_of_mut(config).copy_from_slice(
+            &data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>()],
         );
     }
     require_eq!(
-        feed.version,
+        config.version,
         ACCOUNT_VERSION,
         StoreError::InvalidAccountVersion
     );
     require!(
-        feed.state == *state
-            && feed.data_id == data_id::to_seed(data_id)
-            && info.data_len() >= feed_account_len(feed.max_stored_reports),
+        config.state == *state && config.data_id == data_id::to_seed(data_id),
         StoreError::AccountMismatch
     );
     Ok(())
 }
 
-/// Whether an account was never created: a feed of a data ID that has not been initialized.
-pub fn is_uninitialized(info: &AccountInfo) -> bool {
-    *info.owner == System::id() && info.data_is_empty()
+/// A new, empty feed config of `state` and `data_id`.
+pub fn new_config(state: &Pubkey, data_id: &[u8; 16], config: &mut FeedConfig) {
+    bytemuck::bytes_of_mut(config).fill(0);
+    config.version = ACCOUNT_VERSION;
+    config.data_id = data_id::to_seed(data_id);
+    config.state = *state;
+}
+
+/// Load a data ID's feed config, creating it at its PDA first when it doesn't exist, `payer` (a
+/// signer of this instruction) paying the rent.
+pub fn load_or_create_config<'info>(
+    info: &AccountInfo<'info>,
+    state: &Pubkey,
+    data_id: &[u8; 16],
+    payer: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+    config: &mut FeedConfig,
+) -> Result<()> {
+    if !is_uninitialized(info) {
+        return load_config_into(info, state, data_id, config);
+    }
+    let (address, bump) = feed_config_address(state, data_id);
+    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
+    let seed = data_id::to_seed(data_id);
+    create_pda_account(
+        ANCHOR_DISCRIMINATOR + size_of::<FeedConfig>(),
+        &[&[FEED_CONFIG_SEED, state.as_ref(), &seed, &[bump]]],
+        payer,
+        info,
+        system_program,
+    )?;
+    new_config(state, data_id, config);
+    store(info, config)
 }
 
 /// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke
@@ -221,85 +223,16 @@ impl<'info> EventEmitter<'info> {
     }
 }
 
-/// Settings of a data ID, kept in its feed account.
-pub fn load_settings(
-    info: &AccountInfo,
-    state: &Pubkey,
-    data_id: &[u8; 16],
-) -> Result<DataIdSettings> {
-    Ok(load_feed(info, state, data_id)?.settings)
-}
-
-/// Update the settings of a data ID in its feed account, through `feed`, a buffer the caller
-/// reuses across a batch (the bump allocator never frees).
-pub fn update_settings<R>(
-    info: &AccountInfo,
-    state: &Pubkey,
-    data_id: &[u8; 16],
-    feed: &mut FeedData,
-    f: impl FnOnce(&mut DataIdSettings) -> Result<R>,
-) -> Result<R> {
-    load_feed_into(info, state, data_id, feed)?;
-    let result = f(&mut feed.settings)?;
-    store(info, feed)?;
-    Ok(result)
-}
-
-/// Circular buffer over a feed account's data (the whole account data, header included).
-pub struct RingMut<'a> {
-    data: &'a mut [u8],
-}
-
-impl<'a> RingMut<'a> {
-    pub fn new(data: &'a mut [u8]) -> Self {
-        Self { data }
-    }
-}
-
-fn ring_offset(slot: u64) -> usize {
-    FEED_RING_OFFSET + slot as usize * size_of::<StoredReport>()
-}
-
-impl Ring for RingMut<'_> {
-    fn get(&self, slot: u64) -> StoredReport {
-        let offset = ring_offset(slot);
-        bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
-    }
-
-    fn set(&mut self, slot: u64, report: StoredReport) {
-        let offset = ring_offset(slot);
-        self.data[offset..offset + size_of::<StoredReport>()]
-            .copy_from_slice(bytemuck::bytes_of(&report));
-    }
-}
-
-/// Read-only circular buffer over a feed account's data, for reads.
-pub struct RingRef<'a> {
-    data: &'a [u8],
-}
-
-impl<'a> RingRef<'a> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self { data }
-    }
-}
-
-impl Ring for RingRef<'_> {
-    fn get(&self, slot: u64) -> StoredReport {
-        let offset = ring_offset(slot);
-        bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
-    }
-
-    fn set(&mut self, _slot: u64, _report: StoredReport) {
-        unreachable!("read-only ring")
-    }
-}
-
 pub fn verify_feed_admin(admin: &Signer, admins: &AccountList) -> Result<()> {
     require!(
         admins.binary_search(admin.key).is_ok(),
         StoreError::Unauthorized
     );
+    Ok(())
+}
+
+pub fn validate_data_id(id: &[u8; 16]) -> Result<()> {
+    require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
     Ok(())
 }
 
@@ -349,27 +282,6 @@ pub fn workflow_metadata(metadata: &[u8]) -> Result<([u8; 10], [u8; 20])> {
     let name = metadata.get(32..42).ok_or(StoreError::MalformedReport)?;
     let owner = metadata.get(42..62).ok_or(StoreError::MalformedReport)?;
     Ok((name.try_into().unwrap(), owner.try_into().unwrap()))
-}
-
-pub fn encode_description(description: &str) -> Result<[u8; DESCRIPTION_LEN]> {
-    let bytes = description.as_bytes();
-    require!(
-        bytes.len() <= DESCRIPTION_LEN,
-        StoreError::DescriptionTooLong
-    );
-    // stored zero padded, so a NUL would cut the description short on read
-    require!(!bytes.contains(&0), StoreError::InvalidDescription);
-    let mut out = [0u8; DESCRIPTION_LEN];
-    out[..bytes.len()].copy_from_slice(bytes);
-    Ok(out)
-}
-
-pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
-    let end = description
-        .iter()
-        .position(|b| *b == 0)
-        .unwrap_or(DESCRIPTION_LEN);
-    String::from_utf8_lossy(&description[..end]).into_owned()
 }
 
 pub fn next_account<'a, 'info>(

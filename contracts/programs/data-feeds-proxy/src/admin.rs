@@ -1,37 +1,24 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::{data_id_seed, ACCOUNT_VERSION, STORE_DECIMALS},
+    common::{data_id_seed, ACCOUNT_VERSION, STORED_DECIMALS},
     context::*,
     error::ProxyError,
     event::*,
-    state::FeedConfig,
+    state::Feed,
+    utils::{load_feed_into, store_feed},
 };
 
-pub fn initialize(ctx: Context<Initialize>, feed_admins: Vec<Pubkey>) -> Result<()> {
+pub fn initialize(ctx: Context<Initialize>, writer: Pubkey) -> Result<()> {
+    require_keys_neq!(writer, Pubkey::default(), ProxyError::InvalidAddress);
     let state_key = ctx.accounts.state.key();
     let state = &mut ctx.accounts.state.load_init()?;
     state.version = ACCOUNT_VERSION;
     state.owner = ctx.accounts.owner.key();
-    state.store_program = ctx.accounts.store_program.key();
-    state.store_state = ctx.accounts.store_state.key();
-
-    require!(
-        feed_admins.len() <= state.feed_admins.capacity(),
-        ProxyError::FeedAdminsFull
-    );
-    for pair in feed_admins.windows(2) {
-        require!(pair[0] < pair[1], ProxyError::FeedAdminsNotSorted);
-    }
-    for admin in feed_admins.iter() {
-        require_keys_neq!(*admin, Pubkey::default(), ProxyError::InvalidAddress);
-    }
-    state.feed_admins.extend(&feed_admins);
-
+    state.writer = writer;
     emit_cpi!(ProxyInitialized {
         state: state_key,
-        store_program: state.store_program,
-        store_state: state.store_state,
+        writer,
     });
     Ok(())
 }
@@ -64,102 +51,38 @@ pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     Ok(())
 }
 
-pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: bool) -> Result<()> {
-    require_keys_neq!(feed_admin, Pubkey::default(), ProxyError::InvalidAddress);
+/// Replace the trusted store, as Stellar's `set_cache`. Every feed stays where it is: round IDs and
+/// history continue under the new store.
+pub fn set_store(ctx: Context<OwnerOnly>, writer: Pubkey) -> Result<()> {
+    require_keys_neq!(writer, Pubkey::default(), ProxyError::InvalidAddress);
     let state = &mut ctx.accounts.state.load_mut()?;
-    match (state.feed_admins.binary_search(&feed_admin), is_admin) {
-        (Err(index), true) => {
-            require!(
-                state.feed_admins.remaining_capacity() > 0,
-                ProxyError::FeedAdminsFull
-            );
-            state.feed_admins.insert(index, feed_admin);
-        }
-        (Ok(index), false) => {
-            state.feed_admins.remove(index);
-        }
-        // already in the requested state
-        _ => {}
-    }
-    emit_cpi!(FeedAdminSet {
-        state: ctx.accounts.state.key(),
-        feed_admin,
-        is_admin,
-    });
-    Ok(())
-}
-
-/// Point the proxy at another store. Readers keep the proxy address, they pass the new store's
-/// accounts.
-pub fn set_store(ctx: Context<SetStore>) -> Result<()> {
-    let state = &mut ctx.accounts.state.load_mut()?;
-    let (previous_program, previous_state) = (state.store_program, state.store_state);
-    state.store_program = ctx.accounts.store_program.key();
-    state.store_state = ctx.accounts.store_state.key();
+    let previous_writer = std::mem::replace(&mut state.writer, writer);
     emit_cpi!(StoreSet {
         state: ctx.accounts.state.key(),
-        previous_program,
-        previous_state,
-        new_program: state.store_program,
-        new_state: state.store_state,
+        previous_writer,
+        new_writer: writer,
     });
     Ok(())
 }
 
-/// Set the fewest decimals `read_scaled` serves a data ID at. The default is the stored
-/// decimals, so a feed only serves other decimals once an admin lowers its minimum.
+/// Set the fewest decimals reads of a feed may ask for. New feeds start at the stored decimals,
+/// so a feed only serves fewer once the owner lowers its minimum, as on Stellar.
 pub fn set_min_decimals(
     ctx: Context<SetMinDecimals>,
     data_id: [u8; 16],
     min_decimals: u8,
 ) -> Result<()> {
+    require!(min_decimals <= STORED_DECIMALS, ProxyError::InvalidDecimals);
     let state_key = ctx.accounts.state.key();
-    {
-        let state = ctx.accounts.state.load()?;
-        let admin = ctx.accounts.admin.key();
-        require!(
-            admin == state.owner || state.feed_admins.binary_search(&admin).is_ok(),
-            ProxyError::Unauthorized
-        );
-    }
-    require!(min_decimals <= STORE_DECIMALS, ProxyError::InvalidDecimals);
-
-    let config = &mut ctx.accounts.feed_config;
-    // version 0 is a config created by this call; an existing one is rewritten only at the layout
-    // this program knows
-    require!(
-        config.version == 0 || config.version == ACCOUNT_VERSION,
-        ProxyError::InvalidAccountVersion
-    );
-    config.version = ACCOUNT_VERSION;
-    config.state = state_key;
-    config.data_id = data_id_seed(&data_id);
-    config.min_decimals = min_decimals;
-
+    let info = ctx.accounts.feed.to_account_info();
+    let mut feed: Box<Feed> = bytemuck::zeroed_box();
+    load_feed_into(&info, &state_key, &data_id_seed(&data_id), &mut feed)?;
+    feed.min_decimals = min_decimals;
+    store_feed(&info, &feed)?;
     emit_cpi!(MinDecimalsSet {
         state: state_key,
         data_id,
         min_decimals,
     });
     Ok(())
-}
-
-/// The fewest decimals `read_scaled` serves a data ID at.
-pub fn get_min_decimals(ctx: Context<GetMinDecimals>, _data_id: [u8; 16]) -> Result<u8> {
-    min_decimals(ctx.accounts.feed_config.as_deref())
-}
-
-/// The minimum decimals of an optional feed config, the stored decimals without one.
-pub fn min_decimals(config: Option<&FeedConfig>) -> Result<u8> {
-    match config {
-        None => Ok(STORE_DECIMALS),
-        Some(config) => {
-            require_eq!(
-                config.version,
-                ACCOUNT_VERSION,
-                ProxyError::InvalidAccountVersion
-            );
-            Ok(config.min_decimals)
-        }
-    }
 }

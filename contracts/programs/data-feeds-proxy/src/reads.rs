@@ -1,106 +1,90 @@
-//! Reads through the proxy. Every read calls the configured store's reader interface and returns
-//! its round, `read_scaled` after rescaling the answer.
+//! Reads, as Stellar's proxy reader: the caller passes the data ID and the decimals it wants. The
+//! feed accounts are public too, so readers can also decode them without a call (see the
+//! `chainlink-solana-data-feeds-proxy` crate); these instructions are for those who'd rather call.
 
 use anchor_lang::prelude::*;
-use chainlink_solana_data_feeds_store::{get_latest_round, get_round};
 
 use crate::{
-    common::STORE_DECIMALS,
-    context::{Read, ReadScaled},
+    common::{data_id_seed, STORED_DECIMALS},
+    context::{FeedRead, StateRead},
     error::ProxyError,
-    state::Round,
+    logic::{self, ScaleError, StoredRound},
+    state::{Feed, Round},
+    utils::{decode_description, load_feed_into, RingRef},
 };
 
-fn fetch<'info>(
-    store_program: &UncheckedAccount<'info>,
-    store_state: &UncheckedAccount<'info>,
-    feed: &UncheckedAccount<'info>,
-    data_id: [u8; 16],
-    round_id: Option<u64>,
-) -> Result<Round> {
-    let (program, state, feed) = (
-        store_program.to_account_info(),
-        store_state.to_account_info(),
-        feed.to_account_info(),
-    );
-    let round = match round_id {
-        None => get_latest_round(program, state, feed, data_id)?,
-        Some(round_id) => get_round(program, state, feed, data_id, round_id)?,
-    };
-    Ok(round.into())
+impl From<ScaleError> for ProxyError {
+    fn from(e: ScaleError) -> Self {
+        match e {
+            ScaleError::InvalidDecimals => ProxyError::InvalidDecimals,
+            ScaleError::RoundsToZero => ProxyError::RoundsToZero,
+        }
+    }
 }
 
-/// Rescale a stored answer to `decimals`, truncating toward zero. A non-zero answer that would
-/// become zero is an error, so a reader never mistakes a tiny price for none.
-pub fn scale(answer: i128, decimals: u8) -> Result<i128> {
-    let scaled = answer / 10i128.pow(u32::from(STORE_DECIMALS - decimals));
-    require!(answer == 0 || scaled != 0, ProxyError::RoundsToZero);
-    Ok(scaled)
+/// A stored round at `decimals`, refusing a frozen feed and decimals below its minimum.
+pub fn to_round(feed: &Feed, round: StoredRound, decimals: u8) -> Result<Round> {
+    require!(feed.frozen == 0, ProxyError::FeedFrozen);
+    logic::check_decimals(decimals, feed.min_decimals).map_err(ProxyError::from)?;
+    Ok(Round {
+        round_id: round.round_id,
+        answer: logic::scale(round.answer, decimals).map_err(ProxyError::from)?,
+        observations_timestamp: round.observations_timestamp,
+        recorded_timestamp: round.recorded_timestamp,
+    })
 }
 
-/// The latest round of a data ID, or the given round, at the store's decimals.
-pub fn read(ctx: Context<Read>, data_id: [u8; 16], round_id: Option<u64>) -> Result<Round> {
-    let accounts = &ctx.accounts;
-    fetch(
-        &accounts.store_program,
-        &accounts.store_state,
-        &accounts.feed,
-        data_id,
-        round_id,
-    )
-}
-
-/// The latest round of a data ID, or the given round, with the answer at `decimals`.
-pub fn read_scaled(
-    ctx: Context<ReadScaled>,
-    data_id: [u8; 16],
-    decimals: u8,
-    round_id: Option<u64>,
-) -> Result<Round> {
-    let accounts = &ctx.accounts;
-    let min_decimals = crate::admin::min_decimals(accounts.feed_config.as_deref())?;
-    require!(
-        decimals >= min_decimals && decimals <= STORE_DECIMALS,
-        ProxyError::InvalidDecimals
-    );
-
-    let mut round = fetch(
-        &accounts.store_program,
-        &accounts.store_state,
-        &accounts.feed,
-        data_id,
-        round_id,
+fn load(ctx: &Context<FeedRead>, data_id: &[u8; 16]) -> Result<Box<Feed>> {
+    let mut feed: Box<Feed> = bytemuck::zeroed_box();
+    load_feed_into(
+        &ctx.accounts.feed.to_account_info(),
+        &ctx.accounts.state.key(),
+        &data_id_seed(data_id),
+        &mut feed,
     )?;
-    round.answer = scale(round.answer, decimals)?;
-    Ok(round)
+    Ok(feed)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// The latest round of a data ID at `decimals`. Fails with `NoDataPresent` before the first round.
+pub fn latest_round(ctx: Context<FeedRead>, data_id: [u8; 16], decimals: u8) -> Result<Round> {
+    let feed = load(&ctx, &data_id)?;
+    let round = logic::latest_round(&feed).ok_or(ProxyError::NoDataPresent)?;
+    to_round(&feed, round, decimals)
+}
 
-    const E18: i128 = 1_000_000_000_000_000_000;
+/// A stored round of a data ID at `decimals`. Fails with `NoDataPresent` for a round that was
+/// never written or has been overwritten in the ring.
+pub fn get_round(
+    ctx: Context<FeedRead>,
+    data_id: [u8; 16],
+    round_id: u64,
+    decimals: u8,
+) -> Result<Round> {
+    let feed = load(&ctx, &data_id)?;
+    let info = ctx.accounts.feed.to_account_info();
+    let data = info.try_borrow_data()?;
+    let round = logic::stored_round(round_id, &feed, &RingRef::new(&data[..]))
+        .ok_or(ProxyError::NoDataPresent)?;
+    to_round(&feed, round, decimals)
+}
 
-    #[test]
-    fn scales_and_truncates_toward_zero() {
-        assert_eq!(
-            scale(1_234_567_891 * E18 / 1_000_000_000, 8).unwrap(),
-            123_456_789
-        );
-        assert_eq!(scale(-15 * E18 / 10, 0).unwrap(), -1);
-        assert_eq!(scale(42, 18).unwrap(), 42);
-        assert_eq!(scale(0, 8).unwrap(), 0, "zero stays zero");
-    }
+/// Decimals answers are stored with, the most a read can ask for.
+pub fn decimals(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<u8> {
+    load(&ctx, &data_id)?;
+    Ok(STORED_DECIMALS)
+}
 
-    #[test]
-    fn a_non_zero_answer_never_rounds_to_zero() {
-        assert!(scale(1, 8).is_err());
-        assert!(scale(-1, 8).is_err());
-        assert!(scale(E18 / 10, 0).is_err(), "0.1 at 0 decimals");
-        assert_eq!(
-            scale(10_000_000_000, 8).unwrap(),
-            1,
-            "exactly one unit survives"
-        );
-    }
+/// The description of a data ID's feed, empty when none is set.
+pub fn description(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<String> {
+    Ok(decode_description(&load(&ctx, &data_id)?.description))
+}
+
+/// The fewest decimals reads of a data ID may ask for.
+pub fn get_min_decimals(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<u8> {
+    Ok(load(&ctx, &data_id)?.min_decimals)
+}
+
+/// The trusted store's signer.
+pub fn get_store(ctx: Context<StateRead>) -> Result<Pubkey> {
+    Ok(ctx.accounts.state.load()?.writer)
 }

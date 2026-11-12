@@ -5,20 +5,24 @@ package data_feeds_store
 
 // Account discriminators
 var (
-	Account_FeedData   = [8]byte{162, 107, 82, 18, 92, 193, 22, 129}
+	Account_FeedConfig = [8]byte{75, 97, 12, 15, 89, 221, 78, 71}
 	Account_StoreState = [8]byte{216, 96, 91, 102, 135, 35, 32, 195}
 )
 
 // Event discriminators
 var (
 	Event_AnswerOutOfMinMaxRange                      = [8]byte{11, 76, 139, 16, 19, 145, 46, 40}
-	Event_CallbackProgramAllowedSet                   = [8]byte{178, 28, 124, 189, 61, 18, 220, 90}
 	Event_DefaultFeedMetadataSet                      = [8]byte{228, 50, 167, 196, 5, 3, 142, 220}
+	Event_Df1FeedSet                                  = [8]byte{240, 128, 248, 162, 174, 142, 147, 7}
+	Event_Df1WriteSkipped                             = [8]byte{246, 212, 115, 127, 120, 144, 94, 138}
 	Event_FeedAdminSet                                = [8]byte{34, 71, 225, 118, 151, 185, 149, 144}
+	Event_FeedCreationSkipped                         = [8]byte{190, 187, 80, 147, 210, 10, 152, 173}
 	Event_FeedDescriptionSet                          = [8]byte{204, 4, 197, 215, 180, 77, 137, 82}
-	Event_FeedInitialized                             = [8]byte{112, 111, 89, 0, 44, 197, 88, 78}
-	Event_FeedNotInitializedIgnored                   = [8]byte{93, 168, 81, 77, 76, 3, 181, 171}
+	Event_FeedFrozenSet                               = [8]byte{224, 38, 175, 246, 77, 12, 164, 232}
 	Event_FeedUpdated                                 = [8]byte{200, 60, 190, 86, 247, 9, 50, 81}
+	Event_FeedWritesDisabledIgnored                   = [8]byte{239, 159, 239, 87, 175, 122, 3, 127}
+	Event_FeedWritesDisabledSet                       = [8]byte{172, 0, 243, 31, 50, 174, 58, 138}
+	Event_FeedsCreated                                = [8]byte{16, 52, 94, 149, 26, 60, 62, 124}
 	Event_FutureReportIgnored                         = [8]byte{208, 131, 78, 5, 205, 229, 248, 183}
 	Event_InvalidDataIdIgnored                        = [8]byte{73, 188, 11, 249, 134, 230, 239, 164}
 	Event_InvalidUpdatePermission                     = [8]byte{140, 196, 100, 239, 180, 175, 183, 154}
@@ -27,8 +31,6 @@ var (
 	Event_MinMaxAnswerSet                             = [8]byte{211, 78, 9, 218, 192, 44, 136, 221}
 	Event_OwnershipTransferRequested                  = [8]byte{79, 54, 99, 123, 57, 244, 134, 35}
 	Event_OwnershipTransferred                        = [8]byte{172, 61, 205, 183, 250, 50, 38, 98}
-	Event_ReportCallbackConfigSet                     = [8]byte{108, 176, 238, 231, 81, 240, 233, 60}
-	Event_ReportCallbackRejected                      = [8]byte{39, 248, 95, 22, 197, 1, 226, 152}
 	Event_SpecificFeedMetadataRemoved                 = [8]byte{248, 204, 78, 168, 86, 73, 227, 10}
 	Event_SpecificFeedMetadataSet                     = [8]byte{91, 103, 14, 13, 94, 58, 55, 84}
 	Event_StaleReport                                 = [8]byte{180, 70, 106, 161, 19, 224, 114, 29}
@@ -40,25 +42,20 @@ var (
 var (
 	Instruction_AcceptOwnership                  = [8]byte{172, 23, 43, 13, 238, 213, 85, 150}
 	Instruction_CheckFeedPermission              = [8]byte{27, 200, 93, 229, 253, 200, 18, 191}
-	Instruction_GetDecimals                      = [8]byte{25, 145, 60, 213, 165, 223, 179, 173}
-	Instruction_GetDescription                   = [8]byte{231, 247, 47, 127, 96, 114, 175, 84}
-	Instruction_GetLatestRound                   = [8]byte{200, 218, 233, 250, 29, 234, 205, 187}
-	Instruction_GetLatestRounds                  = [8]byte{229, 156, 84, 86, 200, 12, 249, 213}
-	Instruction_GetRound                         = [8]byte{38, 203, 121, 16, 1, 137, 65, 163}
-	Instruction_InitFeeds                        = [8]byte{74, 175, 53, 104, 185, 70, 65, 169}
 	Instruction_Initialize                       = [8]byte{175, 175, 109, 31, 13, 152, 155, 237}
 	Instruction_OnReport                         = [8]byte{214, 173, 18, 221, 173, 148, 151, 208}
 	Instruction_RecoverNative                    = [8]byte{69, 102, 250, 101, 197, 55, 113, 4}
 	Instruction_RecoverTokens                    = [8]byte{156, 18, 205, 212, 197, 254, 126, 142}
 	Instruction_RemoveSpecificFeedMetadata       = [8]byte{156, 18, 177, 76, 126, 57, 95, 114}
-	Instruction_SetCallbackProgramAllowed        = [8]byte{65, 129, 8, 58, 200, 17, 159, 164}
 	Instruction_SetDefaultFeedMetadata           = [8]byte{77, 85, 174, 7, 126, 211, 45, 223}
+	Instruction_SetDf1Feeds                      = [8]byte{228, 228, 163, 206, 109, 12, 174, 63}
 	Instruction_SetFeedAdmin                     = [8]byte{211, 48, 243, 150, 226, 199, 26, 136}
 	Instruction_SetFeedDescriptions              = [8]byte{154, 207, 197, 50, 43, 120, 101, 198}
+	Instruction_SetFeedFrozen                    = [8]byte{252, 200, 81, 10, 228, 254, 20, 124}
+	Instruction_SetFeedWritesDisabled            = [8]byte{130, 122, 143, 71, 158, 161, 216, 226}
 	Instruction_SetMaxObservationForwardDuration = [8]byte{233, 9, 168, 103, 236, 111, 38, 73}
 	Instruction_SetMaxStoredReports              = [8]byte{20, 146, 17, 61, 33, 203, 64, 68}
 	Instruction_SetMinMaxAnswers                 = [8]byte{243, 255, 180, 93, 224, 128, 31, 118}
-	Instruction_SetReportCallbackConfigs         = [8]byte{160, 21, 239, 121, 86, 125, 188, 52}
 	Instruction_SetSpecificFeedMetadata          = [8]byte{35, 65, 227, 238, 243, 106, 223, 104}
 	Instruction_TransferOwnership                = [8]byte{65, 177, 215, 73, 53, 45, 99, 47}
 )

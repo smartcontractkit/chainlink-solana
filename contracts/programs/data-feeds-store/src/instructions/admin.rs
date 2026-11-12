@@ -1,29 +1,56 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
+use data_feeds_proxy::{
+    common::{MAX_ACCOUNT_DATA_INCREASE, MIN_MAX_STORED_REPORTS},
+    state::feed_account_len,
+};
+
 use crate::{
     common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, CALLBACK_PROGRAM_SEED, MAX_ACCOUNT_DATA_INCREASE,
-        MAX_WORKFLOW_METADATAS, MIN_MAX_STORED_REPORTS, STORE_AUTHORITY_SEED,
+        ACCOUNT_VERSION, DF1_WRITER_SEED, FEED_WRITER_SEED, MAX_WORKFLOW_METADATAS,
+        STORE_AUTHORITY_SEED,
     },
     context::*,
     error::StoreError,
     event::*,
-    state::{feed_account_len, CallbackProgram, WorkflowMetadata},
-    utils::{create_pda_account, validate_workflow_metadata, verify_feed_admin, EventEmitter},
+    state::WorkflowMetadata,
+    utils::{validate_workflow_metadata, verify_feed_admin, EventEmitter},
 };
 
-pub fn initialize(
-    ctx: Context<Initialize>,
-    feed_admins: Vec<Pubkey>,
-    default_max_stored_reports: u64,
-    max_observation_forward_secs: u32,
-) -> Result<()> {
+/// What a store is created with.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
+pub struct StoreConfig {
+    /// Strictly increasing
+    pub feed_admins: Vec<Pubkey>,
+    /// Ring size of the feeds the store creates
+    pub default_max_stored_reports: u64,
+    pub max_observation_forward_secs: u32,
+    /// Proxy program owning the feed accounts
+    pub proxy_program: Pubkey,
+    /// Proxy state that trusts (or will trust) this store's `feed_writer`
+    pub proxy_state: Pubkey,
+    /// DF1 store program whose feeds this store can keep written
+    pub df1_program: Pubkey,
+}
+
+pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
+    let StoreConfig {
+        feed_admins,
+        default_max_stored_reports,
+        max_observation_forward_secs,
+        proxy_program,
+        proxy_state,
+        df1_program,
+    } = config;
     require!(
         default_max_stored_reports >= MIN_MAX_STORED_REPORTS
             && feed_account_len(default_max_stored_reports) <= MAX_ACCOUNT_DATA_INCREASE,
         StoreError::InvalidMaxStoredReports
     );
+    for key in [proxy_program, proxy_state, df1_program] {
+        require_keys_neq!(key, Pubkey::default(), StoreError::InvalidAddress);
+    }
 
     let state_key = ctx.accounts.state.key();
     let state = &mut ctx.accounts.state.load_init()?;
@@ -31,8 +58,14 @@ pub fn initialize(
     state.owner = ctx.accounts.owner.key();
     state.default_max_stored_reports = default_max_stored_reports;
     state.max_observation_forward_secs = max_observation_forward_secs;
-    state.store_authority_bump =
-        Pubkey::find_program_address(&[STORE_AUTHORITY_SEED, state_key.as_ref()], &crate::ID).1;
+    state.proxy_program = proxy_program;
+    state.proxy_state = proxy_state;
+    state.df1_program = df1_program;
+    let bump =
+        |seed: &[u8]| Pubkey::find_program_address(&[seed, state_key.as_ref()], &crate::ID).1;
+    state.store_authority_bump = bump(STORE_AUTHORITY_SEED);
+    state.feed_writer_bump = bump(FEED_WRITER_SEED);
+    state.df1_writer_bump = bump(DF1_WRITER_SEED);
 
     require!(
         feed_admins.len() <= state.feed_admins.capacity(),
@@ -60,6 +93,9 @@ pub fn initialize(
         state: state_key,
         default_max_stored_reports,
         max_observation_forward_secs,
+        proxy_program,
+        proxy_state,
+        df1_program,
     });
     Ok(())
 }
@@ -157,65 +193,6 @@ pub fn set_max_observation_forward_duration(
     Ok(())
 }
 
-/// Allow or disallow a program as a report callback. Feed admins can only configure allowed
-/// programs; disallowing does not remove callbacks already configured, feed admins disable those.
-pub fn set_callback_program_allowed(
-    ctx: Context<SetCallbackProgramAllowed>,
-    callback_program: Pubkey,
-    allowed: bool,
-) -> Result<()> {
-    let program = callback_program;
-    require_keys_neq!(program, Pubkey::default(), StoreError::InvalidAddress);
-    // calling the store back into itself is a forbidden reentrant call that would abort every report
-    require_keys_neq!(program, crate::ID, StoreError::InvalidAddress);
-    let state_key = ctx.accounts.state.key();
-    let info = ctx.accounts.allowlist_entry.to_account_info();
-    let (address, bump) = Pubkey::find_program_address(
-        &[CALLBACK_PROGRAM_SEED, state_key.as_ref(), program.as_ref()],
-        &crate::ID,
-    );
-    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
-
-    if info.data_is_empty() {
-        create_pda_account(
-            ANCHOR_DISCRIMINATOR + CallbackProgram::INIT_SPACE,
-            &[
-                CALLBACK_PROGRAM_SEED,
-                state_key.as_ref(),
-                program.as_ref(),
-                &[bump],
-            ],
-            &ctx.accounts.owner.to_account_info(),
-            &info,
-            &ctx.accounts.system_program.to_account_info(),
-        )?;
-    } else {
-        // an existing entry is rewritten only at the layout this program knows
-        require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
-        let existing = CallbackProgram::try_deserialize(&mut &info.try_borrow_data()?[..])?;
-        require_eq!(
-            existing.version,
-            ACCOUNT_VERSION,
-            StoreError::InvalidAccountVersion
-        );
-    }
-    CallbackProgram {
-        version: ACCOUNT_VERSION,
-        state: state_key,
-        program,
-        allowed,
-        _reserved: [0; 32],
-    }
-    .try_serialize(&mut &mut info.try_borrow_mut_data()?[..])?;
-
-    emit_cpi!(CallbackProgramAllowedSet {
-        state: state_key,
-        program,
-        allowed,
-    });
-    Ok(())
-}
-
 /// Recover SPL tokens held by token accounts of the store authority.
 pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
     require!(
@@ -251,7 +228,7 @@ pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
     Ok(())
 }
 
-/// Recover native SOL sent to the store authority.
+/// Recover native SOL from the vault, e.g. what feed creation no longer needs.
 pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
     require!(
         amount <= ctx.accounts.store_authority.lamports(),

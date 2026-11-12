@@ -594,15 +594,8 @@ name = "chainlink_solana_data_feeds_proxy"
 version = "0.0.1"
 dependencies = [
  "anchor-lang",
+ "bytemuck",
  "data-feeds-proxy",
-]
-
-[[package]]
-name = "chainlink_solana_data_feeds_store"
-version = "0.0.1"
-dependencies = [
- "anchor-lang",
- "data-feeds-store",
 ]
 
 [[package]]
@@ -738,9 +731,7 @@ name = "data-feeds-proxy"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "arrayvec 1.0.1",
  "bytemuck",
- "chainlink_solana_data_feeds_store",
  "static_assertions",
 ]
 
@@ -752,6 +743,7 @@ dependencies = [
  "anchor-spl",
  "arrayvec 1.0.1",
  "bytemuck",
+ "data-feeds-proxy",
  "static_assertions",
 ]
 

@@ -29,20 +29,8 @@ pub enum StoreError {
     FeedNotConfigured,
     #[msg("max stored reports must be at least 2 and fit in one account")]
     InvalidMaxStoredReports,
-    #[msg("max stored reports can only increase once configured")]
-    MaxStoredReportsNotIncreased,
-    #[msg("max stored reports can only change before the ring wraps")]
-    MaxStoredReportsLocked,
-    #[msg("max stored reports must exceed the latest round id")]
-    MaxStoredReportsTooLow,
     #[msg("min answer exceeds max answer")]
     InvalidMinMaxRange,
-    #[msg("no data present")]
-    NoDataPresent,
-    #[msg("report callback program is not executable")]
-    ReportCallbackNoContract,
-    #[msg("description is too long")]
-    DescriptionTooLong,
     #[msg("malformed report")]
     MalformedReport,
     #[msg("feed admin list is full")]
@@ -53,14 +41,8 @@ pub enum StoreError {
     InsufficientBalance,
     #[msg("account has an unsupported version")]
     InvalidAccountVersion,
-    #[msg("report callback program is not allowed")]
-    ReportCallbackNotAllowed,
-    #[msg("too many data ids for one read")]
-    TooManyDataIds,
     #[msg("The signer is unauthorized")]
     Unauthorized,
-    #[msg("description must not contain NUL bytes")]
-    InvalidDescription,
-    #[msg("invalid report callback config")]
-    InvalidCallbackConfig,
+    #[msg("not a DF1 feed this store can write")]
+    InvalidDf1Feed,
 }

@@ -15,13 +15,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 		return nil, fmt.Errorf("failed to peek event discriminator: %w", err)
 	}
 	switch discriminator {
-	case Event_FeedAdminSet:
-		value := new(FeedAdminSet)
-		err := value.UnmarshalWithDecoder(decoder)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal event as FeedAdminSet: %w", err)
-		}
-		return value, nil
 	case Event_MinDecimalsSet:
 		value := new(MinDecimalsSet)
 		err := value.UnmarshalWithDecoder(decoder)
@@ -60,23 +53,6 @@ func ParseAnyEvent(eventData []byte) (any, error) {
 	default:
 		return nil, fmt.Errorf("unknown discriminator: %s", binary.FormatDiscriminator(discriminator))
 	}
-}
-
-func ParseEvent_FeedAdminSet(eventData []byte) (*FeedAdminSet, error) {
-	decoder := binary.NewBorshDecoder(eventData)
-	discriminator, err := decoder.ReadDiscriminator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek discriminator: %w", err)
-	}
-	if discriminator != Event_FeedAdminSet {
-		return nil, fmt.Errorf("expected discriminator %v, got %s", Event_FeedAdminSet, binary.FormatDiscriminator(discriminator))
-	}
-	event := new(FeedAdminSet)
-	err = event.UnmarshalWithDecoder(decoder)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event of type FeedAdminSet: %w", err)
-	}
-	return event, nil
 }
 
 func ParseEvent_MinDecimalsSet(eventData []byte) (*MinDecimalsSet, error) {

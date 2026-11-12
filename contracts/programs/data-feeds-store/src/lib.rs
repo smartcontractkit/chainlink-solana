@@ -1,26 +1,32 @@
 #![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
-//! Chainlink Data Feeds store for CRE: a Solana port of the EVM `DataFeedsStore` without SVR.
-//! Reports arrive from the keystone forwarder through `on_report`, are stored per feed in a
-//! circular buffer and served through a small reader interface that proxies call. Per data ID
-//! report callbacks let other programs follow updates, the DF1 store uses one to keep its existing
-//! feed accounts written. SVR data IDs are reserved in the data ID layout, not supported yet.
-//! Events are CPI events (`emit_cpi!`).
+//! Chainlink Data Feeds store for CRE: the write side of a Solana port of the EVM `DataFeedsStore`,
+//! without SVR. Reports arrive from the keystone forwarder through `on_report`, are checked against
+//! the workflows permitted for their data ID, their ordering and their answer range, and are written
+//! into the data feeds proxy's feed accounts, which readers integrate with. The store is the proxy's
+//! one trusted writer (its `feed_writer` PDA).
+//!
+//! As on EVM, a feed is created by its first report from a workflow on the store's default list;
+//! here the rent comes from a vault the store holds. A data ID can also be linked to an existing DF1
+//! feed account, which the store then keeps written through DF1's `submit`, checking first everything
+//! that could make `submit` fail. SVR data IDs are reserved in the data ID layout, not supported yet.
+//! Events are CPI events.
 
 pub mod common;
 pub mod context;
 pub mod data_id;
+pub mod df1;
 pub mod error;
 pub mod event;
 pub mod instructions;
-pub mod logic;
 pub mod state;
 pub mod utils;
 
 use anchor_lang::prelude::*;
 
 use context::*;
+pub use instructions::admin::StoreConfig;
 use instructions::*;
-use state::{CallbackConfigArgs, ReaderRound, WorkflowMetadata};
+use state::WorkflowMetadata;
 
 declare_id!("9qCsUGTdKCanybkroJuPzAhuRU8P2SZN4NCexevSZAwu");
 
@@ -33,19 +39,9 @@ pub mod data_feeds_store {
     // ================================================================
 
     /// Create a store in a pre-created state account, signed by the program's upgrade authority,
-    /// which becomes the store's owner. `feed_admins` must be strictly increasing.
-    pub fn initialize(
-        ctx: Context<Initialize>,
-        feed_admins: Vec<Pubkey>,
-        default_max_stored_reports: u64,
-        max_observation_forward_secs: u32,
-    ) -> Result<()> {
-        admin::initialize(
-            ctx,
-            feed_admins,
-            default_max_stored_reports,
-            max_observation_forward_secs,
-        )
+    /// which becomes the store's owner.
+    pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
+        admin::initialize(ctx, config)
     }
 
     /// Step 1 of 2: propose a new owner.
@@ -67,22 +63,12 @@ pub mod data_feeds_store {
         admin::set_feed_admin(ctx, feed_admin, is_admin)
     }
 
-    /// Allow or disallow a program as a report callback. Its allowlist entry PDA
-    /// `[CALLBACK_PROGRAM_SEED, state, callback_program]` is created on first use.
-    pub fn set_callback_program_allowed(
-        ctx: Context<SetCallbackProgramAllowed>,
-        callback_program: Pubkey,
-        allowed: bool,
-    ) -> Result<()> {
-        admin::set_callback_program_allowed(ctx, callback_program, allowed)
-    }
-
     /// Recover SPL tokens held by token accounts of the store authority PDA.
     pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
         admin::recover_tokens(ctx, amount)
     }
 
-    /// Recover native SOL sent to the store authority PDA.
+    /// Recover native SOL from the vault (the store authority PDA).
     pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
         admin::recover_native(ctx, amount)
     }
@@ -107,78 +93,87 @@ pub mod data_feeds_store {
         admin::set_max_observation_forward_duration(ctx, max_observation_forward_secs)
     }
 
-    /// Create feed accounts with their descriptions, empty for none (remaining accounts: feed
-    /// PDAs).
-    pub fn init_feeds<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-        data_ids: Vec<[u8; 16]>,
-        descriptions: Vec<String>,
-    ) -> Result<()> {
-        feeds::init_feeds(ctx, data_ids, descriptions)
-    }
-
-    /// Set ring sizes (remaining accounts: feed PDAs).
-    pub fn set_max_stored_reports<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-        data_ids: Vec<[u8; 16]>,
-        max_stored_reports: Vec<u64>,
-    ) -> Result<()> {
-        feeds::set_max_stored_reports(ctx, data_ids, max_stored_reports)
-    }
-
-    /// Set accepted answer ranges (remaining accounts: feed PDAs).
-    pub fn set_min_max_answers<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
-        data_ids: Vec<[u8; 16]>,
-        min_answers: Vec<i128>,
-        max_answers: Vec<i128>,
-    ) -> Result<()> {
-        feeds::set_min_max_answers(ctx, data_ids, min_answers, max_answers)
-    }
-
-    /// Set feed-specific workflow metadata (remaining accounts: feed PDAs).
+    /// Set feed-specific workflow metadata (remaining accounts: feed configs).
     pub fn set_specific_feed_metadata<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
         workflow_metadata: Vec<WorkflowMetadata>,
     ) -> Result<()> {
         settings::set_specific_feed_metadata(ctx, data_ids, workflow_metadata)
     }
 
-    /// Remove feed-specific workflow metadata (remaining accounts: feed PDAs).
+    /// Remove feed-specific workflow metadata (remaining accounts: feed configs).
     pub fn remove_specific_feed_metadata<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
     ) -> Result<()> {
         settings::remove_specific_feed_metadata(ctx, data_ids)
     }
 
-    /// Configure report callbacks (remaining accounts: feed PDAs, then the program account and
-    /// allowlist entry of every enabled callback).
-    pub fn set_report_callback_configs<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+    /// Set accepted answer ranges (remaining accounts: feed configs).
+    pub fn set_min_max_answers<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
         data_ids: Vec<[u8; 16]>,
-        callbacks: Vec<CallbackConfigArgs>,
+        min_answers: Vec<i128>,
+        max_answers: Vec<i128>,
     ) -> Result<()> {
-        settings::set_report_callback_configs(ctx, data_ids, callbacks)
+        settings::set_min_max_answers(ctx, data_ids, min_answers, max_answers)
     }
 
-    /// Set feed descriptions, empty to clear (remaining accounts: feed PDAs).
+    /// Disable or enable writes of feeds for every workflow (remaining accounts: feed configs).
+    pub fn set_feed_writes_disabled<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+        data_ids: Vec<[u8; 16]>,
+        disabled: bool,
+    ) -> Result<()> {
+        settings::set_feed_writes_disabled(ctx, data_ids, disabled)
+    }
+
+    /// Link data IDs to the DF1 feeds this store keeps written (remaining accounts: feed configs,
+    /// then each linked DF1 feed).
+    pub fn set_df1_feeds<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminConfigs<'info>>,
+        data_ids: Vec<[u8; 16]>,
+        df1_feeds: Vec<Pubkey>,
+        write_disabled: Vec<bool>,
+    ) -> Result<()> {
+        settings::set_df1_feeds(ctx, data_ids, df1_feeds, write_disabled)
+    }
+
+    /// Set feed descriptions, empty to clear (remaining accounts: proxy feeds).
     pub fn set_feed_descriptions<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminProxy<'info>>,
         data_ids: Vec<[u8; 16]>,
         descriptions: Vec<String>,
     ) -> Result<()> {
-        descriptions::set_feed_descriptions(ctx, data_ids, descriptions)
+        proxy_settings::set_feed_descriptions(ctx, data_ids, descriptions)
+    }
+
+    /// Freeze or unfreeze reads of feeds (remaining accounts: proxy feeds).
+    pub fn set_feed_frozen<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminProxy<'info>>,
+        data_ids: Vec<[u8; 16]>,
+        frozen: bool,
+    ) -> Result<()> {
+        proxy_settings::set_feed_frozen(ctx, data_ids, frozen)
+    }
+
+    /// Grow the number of rounds feeds keep (remaining accounts: proxy feeds).
+    pub fn set_max_stored_reports<'info>(
+        ctx: Context<'_, '_, 'info, 'info, FeedAdminProxy<'info>>,
+        data_ids: Vec<[u8; 16]>,
+        max_stored_reports: Vec<u64>,
+    ) -> Result<()> {
+        proxy_settings::set_max_stored_reports(ctx, data_ids, max_stored_reports)
     }
 
     // ================================================================
     // │                         Reports                              │
     // ================================================================
 
-    /// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`, remaining accounts are one
-    /// group per report: the feed of its data ID, then the callback program, its callback authority
-    /// PDA and the configured accounts when a callback is configured.
+    /// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`. Remaining accounts are one
+    /// group per report: the data ID's proxy feed, its feed config, then the linked DF1 feed when
+    /// the feed config has one.
     pub fn on_report<'info>(
         ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
         metadata: Vec<u8>,
@@ -188,41 +183,8 @@ pub mod data_feeds_store {
     }
 
     // ================================================================
-    // │                    Reader interface                          │
+    // │                          Reads                               │
     // ================================================================
-
-    /// Latest round of a data ID, answer with 18 decimals.
-    pub fn get_latest_round(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<ReaderRound> {
-        reads::get_latest_round(ctx, data_id)
-    }
-
-    /// Latest rounds of up to 31 data IDs (remaining accounts: their feeds), answers with 18
-    /// decimals. A feed without a report yields round ID 0.
-    pub fn get_latest_rounds<'info>(
-        ctx: Context<'_, '_, 'info, 'info, FeedsRead<'info>>,
-        data_ids: Vec<[u8; 16]>,
-    ) -> Result<Vec<ReaderRound>> {
-        reads::get_latest_rounds(ctx, data_ids)
-    }
-
-    /// A stored round of a data ID, answer with 18 decimals.
-    pub fn get_round(
-        ctx: Context<FeedRead>,
-        data_id: [u8; 16],
-        round_id: u64,
-    ) -> Result<ReaderRound> {
-        reads::get_round(ctx, data_id, round_id)
-    }
-
-    /// Decimals reports are stored with.
-    pub fn get_decimals(ctx: Context<FeedsRead>, data_id: [u8; 16]) -> Result<u8> {
-        reads::get_decimals(ctx, data_id)
-    }
-
-    /// Description of the feed of a data ID, empty when none is set.
-    pub fn get_description(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<String> {
-        reads::get_description(ctx, data_id)
-    }
 
     /// Whether a workflow may write a data ID.
     pub fn check_feed_permission(

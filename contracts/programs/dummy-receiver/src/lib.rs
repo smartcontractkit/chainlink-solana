@@ -57,33 +57,6 @@ pub mod dummy_receiver {
     //     Ok(())
     // }
 
-    // as a mock data feeds store report callback, rejects negative answers
-    pub fn on_report_callback(
-        _ctx: Context<OnReportCallback>,
-        args: OnReportCallbackArgs,
-    ) -> Result<bool> {
-        emit!(CallbackCalled {
-            data_id: args.data_id,
-            round_id: args.round_id,
-            answer: args.answer,
-        });
-        Ok(args.answer >= 0)
-    }
-
-    // as a mock data feeds store reader (the reader interface a proxy calls), answers 42 with 18
-    // decimals for any data ID and round
-    pub fn get_latest_round(_ctx: Context<MockRead>, _data_id: [u8; 16]) -> Result<ReaderRound> {
-        Ok(mock_round(1))
-    }
-
-    pub fn get_round(
-        _ctx: Context<MockRead>,
-        _data_id: [u8; 16],
-        round_id: u64,
-    ) -> Result<ReaderRound> {
-        Ok(mock_round(round_id))
-    }
-
     // as a mock legacy store
     pub fn cache_submit(ctx: Context<CacheSubmit>, rounds: Vec<CacheTransmission>) -> Result<()> {
         // // just assume that ctx.remaining_accounts[0] is the LatestCacheSubmission account
@@ -197,53 +170,4 @@ pub struct Submit {
 pub struct CacheTransmission {
     pub timestamp: u32,
     pub answer: u128,
-}
-
-#[derive(Accounts)]
-pub struct OnReportCallback<'info> {
-    pub authority: Signer<'info>,
-}
-
-// mirrors data_feeds_store::state::OnReportCallbackArgs
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct OnReportCallbackArgs {
-    pub data_id: [u8; 16],
-    pub round_id: u64,
-    pub answer: i128,
-    pub decimals: u8,
-    pub observations_timestamp: u32,
-    pub recorded_timestamp: u32,
-}
-
-#[event]
-pub struct CallbackCalled {
-    pub data_id: [u8; 16],
-    pub round_id: u64,
-    pub answer: i128,
-}
-
-fn mock_round(round_id: u64) -> ReaderRound {
-    ReaderRound {
-        round_id,
-        answer: 42_000_000_000_000_000_000,
-        observations_timestamp: 1_000,
-        recorded_timestamp: 1_001,
-    }
-}
-
-#[derive(Accounts)]
-pub struct MockRead<'info> {
-    /// CHECK: unused by the mock
-    pub state: UncheckedAccount<'info>,
-    /// CHECK: unused by the mock
-    pub feed: UncheckedAccount<'info>,
-}
-
-// mirrors data_feeds_store::state::ReaderRound
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ReaderRound {
-    pub round_id: u64,
-    pub answer: i128,
-    pub observations_timestamp: u32,
-    pub recorded_timestamp: u32,
 }

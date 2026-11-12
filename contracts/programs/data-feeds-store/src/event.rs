@@ -1,19 +1,21 @@
-//! Events mirror the EVM `DataFeedsStore`, each also carries the store state account. They are
-//! emitted as CPI events (`emit_cpi!`): a self-invoke the event authority PDA signs, carried in the
-//! transaction's inner instructions, so they cannot be lost to log truncation when one `on_report`
-//! applies many reports. `InvalidDataIdIgnored`, `FeedNotInitializedIgnored` and
-//! `CallbackProgramAllowedSet` have no EVM counterpart: the EVM store creates feed storage on first
-//! write and needs no callback allowlist.
+//! Events mirror the EVM `DataFeedsStore` where it has them, each also carries the store state
+//! account. They are emitted as CPI events: a self-invoke the event authority PDA signs, carried in
+//! the transaction's inner instructions, so they cannot be lost to log truncation when one
+//! `on_report` applies many reports. Feed changes the store makes through the proxy are reported
+//! here: the proxy emits no events for them.
 
 use anchor_lang::prelude::*;
 
-use crate::state::{CallbackAccount, WorkflowMetadata};
+use crate::state::{Df1SkipReason, FeedCreationSkipReason, WorkflowMetadata};
 
 #[event]
 pub struct StoreInitialized {
     pub state: Pubkey,
     pub default_max_stored_reports: u64,
     pub max_observation_forward_secs: u32,
+    pub proxy_program: Pubkey,
+    pub proxy_state: Pubkey,
+    pub df1_program: Pubkey,
 }
 
 #[event]
@@ -62,10 +64,12 @@ pub struct MaxObservationForwardDurationSecondsUpdated {
     pub new_duration: u32,
 }
 
+/// Feeds' proxy accounts were created, by their first report or a feed admin setting. One event per
+/// instruction: a transaction carries at most 64 instructions, events and inner calls included.
 #[event]
-pub struct FeedInitialized {
+pub struct FeedsCreated {
     pub state: Pubkey,
-    pub data_id: [u8; 16],
+    pub data_ids: Vec<[u8; 16]>,
     pub max_stored_reports: u64,
 }
 
@@ -91,14 +95,29 @@ pub struct FeedDescriptionSet {
     pub description: String,
 }
 
+/// Reads of the feed were frozen or unfrozen.
 #[event]
-pub struct ReportCallbackConfigSet {
+pub struct FeedFrozenSet {
     pub state: Pubkey,
     pub data_id: [u8; 16],
-    pub previous_program: Pubkey,
-    pub current_program: Pubkey,
-    pub accounts: Vec<CallbackAccount>,
-    pub revert_on_failure: bool,
+    pub frozen: bool,
+}
+
+/// Writes of the feed were disabled or enabled.
+#[event]
+pub struct FeedWritesDisabledSet {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+    pub disabled: bool,
+}
+
+/// The DF1 feed kept written with a data ID's rounds, default for none.
+#[event]
+pub struct Df1FeedSet {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+    pub df1_feed: Pubkey,
+    pub write_disabled: bool,
 }
 
 #[event]
@@ -153,16 +172,25 @@ pub struct FeedUpdated {
     pub answer: i128,
 }
 
+/// A round was stored without writing the data ID's DF1 feed.
 #[event]
-pub struct ReportCallbackRejected {
+pub struct Df1WriteSkipped {
     pub state: Pubkey,
     pub data_id: [u8; 16],
-    pub round_id: u64,
-    pub answer: i128,
+    pub df1_feed: Pubkey,
+    pub reason: Df1SkipReason,
 }
 
-/// The skip events carry the sender: they are emitted before the permission check, so anyone can
-/// cause them, and indexers must not take them as coming from a forwarder.
+/// A permitted report for a new data ID was skipped because its feed could not be created.
+#[event]
+pub struct FeedCreationSkipped {
+    pub state: Pubkey,
+    pub data_id: [u8; 16],
+    pub reason: FeedCreationSkipReason,
+}
+
+/// The skip events below carry the sender: they are emitted before the permission check, so anyone
+/// can cause them, and indexers must not take them as coming from a forwarder.
 #[event]
 pub struct InvalidDataIdIgnored {
     pub state: Pubkey,
@@ -171,17 +199,10 @@ pub struct InvalidDataIdIgnored {
 }
 
 #[event]
-pub struct FeedNotInitializedIgnored {
+pub struct FeedWritesDisabledIgnored {
     pub state: Pubkey,
     pub data_id: [u8; 16],
     pub sender: Pubkey,
-}
-
-#[event]
-pub struct CallbackProgramAllowedSet {
-    pub state: Pubkey,
-    pub program: Pubkey,
-    pub allowed: bool,
 }
 
 #[cfg(test)]
@@ -221,28 +242,6 @@ mod tests {
             state,
             data_id: id,
             description: description.to_string(),
-        };
-        assert_eq!(manual, event.data());
-
-        let accounts = vec![CallbackAccount {
-            pubkey: Pubkey::new_unique(),
-            is_writable: true,
-        }];
-        let (previous, current) = (Pubkey::new_unique(), Pubkey::new_unique());
-        let mut manual = ReportCallbackConfigSet::DISCRIMINATOR.to_vec();
-        state.serialize(&mut manual).unwrap();
-        id.serialize(&mut manual).unwrap();
-        previous.serialize(&mut manual).unwrap();
-        current.serialize(&mut manual).unwrap();
-        accounts.as_slice().serialize(&mut manual).unwrap();
-        true.serialize(&mut manual).unwrap();
-        let event = ReportCallbackConfigSet {
-            state,
-            data_id: id,
-            previous_program: previous,
-            current_program: current,
-            accounts,
-            revert_on_failure: true,
         };
         assert_eq!(manual, event.data());
     }
