@@ -48,11 +48,8 @@ func TestNewBoundedSlice_RejectsOversizedLengthWithoutAllocating(t *testing.T) {
 
 			_, _, err = codec.Decode(oversizedLengthPrefix)
 
-			// The error identifies which code path ran, so it also establishes that
-			// nothing was allocated. encodings.slice.Decode returns as soon as the
-			// size codec errors, so only the bound can produce this message; an
-			// unbounded codec reaches reflect.MakeSlice first and then fails in
-			// DecodeEach with "not enough bytes to decode type" instead.
+			// The size-codec error shows that the account bound rejected the
+			// prefix before the slice decoder could allocate any element storage.
 			require.ErrorContains(t, err, "exceeds the maximum")
 			require.ErrorContains(t, err, "2147483647")
 			require.ErrorContains(t, err, fmt.Sprintf("maximum of %d", tt.maxCount))
@@ -107,7 +104,7 @@ func TestNewBoundedSlice_AcceptsLengthAtLimit(t *testing.T) {
 	// proving the guard rejects on size rather than truncating valid payloads
 	atLimit := []byte{0x00, 0x00, 0xA0, 0x00, 0x01}
 	_, _, err = codec.Decode(atLimit)
-	require.ErrorContains(t, err, "not enough bytes")
+	require.ErrorContains(t, err, "exceeds remaining input")
 }
 
 func TestCheckElementCount(t *testing.T) {
@@ -124,4 +121,41 @@ func TestCheckElementCount(t *testing.T) {
 	require.ErrorContains(t, commoncodec.CheckElementCount(commoncodec.MaxAccountBytes, uint64Codec), "exceeds the maximum")
 	require.ErrorContains(t, commoncodec.CheckElementCount(-1, builder.Uint8()), "less than zero")
 	require.ErrorContains(t, commoncodec.CheckElementCount(1, nil), "must be non-nil")
+}
+
+func TestNewBoundedSlice_RejectsLengthExceedingRemainingInput(t *testing.T) {
+	t.Parallel()
+
+	builder := binary.LittleEndian()
+	codec, err := commoncodec.NewBoundedSlice(builder.Uint64(), builder)
+	require.NoError(t, err)
+
+	// 4 elements of 8 bytes need 32 bytes, only 16 follow the prefix
+	input := append([]byte{4, 0, 0, 0}, make([]byte, 16)...)
+	_, _, err = codec.Decode(input)
+	require.ErrorContains(t, err, "exceeds remaining input")
+
+	input = append([]byte{2, 0, 0, 0}, make([]byte, 16)...)
+	got, _, err := codec.Decode(input)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+}
+
+func TestNewBoundedString(t *testing.T) {
+	t.Parallel()
+
+	builder := binary.LittleEndian()
+	codec, err := commoncodec.NewBoundedString(builder)
+	require.NoError(t, err)
+
+	encoded, err := codec.Encode("foo", nil)
+	require.NoError(t, err)
+	require.Equal(t, []byte{3, 0, 0, 0, 'f', 'o', 'o'}, encoded)
+
+	got, _, err := codec.Decode(encoded)
+	require.NoError(t, err)
+	require.Equal(t, "foo", got)
+
+	_, _, err = codec.Decode([]byte{0xFF, 0xFF, 0xFF, 0x7F})
+	require.ErrorContains(t, err, "exceeds the maximum")
 }

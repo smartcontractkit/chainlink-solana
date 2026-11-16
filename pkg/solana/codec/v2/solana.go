@@ -2,7 +2,6 @@ package codecv2
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
@@ -252,7 +251,7 @@ func processFieldType(parentTypeName string, idlType idltype.IdlType, refs *code
 	// Use type switch for all types
 	switch t := idlType.(type) {
 	case *idltype.String:
-		return refs.builder.String(math.MaxUint32)
+		return solcommoncodec.NewBoundedString(refs.builder)
 	case *idltype.Bool:
 		return refs.builder.Bool(), nil
 	// integer types
