@@ -88,7 +88,7 @@ jobs:
         id: setup-postgres
         uses: smartcontractkit/.github/actions/setup-postgres@setup-postgres/v1
         with:
-          image-tag: "16-alpine"
+          image-tag: "16.15-alpine"
           tmpfs: "true"
 
       - name: Prepare Test Schema
