@@ -293,6 +293,9 @@ func (c *Client) GetTransaction(ctx context.Context, txHash solana.Signature) (t
 		version := MaxSupportTransactionVersion
 		return c.rpc.GetTransaction(ctx, txHash, &rpc.GetTransactionOpts{Encoding: solana.EncodingBase64, Commitment: c.commitment, MaxSupportedTransactionVersion: &version})
 	})
+	if err != nil {
+		return nil, err
+	}
 	res, ok := v.(*rpc.GetTransactionResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetTransactionResult{})
@@ -407,6 +410,9 @@ func (c *Client) LatestBlockhash(ctx context.Context) (result *rpc.GetLatestBloc
 	v, err, _ := c.requestGroup.Do("GetLatestBlockhash", func() (interface{}, error) {
 		return c.rpc.GetLatestBlockhash(ctx, c.commitment)
 	})
+	if err != nil {
+		return nil, err
+	}
 	res, ok := v.(*rpc.GetLatestBlockhashResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetLatestBlockhashResult{})
@@ -602,6 +608,9 @@ func (c *Client) GetBlock(ctx context.Context, slot uint64) (result *rpc.GetBloc
 			MaxSupportedTransactionVersion: &version,
 		})
 	})
+	if err != nil {
+		return nil, err
+	}
 	res, ok := v.(*rpc.GetBlockResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.GetBlockResult{})
@@ -624,6 +633,9 @@ func (c *Client) GetBlocksWithLimit(ctx context.Context, startSlot uint64, limit
 	v, err, _ := c.requestGroup.Do(key, func() (interface{}, error) {
 		return c.rpc.GetBlocksWithLimit(ctx, startSlot, limit, c.commitment)
 	})
+	if err != nil {
+		return nil, err
+	}
 	res, ok := v.(*rpc.BlocksResult)
 	if !ok {
 		return nil, fmt.Errorf("result is unexpected type %T, expected %T", v, &rpc.BlocksResult{})
