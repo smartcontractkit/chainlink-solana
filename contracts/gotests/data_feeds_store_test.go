@@ -31,9 +31,8 @@ var (
 	testWorkflowOwner = [20]uint8{19: 11}
 )
 
-// TestDataFeedsStore reports through the forwarder into the data feeds store, which creates feeds
-// set by the feed admin, writes rounds into its feed accounts and keeps linked DF1 feeds
-// written. It pins the account layout a workflow has to produce and measures transaction size,
+// TestDataFeedsStore has the feed admin set feeds, then reports through the forwarder into the
+// data feeds store, which writes rounds into the feed accounts and keeps linked DF1 feeds written. It pins the account layout a workflow has to produce and measures transaction size,
 // compute and heap.
 func TestDataFeedsStore(t *testing.T) {
 	programIDs := map[string]string{
@@ -171,12 +170,10 @@ func TestDataFeedsStore(t *testing.T) {
 	newDF1Target := func(id [16]uint8) target {
 		legacy, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
+		// the DF1 feed's link marker, so no two data IDs link it
+		link := storePDA("df1_link", legacy.PublicKey().Bytes())
 		ix, err := data_feeds_store.NewSetDf1FeedsInstruction([][16]uint8{id}, []solana.PublicKey{legacy.PublicKey()}, []bool{false},
 			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
-		// the DF1 feed's link marker, so no two data IDs link it
-		link, _, err := solana.FindProgramAddress([][]byte{[]byte("df1_link"), storeState.PublicKey().Bytes(), legacy.PublicKey().Bytes()},
-			data_feeds_store.ProgramID)
-		require.NoError(t, err)
 		send([]solana.Instruction{
 			build(system.NewCreateAccountInstruction(df1Rent, df1Space, store.ProgramID, deployer.PublicKey(), legacy.PublicKey()).ValidateAndBuild()),
 			build(store.NewCreateFeedInstruction("ETH / USD", 8, 1, 1, legacy.PublicKey(), deployer.PublicKey())),
@@ -344,8 +341,7 @@ func TestDataFeedsStore(t *testing.T) {
 		"forwarder F=5, 1 report with DF1 write-through")
 	requireStored(df1Target, 2, observedAt+1)
 
-	// Readers call the store, or decode the feed account: at 18 decimals, and at 8 once a feed
-	// admin lowers the feed's minimum.
+	// Readers call the store: at 18 decimals, and at 8 once a feed admin lowers the feed's minimum.
 	simulateRound := func(label string, ix solana.Instruction) data_feeds_store.Round {
 		tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{}, solana.TransactionPayer(deployer.PublicKey()))
 		require.NoError(t, err)
@@ -407,6 +403,7 @@ func TestDataFeedsStore(t *testing.T) {
 	for i, n := range []int{1, 12, 20} {
 		sendReport(directIx(df1Targets[:n], observedAt+uint32(20+i)), fmt.Sprintf("direct on_report, %d reports with DF1 write-through", n))
 	}
+	requireStored(storeTargets[0], 3, observedAt+12)
 	requireStored(df1Targets[0], 3, observedAt+22)
 	// forwarder reports sized for a V1 transaction (4,096 bytes, no lookup table) at F=5
 	for _, c := range []struct {
@@ -419,13 +416,18 @@ func TestDataFeedsStore(t *testing.T) {
 		{df1Targets, "25 reports with DF1 write-through"},
 	} {
 		ix := reportIx(mainnetForwarder, mainnetAuthority, mainnetF, reportId+31, c.tgs, observedAt+30)
-		t.Logf("forwarder F=5, %s: %d bytes inline (V1 limit 4096), %d accounts", c.label,
-			legacyTxSize(t, deployer, ix), txAccountCount(deployer, ix))
+		size, accounts := legacyTxSize(t, deployer, ix), txAccountCount(deployer, ix)
+		t.Logf("forwarder F=5, %s: %d bytes inline (V1 limit %d), %d accounts", c.label, size, maxV1TxSize, accounts)
+		require.LessOrEqual(t, size, maxV1TxSize, "%s: %d bytes", c.label, size)
+		require.LessOrEqual(t, accounts, maxTxAccounts, "%s: %d accounts", c.label, accounts)
 	}
 }
 
 // maxTxAccounts is the mainnet limit on the accounts a transaction locks.
 const maxTxAccounts = 64
+
+// maxV1TxSize is the size limit of a V1 transaction, which carries every account inline.
+const maxV1TxSize = 4096
 
 // txAccountCount is the number of distinct accounts a transaction carrying ix with the relayer's
 // compute budget instructions locks: its accounts, its program, the payer and the compute budget

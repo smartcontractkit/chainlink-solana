@@ -1,18 +1,22 @@
-#![allow(deprecated)] // anchor-lang 0.31 #[program] macro uses AccountInfo::realloc
 //! Chainlink Data Feeds store for CRE: a Solana port of the EVM `DataFeedsStore` without SVR, and
 //! the program readers integrate with. Each data ID has a feed account holding its latest round, a
-//! circular buffer of its history, its description, how it is read (minimum decimals, a read freeze)
-//! and how it is written (its own workflows, answer bounds, a write freeze, a DF1 link). Readers pass
-//! that one account and either call a read here, as on Stellar's proxy, or decode it themselves.
+//! circular buffer of its history, its description, how it is read (minimum decimals, a read
+//! freeze) and how it is written (its own workflows, answer bounds, a write freeze, a DF1 link).
+//! Readers pass that account (with the store state) to a read here, as Stellar's proxy reads, or
+//! decode it themselves.
 //!
 //! Reports arrive from the keystone forwarder through `on_report` and are checked against the
 //! workflows permitted for their data ID (the feed's own, or the store's default ones), their
 //! ordering and their answer range. Feeds are set by a feed admin (`set_feeds` or any per-feed
-//! setter, the admin paying their rent): unlike on EVM, where a feed's storage is paid in gas on its
-//! first report, the forwarder passes no account that could pay for one. A data ID can also be
+//! setter, the admin paying their rent): unlike on EVM, where a feed's storage is paid in gas on
+//! its first report, the forwarder passes no account that could pay for one. A data ID can also be
 //! linked to an existing DF1 feed account, which the store then keeps written through DF1's
 //! `submit`, checking first everything that could make `submit` fail. SVR data IDs are reserved in
 //! the data ID layout, not supported yet. Events are CPI events.
+
+// anchor-lang 0.31's #[program] expansion calls AccountInfo::realloc, and it re-exports the
+// upgradeable loader (whose ProgramData `initialize` checks) only from a deprecated module.
+#![allow(deprecated)]
 
 pub mod common;
 pub mod context;
@@ -98,8 +102,9 @@ pub mod data_feeds_store {
     }
 
     /// Create feeds that don't exist yet and set their descriptions and, unless empty, their
-    /// workflows (remaining accounts: feeds). Every per-feed setter below also creates missing
-    /// feeds, the feed admin paying their rent.
+    /// workflows (remaining accounts: feeds). Every per-feed setter below but
+    /// `remove_specific_feed_metadata` also creates missing feeds, the feed admin paying their
+    /// rent.
     pub fn set_feeds<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -172,8 +177,11 @@ pub mod data_feeds_store {
         feeds::set_min_decimals(ctx, data_ids, min_decimals)
     }
 
-    /// Link data IDs to the DF1 feeds this store keeps written (remaining accounts: feeds, then
-    /// each linked DF1 feed).
+    /// Link data IDs to the DF1 feeds this store keeps written (the default key unlinks), and
+    /// enable or disable that write. A DF1 feed is linked from at most one data ID. Remaining
+    /// accounts: the feeds, then for each data ID in order: the link marker of its current DF1 feed
+    /// if the link changes away from it, then the new DF1 feed and its link marker if one is
+    /// linked.
     pub fn set_df1_feeds<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -242,7 +250,8 @@ pub mod data_feeds_store {
     }
 
     /// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it
-    /// is on the feed's own list or the default list. Takes the data ID's feed account.
+    /// is on the feed's own list or the default list. Takes the data ID's feed account; fails with
+    /// `InvalidDataId` for a zero or SVR data ID.
     pub fn check_feed_permission(
         ctx: Context<PermissionRead>,
         data_id: [u8; 16],

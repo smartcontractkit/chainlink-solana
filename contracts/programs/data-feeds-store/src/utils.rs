@@ -5,7 +5,6 @@ use anchor_lang::{
     solana_program::{
         instruction::{AccountMeta, Instruction},
         program::invoke_signed,
-        system_instruction,
     },
     Discriminator,
 };
@@ -13,7 +12,8 @@ use bytemuck::Pod;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, FEED_SEED, ZERO_ADDRESS, ZERO_NAME,
+        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, DF1_LINK_SEED, FEED_SEED,
+        MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_NAME,
     },
     data_id,
     error::StoreError,
@@ -36,18 +36,19 @@ pub fn create_pda_account<'info>(
     let current_lamports = to_account.lamports();
 
     if current_lamports == 0 {
-        invoke_signed(
-            &system_instruction::create_account(
-                payer.key,
-                to_account.key,
-                rent,
-                space as u64,
-                &crate::ID,
-            ),
-            &[payer.clone(), to_account.clone(), system_program.clone()],
-            &[seeds],
-        )?;
-        return Ok(());
+        return anchor_lang::system_program::create_account(
+            CpiContext::new(
+                system_program.clone(),
+                anchor_lang::system_program::CreateAccount {
+                    from: payer.clone(),
+                    to: to_account.clone(),
+                },
+            )
+            .with_signer(&[seeds]),
+            rent,
+            space as u64,
+            &crate::ID,
+        );
     }
 
     let required_lamports = rent.saturating_sub(current_lamports);
@@ -102,7 +103,7 @@ pub fn load_boxed<T: Pod + Discriminator>(info: &AccountInfo) -> Result<Box<T>> 
     Ok(value)
 }
 
-/// Whether an account was never created.
+/// Whether an account isn't created yet: system-owned with no data (it may hold lamports).
 pub fn is_uninitialized(info: &AccountInfo) -> bool {
     *info.owner == System::id() && info.data_is_empty()
 }
@@ -115,8 +116,17 @@ pub fn feed_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
     )
 }
 
+/// The link marker address of a DF1 feed under a store state, and its bump.
+pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[DF1_LINK_SEED, state.as_ref(), df1_feed.as_ref()],
+        &crate::ID,
+    )
+}
+
 /// Decode a feed header from a feed account's data, checking the discriminator, version, store
-/// state, data ID and that its ring fits. Shared by the program and readers decoding accounts.
+/// state, data ID and that its ring fits. Shared by the program and readers decoding accounts. Not
+/// the owner: callers must check the account belongs to this program.
 pub fn decode_feed_into(
     data: &[u8],
     state: &Pubkey,
@@ -267,7 +277,7 @@ impl<'info> EventEmitter<'info> {
 
     /// Emit an event whose fields `write` serializes in order, so large fields can be written from
     /// borrowed data instead of an owned copy per event. The bytes must match the event struct's
-    /// Borsh encoding (see the tests).
+    /// Borsh encoding (see the tests in `event.rs`).
     pub fn emit_with(
         &self,
         discriminator: &[u8],
@@ -298,6 +308,18 @@ pub fn verify_feed_admin(admin: &Signer, admins: &AccountList) -> Result<()> {
 
 pub fn validate_data_id(id: &[u8; 16]) -> Result<()> {
     require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
+    Ok(())
+}
+
+/// Check a workflow list: at most `MAX_WORKFLOW_METADATAS` entries, each valid.
+pub fn validate_workflows(workflow_metadata: &[WorkflowMetadata]) -> Result<()> {
+    require!(
+        workflow_metadata.len() <= MAX_WORKFLOW_METADATAS,
+        StoreError::MaxEntriesExceeded
+    );
+    for metadata in workflow_metadata.iter() {
+        validate_workflow_metadata(metadata)?;
+    }
     Ok(())
 }
 

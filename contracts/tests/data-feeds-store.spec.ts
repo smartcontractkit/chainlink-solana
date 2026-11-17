@@ -91,9 +91,9 @@ describe("data feeds store", function () {
       [Buffer.from("__event_authority")],
       programId
     )[0];
-  const eventAccounts = (programId = program.programId) => ({
-    eventAuthority: eventAuthority(programId),
-    program: programId,
+  const eventAccounts = () => ({
+    eventAuthority: eventAuthority(program.programId),
+    program: program.programId,
   });
   const meta = (pubkey: PublicKey, isWritable = true): AccountMeta => ({
     pubkey,
@@ -174,21 +174,35 @@ describe("data feeds store", function () {
     systemProgram: SystemProgram.programId,
     ...eventAccounts(),
   });
+  // a feed admin instruction, signed by the feed admin, with its remaining accounts
+  const asFeedAdmin = (
+    call: {
+      accountsStrict(accounts: ReturnType<typeof adminAccounts>): {
+        remainingAccounts(accounts: AccountMeta[]): {
+          signers(signers: Keypair[]): { rpc(): Promise<string> };
+        };
+      };
+    },
+    remaining: AccountMeta[]
+  ) =>
+    call
+      .accountsStrict(adminAccounts())
+      .remainingAccounts(remaining)
+      .signers([feedAdmin.keypair])
+      .rpc();
   const setFeeds = (
     ids: Buffer[],
     descriptions = ids.map(() => ""),
     workflows: ReturnType<typeof workflow>[] = []
   ) =>
-    program.methods
-      .setFeeds(
+    asFeedAdmin(
+      program.methods.setFeeds(
         ids.map((id) => Array.from(id)),
         descriptions,
         workflows
-      )
-      .accountsStrict(adminAccounts())
-      .remainingAccounts(ids.map((id) => meta(feedPda(id))))
-      .signers([feedAdmin.keypair])
-      .rpc();
+      ),
+      ids.map((id) => meta(feedPda(id)))
+    );
 
   // Fixed accounts after the forwarder's: the store state, the DF1 program and writer (the program
   // id when no report writes DF1), the event authority and program. Per report: the feed, then the
@@ -240,7 +254,7 @@ describe("data feeds store", function () {
     return result;
   };
 
-  // reads, as on Stellar's proxy
+  // reads through the store, at the caller's decimals
   const read = (id: Buffer) => ({ state: state.publicKey, feed: feedPda(id) });
   const readLatest = async (id: Buffer, decimals = 18) =>
     (await program.methods
@@ -249,6 +263,11 @@ describe("data feeds store", function () {
       .view())!;
   const latestAnswer = async (id: Buffer) =>
     (await readLatest(id)).answer as BN;
+  const getRound = async (id: Buffer, roundId: number, decimals = 18) =>
+    (await program.methods
+      .getRound(Array.from(id), new BN(roundId), decimals)
+      .accountsStrict(read(id))
+      .view())!;
   const exists = async (key: PublicKey) =>
     (await connection.getAccountInfo(key)) !== null;
 
@@ -334,7 +353,7 @@ describe("data feeds store", function () {
       assert.equal(s.defaultWorkflowMetadata.len.toNumber(), 1);
     });
 
-    it("lets only the upgrade authority create stores", async () => {
+    it("lets only the upgrade authority create stores, once", async () => {
       const other = Keypair.generate();
       await expectError(
         initializeStore(feedAdmin.keypair.publicKey, other.publicKey)
@@ -374,12 +393,9 @@ describe("data feeds store", function () {
       await expectError(setFeeds([zero]), "InvalidDataId");
       await expectError(setFeeds([withSvrPath(id, 1)]), "InvalidDataId");
       await expectError(
-        program.methods
-          .setFeeds([Array.from(id)], [""], [])
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(newDataId()))])
-          .signers([feedAdmin.keypair])
-          .rpc(),
+        asFeedAdmin(program.methods.setFeeds([Array.from(id)], [""], []), [
+          meta(feedPda(newDataId())),
+        ]),
         "AccountMismatch"
       );
     });
@@ -440,12 +456,10 @@ describe("data feeds store", function () {
         await check(feedPda(id)),
         "specific metadata replaces the default"
       );
-      await program.methods
-        .removeSpecificFeedMetadata([Array.from(id)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
+      await asFeedAdmin(
+        program.methods.removeSpecificFeedMetadata([Array.from(id)]),
+        [meta(feedPda(id))]
+      );
       assert.isTrue(await check(feedPda(id)), "back to the default");
     });
   });
@@ -509,14 +523,16 @@ describe("data feeds store", function () {
       await setFeeds([a, b]);
       const ts = nextTimestamp();
       await report([{ dataId: a, timestamp: ts, answer: new BN(1) }]);
-      await program.methods
-        .setMinMaxAnswers([Array.from(b)], [new BN(-10)], [new BN(10)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(b))])
-        .signers([feedAdmin.keypair])
-        .rpc();
+      await asFeedAdmin(
+        program.methods.setMinMaxAnswers(
+          [Array.from(b)],
+          [new BN(-10)],
+          [new BN(10)]
+        ),
+        [meta(feedPda(b))]
+      );
 
-      // two transactions: a legacy transaction fits fewer reports than the program takes
+      // two transactions: a 1,232-byte transaction fits fewer reports than the program takes
       const first = await report([
         {
           dataId: withSvrPath(newDataId(), 1),
@@ -576,12 +592,10 @@ describe("data feeds store", function () {
         { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
       ]);
       const disable = (disabled: boolean) =>
-        program.methods
-          .setFeedWritesDisabled([Array.from(id)], disabled)
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc();
+        asFeedAdmin(
+          program.methods.setFeedWritesDisabled([Array.from(id)], disabled),
+          [meta(feedPda(id))]
+        );
       await disable(true);
       let signature = await report([
         { dataId: id, timestamp: nextTimestamp(), answer: new BN(2) },
@@ -610,12 +624,9 @@ describe("data feeds store", function () {
         { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
       ]);
       const freeze = (frozen: boolean) =>
-        program.methods
-          .setFeedFrozen([Array.from(id)], frozen)
-          .accountsStrict(adminAccounts())
-          .remainingAccounts([meta(feedPda(id))])
-          .signers([feedAdmin.keypair])
-          .rpc();
+        asFeedAdmin(program.methods.setFeedFrozen([Array.from(id)], frozen), [
+          meta(feedPda(id)),
+        ]);
       await freeze(true);
       await expectError(readLatest(id), "FeedFrozen");
       await report([
@@ -628,14 +639,36 @@ describe("data feeds store", function () {
     it("grows a feed's history, before its ring wraps", async () => {
       const id = newDataId();
       await setFeeds([id]);
-      await program.methods
-        .setMaxStoredReports([Array.from(id)], [new BN(6)])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
+      const reportOne = (answer: number) =>
+        report([
+          { dataId: id, timestamp: nextTimestamp(), answer: new BN(answer) },
+        ]);
+      await reportOne(1);
+      await reportOne(2);
+      const grow = (ids: Buffer[], sizes: number[]) =>
+        asFeedAdmin(
+          program.methods.setMaxStoredReports(
+            ids.map((i) => Array.from(i)),
+            sizes.map((n) => new BN(n))
+          ),
+          ids.map((i) => meta(feedPda(i)))
+        );
+      await grow([id], [6]);
       const feed = await program.account.feed.fetch(feedPda(id));
       assert.equal(feed.maxStoredReports.toNumber(), 6);
+      assert.isTrue(
+        (await getRound(id, 1)).answer.eq(new BN(1)),
+        "earlier rounds stay readable"
+      );
+
+      // at most 10 KiB per instruction, from the account's length when the call started: a feed
+      // created in the call starts at 0, and a data ID listed twice grows from its first length
+      await expectError(grow([newDataId()], [300]), "InvalidMaxStoredReports");
+      await expectError(grow([id, id], [300, 600]), "InvalidMaxStoredReports");
+
+      // a ring of 6 holding round 6 has wrapped
+      for (let i = 3; i <= 6; i++) await reportOne(i);
+      await expectError(grow([id], [8]), "MaxStoredReportsLocked");
     });
 
     it("fails a report whose feed is passed read-only", async () => {
@@ -664,12 +697,9 @@ describe("data feeds store", function () {
       ]);
       await expectError(readLatest(id, 8), "InvalidDecimals");
       await expectError(readLatest(id, 19), "InvalidDecimals");
-      await program.methods
-        .setMinDecimals([Array.from(id)], 0)
-        .accountsStrict(adminAccounts())
-        .remainingAccounts([meta(feedPda(id))])
-        .signers([feedAdmin.keypair])
-        .rpc();
+      await asFeedAdmin(program.methods.setMinDecimals([Array.from(id)], 0), [
+        meta(feedPda(id)),
+      ]);
       assert.equal(
         await program.methods
           .getMinDecimals(Array.from(id))
@@ -776,12 +806,10 @@ describe("data feeds store", function () {
       if (!feed.equals(PublicKey.default)) {
         accounts.push(meta(feed, false), meta(df1Link(feed)));
       }
-      return program.methods
-        .setDf1Feeds([Array.from(id)], [feed], [disabled])
-        .accountsStrict(adminAccounts())
-        .remainingAccounts(accounts)
-        .signers([feedAdmin.keypair])
-        .rpc();
+      return asFeedAdmin(
+        program.methods.setDf1Feeds([Array.from(id)], [feed], [disabled]),
+        accounts
+      );
     };
     const skipReason = async (signature: string) =>
       (await cpiEvents(signature)).find((e) => e.name === "df1WriteSkipped")

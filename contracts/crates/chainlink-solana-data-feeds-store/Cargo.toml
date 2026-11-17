@@ -6,11 +6,7 @@ edition = "2021"
 license = "MIT"
 
 [lib]
-crate-type = ["cdylib", "lib"]
 name = "chainlink_solana_data_feeds_store"
-
-[features]
-default = []
 
 [dependencies]
 anchor-lang = "0.31.0"

@@ -27,13 +27,17 @@ pub enum StoreError {
     InvalidAccount,
     #[msg("feed has no specific workflow metadata")]
     FeedNotConfigured,
-    #[msg("max stored reports must be at least 2 and fit in one account")]
+    #[msg(
+        "max stored reports must be at least 2 and grow a feed by at most 10 KiB per instruction"
+    )]
     InvalidMaxStoredReports,
     #[msg("max stored reports can only increase")]
     MaxStoredReportsNotIncreased,
     #[msg("max stored reports can only change before the ring wraps")]
     MaxStoredReportsLocked,
     #[msg("max stored reports must exceed the latest round id")]
+    /// No longer returned: growing the ring before it wraps always exceeds the latest round.
+    /// Kept so the error codes after it don't change.
     MaxStoredReportsTooLow,
     #[msg("min answer exceeds max answer")]
     InvalidMinMaxRange,
@@ -53,7 +57,7 @@ pub enum StoreError {
     InsufficientBalance,
     #[msg("account has an unsupported version")]
     InvalidAccountVersion,
-    #[msg("The signer is unauthorized")]
+    #[msg("the signer is unauthorized")]
     Unauthorized,
     #[msg("not a DF1 feed this store can write")]
     InvalidDf1Feed,

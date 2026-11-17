@@ -1,4 +1,4 @@
-//! Reads, as Stellar's proxy reader: the caller passes the data ID and the decimals it wants. Feed
+//! Reads, as Stellar's proxy reads: the caller passes the data ID and the decimals it wants. Feed
 //! accounts are public too, so readers can also decode them without a call (see the
 //! `chainlink-solana-data-feeds-store` crate); these instructions are for those who'd rather call.
 
@@ -10,10 +10,9 @@ use crate::{
     data_id,
     error::StoreError,
     logic::{self, ScaleError, StoredRound},
-    state::{Feed, Round, StoreState, WorkflowMetadata},
+    state::{Feed, Round, WorkflowMetadata},
     utils::{
-        decode_description, feed_address, has_permission, is_uninitialized, load_boxed,
-        load_feed_into, RingRef,
+        decode_description, feed_address, has_permission, is_uninitialized, load_feed_into, RingRef,
     },
 };
 
@@ -26,7 +25,8 @@ impl From<ScaleError> for StoreError {
     }
 }
 
-/// A stored round at `decimals`, refusing a frozen feed and decimals below its minimum.
+/// A stored round at `decimals`, refusing a frozen feed, decimals outside the feed's minimum to 18,
+/// and a non-zero answer that would read as zero.
 pub fn to_round(feed: &Feed, round: StoredRound, decimals: u8) -> Result<Round> {
     require!(feed.frozen == 0, StoreError::FeedFrozen);
     logic::check_decimals(decimals, feed.min_decimals).map_err(StoreError::from)?;
@@ -97,7 +97,7 @@ pub fn check_feed_permission(
     data_id: [u8; 16],
     workflow_metadata: WorkflowMetadata,
 ) -> Result<bool> {
-    // a data ID the store doesn't serve can't be written, whatever the metadata says
+    // refuse, rather than answer for, a data ID the store doesn't serve
     require!(
         data_id::is_valid_data_id(&data_id),
         StoreError::InvalidDataId
@@ -110,7 +110,7 @@ pub fn check_feed_permission(
         require_keys_eq!(address, *feed_info.key, StoreError::AccountMismatch);
         return Ok(false);
     }
-    let state: Box<StoreState> = load_boxed(&state_info)?;
+    let state = ctx.accounts.state.load()?;
     let mut feed: Box<Feed> = bytemuck::zeroed_box();
     load_feed_into(&feed_info, state_info.key, &data_id, &mut feed)?;
     Ok(has_permission(

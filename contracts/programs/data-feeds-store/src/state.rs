@@ -37,8 +37,9 @@ pub struct StoreState {
 }
 
 /// One feed: its latest round, how it is read and how it is written, followed in the account by a
-/// circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` at slot `r % max_stored_reports`.
-/// This is the account readers pass, and its layout is public: fields only move with a version bump.
+/// circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` at slot `r %
+/// max_stored_reports`. This is the account readers pass, and its layout is public: fields only
+/// move with a version bump.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Feed {
@@ -99,8 +100,8 @@ pub fn feed_account_len(max_stored_reports: u64) -> usize {
 }
 
 /// Marks which data ID links a DF1 feed (PDA `["df1_link", state, df1_feed]`), so two data IDs can
-/// never both write it. Created on the DF1 feed's first link and cleared (zero data ID) when the link
-/// is removed. Reports never read it.
+/// never both write it. Created on the DF1 feed's first link and cleared (zero data ID) when the
+/// link is removed. Reports never read it.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Df1Link {
@@ -146,7 +147,8 @@ arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
 #[zero_copy]
 #[derive(InitSpace, BorshSerialize, BorshDeserialize, PartialEq, Eq, Debug)]
 pub struct WorkflowMetadata {
-    /// Address allowed to send new reports, the forwarder authority PDA of this store
+    /// Address allowed to send reports: a forwarder's authority PDA for this program,
+    /// `["forwarder", forwarder_state, program ID]`, shared by every store state of the program
     pub allowed_sender: Pubkey,
     pub allowed_workflow_owner: [u8; 20],
     pub allowed_workflow_name: [u8; 10],
@@ -198,7 +200,7 @@ pub struct Round {
 /// What a store is created with.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct StoreConfig {
-    /// Strictly increasing
+    /// At most 64, strictly increasing (else `InvalidAddress`), which also refuses the default key
     pub feed_admins: Vec<Pubkey>,
     /// Ring size of the feeds the store creates
     pub default_max_stored_reports: u64,

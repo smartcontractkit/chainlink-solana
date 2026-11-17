@@ -15,8 +15,8 @@
 pub type DataId = [u8; 16];
 
 /// A data ID as accounts store it and derive their addresses from: zero padded to 32 bytes. Data
-/// IDs are 16 bytes on the wire, in events and in callback arguments (as on EVM), accounts are
-/// keyed on 32 bytes so a wider data ID format later keeps every existing account address.
+/// IDs are 16 bytes on the wire and in events (as on EVM); accounts are keyed on 32 bytes so a
+/// wider data ID format later keeps every existing account address.
 pub type DataIdSeed = [u8; 32];
 
 const SVR_PATH: std::ops::Range<usize> = 9..11;
@@ -25,7 +25,7 @@ pub fn is_zero(data_id: &DataId) -> bool {
     *data_id == [0; 16]
 }
 
-/// The 32-byte account key of a data ID: the data ID followed by 16 zero bytes.
+/// The 32-byte PDA seed of a data ID: the data ID followed by 16 zero bytes.
 pub fn to_seed(data_id: &DataId) -> DataIdSeed {
     let mut seed = [0u8; 32];
     seed[..16].copy_from_slice(data_id);
@@ -82,10 +82,13 @@ mod tests {
     fn reserved_bytes_are_part_of_the_id() {
         let a = id(FEED, 0, [0, 0], 0, [0; 4]);
         let b = id(FEED, 0, [0, 0], 0, [0, 0, 0, 1]);
-        assert_ne!(
-            a, b,
-            "two IDs differing only in the reserved bytes are distinct"
-        );
         assert!(is_valid_data_id(&a) && is_valid_data_id(&b));
+        // separate feeds: different seeds, so different feed accounts
+        assert_ne!(to_seed(&a), to_seed(&b));
+        let state = anchor_lang::prelude::Pubkey::new_unique();
+        assert_ne!(
+            crate::utils::feed_address(&state, &a),
+            crate::utils::feed_address(&state, &b)
+        );
     }
 }

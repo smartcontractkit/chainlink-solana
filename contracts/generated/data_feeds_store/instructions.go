@@ -50,7 +50,7 @@ func NewAcceptOwnershipInstruction(
 }
 
 // Builds a "check_feed_permission" instruction.
-// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it // is on the feed's own list or the default list. Takes the data ID's feed account.
+// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it // is on the feed's own list or the default list. Takes the data ID's feed account; fails with // `InvalidDataId` for a zero or SVR data ID.
 func NewCheckFeedPermissionInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -681,7 +681,7 @@ func NewSetDefaultFeedMetadataInstruction(
 }
 
 // Builds a "set_df1_feeds" instruction.
-// Link data IDs to the DF1 feeds this store keeps written (remaining accounts: feeds, then // each linked DF1 feed).
+// Link data IDs to the DF1 feeds this store keeps written (the default key unlinks), and // enable or disable that write. A DF1 feed is linked from at most one data ID. Remaining // accounts: the feeds, then for each data ID in order: the link marker of its current DF1 feed // if the link changes away from it, then the new DF1 feed and its link marker if one is // linked.
 func NewSetDf1FeedsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -974,7 +974,7 @@ func NewSetFeedWritesDisabledInstruction(
 }
 
 // Builds a "set_feeds" instruction.
-// Create feeds that don't exist yet and set their descriptions and, unless empty, their // workflows (remaining accounts: feeds). Every per-feed setter below also creates missing // feeds, the feed admin paying their rent.
+// Create feeds that don't exist yet and set their descriptions and, unless empty, their // workflows (remaining accounts: feeds). Every per-feed setter below but // `remove_specific_feed_metadata` also creates missing feeds, the feed admin paying their // rent.
 func NewSetFeedsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,

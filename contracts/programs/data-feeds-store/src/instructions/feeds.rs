@@ -1,6 +1,7 @@
 //! Feed admin settings of data IDs (remaining accounts: their feed PDAs, in order). A feed that
 //! doesn't exist yet is created first, the feed admin paying its rent: on Solana a feed is set by a
-//! feed admin, as on Aptos and Stellar, since the forwarder passes no account that could pay for it.
+//! feed admin, as on Aptos and Stellar, since the forwarder passes no account that could pay for
+//! it.
 
 use std::mem::size_of;
 
@@ -9,7 +10,7 @@ use anchor_lang::{prelude::*, Discriminator};
 use crate::{
     common::{
         ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_LINK_SEED, FEED_SEED, MAX_ACCOUNT_DATA_INCREASE,
-        MAX_WORKFLOW_METADATAS, STORED_DECIMALS,
+        STORED_DECIMALS,
     },
     context::FeedAdminAccounts,
     data_id, df1,
@@ -18,9 +19,9 @@ use crate::{
     logic::{check_max_stored_reports, MaxStoredReportsError},
     state::{feed_account_len, Df1Link, Feed, WorkflowMetadata},
     utils::{
-        create_pda_account, encode_description, feed_address, is_uninitialized, load_feed_into,
-        next_account, store_feed, validate_data_id, validate_workflow_metadata, verify_feed_admin,
-        EventEmitter,
+        create_pda_account, df1_link_address, encode_description, feed_address, is_uninitialized,
+        load_feed_into, next_account, store_feed, validate_data_id, validate_workflows,
+        verify_feed_admin, EventEmitter,
     },
 };
 
@@ -73,6 +74,8 @@ fn update_feeds<'info>(
         f(i, id, &mut feed, &events)?;
         store_feed(info, &feed)?;
     }
+    // one event for every feed created, after the per-feed ones: each event is an instruction, and
+    // a transaction holds at most 64
     if !created.is_empty() {
         events.emit(&FeedsCreated {
             state: state_key,
@@ -105,17 +108,6 @@ fn set_specific(
         workflow_metadata.serialize(data)?;
         Ok(())
     })
-}
-
-fn validate_workflows(workflow_metadata: &[WorkflowMetadata]) -> Result<()> {
-    require!(
-        workflow_metadata.len() <= MAX_WORKFLOW_METADATAS,
-        StoreError::MaxEntriesExceeded
-    );
-    for metadata in workflow_metadata.iter() {
-        validate_workflow_metadata(metadata)?;
-    }
-    Ok(())
 }
 
 /// FeedDescriptionSet, written from the borrowed description instead of a copy.
@@ -295,7 +287,8 @@ pub fn set_feed_writes_disabled<'info>(
     )
 }
 
-/// Freeze or unfreeze reads of feeds: frozen feeds refuse reads, writes continue.
+/// Freeze or unfreeze round reads of feeds: frozen feeds refuse `latest_round` and `get_round`,
+/// their description and decimals stay readable, and writes continue.
 pub fn set_feed_frozen<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -341,11 +334,11 @@ pub fn set_min_decimals<'info>(
 }
 
 /// Link data IDs to the DF1 feeds this store keeps written with their rounds (default pubkey
-/// unlinks), and enable or disable that write. A DF1 feed is linked from at most one data ID: it has a
-/// marker PDA `["df1_link", state, df1_feed]` holding the data ID that links it, created on its first
-/// link (the feed admin paying, about 0.001 SOL) and cleared, not closed, when the link is removed.
-/// Reports never read the marker. Moving a DF1 feed between data IDs in one call needs the unlink
-/// first.
+/// unlinks), and enable or disable that write. A DF1 feed is linked from at most one data ID: it
+/// has a marker PDA `["df1_link", state, df1_feed]` holding the data ID that links it, created on
+/// its first link (the feed admin paying, about 0.001 SOL) and cleared, not closed, when the link
+/// is removed. Reports never read the marker. Moving a DF1 feed between data IDs in one call needs
+/// the unlink first.
 ///
 /// Remaining accounts: the feeds, then for each data ID in order: the marker of its current DF1
 /// feed if the link changes away from it, then the new DF1 feed and its marker if one is linked.
@@ -483,14 +476,6 @@ fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
     Ok(link.data_id)
 }
 
-/// The link marker address of a DF1 feed under a store state, and its bump.
-pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[DF1_LINK_SEED, state.as_ref(), df1_feed.as_ref()],
-        &crate::ID,
-    )
-}
-
 /// Grow the number of rounds feeds keep: only up, only before a feed's ring wraps, by at most 10KiB
 /// (320 rounds) per feed per instruction. The feed admin tops up the rent.
 pub fn set_max_stored_reports<'info>(
@@ -508,19 +493,21 @@ pub fn set_max_stored_reports<'info>(
     let system_program = ctx.accounts.system_program.to_account_info();
     let rent = Rent::get()?;
     let feeds = ctx.remaining_accounts;
+    // The runtime caps growth at 10 KiB against an account's length when the instruction started,
+    // which is 0 for a feed created in this call and the same for a data ID listed twice.
+    let entry_lens: Vec<usize> = feeds.iter().map(|info| info.data_len()).collect();
     update_feeds(&ctx, &data_ids, feeds, |i, id, feed, events| {
         let new_max = max_stored_reports[i];
         check_max_stored_reports(feed, new_max).map_err(|e| match e {
             MaxStoredReportsError::Invalid => StoreError::InvalidMaxStoredReports,
             MaxStoredReportsError::NotIncreased => StoreError::MaxStoredReportsNotIncreased,
             MaxStoredReportsError::Locked => StoreError::MaxStoredReportsLocked,
-            MaxStoredReportsError::TooLow => StoreError::MaxStoredReportsTooLow,
         })?;
         let info = &feeds[i];
         let old_len = info.data_len();
         let new_len = feed_account_len(new_max);
         require!(
-            new_len > old_len && new_len - old_len <= MAX_ACCOUNT_DATA_INCREASE,
+            new_len > old_len && new_len - entry_lens[i] <= MAX_ACCOUNT_DATA_INCREASE,
             StoreError::InvalidMaxStoredReports
         );
         let top_up = rent
@@ -538,8 +525,8 @@ pub fn set_max_stored_reports<'info>(
                 top_up,
             )?;
         }
+        // zero-fills the new bytes
         info.resize(new_len)?;
-        info.try_borrow_mut_data()?[old_len..].fill(0);
         feed.max_stored_reports = new_max;
         events.emit(&MaxStoredReportsSet {
             state,

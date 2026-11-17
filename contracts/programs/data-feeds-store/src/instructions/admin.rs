@@ -3,14 +3,14 @@ use anchor_spl::token_interface;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE, MAX_WORKFLOW_METADATAS,
-        MIN_MAX_STORED_REPORTS, STORE_AUTHORITY_SEED,
+        ACCOUNT_VERSION, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE, MIN_MAX_STORED_REPORTS,
+        STORE_AUTHORITY_SEED,
     },
     context::*,
     error::StoreError,
     event::*,
     state::{feed_account_len, StoreConfig, WorkflowMetadata},
-    utils::{validate_workflow_metadata, verify_feed_admin, EventEmitter},
+    utils::{validate_workflows, verify_feed_admin},
 };
 
 pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
@@ -43,22 +43,12 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
         feed_admins.len() <= state.feed_admins.capacity(),
         StoreError::FeedAdminsFull
     );
-    // up to 64 admins: one event instruction for all of them (the bump allocator never frees)
-    let events = EventEmitter::new(
-        ctx.accounts.event_authority.to_account_info(),
-        ctx.bumps.event_authority,
-    );
     let mut previous = Pubkey::default();
-    for admin in feed_admins {
-        // sorted for binary search
-        require!(previous < admin, StoreError::InvalidAddress);
-        state.feed_admins.push(admin);
-        events.emit(&FeedAdminSet {
-            state: state_key,
-            feed_admin: admin,
-            is_admin: true,
-        })?;
-        previous = admin;
+    for admin in feed_admins.iter() {
+        // strictly increasing, for binary search; this also refuses the default key
+        require!(previous < *admin, StoreError::InvalidAddress);
+        state.feed_admins.push(*admin);
+        previous = *admin;
     }
 
     emit_cpi!(StoreInitialized {
@@ -66,6 +56,7 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
         default_max_stored_reports,
         max_observation_forward_secs,
         df1_program,
+        feed_admins,
     });
     Ok(())
 }
@@ -128,17 +119,13 @@ pub fn set_default_feed_metadata(
     workflow_metadata: Vec<WorkflowMetadata>,
 ) -> Result<()> {
     require!(!workflow_metadata.is_empty(), StoreError::EmptyConfig);
-    require!(
-        workflow_metadata.len() <= MAX_WORKFLOW_METADATAS,
-        StoreError::MaxEntriesExceeded
-    );
+    validate_workflows(&workflow_metadata)?;
 
     let state = &mut ctx.accounts.state.load_mut()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
     state.default_workflow_metadata.clear();
     for metadata in workflow_metadata.iter() {
-        validate_workflow_metadata(metadata)?;
         state.default_workflow_metadata.push(*metadata);
     }
 

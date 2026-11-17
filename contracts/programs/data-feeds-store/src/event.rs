@@ -7,12 +7,15 @@ use anchor_lang::prelude::*;
 
 use crate::state::{Df1SkipReason, WorkflowMetadata};
 
+/// A store was created, with its first feed admins. One event rather than a `FeedAdminSet` per
+/// admin: every event is an instruction, and a transaction holds at most 64.
 #[event]
 pub struct StoreInitialized {
     pub state: Pubkey,
     pub default_max_stored_reports: u64,
     pub max_observation_forward_secs: u32,
     pub df1_program: Pubkey,
+    pub feed_admins: Vec<Pubkey>,
 }
 
 #[event]
@@ -98,7 +101,7 @@ pub struct MinDecimalsSet {
     pub min_decimals: u8,
 }
 
-/// Reads of the feed were frozen or unfrozen.
+/// Round reads of the feed were frozen or unfrozen.
 #[event]
 pub struct FeedFrozenSet {
     pub state: Pubkey,
@@ -184,8 +187,8 @@ pub struct Df1WriteSkipped {
     pub reason: Df1SkipReason,
 }
 
-/// The skip events below carry the sender: they are emitted before the permission check, so anyone
-/// can cause them, and indexers must not take them as coming from a forwarder.
+/// A report for a zero or SVR data ID was skipped. Emitted before the permission check, so anyone
+/// can cause it: it carries the sender, and indexers must not take it as coming from a forwarder.
 #[event]
 pub struct InvalidDataIdIgnored {
     pub state: Pubkey,
@@ -193,6 +196,9 @@ pub struct InvalidDataIdIgnored {
     pub sender: Pubkey,
 }
 
+/// A report for a feed that hasn't been set was skipped. Emitted before the permission check, so
+/// anyone can cause it: it carries the sender, and indexers must not take it as coming from a
+/// forwarder.
 #[event]
 pub struct FeedNotInitializedIgnored {
     pub state: Pubkey,
@@ -200,6 +206,9 @@ pub struct FeedNotInitializedIgnored {
     pub sender: Pubkey,
 }
 
+/// A report for a feed whose writes are disabled was skipped. Emitted before the permission check,
+/// so anyone can cause it: it carries the sender, and indexers must not take it as coming from a
+/// forwarder.
 #[event]
 pub struct FeedWritesDisabledIgnored {
     pub state: Pubkey,

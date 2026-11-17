@@ -6,7 +6,8 @@ use crate::error::StoreError;
 use crate::state::{Feed, StoreState};
 
 // Every context that changes state emits CPI events (`#[event_cpi]` adds the event authority PDA
-// and this program as its last accounts). Every context checks the state's layout version.
+// and this program as its last accounts). Every context but `Initialize` checks the state's layout
+// version (`OnReport` in its handler).
 
 /// Only the program's upgrade authority creates stores, so every store under this program ID is
 /// ours. The state account is created beforehand (system `create_account`, owned by this program)
@@ -63,8 +64,8 @@ pub struct FeedAdminState<'info> {
     pub state: AccountLoader<'info, StoreState>,
 }
 
-/// Feed admin changes to feeds passed as remaining accounts. The feed admin pays for feeds that
-/// are created or grown.
+/// Feed admin changes to feeds passed as remaining accounts. The feed admin pays for feeds created
+/// or grown, and for DF1 link markers created.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct FeedAdminAccounts<'info> {

@@ -17,14 +17,21 @@ use crate::{
 /// Receives a forwarder report: Borsh `Vec<ReceivedReport>`. Each report is applied independently:
 /// a report with an invalid data ID, for a feed that hasn't been set or whose writes are disabled,
 /// not permitted, future-dated, stale or out of range is skipped with an event while the rest still
-/// land. A feed linked to a DF1 feed also writes the round there, unless DF1 can't take it (then only
-/// DF1 is skipped).
+/// land. A feed linked to a DF1 feed also writes the round there, unless DF1 can't take it (then
+/// only DF1 is skipped).
 ///
-/// A report passes one account per data ID, its feed, plus the linked DF1 feed. What still aborts
-/// the whole transaction: a malformed payload or metadata, an account that is not the data ID's feed
-/// or linked DF1 feed, and a feed or linked DF1 feed not passed writable. Writable flags aren't
-/// covered by the forwarder's signature, so only a faulty or malicious transmitter passes them
-/// read-only; aborting lets another transmitter deliver the report.
+/// Each report passes its data ID's feed, then the linked DF1 feed when the feed has one (even if
+/// the report is then skipped). An empty system account is taken as a feed that hasn't been set;
+/// its address isn't checked, since the forwarder signs the account keys.
+///
+/// What aborts the whole transaction: malformed metadata or payload; a bad state account or
+/// version; a wrong DF1 program or writer account; missing or leftover accounts; an initialized
+/// account that isn't this store's feed for the data ID, or a missing or wrong linked DF1 feed; a
+/// feed or linked DF1 feed passed read-only for a report that would be stored; a failing `submit`
+/// or event call. Writable flags aren't covered by the forwarder's signature, so only a faulty or
+/// malicious transmitter passes them read-only; aborting lets another transmitter deliver the
+/// report. Because the forwarder signs the account list, changing a data ID's DF1 link while a
+/// signed batch is in flight aborts that batch.
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -180,11 +187,7 @@ impl<'info> Batch<'_, 'info> {
         require!(feed_info.is_writable, StoreError::AccountNotWritable);
         if let Some(info) = df1_info {
             require!(info.is_writable, StoreError::AccountNotWritable);
-        }
-
-        if let Some(info) = df1_info {
-            let disabled = self.feed.df1_write_disabled != 0;
-            self.write_df1(&id, disabled, info, report)?;
+            self.write_df1(info, report)?;
         }
 
         let round_id = {
@@ -209,43 +212,30 @@ impl<'info> Batch<'_, 'info> {
     }
 
     /// Write a round to the data ID's DF1 feed, or skip DF1 with an event if it can't take it.
-    fn write_df1(
-        &mut self,
-        id: &[u8; 16],
-        disabled: bool,
-        info: &AccountInfo<'info>,
-        report: &ReceivedReport,
-    ) -> Result<()> {
-        let state_key = self.state_key;
-        let checked = if disabled {
-            Err(Df1SkipReason::Disabled)
+    fn write_df1(&mut self, info: &AccountInfo<'info>, report: &ReceivedReport) -> Result<()> {
+        let reason = if self.feed.df1_write_disabled != 0 {
+            Df1SkipReason::Disabled
+        } else if let Some(submit) = self.df1.as_mut() {
+            match df1::check_round(
+                info,
+                submit.program(),
+                submit.writer(),
+                report.timestamp,
+                report.answer,
+            ) {
+                // no event: the `submit` call is in the transaction, and a transaction carries at
+                // most 64 instructions, events and inner calls included
+                Ok(answer) => return submit.call(&self.state_key, info, report.timestamp, answer),
+                Err(reason) => reason,
+            }
         } else {
-            match &self.df1 {
-                None => Err(Df1SkipReason::NotPassed),
-                Some(submit) => df1::check_round(
-                    info,
-                    submit.program(),
-                    submit.writer(),
-                    report.timestamp,
-                    report.answer,
-                ),
-            }
+            Df1SkipReason::NotPassed
         };
-        match checked {
-            // no event: the `submit` call is in the transaction, and a transaction carries at most 64
-            // instructions, events and inner calls included
-            Ok(answer) => {
-                self.df1
-                    .as_mut()
-                    .unwrap()
-                    .call(&state_key, info, report.timestamp, answer)
-            }
-            Err(reason) => self.events.emit(&Df1WriteSkipped {
-                state: state_key,
-                data_id: *id,
-                df1_feed: *info.key,
-                reason,
-            }),
-        }
+        self.events.emit(&Df1WriteSkipped {
+            state: self.state_key,
+            data_id: report.data_id,
+            df1_feed: *info.key,
+            reason,
+        })
     }
 }

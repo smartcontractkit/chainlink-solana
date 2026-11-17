@@ -20,6 +20,7 @@ pub trait Ring {
     fn set(&mut self, slot: u64, report: StoredReport);
 }
 
+#[cfg(test)]
 impl Ring for Vec<StoredReport> {
     fn get(&self, slot: u64) -> StoredReport {
         self[slot as usize]
@@ -111,14 +112,17 @@ pub fn stored_round(round_id: u64, feed: &Feed, ring: &impl Ring) -> Option<Stor
 /// Why a ring size change is rejected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MaxStoredReportsError {
+    /// Below `MIN_MAX_STORED_REPORTS`
     Invalid,
+    /// Not larger than the current ring
     NotIncreased,
+    /// The ring has wrapped
     Locked,
-    TooLow,
 }
 
 /// The ring can only grow, and only while it has never wrapped: every stored round r then still
-/// sits at slot r, so the larger ring keeps every round where reads look for it.
+/// sits at slot r, so the larger ring keeps every round where reads look for it. As on EVM; the
+/// new size then always exceeds the latest round ID.
 pub fn check_max_stored_reports(
     feed: &Feed,
     new_max_stored_reports: u64,
@@ -133,9 +137,6 @@ pub fn check_max_stored_reports(
     if feed.round_id >= current {
         return Err(MaxStoredReportsError::Locked);
     }
-    if new_max_stored_reports <= feed.round_id {
-        return Err(MaxStoredReportsError::TooLow);
-    }
     Ok(())
 }
 
@@ -148,7 +149,7 @@ pub enum ScaleError {
     RoundsToZero,
 }
 
-/// Whether a reader may ask for `decimals` from a feed with `min_decimals`.
+/// Check that a reader may ask for `decimals` from a feed with `min_decimals`.
 pub fn check_decimals(decimals: u8, min_decimals: u8) -> Result<(), ScaleError> {
     if decimals < min_decimals || decimals > STORED_DECIMALS {
         return Err(ScaleError::InvalidDecimals);

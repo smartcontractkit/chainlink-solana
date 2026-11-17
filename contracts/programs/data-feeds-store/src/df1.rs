@@ -1,10 +1,11 @@
 //! The DF1 write-through: keeping existing DF1 feed accounts written with this store's rounds, via
-//! DF1's unchanged `submit`, signed by the store's `df1_writer` PDA (set as each DF1 feed's writer).
+//! DF1's unchanged `submit`, signed by the store's `df1_writer` PDA (set as each DF1 feed's
+//! writer).
 //!
-//! Solana can't contain a failed call to another program: a `submit` that fails aborts every
-//! report in the transaction. So everything `submit` could fail on is checked here first, and a
-//! round DF1 can't take is skipped for DF1 only (the store still writes it). `submit` itself does no
-//! ordering (OCR2 ordered rounds for it), so the store only writes rounds newer than DF1's latest.
+//! Solana can't contain a failed call to another program: a `submit` that fails aborts every report
+//! in the transaction. So everything `submit` could fail on is checked here first, and a round DF1
+//! can't take is skipped for DF1 only (the store still writes it). `submit` itself does no ordering
+//! (OCR2 ordered rounds for it), so the store only writes rounds newer than DF1's latest.
 
 use anchor_lang::{
     prelude::*,
@@ -23,8 +24,9 @@ fn u32_at(data: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap())
 }
 
-/// Whether `info` is a DF1 feed account of `program` that `submit` can write: the account layout,
-/// its version and the ring geometry `submit` indexes without checking. Not the writer or the round.
+/// Check that `info` is a DF1 feed account of `program` that `submit` can write: the account
+/// layout, its version and the ring geometry `submit` indexes without checking. Not the writer or
+/// the round.
 pub fn check_layout(
     info: &AccountInfo,
     program: &Pubkey,
@@ -66,7 +68,9 @@ pub fn check_layout(
     Ok(())
 }
 
-/// Rescale an answer with `STORED_DECIMALS` to a DF1 feed's decimals, truncating toward zero.
+/// Rescale an answer with `STORED_DECIMALS` to a DF1 feed's decimals, truncating toward zero, so a
+/// small non-zero answer can reach DF1 as 0 (store reads refuse that, DF1 reads don't). `None` on
+/// overflow.
 pub fn rescale(answer: i128, decimals: u8) -> Option<i128> {
     if decimals <= STORED_DECIMALS {
         Some(answer / 10i128.checked_pow(u32::from(STORED_DECIMALS - decimals))?)
@@ -109,7 +113,8 @@ pub fn check_round(
     rescale(answer, data[df1::DECIMALS]).ok_or(Df1SkipReason::AnswerOverflow)
 }
 
-/// The `submit` instruction, reused for every DF1 write of a batch (the bump allocator never frees).
+/// The `submit` instruction, reused for every DF1 write of a batch (the bump allocator never
+/// frees).
 pub struct Submit<'info> {
     program: AccountInfo<'info>,
     writer: AccountInfo<'info>,
@@ -211,25 +216,24 @@ mod tests {
         owner: &Pubkey,
         program: &Pubkey,
         writer: &Pubkey,
-        writable: bool,
         obs: u32,
     ) -> std::result::Result<i128, Df1SkipReason> {
         let key = Pubkey::new_unique();
         let mut lamports = 1;
-        let info = AccountInfo::new(&key, false, writable, &mut lamports, data, owner, false, 0);
+        let info = AccountInfo::new(&key, false, true, &mut lamports, data, owner, false, 0);
         check_round(&info, program, writer, obs, 123_456_789_012 * E18 / 1000)
     }
 
     #[test]
-    fn accepts_a_writable_feed_it_writes_and_rescales() {
+    fn accepts_a_feed_it_writes_and_rescales() {
         let (program, writer) = (Pubkey::new_unique(), Pubkey::new_unique());
         let mut data = feed(&writer, 8, 4, 2, 7, 100);
         assert_eq!(
-            check(&mut data, &program, &program, &writer, true, 101),
+            check(&mut data, &program, &program, &writer, 101),
             Ok(12_345_678_901_200_000)
         );
         let mut new = feed(&writer, 8, 4, 0, 0, 0);
-        assert!(check(&mut new, &program, &program, &writer, true, 1).is_ok());
+        assert!(check(&mut new, &program, &program, &writer, 1).is_ok());
     }
 
     #[test]
@@ -240,36 +244,36 @@ mod tests {
 
         let mut d = base.clone();
         assert_eq!(
-            check(&mut d, &other, &program, &writer, true, 101),
+            check(&mut d, &other, &program, &writer, 101),
             Err(Df1SkipReason::InvalidAccount)
         );
         assert_eq!(
-            check(&mut d, &program, &program, &other, true, 101),
+            check(&mut d, &program, &program, &other, 101),
             Err(Df1SkipReason::NotWriter)
         );
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 100),
+            check(&mut d, &program, &program, &writer, 100),
             Err(Df1SkipReason::Stale)
         );
 
         let mut d = base.clone();
         d[df1::VERSION] = 1;
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::InvalidVersion)
         );
 
         let mut d = base.clone();
         d[0] ^= 1;
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::InvalidAccount)
         );
 
         let mut d = base.clone();
         d.truncate(d.len() - 1);
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::InvalidAccount),
             "ring bytes not a whole number of transmissions"
         );
@@ -277,7 +281,7 @@ mod tests {
         let mut d = base.clone();
         d[df1::GRANULARITY] = 0;
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::InvalidAccount),
             "historical ring with zero granularity"
         );
@@ -285,7 +289,7 @@ mod tests {
         let mut d = base.clone();
         d[df1::LIVE_CURSOR..df1::LIVE_CURSOR + 4].copy_from_slice(&4u32.to_le_bytes());
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::InvalidAccount),
             "cursor outside the live ring"
         );
@@ -293,13 +297,13 @@ mod tests {
         let mut d = base.clone();
         d[df1::LATEST_ROUND_ID..df1::LATEST_ROUND_ID + 4].copy_from_slice(&u32::MAX.to_le_bytes());
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 101),
+            check(&mut d, &program, &program, &writer, 101),
             Err(Df1SkipReason::RoundIdOverflow)
         );
 
         let mut d = feed(&writer, 60, 4, 0, 0, 0);
         assert_eq!(
-            check(&mut d, &program, &program, &writer, true, 1),
+            check(&mut d, &program, &program, &writer, 1),
             Err(Df1SkipReason::AnswerOverflow)
         );
     }
