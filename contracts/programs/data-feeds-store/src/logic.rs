@@ -269,4 +269,113 @@ mod tests {
         assert_eq!(check_decimals(18, 18), Ok(()));
         assert_eq!(check_decimals(19, 0), Err(ScaleError::InvalidDecimals));
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Store `answers` as rounds 1..=n into a fresh ring of `max`.
+        fn stored(max: u64, answers: &[i128]) -> (Feed, Vec<StoredReport>) {
+            let (mut f, mut ring) = feed(max);
+            for (i, answer) in answers.iter().enumerate() {
+                let t = i as u32 + 1;
+                store_round(&mut f, &mut ring, t, *answer, at(t as u64, t));
+            }
+            (f, ring)
+        }
+
+        /// What a read of `round_id` must return: the answer stored as that round while it is
+        /// among the last `max` rounds, nothing otherwise.
+        fn expected(round_id: u64, max: u64, answers: &[i128]) -> Option<i128> {
+            let n = answers.len() as u64;
+            (round_id >= 1 && round_id <= n && n - round_id < max)
+                .then(|| answers[round_id as usize - 1])
+        }
+
+        proptest! {
+            #[test]
+            fn the_ring_serves_exactly_the_last_rounds(
+                max in 2u64..12,
+                answers in prop::collection::vec(any::<i128>(), 0..40),
+            ) {
+                let (f, ring) = stored(max, &answers);
+                let n = answers.len() as u64;
+                prop_assert_eq!(f.round_id, n);
+                prop_assert_eq!(latest_round(&f).map(|r| r.answer), answers.last().copied());
+                for round_id in 0..=n + 1 {
+                    let read = stored_round(round_id, &f, &ring).map(|r| r.answer);
+                    prop_assert_eq!(read, expected(round_id, max, &answers), "round {}", round_id);
+                }
+            }
+
+            #[test]
+            fn growing_before_a_wrap_keeps_every_round(
+                max in 2u64..12,
+                grow in 1u64..12,
+                answers in prop::collection::vec(any::<i128>(), 0..24),
+                later in prop::collection::vec(any::<i128>(), 0..24),
+            ) {
+                let (mut f, mut ring) = stored(max, &answers);
+                let new_max = max + grow;
+                let result = check_max_stored_reports(&f, new_max);
+                if f.round_id >= max {
+                    prop_assert_eq!(result, Err(MaxStoredReportsError::Locked));
+                    return Ok(());
+                }
+                prop_assert_eq!(result, Ok(()));
+                prop_assert!(new_max > f.round_id, "a grown ring holds every round so far");
+                // the program grows the account with zeroed rounds and keeps the header's round
+                ring.resize(new_max as usize, StoredReport::default());
+                f.max_stored_reports = new_max;
+                let mut all = answers.clone();
+                for answer in later {
+                    let t = all.len() as u32 + 1;
+                    store_round(&mut f, &mut ring, t, answer, at(t as u64, t));
+                    all.push(answer);
+                }
+                for round_id in 0..=all.len() as u64 + 1 {
+                    let read = stored_round(round_id, &f, &ring).map(|r| r.answer);
+                    prop_assert_eq!(read, expected(round_id, new_max, &all), "round {}", round_id);
+                }
+            }
+
+            #[test]
+            fn the_ring_never_shrinks(max in 2u64..12, smaller in 0u64..12) {
+                let (f, _) = stored(max, &[]);
+                let new_max = smaller.min(max);
+                let expected = if new_max < MIN_MAX_STORED_REPORTS {
+                    MaxStoredReportsError::Invalid
+                } else {
+                    MaxStoredReportsError::NotIncreased
+                };
+                prop_assert_eq!(check_max_stored_reports(&f, new_max), Err(expected));
+            }
+
+            #[test]
+            fn scaling_truncates_and_never_reads_a_price_as_zero(
+                answer in any::<i128>(),
+                decimals in 0u8..=20,
+            ) {
+                let result = scale(answer, decimals);
+                if decimals > STORED_DECIMALS {
+                    prop_assert_eq!(result, Err(ScaleError::InvalidDecimals));
+                    return Ok(());
+                }
+                let unit = 10u128.pow(u32::from(STORED_DECIMALS - decimals));
+                match result {
+                    Ok(scaled) => {
+                        // truncated toward zero: |scaled| units fit in |answer|, one more doesn't
+                        let (a, s) = (answer.unsigned_abs(), scaled.unsigned_abs());
+                        prop_assert!(s * unit <= a && a < (s + 1) * unit);
+                        prop_assert!(scaled == 0 || (scaled < 0) == (answer < 0));
+                        prop_assert!(answer == 0 || scaled != 0);
+                    }
+                    Err(e) => {
+                        prop_assert_eq!(e, ScaleError::RoundsToZero);
+                        prop_assert!(answer != 0 && answer.unsigned_abs() < unit);
+                    }
+                }
+            }
+        }
+    }
 }

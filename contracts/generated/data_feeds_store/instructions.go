@@ -632,7 +632,7 @@ func NewRemoveSpecificFeedMetadataInstruction(
 }
 
 // Builds a "set_default_feed_metadata" instruction.
-// Set the workflows allowed to write any data ID without feed-specific metadata.
+// Set the workflows allowed to write any data ID without feed-specific metadata. An empty list // leaves only feeds with their own workflows writable.
 func NewSetDefaultFeedMetadataInstruction(
 	// Params:
 	workflowMetadataParam []WorkflowMetadata,

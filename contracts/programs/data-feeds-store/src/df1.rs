@@ -316,4 +316,88 @@ mod tests {
         assert_eq!(rescale(7, 20), Some(700));
         assert_eq!(rescale(i128::MAX, 19), None);
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Whether DF1's `submit` can write this account without panicking, for any round: it
+        /// splits the data after the header into whole live and historical transmissions, writes
+        /// the live ring at its cursor and, for every `granularity`-th round, the historical ring at
+        /// its cursor. Modelled on `programs/store`'s `with_store`, `insert` and `latest`.
+        fn submit_can_write(data: &[u8]) -> bool {
+            if data.len() < df1::RINGS {
+                return false;
+            }
+            let rings = data.len() - df1::RINGS;
+            let live = u32_at(data, df1::LIVE_LENGTH) as usize;
+            let live_bytes = live * df1::TRANSMISSION_LEN;
+            if live == 0 || live_bytes > rings {
+                return false;
+            }
+            // whole transmissions only, or the cast to transmissions fails
+            let historical = (rings - live_bytes) / df1::TRANSMISSION_LEN;
+            if historical * df1::TRANSMISSION_LEN != rings - live_bytes {
+                return false;
+            }
+            (u32_at(data, df1::LIVE_CURSOR) as usize) < live
+                && (historical == 0
+                    || (data[df1::GRANULARITY] != 0
+                        && (u32_at(data, df1::HISTORICAL_CURSOR) as usize) < historical))
+        }
+
+        fn layout(data: &mut [u8], program: &Pubkey) -> bool {
+            let key = Pubkey::new_unique();
+            let mut lamports = 1;
+            let info = AccountInfo::new(&key, false, true, &mut lamports, data, program, false, 0);
+            check_layout(&info, program).is_ok()
+        }
+
+        proptest! {
+            #[test]
+            fn check_layout_accepts_exactly_what_submit_can_write(
+                live in 0u32..6,
+                live_cursor in 0u32..8,
+                historical_bytes in 0usize..(6 * df1::TRANSMISSION_LEN + 47),
+                granularity in 0u8..3,
+                historical_cursor in 0u32..8,
+                cut in 0usize..df1::RINGS + 1,
+            ) {
+                let program = Pubkey::new_unique();
+                let mut data = feed(&Pubkey::new_unique(), 8, live.max(1), 0, 0, 0);
+                data.resize(data.len() + historical_bytes, 0);
+                data[df1::LIVE_LENGTH..df1::LIVE_LENGTH + 4].copy_from_slice(&live.to_le_bytes());
+                data[df1::LIVE_CURSOR..df1::LIVE_CURSOR + 4].copy_from_slice(&live_cursor.to_le_bytes());
+                data[df1::GRANULARITY] = granularity;
+                data[df1::HISTORICAL_CURSOR..df1::HISTORICAL_CURSOR + 4]
+                    .copy_from_slice(&historical_cursor.to_le_bytes());
+                // sometimes too short to hold the header
+                if cut > 0 && cut < data.len() && cut <= df1::RINGS {
+                    data.truncate(cut);
+                }
+                let safe = submit_can_write(&data);
+                prop_assert_eq!(layout(&mut data, &program), safe);
+            }
+
+            #[test]
+            fn rescaling_is_exact_or_refused(answer in any::<i128>(), decimals in 0u8..=38) {
+                let result = rescale(answer, decimals);
+                if decimals <= STORED_DECIMALS {
+                    // truncated toward zero, so a small non-zero answer can become 0
+                    let unit = 10u128.pow(u32::from(STORED_DECIMALS - decimals));
+                    let (a, s) = (answer.unsigned_abs(), result.unwrap().unsigned_abs());
+                    prop_assert!(s * unit <= a && a < (s + 1) * unit);
+                } else {
+                    let unit = 10i128.pow(u32::from(decimals - STORED_DECIMALS));
+                    match result {
+                        Some(scaled) => {
+                            prop_assert_eq!(scaled % unit, 0);
+                            prop_assert_eq!(scaled / unit, answer);
+                        }
+                        None => prop_assert!(answer.unsigned_abs() > i128::MAX as u128 / unit as u128),
+                    }
+                }
+            }
+        }
+    }
 }

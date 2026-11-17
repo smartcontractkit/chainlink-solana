@@ -114,11 +114,13 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
     Ok(())
 }
 
+/// Replace the default workflow list. Unlike on EVM it can be emptied: then only feeds with their
+/// own workflow list can be written, so a compromised default workflow can be revoked in one call
+/// without naming a replacement.
 pub fn set_default_feed_metadata(
     ctx: Context<FeedAdminState>,
     workflow_metadata: Vec<WorkflowMetadata>,
 ) -> Result<()> {
-    require!(!workflow_metadata.is_empty(), StoreError::EmptyConfig);
     validate_workflows(&workflow_metadata)?;
 
     let state = &mut ctx.accounts.state.load_mut()?;

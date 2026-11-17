@@ -1,9 +1,12 @@
 package keystone_forwarder_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -420,6 +423,110 @@ func TestDataFeedsStore(t *testing.T) {
 		t.Logf("forwarder F=5, %s: %d bytes inline (V1 limit %d), %d accounts", c.label, size, maxV1TxSize, accounts)
 		require.LessOrEqual(t, size, maxV1TxSize, "%s: %d bytes", c.label, size)
 		require.LessOrEqual(t, accounts, maxTxAccounts, "%s: %d accounts", c.label, accounts)
+	}
+
+	// An upgrade replaces the program in place, as an MCMS proposal would: feeds keep their history
+	// and keep taking rounds, DF1 writes included.
+	upgradeProgram(t, client, deployer, data_feeds_store.ProgramID, filepath.Join(ProgramsPath, "data_feeds_store.so"))
+	kept := simulateRound("get_round after the upgrade", build(data_feeds_store.NewGetRoundInstruction(storeOnly.id, 1, 18,
+		storeState.PublicKey(), feedPDA(storeOnly.id))))
+	require.Equal(t, uint64(1), kept.RoundId)
+	require.Equal(t, observedAt, kept.ObservationsTimestamp)
+	sendReport(reportIx(mainnetForwarder, mainnetAuthority, mainnetF, reportId+40, []target{storeOnly, df1Target}, observedAt+50),
+		"forwarder F=5, 2 reports after the upgrade")
+	requireStored(storeOnly, 3, observedAt+50)
+	requireStored(df1Target, 3, observedAt+50)
+}
+
+// upgradeProgram replaces a program's code with the binary at path, signed by its upgrade
+// authority, as `solana program deploy` does: the binary is written into a buffer account, which
+// the upgrade then copies into the program's data. The new code runs from the next slot.
+func upgradeProgram(t *testing.T, client *rpc.Client, authority solana.PrivateKey, program solana.PublicKey, path string) {
+	code, err := os.ReadFile(path)
+	require.NoError(t, err)
+	loader := solana.BPFLoaderUpgradeableProgramID
+	tag := func(instruction uint32) []byte { return binary.LittleEndian.AppendUint32(nil, instruction) }
+
+	// a buffer: its state tag and Some(authority), then the code
+	const bufferHeader = 4 + 1 + 32
+	buffer, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	size := uint64(bufferHeader + len(code))
+	rent, err := client.GetMinimumBalanceForRentExemption(t.Context(), size, rpc.CommitmentConfirmed)
+	require.NoError(t, err)
+	create, err := system.NewCreateAccountInstruction(rent, size, loader, authority.PublicKey(), buffer.PublicKey()).ValidateAndBuild()
+	require.NoError(t, err)
+	initialize := solana.NewInstruction(loader, solana.AccountMetaSlice{
+		solana.Meta(buffer.PublicKey()).WRITE(), solana.Meta(authority.PublicKey())}, tag(0))
+	_, err = common.SendAndConfirm(t.Context(), client, []solana.Instruction{create, initialize}, authority,
+		rpc.CommitmentConfirmed, common.AddSigners(buffer))
+	require.NoError(t, err)
+
+	// write the code in chunks that fit a transaction, sent together, resending any that didn't land
+	const chunk = 900
+	chunkEnd := func(offset int) int { return min(offset+chunk, len(code)) }
+	write := func(offset int) solana.Instruction {
+		data := binary.LittleEndian.AppendUint32(tag(1), uint32(offset))
+		data = binary.LittleEndian.AppendUint64(data, uint64(chunkEnd(offset)-offset))
+		return solana.NewInstruction(loader, solana.AccountMetaSlice{
+			solana.Meta(buffer.PublicKey()).WRITE(), solana.Meta(authority.PublicKey()).SIGNER()},
+			append(data, code[offset:chunkEnd(offset)]...))
+	}
+	var pending []int
+	for offset := 0; offset < len(code); offset += chunk {
+		pending = append(pending, offset)
+	}
+	for attempt := 0; len(pending) > 0 && attempt < 5; attempt++ {
+		latest, err := client.GetLatestBlockhash(t.Context(), rpc.CommitmentConfirmed)
+		require.NoError(t, err)
+		for _, offset := range pending {
+			tx, err := solana.NewTransaction([]solana.Instruction{write(offset)}, latest.Value.Blockhash,
+				solana.TransactionPayer(authority.PublicKey()))
+			require.NoError(t, err)
+			_, err = tx.Sign(func(solana.PublicKey) *solana.PrivateKey { return &authority })
+			require.NoError(t, err)
+			_, err = client.SendTransactionWithOpts(t.Context(), tx, rpc.TransactionOpts{SkipPreflight: true})
+			require.NoError(t, err)
+		}
+		for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(500 * time.Millisecond) {
+			info, err := client.GetAccountInfoWithOpts(t.Context(), buffer.PublicKey(),
+				&rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed})
+			require.NoError(t, err)
+			written := info.Value.Data.GetBinary()[bufferHeader:]
+			var missing []int
+			for _, offset := range pending {
+				if !bytes.Equal(written[offset:chunkEnd(offset)], code[offset:chunkEnd(offset)]) {
+					missing = append(missing, offset)
+				}
+			}
+			if len(missing) == 0 || time.Now().After(deadline) {
+				pending = missing
+				break
+			}
+		}
+	}
+	require.Empty(t, pending, "buffer chunks never written")
+
+	programData, _, err := solana.FindProgramAddress([][]byte{program.Bytes()}, loader)
+	require.NoError(t, err)
+	upgrade := solana.NewInstruction(loader, solana.AccountMetaSlice{
+		solana.Meta(programData).WRITE(),
+		solana.Meta(program).WRITE(),
+		solana.Meta(buffer.PublicKey()).WRITE(),
+		solana.Meta(authority.PublicKey()).WRITE(), // spill: the buffer's rent goes back here
+		solana.Meta(solana.SysVarRentPubkey),
+		solana.Meta(solana.SysVarClockPubkey),
+		solana.Meta(authority.PublicKey()).SIGNER(),
+	}, tag(3))
+	res, err := common.SendAndConfirm(t.Context(), client, []solana.Instruction{upgrade}, authority, rpc.CommitmentConfirmed)
+	require.NoError(t, err)
+	for {
+		slot, err := client.GetSlot(t.Context(), rpc.CommitmentConfirmed)
+		require.NoError(t, err)
+		if slot > res.Slot+1 {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

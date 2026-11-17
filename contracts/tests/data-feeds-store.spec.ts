@@ -140,9 +140,9 @@ describe("data feeds store", function () {
     allowedWorkflowOwner: Array.from(workflowOwner),
     allowedWorkflowName: Array.from(name),
   });
-  const setDefault = () =>
+  const setDefault = (workflows = [workflow()]) =>
     program.methods
-      .setDefaultFeedMetadata([workflow()])
+      .setDefaultFeedMetadata(workflows)
       .accountsStrict({
         feedAdmin: feedAdmin.keypair.publicKey,
         state: state.publicKey,
@@ -504,6 +504,26 @@ describe("data feeds store", function () {
       await expectError(readLatest(id), "NoDataPresent");
     });
 
+    it("clears the default workflows, leaving feeds with their own", async () => {
+      const [shared, own] = [newDataId(), newDataId()];
+      await setFeeds([shared]);
+      await setFeeds([own], [""], [workflow()]);
+      await setDefault([]);
+      try {
+        const signature = await report([
+          { dataId: shared, timestamp: nextTimestamp(), answer: new BN(1) },
+          { dataId: own, timestamp: nextTimestamp(), answer: new BN(2) },
+        ]);
+        assert.deepEqual(await eventNames(signature), [
+          "invalidUpdatePermission",
+          "feedUpdated",
+        ]);
+        assert.isTrue((await latestAnswer(own)).eq(new BN(2)));
+      } finally {
+        await setDefault();
+      }
+    });
+
     it("refuses another feed's account", async () => {
       const [id, other] = [newDataId(), newDataId()];
       await setFeeds([id, other]);
@@ -749,6 +769,105 @@ describe("data feeds store", function () {
       assert.isTrue((await round(5)).answer.eq(new BN(5)));
       await expectError(round(1), "NoDataPresent");
       await expectError(round(6), "NoDataPresent");
+    });
+  });
+
+  describe("random report batches", function () {
+    // Seeded, so a failure replays: a model of the processing order (invalid ID, unset feed, write
+    // freeze, permission, future, stale, range, then store) predicts every event and every feed.
+    it("match a model of the report path", async () => {
+      let seed = 20261117;
+      const rand = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      };
+      const pick = <T>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
+
+      const [open, freezable, bounded, own, unset] = [0, 1, 2, 3, 4].map(() =>
+        newDataId()
+      );
+      const invalid = Buffer.alloc(16);
+      await setFeeds([open, freezable, bounded]);
+      // a feed whose own workflow list doesn't include the reporting workflow
+      await setFeeds([own], [""], [workflow(randomBytes(10))]);
+      await asFeedAdmin(
+        program.methods.setMinMaxAnswers(
+          [Array.from(bounded)],
+          [new BN(0)],
+          [new BN(1000)]
+        ),
+        [meta(feedPda(bounded))]
+      );
+
+      type Model = { roundId: number; timestamp: number; answer: number };
+      const model = new Map<string, Model>(
+        [open, freezable, bounded].map((id) => [
+          id.toString("hex"),
+          { roundId: 0, timestamp: 0, answer: 0 },
+        ])
+      );
+      let writesDisabled = false;
+      const expect = (id: Buffer, timestamp: number, answer: number) => {
+        if (id.equals(invalid)) return "invalidDataIdIgnored";
+        if (id.equals(unset)) return "feedNotInitializedIgnored";
+        if (id.equals(freezable) && writesDisabled)
+          return "feedWritesDisabledIgnored";
+        if (id.equals(own)) return "invalidUpdatePermission";
+        const feed = model.get(id.toString("hex"))!;
+        if (timestamp > baseTimestamp + 600 + 3600)
+          return "futureReportIgnored";
+        if (timestamp <= feed.timestamp) return "staleReport";
+        if (id.equals(bounded) && (answer < 0 || answer > 1000))
+          return "answerOutOfMinMaxRange";
+        feed.roundId += 1;
+        feed.timestamp = timestamp;
+        feed.answer = answer;
+        return "feedUpdated";
+      };
+
+      for (let batch = 0; batch < 25; batch++) {
+        if (rand() < 0.2) {
+          writesDisabled = !writesDisabled;
+          await asFeedAdmin(
+            program.methods.setFeedWritesDisabled(
+              [Array.from(freezable)],
+              writesDisabled
+            ),
+            [meta(feedPda(freezable))]
+          );
+        }
+        const reports: Report[] = [];
+        const expected: string[] = [];
+        for (let i = 1 + Math.floor(rand() * 3); i > 0; i--) {
+          const id = pick([open, freezable, bounded, own, unset, invalid]);
+          const latest = model.get(id.toString("hex"))?.timestamp ?? 0;
+          const timestamp = pick([
+            nextTimestamp(),
+            nextTimestamp(),
+            latest, // stale: equal to the latest
+            Math.max(latest - 1, 0), // stale: older
+            reports.length ? reports[reports.length - 1].timestamp : latest, // same as the last in the batch
+            baseTimestamp + 1_000_000, // future
+          ]);
+          const answer = Math.floor(rand() * 1300) - 100;
+          reports.push({ dataId: id, timestamp, answer: new BN(answer) });
+          expected.push(expect(id, timestamp, answer));
+        }
+        const signature = await report(reports);
+        assert.deepEqual(
+          await eventNames(signature),
+          expected,
+          `batch ${batch}`
+        );
+        for (const [hex, want] of model) {
+          const feed = await program.account.feed.fetch(
+            feedPda(Buffer.from(hex, "hex"))
+          );
+          assert.equal(feed.roundId.toNumber(), want.roundId, `batch ${batch}`);
+          assert.equal(feed.latestObservationsTimestamp, want.timestamp);
+          assert.isTrue(feed.latestAnswer.eq(new BN(want.answer)));
+        }
+      }
     });
   });
 

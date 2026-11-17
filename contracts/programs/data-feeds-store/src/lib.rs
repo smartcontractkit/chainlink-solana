@@ -85,7 +85,8 @@ pub mod data_feeds_store {
     // │                       Feed admin                             │
     // ================================================================
 
-    /// Set the workflows allowed to write any data ID without feed-specific metadata.
+    /// Set the workflows allowed to write any data ID without feed-specific metadata. An empty list
+    /// leaves only feeds with their own workflows writable.
     pub fn set_default_feed_metadata(
         ctx: Context<FeedAdminState>,
         workflow_metadata: Vec<WorkflowMetadata>,
