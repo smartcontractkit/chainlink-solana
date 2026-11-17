@@ -858,7 +858,7 @@ func NewSetFeedDescriptionsInstruction(
 }
 
 // Builds a "set_feed_frozen" instruction.
-// Freeze or unfreeze reads of feeds (remaining accounts: feeds).
+// Freeze or unfreeze round reads of feeds, writes continuing (remaining accounts: feeds).
 func NewSetFeedFrozenInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1325,7 +1325,7 @@ func NewSetSpecificFeedMetadataInstruction(
 }
 
 // Builds a "transfer_ownership" instruction.
-// Step 1 of 2: propose a new owner.
+// Step 1 of 2: propose a new owner. The owner changes only when the proposed owner accepts, // so proposing the default key cancels a pending proposal.
 func NewTransferOwnershipInstruction(
 	// Params:
 	proposedOwnerParam solanago.PublicKey,

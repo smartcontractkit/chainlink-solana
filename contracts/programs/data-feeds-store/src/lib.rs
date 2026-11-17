@@ -47,7 +47,8 @@ pub mod data_feeds_store {
         admin::initialize(ctx, config)
     }
 
-    /// Step 1 of 2: propose a new owner.
+    /// Step 1 of 2: propose a new owner. The owner changes only when the proposed owner accepts,
+    /// so proposing the default key cancels a pending proposal.
     pub fn transfer_ownership(ctx: Context<OwnerOnly>, proposed_owner: Pubkey) -> Result<()> {
         admin::transfer_ownership(ctx, proposed_owner)
     }
@@ -153,7 +154,7 @@ pub mod data_feeds_store {
         feeds::set_feed_writes_disabled(ctx, data_ids, disabled)
     }
 
-    /// Freeze or unfreeze reads of feeds (remaining accounts: feeds).
+    /// Freeze or unfreeze round reads of feeds, writes continuing (remaining accounts: feeds).
     pub fn set_feed_frozen<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,

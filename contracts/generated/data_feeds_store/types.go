@@ -434,7 +434,8 @@ func UnmarshalDf1WriteSkipped(buf []byte) (*Df1WriteSkipped, error) {
 type Feed struct {
 	Version uint8 `json:"version"`
 
-	// Reads refuse the feed while set, writes continue
+	// Round reads (`latest_round`, `get_round` and the client crate's) refuse the feed while set;
+	// its description and decimals stay readable, and writes continue
 	Frozen uint8 `json:"frozen"`
 
 	// Fewest decimals a read may ask for

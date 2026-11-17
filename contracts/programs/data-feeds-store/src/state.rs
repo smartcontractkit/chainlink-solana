@@ -43,7 +43,8 @@ pub struct StoreState {
 #[derive(InitSpace)]
 pub struct Feed {
     pub version: u8,
-    /// Reads refuse the feed while set, writes continue
+    /// Round reads (`latest_round`, `get_round` and the client crate's) refuse the feed while set;
+    /// its description and decimals stay readable, and writes continue
     pub frozen: u8,
     /// Fewest decimals a read may ask for
     pub min_decimals: u8,
