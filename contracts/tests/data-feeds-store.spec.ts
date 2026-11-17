@@ -770,6 +770,20 @@ describe("data feeds store", function () {
       );
     });
 
+    it("fails a report whose DF1 feed is passed read-only", async () => {
+      const id = newDataId();
+      const legacy = await createDf1Feed(8);
+      await link(id, legacy);
+      await setWriter(legacy, df1Writer());
+      await expectError(
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }], {
+          df1Feeds: new Map([[id.toString("hex"), legacy]]),
+          accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
+        }),
+        "AccountNotWritable"
+      );
+    });
+
     it("only links DF1 feeds submit can write", async () => {
       const id = newDataId();
       await expectError(link(id, state.publicKey), "InvalidDf1Feed");

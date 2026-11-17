@@ -22,7 +22,9 @@ use crate::{
 ///
 /// A report passes one account per data ID, its feed, plus the linked DF1 feed. What still aborts
 /// the whole transaction: a malformed payload or metadata, an account that is not the data ID's feed
-/// or linked DF1 feed, and a feed not passed writable.
+/// or linked DF1 feed, and a feed or linked DF1 feed not passed writable. Writable flags aren't
+/// covered by the forwarder's signature, so only a faulty or malicious transmitter passes them
+/// read-only; aborting lets another transmitter deliver the report.
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -176,6 +178,9 @@ impl<'info> Batch<'_, 'info> {
             });
         }
         require!(feed_info.is_writable, StoreError::AccountNotWritable);
+        if let Some(info) = df1_info {
+            require!(info.is_writable, StoreError::AccountNotWritable);
+        }
 
         if let Some(info) = df1_info {
             let disabled = self.feed.df1_write_disabled != 0;

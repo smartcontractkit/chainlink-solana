@@ -320,7 +320,6 @@ const (
 	Df1SkipReason_Stale
 	Df1SkipReason_AnswerOverflow
 	Df1SkipReason_RoundIdOverflow
-	Df1SkipReason_NotWritable
 )
 
 func (value Df1SkipReason) String() string {
@@ -341,8 +340,6 @@ func (value Df1SkipReason) String() string {
 		return "AnswerOverflow"
 	case Df1SkipReason_RoundIdOverflow:
 		return "RoundIdOverflow"
-	case Df1SkipReason_NotWritable:
-		return "NotWritable"
 	default:
 		return ""
 	}

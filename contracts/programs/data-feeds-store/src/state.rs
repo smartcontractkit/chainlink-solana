@@ -212,6 +212,4 @@ pub enum Df1SkipReason {
     AnswerOverflow,
     /// The DF1 feed's round counter is exhausted
     RoundIdOverflow,
-    /// The DF1 feed account was not passed writable
-    NotWritable,
 }

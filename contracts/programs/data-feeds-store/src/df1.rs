@@ -83,9 +83,6 @@ pub fn check_round(
     answer: i128,
 ) -> std::result::Result<i128, Df1SkipReason> {
     check_layout(info, program)?;
-    if !info.is_writable {
-        return Err(Df1SkipReason::NotWritable);
-    }
     let data = info
         .try_borrow_data()
         .map_err(|_| Df1SkipReason::InvalidAccount)?;
@@ -248,10 +245,6 @@ mod tests {
         assert_eq!(
             check(&mut d, &program, &program, &other, true, 101),
             Err(Df1SkipReason::NotWriter)
-        );
-        assert_eq!(
-            check(&mut d, &program, &program, &writer, false, 101),
-            Err(Df1SkipReason::NotWritable)
         );
         assert_eq!(
             check(&mut d, &program, &program, &writer, true, 100),
