@@ -240,7 +240,8 @@ pub mod data_feeds_store {
         reads::get_min_decimals(ctx, data_id)
     }
 
-    /// Whether a workflow may write a data ID.
+    /// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it
+    /// is on the feed's own list or the default list. Takes the data ID's feed account.
     pub fn check_feed_permission(
         ctx: Context<PermissionRead>,
         data_id: [u8; 16],

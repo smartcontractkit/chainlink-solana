@@ -11,7 +11,10 @@ use crate::{
     error::StoreError,
     logic::{self, ScaleError, StoredRound},
     state::{Feed, Round, StoreState, WorkflowMetadata},
-    utils::{decode_description, has_permission, load_boxed, load_feed_into, RingRef},
+    utils::{
+        decode_description, feed_address, has_permission, is_uninitialized, load_boxed,
+        load_feed_into, RingRef,
+    },
 };
 
 impl From<ScaleError> for StoreError {
@@ -85,9 +88,10 @@ pub fn get_min_decimals(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<u8>
     Ok(load(&ctx, &data_id)?.min_decimals)
 }
 
-/// Whether a workflow may write a data ID, through its feed-specific metadata when configured and
-/// the store's default metadata otherwise (also when no feed is passed). Writes disabled for the
-/// data ID are not considered.
+/// Whether a workflow may write a data ID: false while its feed hasn't been set (reports for it are
+/// skipped), otherwise whether the workflow is on the feed's own list, or the store's default list
+/// when the feed has none. The feed account is required, so the answer always uses the list that
+/// applies. As on EVM, the write freeze is not considered.
 pub fn check_feed_permission(
     ctx: Context<PermissionRead>,
     data_id: [u8; 16],
@@ -99,11 +103,16 @@ pub fn check_feed_permission(
         StoreError::InvalidDataId
     );
     let state_info = ctx.accounts.state.to_account_info();
+    let feed_info = ctx.accounts.feed.to_account_info();
+    // a feed that hasn't been set takes no reports, whatever the default workflows say
+    if is_uninitialized(&feed_info) {
+        let (address, _) = feed_address(state_info.key, &data_id);
+        require_keys_eq!(address, *feed_info.key, StoreError::AccountMismatch);
+        return Ok(false);
+    }
     let state: Box<StoreState> = load_boxed(&state_info)?;
     let mut feed: Box<Feed> = bytemuck::zeroed_box();
-    if let Some(info) = &ctx.accounts.feed {
-        load_feed_into(&info.to_account_info(), state_info.key, &data_id, &mut feed)?;
-    }
+    load_feed_into(&feed_info, state_info.key, &data_id, &mut feed)?;
     Ok(has_permission(
         &feed.specific_workflow_metadata,
         &state.default_workflow_metadata,

@@ -120,8 +120,8 @@ pub struct PermissionRead<'info> {
     #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
-    /// Feed of the data ID, the default metadata applies when omitted
-    pub feed: Option<AccountLoader<'info, Feed>>,
+    /// CHECK: the data ID's feed PDA, which may not exist yet; checked in the handler
+    pub feed: UncheckedAccount<'info>,
 }
 
 #[event_cpi]

@@ -426,12 +426,15 @@ describe("data feeds store", function () {
 
     it("checks feed permissions", async () => {
       const id = newDataId();
-      const check = (feed: PublicKey | null) =>
+      const check = (feed: PublicKey) =>
         program.methods
           .checkFeedPermission(Array.from(id), workflow())
           .accountsStrict({ state: state.publicKey, feed })
           .view();
-      assert.isTrue(await check(null), "default metadata");
+      assert.isFalse(await check(feedPda(id)), "a feed that isn't set");
+      await expectError(check(feedPda(newDataId())), "AccountMismatch");
+      await setFeeds([id]);
+      assert.isTrue(await check(feedPda(id)), "default metadata");
       await setFeeds([id], [""], [workflow(randomBytes(10))]);
       assert.isFalse(
         await check(feedPda(id)),
@@ -754,17 +757,32 @@ describe("data feeds store", function () {
         answer: new BN(live.subarray(16, 32), "le").fromTwos(128),
       };
     };
-    const link = (id: Buffer, feed: PublicKey, disabled = false) =>
-      program.methods
+    // marker of a linked DF1 feed, so no two data IDs link one DF1 feed
+    const df1Link = (feed: PublicKey) =>
+      PublicKey.findProgramAddressSync(
+        [Buffer.from("df1_link"), state.publicKey.toBuffer(), feed.toBuffer()],
+        program.programId
+      )[0];
+    const linkedDf1Feed = async (id: Buffer) =>
+      (await exists(feedPda(id)))
+        ? ((await program.account.feed.fetch(feedPda(id))).df1Feed as PublicKey)
+        : PublicKey.default;
+    const link = async (id: Buffer, feed: PublicKey, disabled = false) => {
+      const current = await linkedDf1Feed(id);
+      const accounts = [meta(feedPda(id))];
+      if (!current.equals(PublicKey.default) && !current.equals(feed)) {
+        accounts.push(meta(df1Link(current)));
+      }
+      if (!feed.equals(PublicKey.default)) {
+        accounts.push(meta(feed, false), meta(df1Link(feed)));
+      }
+      return program.methods
         .setDf1Feeds([Array.from(id)], [feed], [disabled])
         .accountsStrict(adminAccounts())
-        .remainingAccounts(
-          feed.equals(PublicKey.default)
-            ? [meta(feedPda(id))]
-            : [meta(feedPda(id)), meta(feed, false)]
-        )
+        .remainingAccounts(accounts)
         .signers([feedAdmin.keypair])
         .rpc();
+    };
     const skipReason = async (signature: string) =>
       (await cpiEvents(signature)).find((e) => e.name === "df1WriteSkipped")
         ?.data.reason;
@@ -888,6 +906,31 @@ describe("data feeds store", function () {
         ),
         "AccountNotWritable"
       );
+    });
+
+    it("links a DF1 feed from one data ID at a time", async () => {
+      // the data ID a DF1 feed's marker holds, zero padded; all zero when unlinked
+      const linkedFrom = async (feed: PublicKey) =>
+        (await connection.getAccountInfo(df1Link(feed)))!.data.subarray(16, 48);
+      const [a, b] = [newDataId(), newDataId()];
+      const [x, y] = [await createDf1Feed(8), await createDf1Feed(8)];
+      await link(a, x);
+      assert.deepEqual(await linkedFrom(x), seed32(a));
+      // relinking the same feed keeps its marker
+      await link(a, x, true);
+      await expectError(link(b, x), "Df1FeedAlreadyLinked");
+
+      // moving a to y frees x for b
+      await link(a, y);
+      assert.deepEqual(await linkedFrom(x), Buffer.alloc(32));
+      assert.deepEqual(await linkedFrom(y), seed32(a));
+      await link(b, x);
+      assert.deepEqual(await linkedFrom(x), seed32(b));
+
+      // unlinking clears the marker
+      await link(b, PublicKey.default);
+      assert.deepEqual(await linkedFrom(x), Buffer.alloc(32));
+      assert.isTrue((await linkedDf1Feed(b)).equals(PublicKey.default));
     });
 
     it("only links DF1 feeds submit can write", async () => {

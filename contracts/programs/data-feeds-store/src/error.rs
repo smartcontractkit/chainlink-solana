@@ -63,4 +63,6 @@ pub enum StoreError {
     RoundsToZero,
     #[msg("feed is frozen")]
     FeedFrozen,
+    #[msg("DF1 feed is already linked from another data ID")]
+    Df1FeedAlreadyLinked,
 }

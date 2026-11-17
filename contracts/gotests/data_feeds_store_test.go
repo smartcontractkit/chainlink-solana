@@ -173,12 +173,16 @@ func TestDataFeedsStore(t *testing.T) {
 		require.NoError(t, err)
 		ix, err := data_feeds_store.NewSetDf1FeedsInstruction([][16]uint8{id}, []solana.PublicKey{legacy.PublicKey()}, []bool{false},
 			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
+		// the DF1 feed's link marker, so no two data IDs link it
+		link, _, err := solana.FindProgramAddress([][]byte{[]byte("df1_link"), storeState.PublicKey().Bytes(), legacy.PublicKey().Bytes()},
+			data_feeds_store.ProgramID)
+		require.NoError(t, err)
 		send([]solana.Instruction{
 			build(system.NewCreateAccountInstruction(df1Rent, df1Space, store.ProgramID, deployer.PublicKey(), legacy.PublicKey()).ValidateAndBuild()),
 			build(store.NewCreateFeedInstruction("ETH / USD", 8, 1, 1, legacy.PublicKey(), deployer.PublicKey())),
 			build(store.NewSetWriterInstruction(df1Writer, legacy.PublicKey(), deployer.PublicKey(), deployer.PublicKey())),
 			setFeeds(id),
-			adminIx(ix, err, [][16]uint8{id}, solana.Meta(legacy.PublicKey())),
+			adminIx(ix, err, [][16]uint8{id}, solana.Meta(legacy.PublicKey()), solana.Meta(link).WRITE()),
 		}, legacy)
 		return target{id: id, legacy: legacy.PublicKey()}
 	}

@@ -29,6 +29,8 @@ pub const FEED_SEED: &[u8] = b"feed";
 pub const STORE_AUTHORITY_SEED: &[u8] = b"store_authority";
 /// The store's signer towards DF1, set as the writer of DF1 feeds it keeps written: `[seed, state]`.
 pub const DF1_WRITER_SEED: &[u8] = b"df1_writer";
+/// Marks a DF1 feed as linked from one data ID, so no two data IDs write it: `[seed, state, df1 feed]`.
+pub const DF1_LINK_SEED: &[u8] = b"df1_link";
 
 /// The DF1 store's `Transmissions` feed accounts and `submit` instruction, as deployed. The store
 /// checks everything `submit` could fail on before calling it.

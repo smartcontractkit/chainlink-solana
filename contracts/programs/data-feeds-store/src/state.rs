@@ -97,6 +97,18 @@ pub fn feed_account_len(max_stored_reports: u64) -> usize {
         .saturating_add(FEED_RING_OFFSET)
 }
 
+/// Marks which data ID links a DF1 feed (PDA `["df1_link", state, df1_feed]`), so two data IDs can
+/// never both write it. Created on the DF1 feed's first link and cleared (zero data ID) when the link
+/// is removed. Reports never read it.
+#[account(zero_copy)]
+#[derive(InitSpace)]
+pub struct Df1Link {
+    pub version: u8,
+    pub _padding0: [u8; 7],
+    /// Data ID zero padded to 32 bytes whose feed links the DF1 feed, zero when unlinked
+    pub data_id: [u8; 32],
+}
+
 /// One stored round of a feed's history.
 #[zero_copy]
 #[derive(Default, Debug, PartialEq, Eq, InitSpace)]
@@ -142,6 +154,7 @@ pub struct WorkflowMetadata {
 const_assert_eq!(size_of::<StoreState>(), 3232);
 const_assert_eq!(size_of::<Feed>(), 1328);
 const_assert_eq!(size_of::<StoredReport>(), 32);
+const_assert_eq!(size_of::<Df1Link>(), 40);
 // Offsets readers decode feed accounts by (add 8 for the discriminator); `state` is the
 // getProgramAccounts filter for a store's feeds.
 const_assert_eq!(std::mem::offset_of!(Feed, frozen), 1);

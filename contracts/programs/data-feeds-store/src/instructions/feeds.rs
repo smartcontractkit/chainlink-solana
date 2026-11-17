@@ -2,22 +2,25 @@
 //! doesn't exist yet is created first, the feed admin paying its rent: on Solana a feed is set by a
 //! feed admin, as on Aptos and Stellar, since the forwarder passes no account that could pay for it.
 
+use std::mem::size_of;
+
 use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, FEED_SEED, MAX_ACCOUNT_DATA_INCREASE, MAX_WORKFLOW_METADATAS,
-        STORED_DECIMALS,
+        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_LINK_SEED, FEED_SEED, MAX_ACCOUNT_DATA_INCREASE,
+        MAX_WORKFLOW_METADATAS, STORED_DECIMALS,
     },
     context::FeedAdminAccounts,
     data_id, df1,
     error::StoreError,
     event::*,
     logic::{check_max_stored_reports, MaxStoredReportsError},
-    state::{feed_account_len, Feed, WorkflowMetadata},
+    state::{feed_account_len, Df1Link, Feed, WorkflowMetadata},
     utils::{
         create_pda_account, encode_description, feed_address, is_uninitialized, load_feed_into,
-        store_feed, validate_data_id, validate_workflow_metadata, verify_feed_admin, EventEmitter,
+        next_account, store_feed, validate_data_id, validate_workflow_metadata, verify_feed_admin,
+        EventEmitter,
     },
 };
 
@@ -338,9 +341,14 @@ pub fn set_min_decimals<'info>(
 }
 
 /// Link data IDs to the DF1 feeds this store keeps written with their rounds (default pubkey
-/// unlinks), and enable or disable that write. Remaining accounts: the feeds, then each linked DF1
-/// feed account in order, which must be a DF1 feed `submit` can write. A DF1 feed should be linked
-/// from one data ID only; the deployment tooling checks that across feeds.
+/// unlinks), and enable or disable that write. A DF1 feed is linked from at most one data ID: it has a
+/// marker PDA `["df1_link", state, df1_feed]` holding the data ID that links it, created on its first
+/// link (the feed admin paying, about 0.001 SOL) and cleared, not closed, when the link is removed.
+/// Reports never read the marker. Moving a DF1 feed between data IDs in one call needs the unlink
+/// first.
+///
+/// Remaining accounts: the feeds, then for each data ID in order: the marker of its current DF1
+/// feed if the link changes away from it, then the new DF1 feed and its marker if one is linked.
 pub fn set_df1_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -351,39 +359,136 @@ pub fn set_df1_feeds<'info>(
         data_ids.len() == df1_feeds.len() && data_ids.len() == write_disabled.len(),
         StoreError::ArrayLengthMismatch
     );
-    let linked = df1_feeds
-        .iter()
-        .filter(|feed| **feed != Pubkey::default())
-        .count();
-    require_eq!(
+    require_gte!(
         ctx.remaining_accounts.len(),
-        data_ids.len() + linked,
+        data_ids.len(),
         StoreError::InvalidAccountCount
     );
-    let (feeds, df1_infos) = ctx.remaining_accounts.split_at(data_ids.len());
+    let (feeds, links) = ctx.remaining_accounts.split_at(data_ids.len());
+    let mut links = links.iter();
     let df1_program = ctx.accounts.state.load()?.df1_program;
-    let mut df1_infos = df1_infos.iter();
-    for df1_feed in df1_feeds.iter() {
-        if *df1_feed != Pubkey::default() {
-            let info = df1_infos.next().unwrap();
-            require_keys_eq!(*info.key, *df1_feed, StoreError::AccountMismatch);
+    let state = ctx.accounts.state.key();
+    let payer = ctx.accounts.feed_admin.to_account_info();
+    let system_program = ctx.accounts.system_program.to_account_info();
+    update_feeds(&ctx, &data_ids, feeds, |i, id, feed, events| {
+        let (old, new) = (feed.df1_feed, df1_feeds[i]);
+        if old != Pubkey::default() && old != new {
+            unlink_df1_feed(next_account(&mut links)?, &state, &old, id)?;
+        }
+        if new != Pubkey::default() {
+            let info = next_account(&mut links)?;
+            require_keys_eq!(*info.key, new, StoreError::AccountMismatch);
             require!(
                 df1::check_layout(info, &df1_program).is_ok(),
                 StoreError::InvalidDf1Feed
             );
+            link_df1_feed(
+                next_account(&mut links)?,
+                &state,
+                &new,
+                id,
+                &payer,
+                &system_program,
+            )?;
         }
-    }
-    let state = ctx.accounts.state.key();
-    update_feeds(&ctx, &data_ids, feeds, |i, id, feed, events| {
-        feed.df1_feed = df1_feeds[i];
+        feed.df1_feed = new;
         feed.df1_write_disabled = write_disabled[i] as u8;
         events.emit(&Df1FeedSet {
             state,
             data_id: *id,
-            df1_feed: df1_feeds[i],
+            df1_feed: new,
             write_disabled: write_disabled[i],
         })
-    })
+    })?;
+    require!(links.next().is_none(), StoreError::InvalidAccountCount);
+    Ok(())
+}
+
+/// Create a DF1 feed's link marker for a data ID, or check it already belongs to that data ID.
+fn link_df1_feed<'info>(
+    marker: &AccountInfo<'info>,
+    state: &Pubkey,
+    df1_feed: &Pubkey,
+    id: &[u8; 16],
+    payer: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+) -> Result<()> {
+    let (address, bump) = df1_link_address(state, df1_feed);
+    require_keys_eq!(*marker.key, address, StoreError::AccountMismatch);
+    let seed = data_id::to_seed(id);
+    if is_uninitialized(marker) {
+        create_pda_account(
+            ANCHOR_DISCRIMINATOR + size_of::<Df1Link>(),
+            &[DF1_LINK_SEED, state.as_ref(), df1_feed.as_ref(), &[bump]],
+            payer,
+            marker,
+            system_program,
+        )?;
+    } else {
+        let linked = linked_data_id(marker)?;
+        require!(
+            linked == [0; 32] || linked == seed,
+            StoreError::Df1FeedAlreadyLinked
+        );
+    }
+    write_link(marker, seed)
+}
+
+fn write_link(marker: &AccountInfo, data_id: [u8; 32]) -> Result<()> {
+    let link = Df1Link {
+        version: ACCOUNT_VERSION,
+        _padding0: [0; 7],
+        data_id,
+    };
+    let mut data = marker.try_borrow_mut_data()?;
+    data[..ANCHOR_DISCRIMINATOR].copy_from_slice(Df1Link::DISCRIMINATOR);
+    data[ANCHOR_DISCRIMINATOR..].copy_from_slice(bytemuck::bytes_of(&link));
+    Ok(())
+}
+
+/// Clear a DF1 feed's link marker held by a data ID, so another data ID can link the DF1 feed. The
+/// marker is kept rather than closed: closing moves lamports by hand, which the runtime refuses
+/// once a later call to another program follows in the same instruction.
+fn unlink_df1_feed(
+    marker: &AccountInfo,
+    state: &Pubkey,
+    df1_feed: &Pubkey,
+    id: &[u8; 16],
+) -> Result<()> {
+    let (address, _) = df1_link_address(state, df1_feed);
+    require_keys_eq!(*marker.key, address, StoreError::AccountMismatch);
+    require!(
+        linked_data_id(marker)? == data_id::to_seed(id),
+        StoreError::AccountMismatch
+    );
+    write_link(marker, [0; 32])
+}
+
+/// The data ID (as its 32-byte seed) a link marker of this store holds.
+fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
+    require_keys_eq!(*marker.owner, crate::ID, StoreError::InvalidAccount);
+    require!(marker.is_writable, StoreError::AccountNotWritable);
+    let data = marker.try_borrow_data()?;
+    require!(
+        data.len() == ANCHOR_DISCRIMINATOR + size_of::<Df1Link>()
+            && &data[..ANCHOR_DISCRIMINATOR] == Df1Link::DISCRIMINATOR,
+        StoreError::InvalidAccount
+    );
+    let link: &Df1Link = bytemuck::from_bytes(&data[ANCHOR_DISCRIMINATOR..]);
+    require_eq!(
+        link.version,
+        ACCOUNT_VERSION,
+        StoreError::InvalidAccountVersion
+    );
+    Ok(link.data_id)
+}
+
+/// The link marker address of a DF1 feed under a store state, and its bump.
+pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[DF1_LINK_SEED, state.as_ref(), df1_feed.as_ref()],
+        &crate::ID,
+    )
 }
 
 /// Grow the number of rounds feeds keep: only up, only before a feed's ring wraps, by at most 10KiB

@@ -50,7 +50,7 @@ func NewAcceptOwnershipInstruction(
 }
 
 // Builds a "check_feed_permission" instruction.
-// Whether a workflow may write a data ID.
+// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it // is on the feed's own list or the default list. Takes the data ID's feed account.
 func NewCheckFeedPermissionInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -86,8 +86,7 @@ func NewCheckFeedPermissionInstruction(
 	{
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
-		// Account 1 "feed": Read-only, Non-signer, Optional
-		// Feed of the data ID, the default metadata applies when omitted
+		// Account 1 "feed": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -1507,9 +1506,8 @@ type CheckFeedPermissionInstruction struct {
 	WorkflowMetadata WorkflowMetadata `json:"workflow_metadata"`
 
 	// Accounts:
-	State        solanago.PublicKey `json:"state"`
-	Feed         solanago.PublicKey `json:"feed"`
-	FeedOptional bool               `json:"feed_optional"`
+	State solanago.PublicKey `json:"state"`
+	Feed  solanago.PublicKey `json:"feed"`
 }
 
 func (obj *CheckFeedPermissionInstruction) GetDiscriminator() []byte {
