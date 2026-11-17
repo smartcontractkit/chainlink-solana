@@ -25,7 +25,6 @@ fn u32_at(data: &[u8], offset: usize) -> u32 {
 
 /// Whether `info` is a DF1 feed account of `program` that `submit` can write: the account layout,
 /// its version and the ring geometry `submit` indexes without checking. Not the writer or the round.
-#[allow(clippy::manual_is_multiple_of)] // is_multiple_of is newer than the SBF toolchain
 pub fn check_layout(
     info: &AccountInfo,
     program: &Pubkey,
@@ -46,16 +45,18 @@ pub fn check_layout(
     let live_cursor = u64::from(u32_at(&data, df1::LIVE_CURSOR));
     let rings = (data.len() - df1::RINGS) as u64;
     let transmission = df1::TRANSMISSION_LEN as u64;
+    let live_bytes = live_length * transmission;
     // `submit` splits the data into a live and a historical ring and indexes both by cursor, so a
     // geometry it would panic on is not a feed it can write
-    if live_length == 0
-        || live_cursor >= live_length
-        || rings < live_length * transmission
-        || (rings - live_length * transmission) % transmission != 0
-    {
+    if live_length == 0 || live_cursor >= live_length || rings < live_bytes {
         return Err(Df1SkipReason::InvalidAccount);
     }
-    let historical_length = (rings - live_length * transmission) / transmission;
+    let historical_bytes = rings - live_bytes;
+    let historical_length = historical_bytes / transmission;
+    // nor is one ending in a partial transmission
+    if historical_length * transmission != historical_bytes {
+        return Err(Df1SkipReason::InvalidAccount);
+    }
     if historical_length > 0
         && (data[df1::GRANULARITY] == 0
             || u64::from(u32_at(&data, df1::HISTORICAL_CURSOR)) >= historical_length)
