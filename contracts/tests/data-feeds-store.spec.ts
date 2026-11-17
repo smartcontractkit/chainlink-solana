@@ -1,6 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
-import { AccountMeta, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  AccountMeta,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+} from "@solana/web3.js";
 import { assert } from "chai";
 import { randomBytes } from "crypto";
 import { DataFeedsStore } from "../target/types/data_feeds_store";
@@ -242,7 +247,8 @@ describe("data feeds store", function () {
       .latestRound(Array.from(id), decimals)
       .accountsStrict(read(id))
       .view())!;
-  const latestAnswer = async (id: Buffer) => (await readLatest(id)).answer as BN;
+  const latestAnswer = async (id: Buffer) =>
+    (await readLatest(id)).answer as BN;
   const exists = async (key: PublicKey) =>
     (await connection.getAccountInfo(key)) !== null;
 
@@ -333,7 +339,11 @@ describe("data feeds store", function () {
       await expectError(
         initializeStore(feedAdmin.keypair.publicKey, other.publicKey)
           .preInstructions([
-            await createAccount(other, program.account.storeState.size, program.programId),
+            await createAccount(
+              other,
+              program.account.storeState.size,
+              program.programId
+            ),
           ])
           .signers([other, feedAdmin.keypair])
           .rpc(),
@@ -377,7 +387,11 @@ describe("data feeds store", function () {
     it("sets feeds: creates them, with descriptions and their own workflows", async () => {
       const [a, b] = [newDataId(), newDataId()];
       const before = await connection.getBalance(feedAdmin.keypair.publicKey);
-      const signature = await setFeeds([a, b], ["ETH / USD", "BTC / USD"], [workflow()]);
+      const signature = await setFeeds(
+        [a, b],
+        ["ETH / USD", "BTC / USD"],
+        [workflow()]
+      );
       assert.isBelow(
         await connection.getBalance(feedAdmin.keypair.publicKey),
         before,
@@ -389,7 +403,10 @@ describe("data feeds store", function () {
         "specificFeedMetadataSet",
       ]);
       const description = (id: Buffer) =>
-        program.methods.description(Array.from(id)).accountsStrict(read(id)).view();
+        program.methods
+          .description(Array.from(id))
+          .accountsStrict(read(id))
+          .view();
       assert.equal(await description(a), "ETH / USD");
       assert.equal(await description(b), "BTC / USD");
       const feed = await program.account.feed.fetch(feedPda(a));
@@ -398,7 +415,9 @@ describe("data feeds store", function () {
       assert.equal(feed.specificWorkflowMetadata.len.toNumber(), 1);
 
       // setting an existing feed again keeps its rounds and changes its description
-      await report([{ dataId: a, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await report([
+        { dataId: a, timestamp: nextTimestamp(), answer: new BN(1) },
+      ]);
       await setFeeds([a], ["ETH / USD (1)"]);
       assert.equal(await description(a), "ETH / USD (1)");
       assert.equal((await readLatest(a)).roundId.toNumber(), 1);
@@ -438,15 +457,18 @@ describe("data feeds store", function () {
         { dataId: unset, timestamp: ts, answer: new BN(1) },
       ]);
       const events = await cpiEvents(signature);
-      assert.includeMembers(events.map((e) => e.name), [
-        "feedUpdated",
-        "feedNotInitializedIgnored",
-      ]);
+      assert.includeMembers(
+        events.map((e) => e.name),
+        ["feedUpdated", "feedNotInitializedIgnored"]
+      );
       // skip events before the permission check carry the sender: anyone can cause them
       for (const e of events.filter((e) => e.name.endsWith("Ignored"))) {
         assert.isTrue(e.data.sender.equals(forwarderAuthority));
       }
-      assert.isFalse(await exists(feedPda(unset)), "reports never create feeds");
+      assert.isFalse(
+        await exists(feedPda(unset)),
+        "reports never create feeds"
+      );
 
       const round = await readLatest(set);
       assert.equal(round.roundId.toNumber(), 1);
@@ -469,9 +491,12 @@ describe("data feeds store", function () {
       const [id, other] = [newDataId(), newDataId()];
       await setFeeds([id, other]);
       await expectError(
-        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
-          accounts: () => [meta(feedPda(other))],
-        }),
+        report(
+          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }],
+          {
+            accounts: () => [meta(feedPda(other))],
+          }
+        ),
         "AccountMismatch"
       );
     });
@@ -490,7 +515,11 @@ describe("data feeds store", function () {
 
       // two transactions: a legacy transaction fits fewer reports than the program takes
       const first = await report([
-        { dataId: withSvrPath(newDataId(), 1), timestamp: nextTimestamp(), answer: new BN(1) },
+        {
+          dataId: withSvrPath(newDataId(), 1),
+          timestamp: nextTimestamp(),
+          answer: new BN(1),
+        },
         { dataId: a, timestamp: ts, answer: new BN(2) },
         { dataId: a, timestamp: baseTimestamp + 1_000_000, answer: new BN(3) },
       ]);
@@ -498,13 +527,16 @@ describe("data feeds store", function () {
         { dataId: b, timestamp: nextTimestamp(), answer: new BN(11) },
         { dataId: b, timestamp: nextTimestamp(), answer: new BN(9) },
       ]);
-      assert.includeMembers([...(await eventNames(first)), ...(await eventNames(second))], [
-        "invalidDataIdIgnored",
-        "staleReport",
-        "futureReportIgnored",
-        "answerOutOfMinMaxRange",
-        "feedUpdated",
-      ]);
+      assert.includeMembers(
+        [...(await eventNames(first)), ...(await eventNames(second))],
+        [
+          "invalidDataIdIgnored",
+          "staleReport",
+          "futureReportIgnored",
+          "answerOutOfMinMaxRange",
+          "feedUpdated",
+        ]
+      );
       assert.isTrue((await latestAnswer(a)).eq(new BN(1)), "a untouched");
       assert.isTrue((await latestAnswer(b)).eq(new BN(9)), "in range lands");
     });
@@ -520,10 +552,15 @@ describe("data feeds store", function () {
       ]);
       const events = await cpiEvents(signature);
       assert.deepEqual(
-        events.filter((e) => e.name === "feedUpdated").map((e) => e.data.roundId.toNumber()),
+        events
+          .filter((e) => e.name === "feedUpdated")
+          .map((e) => e.data.roundId.toNumber()),
         [1, 2]
       );
-      assert.include(events.map((e) => e.name), "staleReport");
+      assert.include(
+        events.map((e) => e.name),
+        "staleReport"
+      );
       const latest = await readLatest(id);
       assert.equal(latest.roundId.toNumber(), 2);
       assert.isTrue(latest.answer.eq(new BN(2)));
@@ -532,7 +569,9 @@ describe("data feeds store", function () {
     it("disables writes for every workflow, reads continue", async () => {
       const id = newDataId();
       await setFeeds([id]);
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
+      ]);
       const disable = (disabled: boolean) =>
         program.methods
           .setFeedWritesDisabled([Array.from(id)], disabled)
@@ -555,14 +594,18 @@ describe("data feeds store", function () {
       assert.include(await eventNames(signature), "feedWritesDisabledIgnored");
 
       await disable(false);
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(3) },
+      ]);
       assert.isTrue((await latestAnswer(id)).eq(new BN(3)));
     });
 
     it("freezes reads, writes continue", async () => {
       const id = newDataId();
       await setFeeds([id]);
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
+      ]);
       const freeze = (frozen: boolean) =>
         program.methods
           .setFeedFrozen([Array.from(id)], frozen)
@@ -572,7 +615,9 @@ describe("data feeds store", function () {
           .rpc();
       await freeze(true);
       await expectError(readLatest(id), "FeedFrozen");
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(2) },
+      ]);
       await freeze(false);
       assert.equal((await readLatest(id)).roundId.toNumber(), 2);
     });
@@ -594,9 +639,12 @@ describe("data feeds store", function () {
       const id = newDataId();
       await setFeeds([id]);
       await expectError(
-        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }], {
-          accounts: (r) => [meta(feedPda(r.dataId), false)],
-        }),
+        report(
+          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2) }],
+          {
+            accounts: (r) => [meta(feedPda(r.dataId), false)],
+          }
+        ),
         "AccountNotWritable"
       );
     });
@@ -605,7 +653,11 @@ describe("data feeds store", function () {
       const id = newDataId();
       await setFeeds([id]);
       await report([
-        { dataId: id, timestamp: nextTimestamp(), answer: new BN(123456789).mul(E18).divn(100) },
+        {
+          dataId: id,
+          timestamp: nextTimestamp(),
+          answer: new BN(123456789).mul(E18).divn(100),
+        },
       ]);
       await expectError(readLatest(id, 8), "InvalidDecimals");
       await expectError(readLatest(id, 19), "InvalidDecimals");
@@ -616,15 +668,23 @@ describe("data feeds store", function () {
         .signers([feedAdmin.keypair])
         .rpc();
       assert.equal(
-        await program.methods.getMinDecimals(Array.from(id)).accountsStrict(read(id)).view(),
+        await program.methods
+          .getMinDecimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
         0
       );
       assert.equal(
-        await program.methods.decimals(Array.from(id)).accountsStrict(read(id)).view(),
+        await program.methods
+          .decimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
         18
       );
       assert.isTrue(
-        (await readLatest(id, 8)).answer.eq(new BN(123456789).mul(E8).divn(100)),
+        (await readLatest(id, 8)).answer.eq(
+          new BN(123456789).mul(E8).divn(100)
+        ),
         "rescaled"
       );
       const round = await program.methods
@@ -632,7 +692,9 @@ describe("data feeds store", function () {
         .accountsStrict(read(id))
         .view();
       assert.isTrue(round.answer.eq(new BN(1234567)), "truncated");
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(1) },
+      ]);
       await expectError(readLatest(id, 8), "RoundsToZero");
     });
 
@@ -640,10 +702,15 @@ describe("data feeds store", function () {
       const id = newDataId();
       await setFeeds([id]);
       for (let i = 1; i <= 5; i++) {
-        await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(i) }]);
+        await report([
+          { dataId: id, timestamp: nextTimestamp(), answer: new BN(i) },
+        ]);
       }
       const round = (r: number) =>
-        program.methods.getRound(Array.from(id), new BN(r), 18).accountsStrict(read(id)).view();
+        program.methods
+          .getRound(Array.from(id), new BN(r), 18)
+          .accountsStrict(read(id))
+          .view();
       // a ring of 4: rounds 2..=5 kept
       assert.isTrue((await round(2)).answer.eq(new BN(2)));
       assert.isTrue((await round(5)).answer.eq(new BN(5)));
@@ -669,11 +736,18 @@ describe("data feeds store", function () {
     const setWriter = (feed: PublicKey, writer: PublicKey) =>
       df1.methods
         .setWriter(writer)
-        .accounts({ feed, owner: provider.publicKey, authority: provider.publicKey })
+        .accounts({
+          feed,
+          owner: provider.publicKey,
+          authority: provider.publicKey,
+        })
         .rpc();
     const df1Round = async (feed: PublicKey) => {
       const header = await df1.account.transmissions.fetch(feed);
-      const live = (await connection.getAccountInfo(feed))!.data.subarray(200, 248);
+      const live = (await connection.getAccountInfo(feed))!.data.subarray(
+        200,
+        248
+      );
       return {
         roundId: header.latestRoundId,
         timestamp: live.readUInt32LE(8),
@@ -692,8 +766,8 @@ describe("data feeds store", function () {
         .signers([feedAdmin.keypair])
         .rpc();
     const skipReason = async (signature: string) =>
-      (await cpiEvents(signature)).find((e) => e.name === "df1WriteSkipped")?.data
-        .reason;
+      (await cpiEvents(signature)).find((e) => e.name === "df1WriteSkipped")
+        ?.data.reason;
 
     it("keeps a linked DF1 feed written once it is the writer", async () => {
       const id = newDataId();
@@ -704,7 +778,13 @@ describe("data feeds store", function () {
 
       // writer still OCR2: the round is stored, DF1 is skipped
       let signature = await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(2).mul(E18) }],
+        [
+          {
+            dataId: id,
+            timestamp: nextTimestamp(),
+            answer: new BN(2).mul(E18),
+          },
+        ],
         { df1Feeds }
       );
       assert.deepEqual(await skipReason(signature), { notWriter: {} });
@@ -725,7 +805,13 @@ describe("data feeds store", function () {
 
       // not passed: DF1 skipped, the round still stored
       signature = await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(3).mul(E18) }],
+        [
+          {
+            dataId: id,
+            timestamp: nextTimestamp(),
+            answer: new BN(3).mul(E18),
+          },
+        ],
         { df1Feeds, passDf1: false }
       );
       assert.deepEqual(await skipReason(signature), { notPassed: {} });
@@ -734,12 +820,21 @@ describe("data feeds store", function () {
       // DF1 already has a newer round
       await setWriter(legacy, provider.publicKey);
       await df1.methods
-        .submit({ timestamp: new BN(baseTimestamp + 100_000), answer: new BN(1) })
+        .submit({
+          timestamp: new BN(baseTimestamp + 100_000),
+          answer: new BN(1),
+        })
         .accounts({ feed: legacy, authority: provider.publicKey })
         .rpc();
       await setWriter(legacy, df1Writer());
       signature = await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(4).mul(E18) }],
+        [
+          {
+            dataId: id,
+            timestamp: nextTimestamp(),
+            answer: new BN(4).mul(E18),
+          },
+        ],
         { df1Feeds }
       );
       assert.deepEqual(await skipReason(signature), { stale: {} });
@@ -747,7 +842,13 @@ describe("data feeds store", function () {
       // disabled
       await link(id, legacy, true);
       signature = await report(
-        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(5).mul(E18) }],
+        [
+          {
+            dataId: id,
+            timestamp: nextTimestamp(),
+            answer: new BN(5).mul(E18),
+          },
+        ],
         { df1Feeds }
       );
       assert.deepEqual(await skipReason(signature), { disabled: {} });
@@ -756,7 +857,9 @@ describe("data feeds store", function () {
 
       // rollback is DF1's set_writer; unlinking drops the account from reports
       await link(id, PublicKey.default);
-      await report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(6).mul(E18) }]);
+      await report([
+        { dataId: id, timestamp: nextTimestamp(), answer: new BN(6).mul(E18) },
+      ]);
       assert.isTrue((await latestAnswer(id)).eq(new BN(6).mul(E18)));
     });
 
@@ -776,10 +879,13 @@ describe("data feeds store", function () {
       await link(id, legacy);
       await setWriter(legacy, df1Writer());
       await expectError(
-        report([{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }], {
-          df1Feeds: new Map([[id.toString("hex"), legacy]]),
-          accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
-        }),
+        report(
+          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }],
+          {
+            df1Feeds: new Map([[id.toString("hex"), legacy]]),
+            accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
+          }
+        ),
         "AccountNotWritable"
       );
     });
