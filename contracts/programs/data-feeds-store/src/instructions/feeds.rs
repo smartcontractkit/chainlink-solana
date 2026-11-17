@@ -27,13 +27,14 @@ use crate::{
 
 /// Check the admin, create the feeds that don't exist yet, then run `f` on each feed's header and
 /// write it back. One header buffer and one event emitter serve the batch: the bump allocator never
-/// frees.
-fn update_feeds<'info>(
+/// frees. `FeedsCreated` comes first, so indexers applying events in order see a feed created
+/// before its settings; the emitter is returned for events covering the whole call.
+fn update_feeds_with_events<'info>(
     ctx: &Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: &[[u8; 16]],
     feeds: &[AccountInfo<'info>],
     mut f: impl FnMut(usize, &[u8; 16], &mut Feed, &EventEmitter<'info>) -> Result<()>,
-) -> Result<()> {
+) -> Result<EventEmitter<'info>> {
     let (max_stored_reports, state_key) = {
         let state = ctx.accounts.state.load()?;
         verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
@@ -46,8 +47,22 @@ fn update_feeds<'info>(
     );
     let payer = ctx.accounts.feed_admin.to_account_info();
     let system_program = ctx.accounts.system_program.to_account_info();
+    // one event for every feed created: each event is an instruction, and a transaction holds at
+    // most 64 (a data ID listed twice is created once)
+    let mut created: Vec<[u8; 16]> = Vec::new();
+    for (id, info) in data_ids.iter().zip(feeds.iter()) {
+        if is_uninitialized(info) && !created.contains(id) {
+            created.push(*id);
+        }
+    }
+    if !created.is_empty() {
+        events.emit(&FeedsCreated {
+            state: state_key,
+            data_ids: created,
+            max_stored_reports,
+        })?;
+    }
     let mut feed: Box<Feed> = bytemuck::zeroed_box();
-    let mut created = Vec::new();
     for (i, (id, info)) in data_ids.iter().zip(feeds.iter()).enumerate() {
         validate_data_id(id)?;
         if is_uninitialized(info) {
@@ -67,44 +82,42 @@ fn update_feeds<'info>(
             feed.data_id = seed;
             feed.state = state_key;
             feed.max_stored_reports = max_stored_reports;
-            created.push(*id);
         } else {
             load_feed_into(info, &state_key, id, &mut feed)?;
         }
         f(i, id, &mut feed, &events)?;
         store_feed(info, &feed)?;
     }
-    // one event for every feed created, after the per-feed ones: each event is an instruction, and
-    // a transaction holds at most 64
-    if !created.is_empty() {
-        events.emit(&FeedsCreated {
-            state: state_key,
-            data_ids: created,
-            max_stored_reports,
-        })?;
-    }
-    Ok(())
+    Ok(events)
 }
 
-fn set_specific(
-    state: &Pubkey,
-    id: &[u8; 16],
-    feed: &mut Feed,
-    workflow_metadata: &[WorkflowMetadata],
-    events: &EventEmitter,
+/// `update_feeds_with_events` for setters that emit only per-feed events.
+fn update_feeds<'info>(
+    ctx: &Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
+    data_ids: &[[u8; 16]],
+    feeds: &[AccountInfo<'info>],
+    f: impl FnMut(usize, &[u8; 16], &mut Feed, &EventEmitter<'info>) -> Result<()>,
 ) -> Result<()> {
-    if !feed.specific_workflow_metadata.is_empty() {
-        events.emit(&SpecificFeedMetadataRemoved {
-            state: *state,
-            data_id: *id,
-        })?;
-    }
-    feed.specific_workflow_metadata.clear();
+    update_feeds_with_events(ctx, data_ids, feeds, f).map(|_| ())
+}
+
+/// Replace a feed's own workflow list, zeroing the slots a shorter list leaves (the layout is
+/// public, so removed workflows shouldn't linger in it).
+fn set_specific(feed: &mut Feed, workflow_metadata: &[WorkflowMetadata]) {
+    feed.specific_workflow_metadata = bytemuck::Zeroable::zeroed();
     feed.specific_workflow_metadata.extend(workflow_metadata);
-    // SpecificFeedMetadataSet, written from the borrowed list instead of a copy per data ID
+}
+
+/// One SpecificFeedMetadataSet for every data ID of the call, written from the borrowed lists.
+fn emit_specific_set(
+    events: &EventEmitter<'_>,
+    state: &Pubkey,
+    data_ids: &[[u8; 16]],
+    workflow_metadata: &[WorkflowMetadata],
+) -> Result<()> {
     events.emit_with(SpecificFeedMetadataSet::DISCRIMINATOR, |data| {
         state.serialize(data)?;
-        id.serialize(data)?;
+        data_ids.serialize(data)?;
         workflow_metadata.serialize(data)?;
         Ok(())
     })
@@ -142,7 +155,7 @@ pub fn set_feeds<'info>(
     );
     validate_workflows(&workflow_metadata)?;
     let state = ctx.accounts.state.key();
-    update_feeds(
+    let events = update_feeds_with_events(
         &ctx,
         &data_ids,
         ctx.remaining_accounts,
@@ -150,11 +163,15 @@ pub fn set_feeds<'info>(
             feed.description = encode_description(&descriptions[i])?;
             emit_description_set(events, &state, id, &descriptions[i])?;
             if !workflow_metadata.is_empty() {
-                set_specific(&state, id, feed, &workflow_metadata, events)?;
+                set_specific(feed, &workflow_metadata);
             }
             Ok(())
         },
-    )
+    )?;
+    if !workflow_metadata.is_empty() {
+        emit_specific_set(&events, &state, &data_ids, &workflow_metadata)?;
+    }
+    Ok(())
 }
 
 /// Set feed descriptions, e.g. "ETH / USD", an empty string clears one.
@@ -193,12 +210,12 @@ pub fn set_specific_feed_metadata<'info>(
     );
     validate_workflows(&workflow_metadata)?;
     let state = ctx.accounts.state.key();
-    update_feeds(
-        &ctx,
-        &data_ids,
-        ctx.remaining_accounts,
-        |_, id, feed, events| set_specific(&state, id, feed, &workflow_metadata, events),
-    )
+    let events =
+        update_feeds_with_events(&ctx, &data_ids, ctx.remaining_accounts, |_, _, feed, _| {
+            set_specific(feed, &workflow_metadata);
+            Ok(())
+        })?;
+    emit_specific_set(&events, &state, &data_ids, &workflow_metadata)
 }
 
 /// Remove feed-specific workflow metadata, the data IDs fall back to the default metadata.
@@ -216,7 +233,7 @@ pub fn remove_specific_feed_metadata<'info>(
                 !feed.specific_workflow_metadata.is_empty(),
                 StoreError::FeedNotConfigured
             );
-            feed.specific_workflow_metadata.clear();
+            feed.specific_workflow_metadata = bytemuck::Zeroable::zeroed();
             events.emit(&SpecificFeedMetadataRemoved {
                 state,
                 data_id: *id,
@@ -476,8 +493,11 @@ fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
     Ok(link.data_id)
 }
 
-/// Grow the number of rounds feeds keep: only up, only before a feed's ring wraps, by at most 10KiB
-/// (320 rounds) per feed per instruction. The feed admin tops up the rent.
+/// Grow the number of rounds feeds keep: only up, only before a feed's ring wraps, by at most 10 KiB
+/// per feed per instruction counted from its length when the instruction started (320 rounds for an
+/// existing feed; a feed created in the call holds at most 278). Called through another program,
+/// as an MCMS batch does, the runtime counts from the outer instruction's start, so grow each feed
+/// once per outer instruction. The feed admin tops up the rent.
 pub fn set_max_stored_reports<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -504,6 +524,8 @@ pub fn set_max_stored_reports<'info>(
             MaxStoredReportsError::Locked => StoreError::MaxStoredReportsLocked,
         })?;
         let info = &feeds[i];
+        // before the rent top-up, which would otherwise fail with a less clear error
+        require!(info.is_writable, StoreError::AccountNotWritable);
         let old_len = info.data_len();
         let new_len = feed_account_len(new_max);
         require!(

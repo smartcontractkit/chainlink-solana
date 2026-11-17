@@ -413,11 +413,18 @@ describe("data feeds store", function () {
         before,
         "the feed admin pays the rent"
       );
-      assert.includeMembers(await eventNames(signature), [
-        "feedsCreated",
-        "feedDescriptionSet",
-        "specificFeedMetadataSet",
-      ]);
+      // creation first, then the per-feed events, then one workflow-list event for the call
+      const events = await cpiEvents(signature);
+      assert.deepEqual(
+        events.map((e) => e.name),
+        [
+          "feedsCreated",
+          "feedDescriptionSet",
+          "feedDescriptionSet",
+          "specificFeedMetadataSet",
+        ]
+      );
+      assert.equal(events[3].data.dataIds.length, 2);
       const description = (id: Buffer) =>
         program.methods
           .description(Array.from(id))
@@ -429,6 +436,17 @@ describe("data feeds store", function () {
       assert.equal(feed.maxStoredReports.toNumber(), 4, "the default ring");
       assert.equal(feed.minDecimals, 18, "strictest minimum by default");
       assert.equal(feed.specificWorkflowMetadata.len.toNumber(), 1);
+
+      // a shorter list leaves no stale workflow in the account's spare slots
+      await setFeeds([b], [""], [workflow(), workflow(randomBytes(10))]);
+      await setFeeds([b], [""], [workflow()]);
+      const shorter = await program.account.feed.fetch(feedPda(b));
+      assert.equal(shorter.specificWorkflowMetadata.len.toNumber(), 1);
+      assert.isTrue(
+        new PublicKey(
+          shorter.specificWorkflowMetadata.xs[1].allowedSender
+        ).equals(PublicKey.default)
+      );
 
       // setting an existing feed again keeps its rounds and changes its description
       await report([
@@ -1053,6 +1071,17 @@ describe("data feeds store", function () {
         ),
         "AccountNotWritable"
       );
+
+      // while the DF1 write is disabled nothing is written to DF1, so read-only is fine
+      await link(id, legacy, true);
+      const signature = await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }],
+        {
+          df1Feeds: new Map([[id.toString("hex"), legacy]]),
+          accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
+        }
+      );
+      assert.deepEqual(await skipReason(signature), { disabled: {} });
     });
 
     it("links a DF1 feed from one data ID at a time", async () => {

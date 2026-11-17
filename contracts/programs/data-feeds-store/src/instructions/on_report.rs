@@ -27,11 +27,11 @@ use crate::{
 /// What aborts the whole transaction: malformed metadata or payload; a bad state account or
 /// version; a wrong DF1 program or writer account; missing or leftover accounts; an initialized
 /// account that isn't this store's feed for the data ID, or a missing or wrong linked DF1 feed; a
-/// feed or linked DF1 feed passed read-only for a report that would be stored; a failing `submit`
-/// or event call. Writable flags aren't covered by the forwarder's signature, so only a faulty or
-/// malicious transmitter passes them read-only; aborting lets another transmitter deliver the
-/// report. Because the forwarder signs the account list, changing a data ID's DF1 link while a
-/// signed batch is in flight aborts that batch.
+/// feed passed read-only for a report that would be stored; a linked DF1 feed passed read-only when
+/// DF1 would be written; a failing `submit` or event call. Writable flags aren't covered by the
+/// forwarder's signature, so only a faulty or malicious transmitter passes them read-only; aborting
+/// lets another transmitter deliver the report. Because the forwarder signs the account list,
+/// changing a data ID's DF1 link while a signed batch is in flight aborts that batch.
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, OnReport<'info>>,
     metadata: Vec<u8>,
@@ -57,6 +57,7 @@ pub fn handler<'info>(
         workflow_owner,
         now: Now {
             slot: clock.slot,
+            // seconds as u32, as EVM's uint32 timestamps (good until 2106)
             timestamp: clock.unix_timestamp as u32,
         },
         events: EventEmitter::new(
@@ -186,7 +187,6 @@ impl<'info> Batch<'_, 'info> {
         }
         require!(feed_info.is_writable, StoreError::AccountNotWritable);
         if let Some(info) = df1_info {
-            require!(info.is_writable, StoreError::AccountNotWritable);
             self.write_df1(info, report)?;
         }
 
@@ -225,7 +225,14 @@ impl<'info> Batch<'_, 'info> {
             ) {
                 // no event: the `submit` call is in the transaction, and a transaction carries at
                 // most 64 instructions, events and inner calls included
-                Ok(answer) => return submit.call(&self.state_key, info, report.timestamp, answer),
+                Ok(answer) => {
+                    // A DF1 feed passed read-only aborts rather than skips: writable flags aren't
+                    // signed by the DON, so a skip would let a transmitter keep rounds from DF1.
+                    // Only checked when DF1 is written, so a disabled or not-yet-cut-over link can
+                    // pass the DF1 feed read-only instead of write-locking an account OCR2 writes.
+                    require!(info.is_writable, StoreError::AccountNotWritable);
+                    return submit.call(&self.state_key, info, report.timestamp, answer);
+                }
                 Err(reason) => reason,
             }
         } else {

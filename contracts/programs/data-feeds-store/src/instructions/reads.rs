@@ -25,11 +25,13 @@ impl From<ScaleError> for StoreError {
     }
 }
 
-/// A stored round at `decimals`, refusing a frozen feed, decimals outside the feed's minimum to 18,
-/// and a non-zero answer that would read as zero.
-pub fn to_round(feed: &Feed, round: StoredRound, decimals: u8) -> Result<Round> {
+/// A round read at `decimals`, checked in Stellar's order: a frozen feed (`FeedFrozen`), decimals
+/// outside the feed's minimum to 18 (`InvalidDecimals`), no such round (`NoDataPresent`), then a
+/// non-zero answer that would read as zero (`RoundsToZero`).
+pub fn to_round(feed: &Feed, round: Option<StoredRound>, decimals: u8) -> Result<Round> {
     require!(feed.frozen == 0, StoreError::FeedFrozen);
     logic::check_decimals(decimals, feed.min_decimals).map_err(StoreError::from)?;
+    let round = round.ok_or(StoreError::NoDataPresent)?;
     Ok(Round {
         round_id: round.round_id,
         answer: logic::scale(round.answer, decimals).map_err(StoreError::from)?,
@@ -52,8 +54,7 @@ fn load(ctx: &Context<FeedRead>, data_id: &[u8; 16]) -> Result<Box<Feed>> {
 /// The latest round of a data ID at `decimals`. Fails with `NoDataPresent` before the first round.
 pub fn latest_round(ctx: Context<FeedRead>, data_id: [u8; 16], decimals: u8) -> Result<Round> {
     let feed = load(&ctx, &data_id)?;
-    let round = logic::latest_round(&feed).ok_or(StoreError::NoDataPresent)?;
-    to_round(&feed, round, decimals)
+    to_round(&feed, logic::latest_round(&feed), decimals)
 }
 
 /// A stored round of a data ID at `decimals`. Fails with `NoDataPresent` for a round that was
@@ -67,8 +68,7 @@ pub fn get_round(
     let feed = load(&ctx, &data_id)?;
     let info = ctx.accounts.feed.to_account_info();
     let data = info.try_borrow_data()?;
-    let round = logic::stored_round(round_id, &feed, &RingRef::new(&data[..]))
-        .ok_or(StoreError::NoDataPresent)?;
+    let round = logic::stored_round(round_id, &feed, &RingRef::new(&data[..]));
     to_round(&feed, round, decimals)
 }
 

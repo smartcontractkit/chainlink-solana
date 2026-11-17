@@ -2160,9 +2160,11 @@ func UnmarshalSpecificFeedMetadataRemoved(buf []byte) (*SpecificFeedMetadataRemo
 	return obj, nil
 }
 
+// Feeds were given their own workflow list, replacing any they had. One event per call for every
+// data ID given the same list: each event is an instruction, and copies its data onto the heap.
 type SpecificFeedMetadataSet struct {
 	State            solanago.PublicKey `json:"state"`
-	DataId           [16]uint8          `json:"data_id"`
+	DataIds          [][16]uint8        `json:"data_ids"`
 	WorkflowMetadata []WorkflowMetadata `json:"workflow_metadata"`
 }
 
@@ -2172,10 +2174,10 @@ func (obj SpecificFeedMetadataSet) MarshalWithEncoder(encoder *binary.Encoder) (
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Serialize `DataId`:
-	err = encoder.Encode(obj.DataId)
+	// Serialize `DataIds`:
+	err = encoder.Encode(obj.DataIds)
 	if err != nil {
-		return errors.NewField("DataId", err)
+		return errors.NewField("DataIds", err)
 	}
 	// Serialize `WorkflowMetadata`:
 	err = encoder.Encode(obj.WorkflowMetadata)
@@ -2201,10 +2203,10 @@ func (obj *SpecificFeedMetadataSet) UnmarshalWithDecoder(decoder *binary.Decoder
 	if err != nil {
 		return errors.NewField("State", err)
 	}
-	// Deserialize `DataId`:
-	err = decoder.Decode(&obj.DataId)
+	// Deserialize `DataIds`:
+	err = decoder.Decode(&obj.DataIds)
 	if err != nil {
-		return errors.NewField("DataId", err)
+		return errors.NewField("DataIds", err)
 	}
 	// Deserialize `WorkflowMetadata`:
 	err = decoder.Decode(&obj.WorkflowMetadata)
@@ -2401,10 +2403,11 @@ func UnmarshalStoreConfig(buf []byte) (*StoreConfig, error) {
 	return obj, nil
 }
 
-// A store was created, with its first feed admins. One event rather than a `FeedAdminSet` per
-// admin: every event is an instruction, and a transaction holds at most 64.
+// A store was created, with its owner and first feed admins. One event rather than a
+// `FeedAdminSet` per admin: every event is an instruction, and a transaction holds at most 64.
 type StoreInitialized struct {
 	State                     solanago.PublicKey   `json:"state"`
+	Owner                     solanago.PublicKey   `json:"owner"`
 	DefaultMaxStoredReports   uint64               `json:"default_max_stored_reports"`
 	MaxObservationForwardSecs uint32               `json:"max_observation_forward_secs"`
 	Df1Program                solanago.PublicKey   `json:"df1_program"`
@@ -2416,6 +2419,11 @@ func (obj StoreInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err err
 	err = encoder.Encode(obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
+	}
+	// Serialize `Owner`:
+	err = encoder.Encode(obj.Owner)
+	if err != nil {
+		return errors.NewField("Owner", err)
 	}
 	// Serialize `DefaultMaxStoredReports`:
 	err = encoder.Encode(obj.DefaultMaxStoredReports)
@@ -2455,6 +2463,11 @@ func (obj *StoreInitialized) UnmarshalWithDecoder(decoder *binary.Decoder) (err 
 	err = decoder.Decode(&obj.State)
 	if err != nil {
 		return errors.NewField("State", err)
+	}
+	// Deserialize `Owner`:
+	err = decoder.Decode(&obj.Owner)
+	if err != nil {
+		return errors.NewField("Owner", err)
 	}
 	// Deserialize `DefaultMaxStoredReports`:
 	err = decoder.Decode(&obj.DefaultMaxStoredReports)

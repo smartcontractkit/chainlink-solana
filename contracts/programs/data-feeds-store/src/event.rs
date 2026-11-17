@@ -7,11 +7,12 @@ use anchor_lang::prelude::*;
 
 use crate::state::{Df1SkipReason, WorkflowMetadata};
 
-/// A store was created, with its first feed admins. One event rather than a `FeedAdminSet` per
-/// admin: every event is an instruction, and a transaction holds at most 64.
+/// A store was created, with its owner and first feed admins. One event rather than a
+/// `FeedAdminSet` per admin: every event is an instruction, and a transaction holds at most 64.
 #[event]
 pub struct StoreInitialized {
     pub state: Pubkey,
+    pub owner: Pubkey,
     pub default_max_stored_reports: u64,
     pub max_observation_forward_secs: u32,
     pub df1_program: Pubkey,
@@ -45,10 +46,12 @@ pub struct DefaultFeedMetadataSet {
     pub workflow_metadata: Vec<WorkflowMetadata>,
 }
 
+/// Feeds were given their own workflow list, replacing any they had. One event per call for every
+/// data ID given the same list: each event is an instruction, and copies its data onto the heap.
 #[event]
 pub struct SpecificFeedMetadataSet {
     pub state: Pubkey,
-    pub data_id: [u8; 16],
+    pub data_ids: Vec<[u8; 16]>,
     pub workflow_metadata: Vec<WorkflowMetadata>,
 }
 
@@ -233,13 +236,14 @@ mod tests {
             allowed_workflow_owner: [1; 20],
             allowed_workflow_name: [2; 10],
         }];
+        let ids = [id, [8u8; 16]];
         let mut manual = SpecificFeedMetadataSet::DISCRIMINATOR.to_vec();
         state.serialize(&mut manual).unwrap();
-        id.serialize(&mut manual).unwrap();
+        ids.as_slice().serialize(&mut manual).unwrap();
         metadata.as_slice().serialize(&mut manual).unwrap();
         let event = SpecificFeedMetadataSet {
             state,
-            data_id: id,
+            data_ids: ids.to_vec(),
             workflow_metadata: metadata,
         };
         assert_eq!(manual, event.data());

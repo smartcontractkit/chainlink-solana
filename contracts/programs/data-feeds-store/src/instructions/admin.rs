@@ -26,9 +26,13 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
         StoreError::InvalidMaxStoredReports
     );
     require_keys_neq!(df1_program, Pubkey::default(), StoreError::InvalidAddress);
+    // this program's ID stands for "not passed" among a report's optional accounts
+    require_keys_neq!(df1_program, crate::ID, StoreError::InvalidAddress);
 
     let state_key = ctx.accounts.state.key();
     let state = &mut ctx.accounts.state.load_init()?;
+    // start from zeroes whatever the account held: `zero` only checks the discriminator
+    **state = bytemuck::Zeroable::zeroed();
     state.version = ACCOUNT_VERSION;
     state.owner = ctx.accounts.owner.key();
     state.default_max_stored_reports = default_max_stored_reports;
@@ -53,6 +57,7 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
 
     emit_cpi!(StoreInitialized {
         state: state_key,
+        owner: state.owner,
         default_max_stored_reports,
         max_observation_forward_secs,
         df1_program,
@@ -102,6 +107,9 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
         }
         (Ok(index), false) => {
             state.feed_admins.remove(index);
+            // the layout is public: don't leave the removed admin in the freed slot
+            let freed = state.feed_admins.len();
+            state.feed_admins.xs[freed] = Pubkey::default();
         }
         // already in the requested state
         _ => {}
@@ -126,10 +134,9 @@ pub fn set_default_feed_metadata(
     let state = &mut ctx.accounts.state.load_mut()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-    state.default_workflow_metadata.clear();
-    for metadata in workflow_metadata.iter() {
-        state.default_workflow_metadata.push(*metadata);
-    }
+    // zeroed first, so a shorter list leaves no removed workflows in the public layout
+    state.default_workflow_metadata = bytemuck::Zeroable::zeroed();
+    state.default_workflow_metadata.extend(&workflow_metadata);
 
     emit_cpi!(DefaultFeedMetadataSet {
         state: ctx.accounts.state.key(),
@@ -189,8 +196,13 @@ pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
 
 /// Recover native SOL sent to the store authority.
 pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
+    // all of it, or leave the store authority rent-exempt: the runtime refuses anything between
+    let balance = ctx.accounts.store_authority.lamports();
+    let left = balance
+        .checked_sub(amount)
+        .ok_or(StoreError::InsufficientBalance)?;
     require!(
-        amount <= ctx.accounts.store_authority.lamports(),
+        left == 0 || left >= Rent::get()?.minimum_balance(0),
         StoreError::InsufficientBalance
     );
 

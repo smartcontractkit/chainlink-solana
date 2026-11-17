@@ -249,8 +249,8 @@ pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
 
 /// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke
 /// signed by the event authority PDA. It reuses one instruction for every event, serializing the
-/// event straight into it, so a batch of reports doesn't allocate per event beyond the copy the
-/// runtime's invoke makes.
+/// event straight into it, so a batch only allocates the copy `invoke_signed` makes on this
+/// program's heap per event.
 pub struct EventEmitter<'info> {
     authority: AccountInfo<'info>,
     bump: u8,

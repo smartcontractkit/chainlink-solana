@@ -49,8 +49,7 @@ pub fn read_latest_round(
     decimals: u8,
 ) -> Result<Round> {
     let (header, _) = decode(feed, store_state, &data_id)?;
-    let round = logic::latest_round(&header).ok_or(StoreError::NoDataPresent)?;
-    to_round(&header, round, decimals)
+    to_round(&header, logic::latest_round(&header), decimals)
 }
 
 /// A stored round of a data ID at `decimals`, decoded from its feed account.
@@ -62,8 +61,7 @@ pub fn read_round(
     decimals: u8,
 ) -> Result<Round> {
     let (header, data) = decode(feed, store_state, &data_id)?;
-    let round = logic::stored_round(round_id, &header, &RingRef::new(&data[..]))
-        .ok_or(StoreError::NoDataPresent)?;
+    let round = logic::stored_round(round_id, &header, &RingRef::new(&data[..]));
     to_round(&header, round, decimals)
 }
 
