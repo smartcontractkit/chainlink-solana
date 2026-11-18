@@ -7,6 +7,9 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,12 +18,14 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
-
-	ctf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/freeport"
 
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/data_feeds_store"
 	"github.com/smartcontractkit/chainlink-solana/contracts/generated/keystone_forwarder"
@@ -43,19 +48,8 @@ func TestDataFeedsStore(t *testing.T) {
 		"data_feeds_store":   data_feeds_store.ProgramID.String(),
 		"store":              store.ProgramID.String(),
 	}
-	provider := cldf_solana_provider.NewCTFChainProvider(t, 16423721717087811551,
-		cldf_solana_provider.CTFChainProviderConfig{
-			DeployerKeyGen:               cldf_solana_provider.PrivateKeyFromRaw(soltesting.Funder.String()),
-			ProgramsPath:                 ProgramsPath,
-			ProgramIDs:                   programIDs,
-			WaitDelayAfterContainerStart: 5 * time.Second,
-		},
-	)
-	node, err := provider.Initialize(t.Context())
-	require.NoError(t, err)
-	chain := node.(ctf_solana.Chain)
-	client := rpc.New(chain.URL)
-	deployer := *chain.DeployerKey
+	deployer := soltesting.Funder
+	client := rpc.New(startValidator(t, deployer.PublicKey(), programIDs))
 	send := func(ixs []solana.Instruction, signers ...solana.PrivateKey) *rpc.GetTransactionResult {
 		res, err := common.SendAndConfirm(t.Context(), client, ixs, deployer, rpc.CommitmentConfirmed,
 			common.AddSigners(signers...), common.AddComputeUnitLimit(fees.ComputeUnitLimit(1_400_000)))
@@ -433,13 +427,58 @@ func TestDataFeedsStore(t *testing.T) {
 	requireStored(df1Target, 3, observedAt+50)
 }
 
+// startValidator starts a Solana test validator in Docker with the programs loaded at startup and
+// the deployer funded, and returns its RPC URL. It does what the deployment framework's CTF chain
+// provider does, except for the image on amd64. There the provider runs solanalabs/solana:v1.18.26,
+// which marks the program data of a program loaded at startup as executable and then refuses to
+// upgrade it, so this test's in-place upgrade would fail. Agave 2.1.21 doesn't, so it runs that
+// instead. On arm64 (Apple silicon) the testing framework's default image already allows upgrades.
+func startValidator(t *testing.T, deployer solana.PublicKey, programIDs map[string]string) string {
+	const localnet = 16423721717087811551
+	chainID, err := chainsel.GetChainIDFromSelector(localnet)
+	require.NoError(t, err)
+	image := ""
+	if runtime.GOARCH == "amd64" {
+		image = "anzaxyz/agave:v2.1.21"
+	}
+	require.NoError(t, framework.DefaultNetwork(&sync.Once{}))
+	// The validator also takes the next port for websockets.
+	ports := freeport.GetN(t, 2)
+	out, err := blockchain.NewBlockchainNetwork(&blockchain.Input{
+		Image:          image,
+		Type:           blockchain.TypeSolana,
+		ChainID:        chainID,
+		PublicKey:      deployer.String(),
+		Port:           strconv.Itoa(ports[0]),
+		ContractsDir:   ProgramsPath,
+		SolanaPrograms: programIDs,
+	})
+	require.NoError(t, err)
+	testcontainers.CleanupContainer(t, out.Container)
+	url := out.Nodes[0].ExternalHTTPUrl
+	client := rpc.New(url)
+	require.Eventually(t, func() bool {
+		health, err := client.GetHealth(t.Context())
+		return err == nil && health == rpc.HealthOk
+	}, 30*time.Second, time.Second, "the validator never became healthy")
+	// The deployment framework's provider waited this long after start-up too, so the chain is
+	// fully booted before the first transaction.
+	time.Sleep(5 * time.Second)
+	return url
+}
+
 // upgradeProgram replaces a program's code with the binary at path, signed by its upgrade
 // authority, as `solana program deploy` does: the binary is written into a buffer account, which
 // the upgrade then copies into the program's data. The new code runs from the next slot.
+//
+// The validator must leave the program data of a program loaded at startup non-executable, or the
+// upgrade fails with "instruction changed executable accounts data" (see startValidator).
 func upgradeProgram(t *testing.T, client *rpc.Client, authority solana.PrivateKey, program solana.PublicKey, path string) {
+	loader := solana.BPFLoaderUpgradeableProgramID
+	programData, _, err := solana.FindProgramAddress([][]byte{program.Bytes()}, loader)
+	require.NoError(t, err)
 	code, err := os.ReadFile(path)
 	require.NoError(t, err)
-	loader := solana.BPFLoaderUpgradeableProgramID
 	tag := func(instruction uint32) []byte { return binary.LittleEndian.AppendUint32(nil, instruction) }
 
 	// a buffer: its state tag and Some(authority), then the code
@@ -502,8 +541,6 @@ func upgradeProgram(t *testing.T, client *rpc.Client, authority solana.PrivateKe
 	}
 	require.Empty(t, pending, "buffer chunks never written")
 
-	programData, _, err := solana.FindProgramAddress([][]byte{program.Bytes()}, loader)
-	require.NoError(t, err)
 	upgrade := solana.NewInstruction(loader, solana.AccountMetaSlice{
 		solana.Meta(programData).WRITE(),
 		solana.Meta(program).WRITE(),
