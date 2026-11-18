@@ -71,7 +71,7 @@ A round read fails, checked in this order, with:
 
 Round IDs keep increasing for the life of a feed: the program is upgraded in place, so there are no phase IDs.
 
-**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers both ways to read. `read_latest_round` and `read_round` decode the feed account inside the customer's program, with no call. `latest_round` and `get_round` call the store. Both apply the same checks, in the same order, and the same rescaling, and both check the account belongs to the store program and the state the caller pins: `latest_round` and `get_round` take that state as `expected_state` and refuse any other (`AccountMismatch`).
+**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. Every one of them checks that the account belongs to the store program, the store state the caller pins and the data ID, whatever it returns, because another feed's account would otherwise give another feed's price or description. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
 
 **No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 56).
 
@@ -128,6 +128,11 @@ A new build is proven before customers read it, then installed by upgrading the 
 4. To roll back, upgrade to the previous verified build (through the MCMS bypasser in an incident).
 
 Feed accounts keep their addresses, history and settings across an upgrade; a layout change bumps the account version and migrates accounts explicitly.
+
+Before the first mainnet release:
+- the external audit is complete, and its findings are fixed or accepted;
+- the audited commit has a verified build, and that build is the one deployed;
+- the client crate `chainlink_solana_data_feeds_store` is published to crates.io from the audited commit, so customer programs can depend on it as they depend on `chainlink_solana` for DF1.
 
 ## Capacity
 

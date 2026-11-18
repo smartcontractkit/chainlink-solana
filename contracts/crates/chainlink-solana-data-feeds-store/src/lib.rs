@@ -4,14 +4,37 @@
 //! There are two ways to read the same data, and both take the store state you trust. Each
 //! deployment of the store program is meant to hold one store, but the program accepts more than
 //! one, so pin the state's address in your program rather than taking it from your caller.
-//! - Decode the feed account yourself with [`read_latest_round`] and [`read_round`], with no call
-//!   to another program. The account must be owned by the store program this crate is built for
-//!   ([`DATA_FEEDS_STORE_ID`]) and belong to the store state you pass.
-//! - Call the store with [`latest_round`] and [`get_round`]. The store then checks the feed
-//!   account, and the crate checks that the state passed is the one you pinned.
 //!
-//! Both ways refuse a frozen feed, decimals outside that range, a round that isn't stored, and a
-//! non-zero answer that would round to zero. Round IDs keep increasing for the life of a feed.
+//! Every read the store program offers to readers is available both ways:
+//!
+//! | What it returns              | Decode the feed account | Call the store       |
+//! |------------------------------|-------------------------|----------------------|
+//! | The latest round             | [`read_latest_round`]   | [`latest_round`]     |
+//! | A stored round               | [`read_round`]          | [`get_round`]        |
+//! | The stored decimals (18)     | [`read_decimals`]       | [`decimals`]         |
+//! | The feed's description       | [`read_description`]    | [`description`]      |
+//! | The fewest decimals to read  | [`read_min_decimals`]   | [`get_min_decimals`] |
+//!
+//! - Decoding reads the feed account in your program, with no call to another program. Before it
+//!   trusts the bytes, the crate checks that the account is owned by the store program this crate
+//!   is built for ([`DATA_FEEDS_STORE_ID`]), carries the feed discriminator and version, and
+//!   belongs to the store state and data ID you pass.
+//! - Calling runs the store's own read instruction, which makes the same account checks. Before
+//!   the call, the crate checks that the program is the store program and that the store state is
+//!   the one you pinned (`expected_state`). After the call, it accepts the answer only if the
+//!   store program returned it.
+//!
+//! Every read makes these account checks, whatever it returns, because a reader given another
+//! store's or another data ID's feed would otherwise get that feed's price or description without
+//! noticing.
+//!
+//! The round reads also refuse a frozen feed, decimals outside the feed's minimum to 18, a round
+//! that isn't stored, and a non-zero answer that would round to zero. The other reads don't check
+//! the read freeze, as in the store program, because they return no price. Round IDs keep
+//! increasing for the life of a feed.
+//!
+//! The store's `check_feed_permission` instruction, which says whether a workflow may write a data
+//! ID, is for tooling rather than readers, so the crate doesn't wrap it.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::get_return_data;
@@ -20,7 +43,7 @@ use data_feeds_store::{
     instructions::reads::to_round,
     logic,
     state::Feed,
-    utils::{decode_feed_into, RingRef},
+    utils::{decode_description, decode_feed_into, RingRef},
 };
 
 pub use data_feeds_store::common::STORED_DECIMALS;
@@ -67,6 +90,35 @@ pub fn read_round(
     let (header, data) = decode(feed, store_state, &data_id)?;
     let round = logic::stored_round(round_id, &header, &RingRef::new(&data[..]));
     to_round(&header, round, decimals)
+}
+
+/// Returns the decimals the store keeps answers in, which is 18 and also the most a read can ask
+/// for, after checking that `feed` is the data ID's feed account of `store_state`. It fails for a
+/// data ID whose feed doesn't exist, as the store's `decimals` instruction does.
+pub fn read_decimals(feed: &AccountInfo, store_state: &Pubkey, data_id: [u8; 16]) -> Result<u8> {
+    decode(feed, store_state, &data_id)?;
+    Ok(STORED_DECIMALS)
+}
+
+/// Returns the description of a data ID's feed, decoded from its feed account, or an empty string
+/// when none is set.
+pub fn read_description(
+    feed: &AccountInfo,
+    store_state: &Pubkey,
+    data_id: [u8; 16],
+) -> Result<String> {
+    let (header, _) = decode(feed, store_state, &data_id)?;
+    Ok(decode_description(&header.description))
+}
+
+/// Returns the fewest decimals a read of a data ID may ask for, decoded from its feed account.
+pub fn read_min_decimals(
+    feed: &AccountInfo,
+    store_state: &Pubkey,
+    data_id: [u8; 16],
+) -> Result<u8> {
+    let (header, _) = decode(feed, store_state, &data_id)?;
+    Ok(header.min_decimals)
 }
 
 /// Checks, before a call to the store, that `store_program` is the store program and that
@@ -136,12 +188,75 @@ pub fn get_round<'info>(
     returned()
 }
 
-/// Decodes the round the store just returned. The return data must come from the store program,
+/// Returns the decimals the store keeps answers in (18) by calling the store program, which fails
+/// for a data ID whose feed doesn't exist. `expected_state` is the store state you trust.
+pub fn decimals<'info>(
+    store_program: AccountInfo<'info>,
+    store_state: AccountInfo<'info>,
+    expected_state: &Pubkey,
+    feed: AccountInfo<'info>,
+    data_id: [u8; 16],
+) -> Result<u8> {
+    check_call(&store_program, &store_state, expected_state)?;
+    let ctx = CpiContext::new(
+        store_program,
+        FeedRead {
+            state: store_state,
+            feed,
+        },
+    );
+    data_feeds_store::cpi::decimals(ctx, data_id)?;
+    returned()
+}
+
+/// Returns the description of a data ID's feed by calling the store program. `expected_state` is
+/// the store state you trust.
+pub fn description<'info>(
+    store_program: AccountInfo<'info>,
+    store_state: AccountInfo<'info>,
+    expected_state: &Pubkey,
+    feed: AccountInfo<'info>,
+    data_id: [u8; 16],
+) -> Result<String> {
+    check_call(&store_program, &store_state, expected_state)?;
+    let ctx = CpiContext::new(
+        store_program,
+        FeedRead {
+            state: store_state,
+            feed,
+        },
+    );
+    data_feeds_store::cpi::description(ctx, data_id)?;
+    returned()
+}
+
+/// Returns the fewest decimals a read of a data ID may ask for by calling the store program.
+/// `expected_state` is the store state you trust.
+pub fn get_min_decimals<'info>(
+    store_program: AccountInfo<'info>,
+    store_state: AccountInfo<'info>,
+    expected_state: &Pubkey,
+    feed: AccountInfo<'info>,
+    data_id: [u8; 16],
+) -> Result<u8> {
+    check_call(&store_program, &store_state, expected_state)?;
+    let ctx = CpiContext::new(
+        store_program,
+        FeedRead {
+            state: store_state,
+            feed,
+        },
+    );
+    data_feeds_store::cpi::get_min_decimals(ctx, data_id)?;
+    returned()
+}
+
+/// Decodes the value the store just returned. The return data must come from the store program,
 /// so no other program can answer in its place.
-fn returned() -> Result<Round> {
+fn returned<T: AnchorDeserialize>() -> Result<T> {
     match get_return_data() {
         Some((from, data)) if from == DATA_FEEDS_STORE_ID => {
-            Round::try_from_slice(&data).map_err(|_| {
+            T::try_from_slice(&data).map_err(|_| {
                 msg!("Malformed answer from the store");
                 ProgramError::InvalidAccountData.into()
             })
@@ -178,7 +293,7 @@ mod tests {
         set_syscall_stubs(Box::new(Stubs));
         let answer = |data: Option<(Pubkey, Vec<u8>)>| {
             *RETURN_DATA.lock().unwrap() = data;
-            returned()
+            returned::<Round>()
         };
         let round = Round {
             round_id: 7,
@@ -216,6 +331,7 @@ mod tests {
         header.version = ACCOUNT_VERSION;
         header.frozen = frozen as u8;
         header.min_decimals = 8;
+        header.description[..7].copy_from_slice(b"BTC/USD");
         header.data_id = to_seed(data_id);
         header.state = *state;
         header.max_stored_reports = MAX;
@@ -323,6 +439,37 @@ mod tests {
     }
 
     #[test]
+    fn decodes_the_other_reads_with_the_same_account_checks() {
+        let state = Pubkey::new_unique();
+        let id = [1u8; 16];
+        let mut data = feed_account(&state, &id, 3, false);
+        with_account(&mut data, &DATA_FEEDS_STORE_ID, |info| {
+            assert_eq!(read_decimals(info, &state, id).unwrap(), 18);
+            assert_eq!(read_description(info, &state, id).unwrap(), "BTC/USD");
+            assert_eq!(read_min_decimals(info, &state, id).unwrap(), 8);
+            let other_store = Pubkey::new_unique();
+            for result in [
+                read_decimals(info, &other_store, id).map(|_| ()),
+                read_description(info, &other_store, id).map(|_| ()),
+                read_min_decimals(info, &other_store, id).map(|_| ()),
+                read_description(info, &state, [2u8; 16]).map(|_| ()),
+            ] {
+                assert_eq!(result.unwrap_err(), err(StoreError::AccountMismatch));
+            }
+        });
+        let mut data = feed_account(&state, &id, 3, false);
+        with_account(&mut data, &Pubkey::new_unique(), |info| {
+            let foreign = read_description(info, &state, id);
+            assert_eq!(foreign.unwrap_err(), err(StoreError::InvalidAccount));
+        });
+        // As in the store program, only round reads check the read freeze.
+        let mut frozen = feed_account(&state, &id, 3, true);
+        with_account(&mut frozen, &DATA_FEEDS_STORE_ID, |info| {
+            assert_eq!(read_description(info, &state, id).unwrap(), "BTC/USD");
+        });
+    }
+
+    #[test]
     fn refuses_frozen_feeds() {
         let state = Pubkey::new_unique();
         let id = [1u8; 16];
@@ -383,8 +530,22 @@ mod tests {
             8,
         );
         assert_eq!(latest.unwrap_err(), invalid);
-        let round = get_round(program, state_info, &state, feed_info, [1; 16], 1, 8);
+        let round = get_round(
+            program.clone(),
+            state_info.clone(),
+            &state,
+            feed_info.clone(),
+            [1; 16],
+            1,
+            8,
+        );
         assert_eq!(round.unwrap_err(), invalid);
+        let (p, s, f) = (program.clone(), state_info.clone(), feed_info.clone());
+        assert_eq!(decimals(p, s, &state, f, [1; 16]).unwrap_err(), invalid);
+        let (p, s, f) = (program.clone(), state_info.clone(), feed_info.clone());
+        assert_eq!(description(p, s, &state, f, [1; 16]).unwrap_err(), invalid);
+        let min = get_min_decimals(program, state_info, &state, feed_info, [1; 16]);
+        assert_eq!(min.unwrap_err(), invalid);
     }
 
     #[test]
@@ -405,7 +566,25 @@ mod tests {
             8,
         );
         assert_eq!(latest.unwrap_err(), err(StoreError::AccountMismatch));
-        let round = get_round(program, state_info, &pinned, feed_info, [1; 16], 1, 8);
-        assert_eq!(round.unwrap_err(), err(StoreError::AccountMismatch));
+        let round = get_round(
+            program.clone(),
+            state_info.clone(),
+            &pinned,
+            feed_info.clone(),
+            [1; 16],
+            1,
+            8,
+        );
+        let mismatch = err(StoreError::AccountMismatch);
+        assert_eq!(round.unwrap_err(), mismatch);
+        let (p, s, f) = (program.clone(), state_info.clone(), feed_info.clone());
+        assert_eq!(decimals(p, s, &pinned, f, [1; 16]).unwrap_err(), mismatch);
+        let (p, s, f) = (program.clone(), state_info.clone(), feed_info.clone());
+        assert_eq!(
+            description(p, s, &pinned, f, [1; 16]).unwrap_err(),
+            mismatch
+        );
+        let min = get_min_decimals(program, state_info, &pinned, feed_info, [1; 16]);
+        assert_eq!(min.unwrap_err(), mismatch);
     }
 }
