@@ -1,9 +1,9 @@
 //! Readers for the Chainlink Data Feeds store on Solana. Each data ID has one feed account. You
 //! pass it with the decimals you want, which must be at least the feed's minimum and at most 18.
 //!
-//! There are two ways to read the same data, and both take the store state you trust. One program
-//! can hold several stores (production, staging, retired ones), so pin the state's address in your
-//! program rather than taking it from your caller.
+//! There are two ways to read the same data, and both take the store state you trust. Each
+//! deployment of the store program is meant to hold one store, but the program accepts more than
+//! one, so pin the state's address in your program rather than taking it from your caller.
 //! - Decode the feed account yourself with [`read_latest_round`] and [`read_round`], with no call
 //!   to another program. The account must be owned by the store program this crate is built for
 //!   ([`DATA_FEEDS_STORE_ID`]) and belong to the store state you pass.
