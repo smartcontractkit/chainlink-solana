@@ -2,14 +2,14 @@
 
 `programs/data-feeds-store` is the Chainlink Data Feeds program on Solana for feeds written by CRE. It is a Solana port of the EVM `DataFeedsStore` (`svr-auction-don/contracts/src/v0.2-df-store-spf`) without SVR, and it is also the program readers integrate with: there is no separate proxy.
 
-Reports arrive from the [keystone forwarder](../forwarder/README.md) through `on_report`. The store checks each one against the workflows allowed to write its data ID, its ordering and its answer bounds, and appends it to that data ID's feed account. A data ID can also be linked to an existing DF1 feed account, which the store then keeps written through DF1's unchanged `submit`.
+Reports arrive from the [keystone forwarder](../forwarder/README.md) through `on_report`. The store checks each one against the workflows allowed to write its data ID, its ordering and its answer bounds, and appends it to that data ID's feed account. A data ID can also be linked to an existing feed account of **DF1**, the current Solana store program that existing customers read. The store then also writes each round to that account, through DF1's unchanged `submit` instruction.
 
 ## Data IDs
 
 A data ID is 16 bytes, laid out like `DataId.sol`: a compact feed ID (bytes 0–7, the first 8 bytes of the Data Streams feed ID), an index (byte 8, for example benchmark, bid or ask), an SVR path (bytes 9–10), an instance (byte 11) and 4 reserved bytes.
 
 - **SVR paths are reserved.** The store serves data IDs whose SVR path is zero. Reports for other data IDs are skipped (`InvalidDataIdIgnored`), and feed admin calls reject them with `InvalidDataId`. The layout stays the same if SVR is added later.
-- **Accounts key a data ID zero padded to 32 bytes**, while the wire format and events keep 16 bytes, so a wider data ID format later would keep every account address.
+- **Account addresses use the data ID padded with zeros to 32 bytes.** Reports and events use the 16-byte form. A longer data ID format later would therefore not change any address.
 - **Instances are separate feeds.** Two data IDs that differ only in the instance or reserved bytes have separate histories and descriptions.
 - **Answers are signed `i128` with 18 decimals**, the same answer type as DF1.
 
@@ -29,7 +29,7 @@ A data ID is 16 bytes, laid out like `DataId.sol`: a compact feed ID (bytes 0–
 
 `on_report(metadata, report)` is called by the forwarder. `report` is Borsh `Vec<ReceivedReport { data_id: [u8; 16], timestamp: u32, answer: i128 }>`.
 
-**Accounts.** After the forwarder's own two (`forwarder_state`, `forwarder_authority`) come the store state, the DF1 program and the DF1 writer (the store program's ID stands for each when no report in the batch writes DF1), and the event authority and program. Then, for each report in order, the data ID's feed (writable), followed by its linked DF1 feed if the feed has one.
+**Accounts.** After the forwarder's own two (`forwarder_state`, `forwarder_authority`) come the store state, the DF1 program, the DF1 writer, and the event authority and program. The DF1 program and writer are optional. Anchor marks an optional account as absent by passing the program's own ID in its place, so a transaction in which no report writes DF1 passes the store's program ID for both. Then, for each report in order, come the data ID's feed (writable) and its linked DF1 feed if the feed has one. Reports take these accounts in order, so even a skipped report steps past exactly its own accounts, and the next report reads the right feed.
 
 **Each report is handled on its own**, as on EVM. A report is skipped with an event, and the rest of the batch still lands, when:
 
@@ -39,7 +39,7 @@ A data ID is 16 bytes, laid out like `DataId.sol`: a compact feed ID (bytes 0–
 - its workflow isn't allowed (`InvalidUpdatePermission`);
 - it is future-dated (`FutureReportIgnored`), stale (`StaleReport`) or outside the feed's answer bounds (`AnswerOutOfMinMaxRange`).
 
-The skip events before the permission check carry the sender, because anyone can cause them.
+The first three skips (invalid data ID, feed not set, write freeze) come before the permission check, so anyone can cause them by calling the store directly. Their events carry the sender, so indexers can ignore those not sent by a known forwarder.
 
 What still fails the whole transaction:
 
@@ -48,21 +48,21 @@ What still fails the whole transaction:
 - a feed passed read-only;
 - a linked DF1 feed passed read-only when the store would write DF1 (see "DF1 feeds").
 
-Writable flags aren't covered by the forwarder's signature, so only a faulty or malicious transmitter passes them read-only, and aborting lets another transmitter deliver the report.
+Why a read-only account aborts rather than skips: the transmitter chooses which accounts are writable, and the DON's signature, which the forwarder checks, doesn't cover that choice. Only a faulty or malicious transmitter passes a needed account read-only. A skip would mark the report delivered and lose the round, while an abort lets another transmitter deliver it.
 
-**Permissions.** A report is applied only when its sender, workflow owner and workflow name match an allowed workflow: the feed's own list if it has one, otherwise the store's default list. The sender is normally the forwarder authority PDA `["forwarder", forwarder_state, data_feeds_store_program]` under the forwarder program, which the forwarder signs with only for reports it verified. Each forwarder (for example one per zone) is just another entry. The store doesn't check that a sender is a forwarder: as on EVM, any key can be an allowed sender, and the deployment tooling only lists forwarder PDAs.
+**Permissions.** A report is applied only when its sender, workflow owner and workflow name match an allowed workflow: the feed's own list if it has one, otherwise the store's default list. The sender is normally the forwarder authority PDA `["forwarder", forwarder_state, data_feeds_store_program]` under the forwarder program, which the forwarder signs with only for reports it verified. Each forwarder is just another entry; there is one per **zone**, an independent CRE deployment with its own DON and forwarder. The store doesn't check that a sender is a forwarder: as on EVM, any key can be an allowed sender. Listing an ordinary key would let its holder write without the DON, so the deployment tooling only lists forwarder PDAs.
 
 **Events** are CPI events, a self-invoke signed by the program's event authority, carried in the transaction's inner instructions. Unlike log events, they can't be lost when a transaction with many reports exceeds the log limit.
 
 ## Reads
 
-Reads follow Stellar's: the caller passes the data ID and the decimals it wants.
+On EVM, a read returns the answer at the feed's fixed decimals. Here, as on Stellar, the caller passes the data ID and the decimals it wants.
 
 - `latest_round(data_id, decimals)` and `get_round(data_id, round_id, decimals)` return `Round { round_id, answer, observations_timestamp, recorded_timestamp }`, with the answer rescaled to `decimals` (truncating toward zero). They take the store state and the feed.
 - `decimals(data_id)` returns 18, `description(data_id)` the description, `get_min_decimals(data_id)` the fewest decimals a read may ask for.
-- `check_feed_permission(data_id, workflow)` tells whether a workflow may write a data ID, from the feed's own list or else the default list. It takes the feed account, answers false for a feed that isn't set (its reports are skipped) and, as on EVM, ignores the write freeze.
+- `check_feed_permission(data_id, workflow)` tells whether a workflow may write a data ID, from the feed's own list or else the default list. It takes the feed account and answers false for a feed that isn't set, since its reports are skipped. Like the EVM function it mirrors, it ignores the write freeze, which EVM doesn't have.
 
-A round read fails, checked in this order, with:
+A round read fails with the first of these that applies:
 
 1. `FeedFrozen` while the read freeze is on;
 2. `InvalidDecimals` below the feed's minimum (18 until a feed admin lowers it) or above 18;
@@ -71,7 +71,7 @@ A round read fails, checked in this order, with:
 
 Round IDs keep increasing for the life of a feed: the program is upgraded in place, so there are no phase IDs.
 
-**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. Every one of them checks that the account belongs to the store program, the store state the caller pins and the data ID, whatever it returns, because another feed's account would otherwise give another feed's price or description. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
+**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. Every one of them checks that the account belongs to the store program, the store state the caller trusts and the data ID, whatever it returns, because another feed's account would otherwise give another feed's price or description. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
 
 **No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 56).
 
@@ -86,9 +86,9 @@ Feed admins (MCMS on mainnet) change every per-feed setting. Each setter takes t
 - `set_feed_frozen`: the read freeze, which refuses round reads (the description and decimals stay readable) while writes continue;
 - `set_min_decimals`: the fewest decimals a read may ask for;
 - `set_df1_feeds`: the DF1 link and its own switch (see below);
-- `set_max_stored_reports`: the ring size, which only grows, only before the ring has wrapped, and by at most 10 KiB (320 rounds) per instruction, counted from the account's length when the instruction started. Separate instructions can grow a feed further. Through another program, as an MCMS timelock batch does, growth counts from the outer instruction's start, so grow each feed once per outer instruction.
+- `set_max_stored_reports`: the ring size. It only grows, and only before the ring has wrapped. Solana lets an account grow by at most 10 KiB per instruction, so one call adds at most 320 rounds; later calls can grow it further. Inside an MCMS timelock batch, the runtime applies that limit to the whole batch, so a batch should grow each feed once.
 
-Store-wide settings are the default workflow list (`set_default_feed_metadata`; unlike on EVM it can be emptied, leaving only feeds with their own workflow list writable) and the forward window (`set_max_observation_forward_duration`). The owner manages feed admins and ownership (two steps) and can recover tokens and SOL sent to the store.
+Store-wide settings are the default workflow list (`set_default_feed_metadata`) and the forward window (`set_max_observation_forward_duration`). On EVM the default list can only be replaced; here it can also be emptied, leaving only feeds with their own workflow list writable, which revokes a compromised default workflow at once. The owner manages feed admins and ownership (two steps) and can recover tokens and SOL sent to the store.
 
 ## DF1 feeds
 
@@ -99,7 +99,7 @@ Existing customers read DF1 prices from the DF1 store program's `Transmissions` 
 - the link marker of its current DF1 feed, if the link changes away from it;
 - the new DF1 feed and its link marker, if one is linked.
 
-So unlinking passes one account, linking or re-linking the same DF1 feed two, and switching three. To move a DF1 feed between data IDs in one call, list the unlink first.
+So unlinking passes one account, linking or re-linking the same DF1 feed two, and switching three. To move a DF1 feed from one data ID to another in one call, list the unlink first: the link marker is then cleared before the second data ID claims it, which would otherwise fail with `Df1FeedAlreadyLinked`.
 
 **Writing.** For each round of a linked feed, the store calls DF1's unchanged `submit`, signed by its `df1_writer` PDA, with the answer rescaled to the DF1 feed's decimals. Solana can't contain a failing call to another program, so the store first checks everything `submit` could fail on:
 
@@ -109,12 +109,12 @@ So unlinking passes one account, linking or re-linking the same DF1 feed two, an
 - that the rescaled answer fits;
 - that DF1's round counter won't overflow.
 
-If any check fails, the DF1 write is skipped with `Df1WriteSkipped { reason }` and the round is still stored. A per-feed switch stops only the DF1 write. The DF1 feed must be writable only when `submit` is called, so a link that is disabled or not yet cut over can pass its DF1 feed read-only rather than write-lock the account OCR2 writes.
+If any check fails, the DF1 write is skipped with `Df1WriteSkipped { reason }` and the round is still stored. Each feed also has a switch, `df1_write_disabled`, that stops only its DF1 write. The DF1 feed has to be writable only when `submit` is called. So while a link is disabled, or before the cutover, the DF1 feed can be passed read-only, and store transactions don't compete with OCR2's for a write lock on the account OCR2 writes.
 
 **Cutover, per feed:**
 
 1. `set_feeds` for the feed's data ID; let the CRE workflow write it, and compare it with the DF1 feed.
-2. `set_df1_feeds(data_id, df1_feed, write_disabled = false)`. A report batch signed before a link changes carries the old accounts and aborts, so change links between report rounds.
+2. `set_df1_feeds(data_id, df1_feed, write_disabled = false)`. The workflow chooses a report's accounts when it builds the report, and the DON signs them, so a report built before the link changed still carries the old accounts and aborts. Change links between rounds; at worst, one round is delivered by the next report instead.
 3. The DF1 feed owner (MCMS on mainnet) calls DF1's `set_writer(df1_writer)`, then stops the feed's OCR2 job.
 4. To roll back: DF1's `set_writer` back to the OCR2 store authority PDA, and restart OCR2.
 
@@ -146,7 +146,9 @@ A CRE write is one forwarder report instruction with every account inline, plus 
 - **Instruction limit:** a transaction carries at most 64 instructions, counting events and inner calls. A store-only report uses 1 (`FeedUpdated`), a DF1-backed report 2 (`submit` or the `Df1WriteSkipped` event, plus `FeedUpdated`).
 - **Feed setters:** `set_feeds` creating 20 feeds takes about 238k compute units.
 
-**Batch sizing.** Transaction size and the 64-account lock limit bind first. Behind them, the 64-instruction trace (top-level instructions, the forwarder's inner calls, one event per report and two for DF1-backed) caps a batch at roughly 57 store-only or 28 DF1-backed reports. The heap caps it at the same order, since each event and `submit` copies its instruction onto it. Anyone can pre-fund a feed or link-marker PDA, which turns its creation into up to three calls, so leave headroom when sizing `set_feeds` batches. Likewise anyone can pre-fund the forwarder's per-report record, whose address follows from the signed report, adding two inner instructions to that report's transaction, so size report batches with two instructions spare.
+**How many reports fit in one transaction.** Three runtime limits apply: 4,096 bytes, 64 accounts and 64 instructions (inner calls included). Size and accounts run out first, at about 40 store-only or 25 DF1-backed reports at F=5. The instruction limit would allow about 57 and 28: each stored report adds one instruction (its event), and a report that writes DF1 adds two (`submit` and the event). Memory runs out at about the same point.
+
+**Leave two instructions spare.** Anyone can send SOL to an address before an account is created there. When a program then creates that account, it takes three instructions instead of one. This applies to feed and link-marker accounts created by `set_feeds`, and to the forwarder's per-report execution-state account, whose address anyone can work out from the report. A batch sized exactly to the instruction limit could then fail, and for a report, every retry would fail the same way. So size `set_feeds` calls and report batches with at least two instructions spare.
 
 ## Adding SVR later
 
