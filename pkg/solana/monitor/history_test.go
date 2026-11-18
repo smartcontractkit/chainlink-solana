@@ -135,12 +135,12 @@ func TestHistoryMonitorRecordsPerNodeValues(t *testing.T) {
 	m.measureNode(t.Context(), m.nodes[0])
 	m.measureNode(t.Context(), m.nodes[1])
 
-	require.Equal(t, float64(100), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")))
-	require.Equal(t, float64(200), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "b")))
+	require.InDelta(t, float64(100), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")), 0)
+	require.InDelta(t, float64(200), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "b")), 0)
 	require.Equal(t, int64(100), mustGaugeValue(t, reader, rpcFirstAvailableSlotName, t.Name(), "a"))
 	require.Equal(t, int64(200), mustGaugeValue(t, reader, rpcFirstAvailableSlotName, t.Name(), "b"))
-	require.Greater(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "a"), int64(0))
-	require.Greater(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "b"), int64(0))
+	require.Positive(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "a"))
+	require.Positive(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "b"))
 }
 
 func TestHistoryMonitorAcceptsSlotZero(t *testing.T) {
@@ -151,8 +151,8 @@ func TestHistoryMonitorAcceptsSlotZero(t *testing.T) {
 
 	m.measureNode(t.Context(), m.nodes[0])
 
-	require.Equal(t, float64(0), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")))
-	require.Greater(t, testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")), float64(0))
+	require.Zero(t, testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")))
+	require.Positive(t, testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")))
 }
 
 func TestHistoryMonitorOverflow(t *testing.T) {
@@ -190,8 +190,8 @@ func TestHistoryMonitorFailureKeepsGauges(t *testing.T) {
 
 		client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(0), errors.New("boom")).Once()
 		m.measureNode(t.Context(), m.nodes[0])
-		require.Equal(t, float64(42), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")))
-		require.Equal(t, lastSuccess, testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")))
+		require.InDelta(t, float64(42), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")), 0)
+		require.InDelta(t, lastSuccess, testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")), 0)
 	})
 }
 
