@@ -56,7 +56,7 @@ Writable flags aren't covered by the forwarder's signature, so only a faulty or 
 
 ## Reads
 
-Reads match Stellar's proxy: the caller passes the data ID and the decimals it wants.
+Reads follow Stellar's: the caller passes the data ID and the decimals it wants.
 
 - `latest_round(data_id, decimals)` and `get_round(data_id, round_id, decimals)` return `Round { round_id, answer, observations_timestamp, recorded_timestamp }`, with the answer rescaled to `decimals` (truncating toward zero). They take the store state and the feed.
 - `decimals(data_id)` returns 18, `description(data_id)` the description, `get_min_decimals(data_id)` the fewest decimals a read may ask for.
@@ -141,7 +141,7 @@ A CRE write is one forwarder report instruction with every account inline, plus 
 - **Instruction limit:** a transaction carries at most 64 instructions, counting events and inner calls. A store-only report uses 1 (`FeedUpdated`), a DF1-backed report 2 (`submit` or the `Df1WriteSkipped` event, plus `FeedUpdated`).
 - **Feed setters:** `set_feeds` creating 20 feeds takes about 238k compute units.
 
-**Batch sizing.** Transaction size and the 64-account lock limit bind first. Behind them, the 64-instruction trace (top-level instructions, the forwarder's inner calls, one event per report and two for DF1-backed) caps a batch at roughly 57 store-only or 28 DF1-backed reports. The heap caps it at the same order, since each event and `submit` copies its instruction onto it. Anyone can pre-fund a feed or link-marker PDA, which turns its creation into up to three calls, so leave headroom when sizing `set_feeds` batches.
+**Batch sizing.** Transaction size and the 64-account lock limit bind first. Behind them, the 64-instruction trace (top-level instructions, the forwarder's inner calls, one event per report and two for DF1-backed) caps a batch at roughly 57 store-only or 28 DF1-backed reports. The heap caps it at the same order, since each event and `submit` copies its instruction onto it. Anyone can pre-fund a feed or link-marker PDA, which turns its creation into up to three calls, so leave headroom when sizing `set_feeds` batches. Likewise anyone can pre-fund the forwarder's per-report record, whose address follows from the signed report, adding two inner instructions to that report's transaction, so size report batches with two instructions spare.
 
 ## Adding SVR later
 
