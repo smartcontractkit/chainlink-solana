@@ -15,13 +15,13 @@ A data ID is 16 bytes, laid out like `DataId.sol`: a compact feed ID (bytes 0–
 
 ## Accounts
 
-- **`StoreState`** (a keypair account created beforehand: 3,240 bytes, a 3,232-byte struct after the discriminator): owner, feed admins, the default ring size, the forward window (`max_observation_forward_secs`, how far an observation timestamp may lead the clock), the DF1 program, and the default workflow list.
+- **`StoreState`** (the PDA `["state", store ID]` that `initialize` creates: 3,240 bytes, a 3,232-byte struct after the discriminator): owner, feed admins, the default ring size, the forward window (`max_observation_forward_secs`, how far an observation timestamp may lead the clock), the DF1 program, and the default workflow list.
 - **Feed** (PDA `["feed", state, data_id_32]`): the account readers pass. Its 1,328-byte header holds the latest round, the description, the minimum read decimals, the read freeze, the feed's own workflow list, its answer bounds, its write freeze and its DF1 link. A ring of `max_stored_reports` rounds follows (32 bytes each, round `r` at slot `r % max_stored_reports`). Its layout is public: fields move only with a version bump, and reserved bytes are kept for later fields, including SVR's.
 - **Store authority** (PDA `["store_authority", state]`): holds tokens and SOL sent to the store, which the owner can recover. It signs nothing else.
 - **DF1 writer** (PDA `["df1_writer", state]`): the writer the store signs DF1 `submit` calls with, set as each linked DF1 feed's writer.
 - **Link marker** (PDA `["df1_link", state, df1_feed]`): which data ID links a DF1 feed, so no two do.
 
-**Creating a store.** Only the program's upgrade authority can `initialize` a store, into a state account created beforehand at the exact size, so a timelock holding the authority can create a store by proposal. The authority becomes the store's owner.
+**Creating a store.** Only the program's upgrade authority can `initialize` a store. It passes a store ID (a `u64`), and `initialize` creates the state account itself at the PDA `["state", store ID as 8 little-endian bytes]`, so a timelock holding the authority can create a store by proposal. The authority becomes the store's owner and pays the state's rent (about 0.023 SOL), so a timelock signer needs that much SOL first. Creating the account in the same instruction leaves no window in which anyone could take over a half-created state account.
 
 **Creating feeds.** A feed admin creates feeds with `set_feeds`, which also sets their descriptions and, optionally, their own workflow list. Every other per-feed setter but `remove_specific_feed_metadata` also creates a feed that doesn't exist yet. The feed admin pays the rent: about 0.01 SOL plus about 0.00022 SOL per round kept, so about 0.07 SOL at the largest default ring size (278 rounds). Reports never create feeds: the forwarder passes every account unsigned, so none could pay the rent. As on EVM, feeds are never closed.
 
@@ -71,7 +71,7 @@ A round read fails, checked in this order, with:
 
 Round IDs keep increasing for the life of a feed: the program is upgraded in place, so there are no phase IDs.
 
-**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers both ways to read. `read_latest_round` and `read_round` decode the feed account inside the customer's program, with no call. `latest_round` and `get_round` call the store. Both apply the same checks, in the same order, and the same rescaling, and both check the account belongs to the store program and state the caller pins.
+**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers both ways to read. `read_latest_round` and `read_round` decode the feed account inside the customer's program, with no call. `latest_round` and `get_round` call the store. Both apply the same checks, in the same order, and the same rescaling, and both check the account belongs to the store program and the state the caller pins: `latest_round` and `get_round` take that state as `expected_state` and refuse any other (`AccountMismatch`).
 
 **No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 56).
 

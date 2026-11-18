@@ -12,7 +12,7 @@ import (
 )
 
 // Builds a "accept_ownership" instruction.
-// Step 2 of 2: the proposed owner accepts.
+// Makes the proposed owner the owner, step 2 of 2. The proposed owner must sign.
 func NewAcceptOwnershipInstruction(
 	newOwnerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
@@ -50,7 +50,7 @@ func NewAcceptOwnershipInstruction(
 }
 
 // Builds a "check_feed_permission" instruction.
-// Whether a workflow may write a data ID: false while its feed isn't set, otherwise whether it // is on the feed's own list or the default list. Takes the data ID's feed account; fails with // `InvalidDataId` for a zero or SVR data ID.
+// Returns whether a workflow may write a data ID. It returns false if the feed hasn't been // set, since reports for it are skipped. Otherwise it checks the feed's own workflow list, or // the store's default list if the feed has none. It takes the data ID's feed account and // fails with `InvalidDataId` for a zero or SVR data ID.
 func NewCheckFeedPermissionInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -87,6 +87,7 @@ func NewCheckFeedPermissionInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
+		// it doesn't exist, and its contents when it does.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -99,7 +100,7 @@ func NewCheckFeedPermissionInstruction(
 }
 
 // Builds a "decimals" instruction.
-// Decimals answers are stored with (18), the most a read can ask for.
+// Returns the number of decimals answers are stored with, which is 18. This is also the most // decimals a read can ask for.
 func NewDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -130,7 +131,7 @@ func NewDecimalsInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// Feed of the data ID, matched against the state and the data ID in the handler
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -143,7 +144,7 @@ func NewDecimalsInstruction(
 }
 
 // Builds a "description" instruction.
-// Description of a data ID's feed, empty when none is set.
+// Returns the description of a data ID's feed, or an empty string if none is set.
 func NewDescriptionInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -174,7 +175,7 @@ func NewDescriptionInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// Feed of the data ID, matched against the state and the data ID in the handler
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -187,7 +188,7 @@ func NewDescriptionInstruction(
 }
 
 // Builds a "get_min_decimals" instruction.
-// The fewest decimals reads of a data ID may ask for.
+// Returns the fewest decimals a read of a data ID may ask for.
 func NewGetMinDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -218,7 +219,7 @@ func NewGetMinDecimalsInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// Feed of the data ID, matched against the state and the data ID in the handler
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -231,7 +232,7 @@ func NewGetMinDecimalsInstruction(
 }
 
 // Builds a "get_round" instruction.
-// A stored round of a data ID, as `latest_round`.
+// Returns a stored round of a data ID, with the answer at `decimals`. It fails as // `latest_round` does, and also when the round was never stored or has been overwritten in // the ring.
 func NewGetRoundInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -274,7 +275,7 @@ func NewGetRoundInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// Feed of the data ID, matched against the state and the data ID in the handler
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -287,15 +288,17 @@ func NewGetRoundInstruction(
 }
 
 // Builds a "initialize" instruction.
-// Create a store in a pre-created state account, signed by the program's upgrade authority, // which becomes the store's owner.
+// Creates a store. It creates the store's state account at the PDA `["state", store_id]`, // so each store ID can hold one store. The program's upgrade authority (the key allowed to // redeploy the program) must sign; it becomes the store's owner and pays the account's rent.
 func NewInitializeInstruction(
 	// Params:
+	storeIdParam uint64,
 	configParam StoreConfig,
 
 	// Accounts:
 	ownerAccount solanago.PublicKey,
 	stateAccount solanago.PublicKey,
 	programDataAccount solanago.PublicKey,
+	systemProgramAccount solanago.PublicKey,
 	eventAuthorityAccount solanago.PublicKey,
 	programAccount solanago.PublicKey,
 ) (solanago.Instruction, error) {
@@ -308,6 +311,11 @@ func NewInitializeInstruction(
 		return nil, fmt.Errorf("failed to write instruction discriminator: %w", err)
 	}
 	{
+		// Serialize `storeIdParam`:
+		err = enc__.Encode(storeIdParam)
+		if err != nil {
+			return nil, errors.NewField("storeIdParam", err)
+		}
 		// Serialize `configParam`:
 		err = enc__.Encode(configParam)
 		if err != nil {
@@ -318,16 +326,21 @@ func NewInitializeInstruction(
 
 	// Add the accounts to the instruction.
 	{
-		// Account 0 "owner": Read-only, Signer, Required
-		// The program's upgrade authority, the store's first owner
-		accounts__.Append(solanago.NewAccountMeta(ownerAccount, false, true))
+		// Account 0 "owner": Writable, Signer, Required
+		// The program's upgrade authority. It becomes the store's first owner and pays the state
+		// account's rent.
+		accounts__.Append(solanago.NewAccountMeta(ownerAccount, true, true))
 		// Account 1 "state": Writable, Non-signer, Required
+		// creates. Anchor checks the address; the handler checks that no account exists there yet.
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, true, false))
 		// Account 2 "program_data": Read-only, Non-signer, Required
+		// The program's ProgramData account, which records the program's upgrade authority.
 		accounts__.Append(solanago.NewAccountMeta(programDataAccount, false, false))
-		// Account 3 "event_authority": Read-only, Non-signer, Required
+		// Account 3 "system_program": Read-only, Non-signer, Required
+		accounts__.Append(solanago.NewAccountMeta(systemProgramAccount, false, false))
+		// Account 4 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
-		// Account 4 "program": Read-only, Non-signer, Required
+		// Account 5 "program": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(programAccount, false, false))
 	}
 
@@ -340,7 +353,7 @@ func NewInitializeInstruction(
 }
 
 // Builds a "latest_round" instruction.
-// The latest round of a data ID with the answer at `decimals`: at least the feed's minimum, // at most 18. Fails for a frozen feed, or if a non-zero answer would round to zero.
+// Returns the latest round of a data ID, with the answer at `decimals`, which must be at // least the feed's minimum and at most 18. It fails if the feed is frozen, if it has no round // yet, or if a non-zero answer would round to zero.
 func NewLatestRoundInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -377,7 +390,7 @@ func NewLatestRoundInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// Feed of the data ID, matched against the state and the data ID in the handler
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -390,7 +403,7 @@ func NewLatestRoundInstruction(
 }
 
 // Builds a "on_report" instruction.
-// Forwarder entrypoint. `report` is Borsh `Vec<ReceivedReport>`. Remaining accounts are one // group per report: the data ID's feed, then the linked DF1 feed when the feed has one.
+// Receives reports from the keystone forwarder. The store takes the workflow name and owner // from `metadata`, and `report` is a Borsh-encoded `Vec<ReceivedReport>`. The remaining // accounts hold one group per report: the feed of its data ID, then the linked DF1 feed if // that feed has one (see `context::OnReport`).
 func NewOnReportInstruction(
 	// Params:
 	metadataParam []byte,
@@ -430,18 +443,22 @@ func NewOnReportInstruction(
 	// Add the accounts to the instruction.
 	{
 		// Account 0 "forwarder_state": Read-only, Non-signer, Required
+		// does not read it.
 		accounts__.Append(solanago.NewAccountMeta(forwarderStateAccount, false, false))
 		// Account 1 "forwarder_authority": Read-only, Signer, Required
-		// The sender: reports are only applied when it is the allowed sender of a workflow permitted
-		// for the data ID, a forwarder authority PDA that its forwarder only signs with for reports it
-		// verified. Any number of forwarders, e.g. one per zone, is just more workflow metadata.
+		// The sender of the reports. A report is only applied when this is the allowed sender of a
+		// workflow permitted for its data ID. That sender is a forwarder's authority PDA, which the
+		// forwarder only signs with after verifying a report, so supporting more forwarders (one per
+		// zone, for example) only takes more workflow entries.
 		accounts__.Append(solanago.NewAccountMeta(forwarderAuthorityAccount, false, true))
 		// Account 2 "state": Read-only, Non-signer, Required
-		// Version checked in the handler, which loads it once for every report
+		// The store state. The handler checks its version once and reuses it for every report.
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 3 "df1_program": Read-only, Non-signer, Optional
+		// caller passes this program's ID instead, and DF1 writes are then skipped as `NotPassed`.
 		accounts__.Append(solanago.NewAccountMeta(df1ProgramAccount, false, false))
 		// Account 4 "df1_writer": Read-only, Non-signer, Optional
+		// it out, the caller passes this program's ID instead, as for `df1_program`.
 		accounts__.Append(solanago.NewAccountMeta(df1WriterAccount, false, false))
 		// Account 5 "event_authority": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(eventAuthorityAccount, false, false))
@@ -458,7 +475,7 @@ func NewOnReportInstruction(
 }
 
 // Builds a "recover_native" instruction.
-// Recover native SOL sent to the store authority PDA.
+// Moves SOL out of the store authority PDA. Only the owner can call it, to recover SOL sent // to the store by mistake. It must take all of the SOL or leave at least the rent-exempt // minimum.
 func NewRecoverNativeInstruction(
 	// Params:
 	amountParam uint64,
@@ -516,7 +533,7 @@ func NewRecoverNativeInstruction(
 }
 
 // Builds a "recover_tokens" instruction.
-// Recover SPL tokens held by token accounts of the store authority PDA.
+// Moves SPL tokens out of a token account owned by the store authority PDA. Only the owner // can call it, to recover tokens sent to the store by mistake.
 func NewRecoverTokensInstruction(
 	// Params:
 	amountParam uint64,
@@ -580,7 +597,7 @@ func NewRecoverTokensInstruction(
 }
 
 // Builds a "remove_specific_feed_metadata" instruction.
-// Remove feed-specific workflow metadata (remaining accounts: feeds).
+// Removes each feed's own workflow list, so the store's default list applies to it again. It // fails for a feed with no list of its own. The remaining accounts are the feeds, in data ID // order.
 func NewRemoveSpecificFeedMetadataInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -632,7 +649,7 @@ func NewRemoveSpecificFeedMetadataInstruction(
 }
 
 // Builds a "set_default_feed_metadata" instruction.
-// Set the workflows allowed to write any data ID without feed-specific metadata. An empty list // leaves only feeds with their own workflows writable.
+// Replaces the store's default workflow list, which applies to every feed that has no // workflow list of its own. An empty list leaves only feeds with their own list writable.
 func NewSetDefaultFeedMetadataInstruction(
 	// Params:
 	workflowMetadataParam []WorkflowMetadata,
@@ -681,7 +698,7 @@ func NewSetDefaultFeedMetadataInstruction(
 }
 
 // Builds a "set_df1_feeds" instruction.
-// Link data IDs to the DF1 feeds this store keeps written (the default key unlinks), and // enable or disable that write. A DF1 feed is linked from at most one data ID. Remaining // accounts: the feeds, then for each data ID in order: the link marker of its current DF1 feed // if the link changes away from it, then the new DF1 feed and its link marker if one is // linked.
+// Links each data ID to a DF1 feed account that the store then writes every new round to, or // unlinks it when given the default key. It also enables or disables that write. A DF1 feed // can be linked from only one data ID. The remaining accounts are the feeds, then for each // data ID in order: the link marker of its current DF1 feed if the link changes away from it, // then, if its new DF1 feed isn't the default key (even when it is unchanged), that DF1 feed // and its link marker. `instructions::feeds::set_df1_feeds` has a worked example.
 func NewSetDf1FeedsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -745,7 +762,7 @@ func NewSetDf1FeedsInstruction(
 }
 
 // Builds a "set_feed_admin" instruction.
-// Grant or revoke feed admin permission for all feeds.
+// Grants or revokes a key's feed admin permission, which covers every feed of the store.
 func NewSetFeedAdminInstruction(
 	// Params:
 	feedAdminParam solanago.PublicKey,
@@ -800,7 +817,7 @@ func NewSetFeedAdminInstruction(
 }
 
 // Builds a "set_feed_descriptions" instruction.
-// Set feed descriptions, empty to clear (remaining accounts: feeds).
+// Sets each feed's description. An empty string clears it. The remaining accounts are the // feeds, in data ID order.
 func NewSetFeedDescriptionsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -858,7 +875,7 @@ func NewSetFeedDescriptionsInstruction(
 }
 
 // Builds a "set_feed_frozen" instruction.
-// Freeze or unfreeze round reads of feeds, writes continuing (remaining accounts: feeds).
+// Freezes or unfreezes round reads of each feed. While a feed is frozen, `latest_round` and // `get_round` fail, but its reports are still stored. The remaining accounts are the feeds, // in data ID order.
 func NewSetFeedFrozenInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -916,7 +933,7 @@ func NewSetFeedFrozenInstruction(
 }
 
 // Builds a "set_feed_writes_disabled" instruction.
-// Disable or enable writes of feeds for every workflow (remaining accounts: feeds).
+// Disables or enables writes to each feed. While writes are disabled, every report for the // feed is skipped, whichever workflow sent it. The remaining accounts are the feeds, in data // ID order.
 func NewSetFeedWritesDisabledInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -974,7 +991,7 @@ func NewSetFeedWritesDisabledInstruction(
 }
 
 // Builds a "set_feeds" instruction.
-// Create feeds that don't exist yet and set their descriptions and, unless empty, their // workflows (remaining accounts: feeds). Every per-feed setter below but // `remove_specific_feed_metadata` also creates missing feeds, the feed admin paying their // rent.
+// Creates the feeds that don't exist yet and sets each feed's description. If // `workflow_metadata` isn't empty, it also becomes each listed feed's own workflow list. The // remaining accounts are the feeds, in data ID order. Every per-feed setter below except // `remove_specific_feed_metadata` also creates missing feeds, and the feed admin pays their // rent.
 func NewSetFeedsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1038,7 +1055,7 @@ func NewSetFeedsInstruction(
 }
 
 // Builds a "set_max_observation_forward_duration" instruction.
-// Set the max seconds a report's observation timestamp may lead the clock.
+// Sets how many seconds ahead of the chain's clock a report's observation timestamp may be. // A report stamped further ahead is skipped with `FutureReportIgnored`.
 func NewSetMaxObservationForwardDurationInstruction(
 	// Params:
 	maxObservationForwardSecsParam uint32,
@@ -1087,7 +1104,7 @@ func NewSetMaxObservationForwardDurationInstruction(
 }
 
 // Builds a "set_max_stored_reports" instruction.
-// Grow the number of rounds feeds keep (remaining accounts: feeds).
+// Grows the number of rounds each feed keeps. A ring can only grow, and only before it first // wraps. The remaining accounts are the feeds, in data ID order.
 func NewSetMaxStoredReportsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1145,7 +1162,7 @@ func NewSetMaxStoredReportsInstruction(
 }
 
 // Builds a "set_min_decimals" instruction.
-// Set the fewest decimals reads of feeds may ask for (remaining accounts: feeds).
+// Sets the fewest decimals a read of each feed may ask for, at most 18. The remaining // accounts are the feeds, in data ID order.
 func NewSetMinDecimalsInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1203,7 +1220,7 @@ func NewSetMinDecimalsInstruction(
 }
 
 // Builds a "set_min_max_answers" instruction.
-// Set accepted answer ranges (remaining accounts: feeds).
+// Sets the range of answers each feed accepts. Passing `i128::MIN` and `i128::MAX` removes // the range. The remaining accounts are the feeds, in data ID order.
 func NewSetMinMaxAnswersInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1267,7 +1284,7 @@ func NewSetMinMaxAnswersInstruction(
 }
 
 // Builds a "set_specific_feed_metadata" instruction.
-// Set feed-specific workflow metadata (remaining accounts: feeds).
+// Gives each feed its own workflow list, replacing any list it had. The remaining accounts // are the feeds, in data ID order.
 func NewSetSpecificFeedMetadataInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
@@ -1325,7 +1342,7 @@ func NewSetSpecificFeedMetadataInstruction(
 }
 
 // Builds a "transfer_ownership" instruction.
-// Step 1 of 2: propose a new owner. The owner changes only when the proposed owner accepts, // so proposing the default key cancels a pending proposal.
+// Proposes a new owner, step 1 of 2. The owner only changes when the proposed owner accepts, // so proposing the default key cancels a pending proposal.
 func NewTransferOwnershipInstruction(
 	// Params:
 	proposedOwnerParam solanago.PublicKey,
@@ -2035,14 +2052,17 @@ func UnmarshalGetRoundInstruction(buf []byte) (*GetRoundInstruction, error) {
 }
 
 type InitializeInstruction struct {
-	Config StoreConfig `json:"config"`
+	StoreId uint64      `json:"store_id"`
+	Config  StoreConfig `json:"config"`
 
 	// Accounts:
 	Owner          solanago.PublicKey `json:"owner"`
+	OwnerWritable  bool               `json:"owner_writable"`
 	OwnerSigner    bool               `json:"owner_signer"`
 	State          solanago.PublicKey `json:"state"`
 	StateWritable  bool               `json:"state_writable"`
 	ProgramData    solanago.PublicKey `json:"program_data"`
+	SystemProgram  solanago.PublicKey `json:"system_program"`
 	EventAuthority solanago.PublicKey `json:"event_authority"`
 	Program        solanago.PublicKey `json:"program"`
 }
@@ -2061,6 +2081,11 @@ func (obj *InitializeInstruction) UnmarshalWithDecoder(decoder *binary.Decoder) 
 	}
 	if discriminator != Instruction_Initialize {
 		return fmt.Errorf("instruction discriminator mismatch for %s: expected %s, got %s", "InitializeInstruction", Instruction_Initialize, discriminator)
+	}
+	// Deserialize `StoreId`:
+	err = decoder.Decode(&obj.StoreId)
+	if err != nil {
+		return err
 	}
 	// Deserialize `Config`:
 	err = decoder.Decode(&obj.Config)
@@ -2097,6 +2122,13 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 		return nil, fmt.Errorf("failed to decode %s account index: %w", "program_data", err)
 	}
 	indices = append(indices, index)
+	// Decode from system_program account index
+	index = uint8(0)
+	err = decoder.Decode(&index)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode %s account index: %w", "system_program", err)
+	}
+	indices = append(indices, index)
 	// Decode from event_authority account index
 	index = uint8(0)
 	err = decoder.Decode(&index)
@@ -2116,8 +2148,8 @@ func (obj *InitializeInstruction) UnmarshalAccountIndices(buf []byte) ([]uint8, 
 
 func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, accountKeys []solanago.PublicKey) error {
 	// PopulateFromAccountIndices sets account public keys from indices and account keys array
-	if len(indices) != 5 {
-		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 5, len(indices))
+	if len(indices) != 6 {
+		return fmt.Errorf("mismatch between expected accounts (%d) and provided indices (%d)", 6, len(indices))
 	}
 	indexOffset := 0
 	// Set owner account from index
@@ -2137,6 +2169,12 @@ func (obj *InitializeInstruction) PopulateFromAccountIndices(indices []uint8, ac
 		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "program_data", len(accountKeys)-1)
 	}
 	obj.ProgramData = accountKeys[indices[indexOffset]]
+	indexOffset++
+	// Set system_program account from index
+	if indices[indexOffset] >= uint8(len(accountKeys)) {
+		return fmt.Errorf("account index %d for %s is out of bounds (max: %d)", indices[indexOffset], "system_program", len(accountKeys)-1)
+	}
+	obj.SystemProgram = accountKeys[indices[indexOffset]]
 	indexOffset++
 	// Set event_authority account from index
 	if indices[indexOffset] >= uint8(len(accountKeys)) {
@@ -2158,6 +2196,7 @@ func (obj *InitializeInstruction) GetAccountKeys() []solanago.PublicKey {
 	keys = append(keys, obj.Owner)
 	keys = append(keys, obj.State)
 	keys = append(keys, obj.ProgramData)
+	keys = append(keys, obj.SystemProgram)
 	keys = append(keys, obj.EventAuthority)
 	keys = append(keys, obj.Program)
 	return keys

@@ -1,4 +1,4 @@
-//! Port of `DataId.sol`. A data ID is one 16-byte word laid out as:
+//! A port of the EVM `DataId.sol`. A data ID is one 16-byte word, laid out as follows:
 //!
 //! ```text
 //! byte   0               8        9           11         12         16
@@ -8,37 +8,42 @@
 //!        +---------------+--------+-----------+----------+----------+
 //! ```
 //!
-//! The store serves data IDs with a zero SVR path ID: non-zero SVR path IDs are reserved, not
-//! supported yet. The instance and the reserved bytes carry no invariant: two data IDs differing
-//! only there are separate feeds with separate histories (and descriptions).
+//! The store serves only data IDs whose SVR path ID is zero. Non-zero SVR path IDs are reserved
+//! for SVR, which isn't supported yet. The instance and the reserved bytes carry no rule: two data
+//! IDs that differ only there are separate feeds, with separate histories and descriptions.
 
+/// A data ID as it appears in reports, instructions and events: 16 bytes.
 pub type DataId = [u8; 16];
 
 /// A data ID as accounts store it and derive their addresses from: zero padded to 32 bytes. Data
-/// IDs are 16 bytes on the wire and in events (as on EVM); accounts are keyed on 32 bytes so a
+/// IDs are 16 bytes in reports and events, as on EVM, but accounts are keyed on 32 bytes so that a
 /// wider data ID format later keeps every existing account address.
 pub type DataIdSeed = [u8; 32];
 
+/// Bytes 9 and 10 of a data ID hold its SVR path ID.
 const SVR_PATH: std::ops::Range<usize> = 9..11;
 
+/// Returns whether every byte of the data ID is zero.
 pub fn is_zero(data_id: &DataId) -> bool {
     *data_id == [0; 16]
 }
 
-/// The 32-byte PDA seed of a data ID: the data ID followed by 16 zero bytes.
+/// Returns the 32-byte seed a data ID's accounts are keyed on: the data ID followed by 16 zero
+/// bytes.
 pub fn to_seed(data_id: &DataId) -> DataIdSeed {
     let mut seed = [0u8; 32];
     seed[..16].copy_from_slice(data_id);
     seed
 }
 
-/// Whether a data ID carries an SVR path ID. The store does not support SVR yet, the bytes stay
-/// reserved so data IDs keep their layout if SVR is added later.
+/// Returns whether a data ID has a non-zero SVR path ID. The store doesn't support SVR yet, and
+/// these bytes stay reserved so that data IDs keep their layout if SVR is added later.
 pub fn has_svr_path(data_id: &DataId) -> bool {
     data_id[SVR_PATH] != [0, 0]
 }
 
-/// Whether a data ID is one the store serves: not zero, with a zero SVR path ID.
+/// Returns whether the store serves a data ID, which needs the data ID to be non-zero and its SVR
+/// path ID to be zero.
 pub fn is_valid_data_id(data_id: &DataId) -> bool {
     !is_zero(data_id) && !has_svr_path(data_id)
 }
@@ -83,7 +88,7 @@ mod tests {
         let a = id(FEED, 0, [0, 0], 0, [0; 4]);
         let b = id(FEED, 0, [0, 0], 0, [0, 0, 0, 1]);
         assert!(is_valid_data_id(&a) && is_valid_data_id(&b));
-        // separate feeds: different seeds, so different feed accounts
+        // They are separate feeds: different seeds give different feed accounts.
         assert_ne!(to_seed(&a), to_seed(&b));
         let state = anchor_lang::prelude::Pubkey::new_unique();
         assert_ne!(

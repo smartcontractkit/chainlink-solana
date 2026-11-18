@@ -100,42 +100,37 @@ func TestDataFeedsStore(t *testing.T) {
 	stagingForwarder, stagingAuthority := newForwarder(stagingF)
 	mainnetForwarder, mainnetAuthority := newForwarder(mainnetF)
 
-	storeState, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	// initialize creates the store's state account at the PDA ["state", store ID].
+	const storeID uint64 = 1
+	storeState := findPDA(data_feeds_store.ProgramID, []byte("state"), binary.LittleEndian.AppendUint64(nil, storeID))
 	storePDA := func(seed string, keys ...[]byte) solana.PublicKey {
-		return findPDA(data_feeds_store.ProgramID, append([][]byte{[]byte(seed), storeState.PublicKey().Bytes()}, keys...)...)
+		return findPDA(data_feeds_store.ProgramID, append([][]byte{[]byte(seed), storeState.Bytes()}, keys...)...)
 	}
 	df1Writer := storePDA("df1_writer")
 	feedPDA := func(id [16]uint8) solana.PublicKey { return storePDA("feed", seed32(id)) }
 	// events are CPI events: emitting instructions take the program's event authority and the program
 	storeEvents := findPDA(data_feeds_store.ProgramID, []byte("__event_authority"))
 
-	// A store lives in a pre-created state account that only the program's upgrade authority, here
-	// the deployer, initializes.
-	createState := func(key solana.PrivateKey, space uint64, program solana.PublicKey) solana.Instruction {
-		rent, err := client.GetMinimumBalanceForRentExemption(t.Context(), space, rpc.CommitmentConfirmed)
-		require.NoError(t, err)
-		return build(system.NewCreateAccountInstruction(rent, space, program, deployer.PublicKey(), key.PublicKey()).ValidateAndBuild())
-	}
+	// Only the program's upgrade authority, here the deployer, creates stores. It pays the state
+	// account's rent.
 	programData := func(program solana.PublicKey) solana.PublicKey {
 		return findPDA(solana.BPFLoaderUpgradeableProgramID, program.Bytes())
 	}
 	send([]solana.Instruction{
-		createState(storeState, 8+3232, data_feeds_store.ProgramID),
-		build(data_feeds_store.NewInitializeInstruction(data_feeds_store.StoreConfig{
+		build(data_feeds_store.NewInitializeInstruction(storeID, data_feeds_store.StoreConfig{
 			FeedAdmins:                []solana.PublicKey{deployer.PublicKey()},
 			DefaultMaxStoredReports:   16,
 			MaxObservationForwardSecs: 3600,
 			Df1Program:                store.ProgramID,
-		}, deployer.PublicKey(), storeState.PublicKey(), programData(data_feeds_store.ProgramID), storeEvents, data_feeds_store.ProgramID)),
-	}, storeState)
+		}, deployer.PublicKey(), storeState, programData(data_feeds_store.ProgramID), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)),
+	})
 	send([]solana.Instruction{
 		build(data_feeds_store.NewSetDefaultFeedMetadataInstruction([]data_feeds_store.WorkflowMetadata{
 			{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
 			{AllowedSender: mainnetAuthority, AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
 			// the deployer sends reports directly to measure compute and heap per report
 			{AllowedSender: deployer.PublicKey(), AllowedWorkflowOwner: testWorkflowOwner, AllowedWorkflowName: testWorkflowName},
-		}, deployer.PublicKey(), storeState.PublicKey(), storeEvents, data_feeds_store.ProgramID)),
+		}, deployer.PublicKey(), storeState, storeEvents, data_feeds_store.ProgramID)),
 	})
 
 	// target is a non-SVR data ID and, when legacy is set, the DF1 feed it is linked to
@@ -164,7 +159,7 @@ func TestDataFeedsStore(t *testing.T) {
 		for i := range ids {
 			descriptions[i] = fmt.Sprintf("F%02d / USD", i)
 		}
-		ix, err := data_feeds_store.NewSetFeedsInstruction(ids, descriptions, nil, deployer.PublicKey(), storeState.PublicKey(),
+		ix, err := data_feeds_store.NewSetFeedsInstruction(ids, descriptions, nil, deployer.PublicKey(), storeState,
 			solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
 		return adminIx(ix, err, ids)
 	}
@@ -176,7 +171,7 @@ func TestDataFeedsStore(t *testing.T) {
 		// the DF1 feed's link marker, so no two data IDs link it
 		link := storePDA("df1_link", legacy.PublicKey().Bytes())
 		ix, err := data_feeds_store.NewSetDf1FeedsInstruction([][16]uint8{id}, []solana.PublicKey{legacy.PublicKey()}, []bool{false},
-			deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
+			deployer.PublicKey(), storeState, solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
 		send([]solana.Instruction{
 			build(system.NewCreateAccountInstruction(df1Rent, df1Space, store.ProgramID, deployer.PublicKey(), legacy.PublicKey()).ValidateAndBuild()),
 			build(store.NewCreateFeedInstruction("ETH / USD", 8, 1, 1, legacy.PublicKey(), deployer.PublicKey())),
@@ -201,7 +196,7 @@ func TestDataFeedsStore(t *testing.T) {
 			withDF1 = withDF1 || !tg.legacy.IsZero()
 		}
 		remaining := []*solana.AccountMeta{
-			solana.Meta(storeState.PublicKey()), none, none,
+			solana.Meta(storeState), none, none,
 			solana.Meta(storeEvents), solana.Meta(data_feeds_store.ProgramID),
 		}
 		if withDF1 {
@@ -243,7 +238,7 @@ func TestDataFeedsStore(t *testing.T) {
 	directIx := func(targets []target, observed uint32) solana.Instruction {
 		payload, remaining := payloadAndAccounts(targets, observed)
 		ix := build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID, deployer.PublicKey(),
-			storeState.PublicKey(), data_feeds_store.ProgramID, data_feeds_store.ProgramID, storeEvents, data_feeds_store.ProgramID))
+			storeState, data_feeds_store.ProgramID, data_feeds_store.ProgramID, storeEvents, data_feeds_store.ProgramID))
 		generic := ix.(*solana.GenericInstruction)
 		generic.AccountValues = append([]*solana.AccountMeta{solana.Meta(solana.SystemProgramID), solana.Meta(deployer.PublicKey()).SIGNER()}, remaining...)
 		return generic
@@ -359,14 +354,14 @@ func TestDataFeedsStore(t *testing.T) {
 		return round
 	}
 	atStored := simulateRound("latest_round at 18 decimals", build(data_feeds_store.NewLatestRoundInstruction(df1Target.id, 18,
-		storeState.PublicKey(), feedPDA(df1Target.id))))
+		storeState, feedPDA(df1Target.id))))
 	require.Equal(t, uint64(2), atStored.RoundId)
 	require.Equal(t, 0, answer.Cmp(atStored.Answer.BigInt()))
 	minIx, err := data_feeds_store.NewSetMinDecimalsInstruction([][16]uint8{df1Target.id}, 8, deployer.PublicKey(),
-		storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
+		storeState, solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
 	send([]solana.Instruction{adminIx(minIx, err, [][16]uint8{df1Target.id})})
 	scaled := simulateRound("latest_round at 8 decimals", build(data_feeds_store.NewLatestRoundInstruction(df1Target.id, 8,
-		storeState.PublicKey(), feedPDA(df1Target.id))))
+		storeState, feedPDA(df1Target.id))))
 	require.Equal(t, "325012000000", scaled.Answer.BigInt().String(), "3250.12 at 8 decimals")
 
 	// Admin batches: 20 feeds set (created, with descriptions), then given specific metadata.
@@ -378,7 +373,7 @@ func TestDataFeedsStore(t *testing.T) {
 	metadataIx, err := data_feeds_store.NewSetSpecificFeedMetadataInstruction(adminIDs,
 		[]data_feeds_store.WorkflowMetadata{{AllowedSender: stagingAuthority, AllowedWorkflowOwner: testWorkflowOwner,
 			AllowedWorkflowName: testWorkflowName}},
-		deployer.PublicKey(), storeState.PublicKey(), solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
+		deployer.PublicKey(), storeState, solana.SystemProgramID, storeEvents, data_feeds_store.ProgramID)
 	sendReport(adminIx(metadataIx, err, adminIDs), "set_specific_feed_metadata, 20 feeds")
 
 	// Compute and heap per report, without the forwarder's signatures: the deployer is an allowed
@@ -429,7 +424,7 @@ func TestDataFeedsStore(t *testing.T) {
 	// and keep taking rounds, DF1 writes included.
 	upgradeProgram(t, client, deployer, data_feeds_store.ProgramID, filepath.Join(ProgramsPath, "data_feeds_store.so"))
 	kept := simulateRound("get_round after the upgrade", build(data_feeds_store.NewGetRoundInstruction(storeOnly.id, 1, 18,
-		storeState.PublicKey(), feedPDA(storeOnly.id))))
+		storeState, feedPDA(storeOnly.id))))
 	require.Equal(t, uint64(1), kept.RoundId)
 	require.Equal(t, observedAt, kept.ObservationsTimestamp)
 	sendReport(reportIx(mainnetForwarder, mainnetAuthority, mainnetF, reportId+40, []target{storeOnly, df1Target}, observedAt+50),

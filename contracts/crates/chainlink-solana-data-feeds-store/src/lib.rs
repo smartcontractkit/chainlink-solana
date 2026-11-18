@@ -1,15 +1,17 @@
-//! Readers for the Chainlink Data Feeds store on Solana. Each data ID has one feed account: pass it
-//! with the decimals you want, at least the feed's minimum and at most 18.
+//! Readers for the Chainlink Data Feeds store on Solana. Each data ID has one feed account. You
+//! pass it with the decimals you want, which must be at least the feed's minimum and at most 18.
 //!
-//! Two ways to read the same data:
-//! - **Decode the feed account** ([`read_latest_round`], [`read_round`]): no call to another
-//!   program. The account must be owned by the store program this crate is built for
-//!   ([`DATA_FEEDS_STORE_ID`]) and belong to the store state you pass; only the program's upgrade
-//!   authority creates store states, but pin the one you trust.
-//! - **Call the store** ([`latest_round`], [`get_round`]): one call, the store checks the account.
+//! There are two ways to read the same data, and both take the store state you trust. One program
+//! can hold several stores (production, staging, retired ones), so pin the state's address in your
+//! program rather than taking it from your caller.
+//! - Decode the feed account yourself with [`read_latest_round`] and [`read_round`], with no call
+//!   to another program. The account must be owned by the store program this crate is built for
+//!   ([`DATA_FEEDS_STORE_ID`]) and belong to the store state you pass.
+//! - Call the store with [`latest_round`] and [`get_round`]. The store then checks the feed
+//!   account, and the crate checks that the state passed is the one you pinned.
 //!
-//! Both refuse a frozen feed, decimals below the feed's minimum, and a non-zero answer that would
-//! round to zero. Round IDs keep increasing for the life of a feed.
+//! Both ways refuse a frozen feed, decimals outside that range, a round that isn't stored, and a
+//! non-zero answer that would round to zero. Round IDs keep increasing for the life of a feed.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::get_return_data;
@@ -22,13 +24,15 @@ use data_feeds_store::{
 };
 
 pub use data_feeds_store::common::STORED_DECIMALS;
-/// The errors reads fail with, e.g. `FeedFrozen` or `NoDataPresent`.
+/// The errors reads fail with, for example `FeedFrozen` or `NoDataPresent`.
 pub use data_feeds_store::error::StoreError;
 pub use data_feeds_store::logic::{scale, ScaleError};
 pub use data_feeds_store::state::Round;
 pub use data_feeds_store::utils::feed_address;
 pub use data_feeds_store::ID as DATA_FEEDS_STORE_ID;
 
+/// Checks that `feed` is a feed account of the store program for `store_state` and `data_id`, and
+/// returns its header and its borrowed data.
 fn decode<'a>(
     feed: &'a AccountInfo,
     store_state: &Pubkey,
@@ -41,7 +45,7 @@ fn decode<'a>(
     Ok((header, data))
 }
 
-/// The latest round of a data ID at `decimals`, decoded from its feed account.
+/// Returns the latest round of a data ID at `decimals`, decoded from its feed account.
 pub fn read_latest_round(
     feed: &AccountInfo,
     store_state: &Pubkey,
@@ -52,7 +56,7 @@ pub fn read_latest_round(
     to_round(&header, logic::latest_round(&header), decimals)
 }
 
-/// A stored round of a data ID at `decimals`, decoded from its feed account.
+/// Returns a stored round of a data ID at `decimals`, decoded from its feed account.
 pub fn read_round(
     feed: &AccountInfo,
     store_state: &Pubkey,
@@ -65,19 +69,38 @@ pub fn read_round(
     to_round(&header, round, decimals)
 }
 
-/// The latest round of a data ID at `decimals`, through a call to the store.
-pub fn latest_round<'info>(
-    store_program: AccountInfo<'info>,
-    store_state: AccountInfo<'info>,
-    feed: AccountInfo<'info>,
-    data_id: [u8; 16],
-    decimals: u8,
-) -> Result<Round> {
+/// Checks, before a call to the store, that `store_program` is the store program and that
+/// `store_state` is the state the caller pinned.
+fn check_call(
+    store_program: &AccountInfo,
+    store_state: &AccountInfo,
+    expected_state: &Pubkey,
+) -> Result<()> {
     require_keys_eq!(
         store_program.key(),
         DATA_FEEDS_STORE_ID,
         ErrorCode::InvalidProgramId
     );
+    require_keys_eq!(
+        store_state.key(),
+        *expected_state,
+        StoreError::AccountMismatch
+    );
+    Ok(())
+}
+
+/// Returns the latest round of a data ID at `decimals` by calling the store program.
+/// `expected_state` is the store state you trust; the call fails with `AccountMismatch` if
+/// `store_state` is another one.
+pub fn latest_round<'info>(
+    store_program: AccountInfo<'info>,
+    store_state: AccountInfo<'info>,
+    expected_state: &Pubkey,
+    feed: AccountInfo<'info>,
+    data_id: [u8; 16],
+    decimals: u8,
+) -> Result<Round> {
+    check_call(&store_program, &store_state, expected_state)?;
     let ctx = CpiContext::new(
         store_program,
         FeedRead {
@@ -89,20 +112,19 @@ pub fn latest_round<'info>(
     returned()
 }
 
-/// A stored round of a data ID at `decimals`, through a call to the store.
+/// Returns a stored round of a data ID at `decimals` by calling the store program.
+/// `expected_state` is the store state you trust; the call fails with `AccountMismatch` if
+/// `store_state` is another one.
 pub fn get_round<'info>(
     store_program: AccountInfo<'info>,
     store_state: AccountInfo<'info>,
+    expected_state: &Pubkey,
     feed: AccountInfo<'info>,
     data_id: [u8; 16],
     round_id: u64,
     decimals: u8,
 ) -> Result<Round> {
-    require_keys_eq!(
-        store_program.key(),
-        DATA_FEEDS_STORE_ID,
-        ErrorCode::InvalidProgramId
-    );
+    check_call(&store_program, &store_state, expected_state)?;
     let ctx = CpiContext::new(
         store_program,
         FeedRead {
@@ -114,7 +136,8 @@ pub fn get_round<'info>(
     returned()
 }
 
-/// The return data of the last call, which must come from the store.
+/// Decodes the round the store just returned. The return data must come from the store program,
+/// so no other program can answer in its place.
 fn returned() -> Result<Round> {
     match get_return_data() {
         Some((from, data)) if from == DATA_FEEDS_STORE_ID => {
@@ -185,8 +208,8 @@ mod tests {
     const E18: i128 = 1_000_000_000_000_000_000;
     const MAX: u64 = 4;
 
-    /// A feed account with rounds `1..=rounds` (answers 100, 200, ... with 18 decimals) in a ring
-    /// of 4, minimum read decimals 8.
+    /// Builds a feed account with rounds 1 to `rounds` (answers 100, 200, ... with 18 decimals) in
+    /// a ring of 4, with a minimum of 8 read decimals.
     fn feed_account(state: &Pubkey, data_id: &[u8; 16], rounds: u64, frozen: bool) -> Vec<u8> {
         let mut data = vec![0u8; feed_account_len(MAX)];
         let mut header: Feed = bytemuck::Zeroable::zeroed();
@@ -215,13 +238,14 @@ mod tests {
         data
     }
 
+    /// Writes a round into a feed account's ring at the round's index.
     fn set_report(data: &mut [u8], round: u64, report: &StoredReport) {
         let offset = FEED_RING_OFFSET + (round % MAX) as usize * size_of::<StoredReport>();
         data[offset..offset + size_of::<StoredReport>()]
             .copy_from_slice(bytemuck::bytes_of(report));
     }
 
-    /// Run `f` on a feed account with the given data, owned by `owner`.
+    /// Runs `f` on a feed account with the given data, owned by `owner`.
     fn with_account<T>(data: &mut [u8], owner: &Pubkey, f: impl FnOnce(&AccountInfo) -> T) -> T {
         let key = Pubkey::new_unique();
         let mut lamports = 0;
@@ -268,7 +292,7 @@ mod tests {
             let none = read_latest_round(info, &state, id, 8);
             assert_eq!(none.unwrap_err(), err(StoreError::NoDataPresent));
         });
-        // rounds 1..=5 in a ring of 4: round 1 was overwritten by round 5
+        // Rounds 1 to 5 in a ring of 4: round 5 overwrote round 1.
         let mut wrapped = feed_account(&state, &id, 5, false);
         with_account(&mut wrapped, &DATA_FEEDS_STORE_ID, |info| {
             let overwritten = read_round(info, &state, id, 1, 8);
@@ -333,7 +357,7 @@ mod tests {
         let version = read(&mut data, &DATA_FEEDS_STORE_ID);
         assert_eq!(version.unwrap_err(), err(StoreError::InvalidAccountVersion));
 
-        // a header claiming a ring the account doesn't hold
+        // The header claims a ring that the account doesn't hold.
         let mut data = feed_account(&state, &id, 3, false);
         data.truncate(feed_account_len(MAX) - 1);
         let short = read(&mut data, &DATA_FEEDS_STORE_ID);
@@ -353,12 +377,35 @@ mod tests {
         let latest = latest_round(
             program.clone(),
             state_info.clone(),
+            &state,
             feed_info.clone(),
             [1; 16],
             8,
         );
         assert_eq!(latest.unwrap_err(), invalid);
-        let round = get_round(program, state_info, feed_info, [1; 16], 1, 8);
+        let round = get_round(program, state_info, &state, feed_info, [1; 16], 1, 8);
         assert_eq!(round.unwrap_err(), invalid);
+    }
+
+    #[test]
+    fn calls_only_with_the_pinned_store_state() {
+        let (state, feed) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let (store, pinned) = (DATA_FEEDS_STORE_ID, Pubkey::new_unique());
+        let (mut l1, mut l2, mut l3) = (0, 0, 0);
+        let (mut d1, mut d2, mut d3) = (vec![], vec![], vec![]);
+        let program = AccountInfo::new(&store, false, false, &mut l1, &mut d1, &store, true, 0);
+        let state_info = AccountInfo::new(&state, false, false, &mut l2, &mut d2, &store, false, 0);
+        let feed_info = AccountInfo::new(&feed, false, false, &mut l3, &mut d3, &store, false, 0);
+        let latest = latest_round(
+            program.clone(),
+            state_info.clone(),
+            &pinned,
+            feed_info.clone(),
+            [1; 16],
+            8,
+        );
+        assert_eq!(latest.unwrap_err(), err(StoreError::AccountMismatch));
+        let round = get_round(program, state_info, &pinned, feed_info, [1; 16], 1, 8);
+        assert_eq!(round.unwrap_err(), err(StoreError::AccountMismatch));
     }
 }

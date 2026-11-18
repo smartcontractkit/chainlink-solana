@@ -72,7 +72,9 @@ describe("data feeds store", function () {
   let forwarder: Forwarder;
   let otherForwarder: Forwarder;
   let forwarderAuthority: PublicKey;
-  let state: Keypair;
+  // the current store: its store ID and its state account, the PDA ["state", store ID]
+  let storeId: BN;
+  let state: { publicKey: PublicKey };
   const workflowOwner = randomBytes(20);
   const workflowName = randomBytes(10);
 
@@ -109,21 +111,15 @@ describe("data feeds store", function () {
   const loader = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
   const programData = (programId: PublicKey) =>
     PublicKey.findProgramAddressSync([programId.toBuffer()], loader)[0];
-  const createAccount = async (
-    account: Keypair,
-    space: number,
-    programId: PublicKey
-  ) =>
-    SystemProgram.createAccount({
-      fromPubkey: provider.publicKey,
-      newAccountPubkey: account.publicKey,
-      space,
-      lamports: await connection.getMinimumBalanceForRentExemption(space),
-      programId,
-    });
-  const initializeStore = (owner: PublicKey, account: PublicKey) =>
+  const statePda = (id: BN) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("state"), id.toArrayLike(Buffer, "le", 8)],
+      program.programId
+    )[0];
+  const newStoreId = () => new BN(randomBytes(8), "le");
+  const initializeStore = (owner: PublicKey, id: BN) =>
     program.methods
-      .initialize({
+      .initialize(id, {
         feedAdmins: [feedAdmin.keypair.publicKey],
         defaultMaxStoredReports: new BN(4),
         maxObservationForwardSecs: 3600,
@@ -131,8 +127,9 @@ describe("data feeds store", function () {
       })
       .accountsStrict({
         owner,
-        state: account,
+        state: statePda(id),
         programData: programData(program.programId),
+        systemProgram: SystemProgram.programId,
         ...eventAccounts(),
       });
   const workflow = (name = workflowName) => ({
@@ -153,17 +150,9 @@ describe("data feeds store", function () {
 
   // a new store with the forwarder as default workflow
   const initStore = async () => {
-    state = Keypair.generate();
-    await initializeStore(provider.publicKey, state.publicKey)
-      .preInstructions([
-        await createAccount(
-          state,
-          program.account.storeState.size,
-          program.programId
-        ),
-      ])
-      .signers([state])
-      .rpc();
+    storeId = newStoreId();
+    await initializeStore(provider.publicKey, storeId).rpc();
+    state = { publicKey: statePda(storeId) };
     await setDefault();
   };
 
@@ -344,6 +333,14 @@ describe("data feeds store", function () {
 
   describe("configuration", function () {
     it("initializes", async () => {
+      // initialize creates the state account itself, owned by the program and rent-exempt
+      const info = (await connection.getAccountInfo(state.publicKey))!;
+      assert.isTrue(info.owner.equals(program.programId));
+      assert.equal(info.data.length, program.account.storeState.size);
+      assert.isAtLeast(
+        info.lamports,
+        await connection.getMinimumBalanceForRentExemption(info.data.length)
+      );
       const s = await program.account.storeState.fetch(state.publicKey);
       assert.isTrue(s.owner.equals(provider.publicKey));
       assert.equal(s.defaultMaxStoredReports.toNumber(), 4);
@@ -354,24 +351,32 @@ describe("data feeds store", function () {
     });
 
     it("lets only the upgrade authority create stores, once", async () => {
-      const other = Keypair.generate();
       await expectError(
-        initializeStore(feedAdmin.keypair.publicKey, other.publicKey)
-          .preInstructions([
-            await createAccount(
-              other,
-              program.account.storeState.size,
-              program.programId
-            ),
-          ])
-          .signers([other, feedAdmin.keypair])
+        initializeStore(feedAdmin.keypair.publicKey, newStoreId())
+          .signers([feedAdmin.keypair])
           .rpc(),
         "Unauthorized"
       );
       await expectError(
-        initializeStore(provider.publicKey, state.publicKey).rpc(),
-        "ConstraintZero"
+        initializeStore(provider.publicKey, storeId).rpc(),
+        "StoreAlreadyInitialized"
       );
+    });
+
+    it("creates a store whose address someone already sent SOL to", async () => {
+      // A plain create_account would fail on a funded address, so anyone could block creation.
+      const id = newStoreId();
+      const tx = new anchor.web3.Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: provider.publicKey,
+          toPubkey: statePda(id),
+          lamports: 1_000_000,
+        })
+      );
+      await provider.sendAndConfirm(tx);
+      await initializeStore(provider.publicKey, id).rpc();
+      const s = await program.account.storeState.fetch(statePda(id));
+      assert.isTrue(s.owner.equals(provider.publicKey));
     });
 
     it("gives every error its own code", () => {

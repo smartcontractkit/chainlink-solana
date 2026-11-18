@@ -23,8 +23,10 @@ use crate::{
     },
 };
 
-/// Create a program owned PDA, topping up an account someone pre-funded (a plain `create_account`
-/// would fail on it). `payer` must already be a signer of this instruction.
+/// Creates an account of `space` bytes at a PDA of this program, with `payer` paying the rent. If
+/// someone already sent SOL to the address, a plain `create_account` would fail, so it tops the
+/// balance up, then allocates and assigns the account instead. `payer` must already sign this
+/// instruction.
 pub fn create_pda_account<'info>(
     space: usize,
     seeds: &[&[u8]],
@@ -87,8 +89,10 @@ pub fn create_pda_account<'info>(
     Ok(())
 }
 
-/// Like reading a zero-copy account, but by value on the heap, checking owner and discriminator.
-/// For accounts too large for the 4KiB stack frame. Alignment agnostic.
+/// Copies an account of this program onto the heap and returns the copy. It first checks that
+/// this program owns the account and that the data starts with the type's tag. The account is
+/// copied to the heap because a Solana stack frame is only 4 KiB and the store state alone takes
+/// 3,232 bytes, and copying also works whatever the alignment of the account data.
 pub fn load_boxed<T: Pod + Discriminator>(info: &AccountInfo) -> Result<Box<T>> {
     require_keys_eq!(*info.owner, crate::ID, StoreError::InvalidAccount);
     let data = info.try_borrow_data()?;
@@ -103,12 +107,13 @@ pub fn load_boxed<T: Pod + Discriminator>(info: &AccountInfo) -> Result<Box<T>> 
     Ok(value)
 }
 
-/// Whether an account isn't created yet: system-owned with no data (it may hold lamports).
+/// Returns true if no account has been created at this address yet. Such an address is owned by
+/// the system program and has no data, though someone may have sent SOL to it.
 pub fn is_uninitialized(info: &AccountInfo) -> bool {
     *info.owner == System::id() && info.data_is_empty()
 }
 
-/// The feed address of a data ID under a store state, and its bump.
+/// Returns the address of a data ID's feed in a store, together with the PDA's bump.
 pub fn feed_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[FEED_SEED, state.as_ref(), &data_id::to_seed(data_id)],
@@ -116,7 +121,7 @@ pub fn feed_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
     )
 }
 
-/// The link marker address of a DF1 feed under a store state, and its bump.
+/// Returns the address of a DF1 feed's link marker in a store, together with the PDA's bump.
 pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[DF1_LINK_SEED, state.as_ref(), df1_feed.as_ref()],
@@ -124,9 +129,10 @@ pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
     )
 }
 
-/// Decode a feed header from a feed account's data, checking the discriminator, version, store
-/// state, data ID and that its ring fits. Shared by the program and readers decoding accounts. Not
-/// the owner: callers must check the account belongs to this program.
+/// Copies a feed header out of a feed account's data. It checks the tag, the layout version, that
+/// the feed belongs to `state` and `data_id`, and that the account is long enough for its ring.
+/// Both the program and readers that decode accounts use it. It doesn't check the account's
+/// owner, so callers must check that this program owns the account.
 pub fn decode_feed_into(
     data: &[u8],
     state: &Pubkey,
@@ -154,8 +160,9 @@ pub fn decode_feed_into(
     Ok(())
 }
 
-/// Load a feed header of this program into an existing buffer: the bump allocator never frees,
-/// so batches reuse one buffer.
+/// Copies a feed header of this program into a buffer the caller owns. It checks that this
+/// program owns the account, then everything [`decode_feed_into`] checks. A batch reuses one
+/// buffer for every feed, because a program's heap is never freed.
 pub fn load_feed_into(
     info: &AccountInfo,
     state: &Pubkey,
@@ -166,7 +173,8 @@ pub fn load_feed_into(
     decode_feed_into(&info.try_borrow_data()?, state, data_id, feed)
 }
 
-/// Write a feed header back.
+/// Writes a feed header, with its tag, back to the start of the feed account. It fails if the
+/// account wasn't passed writable.
 pub fn store_feed(info: &AccountInfo, feed: &Feed) -> Result<()> {
     require!(info.is_writable, StoreError::AccountNotWritable);
     let mut data = info.try_borrow_mut_data()?;
@@ -176,69 +184,76 @@ pub fn store_feed(info: &AccountInfo, feed: &Feed) -> Result<()> {
     Ok(())
 }
 
-fn ring_offset(slot: u64) -> usize {
-    FEED_RING_OFFSET + slot as usize * size_of::<StoredReport>()
+/// Returns the byte offset of a ring index in a feed account.
+fn ring_offset(index: u64) -> usize {
+    FEED_RING_OFFSET + index as usize * size_of::<StoredReport>()
 }
 
-/// Circular buffer over a feed account's data (the whole account data, header included).
+/// The ring of a feed account, for reading and writing. It wraps the whole account data, header
+/// included, and finds index i at byte `FEED_RING_OFFSET + 32 * i`.
 pub struct RingMut<'a> {
     data: &'a mut [u8],
 }
 
 impl<'a> RingMut<'a> {
+    /// Wraps a feed account's whole data.
     pub fn new(data: &'a mut [u8]) -> Self {
         Self { data }
     }
 }
 
 impl Ring for RingMut<'_> {
-    fn get(&self, slot: u64) -> StoredReport {
-        let offset = ring_offset(slot);
+    fn get(&self, index: u64) -> StoredReport {
+        let offset = ring_offset(index);
         bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
     }
 
-    fn set(&mut self, slot: u64, report: StoredReport) {
-        let offset = ring_offset(slot);
+    fn set(&mut self, index: u64, report: StoredReport) {
+        let offset = ring_offset(index);
         self.data[offset..offset + size_of::<StoredReport>()]
             .copy_from_slice(bytemuck::bytes_of(&report));
     }
 }
 
-/// Read-only circular buffer over a feed account's data.
+/// The ring of a feed account, for reading only.
 pub struct RingRef<'a> {
     data: &'a [u8],
 }
 
 impl<'a> RingRef<'a> {
+    /// Wraps a feed account's whole data.
     pub fn new(data: &'a [u8]) -> Self {
         Self { data }
     }
 }
 
 impl Ring for RingRef<'_> {
-    fn get(&self, slot: u64) -> StoredReport {
-        let offset = ring_offset(slot);
+    fn get(&self, index: u64) -> StoredReport {
+        let offset = ring_offset(index);
         bytemuck::pod_read_unaligned(&self.data[offset..offset + size_of::<StoredReport>()])
     }
 
-    fn set(&mut self, _slot: u64, _report: StoredReport) {
+    fn set(&mut self, _index: u64, _report: StoredReport) {
         unreachable!("read-only ring")
     }
 }
 
+/// Encodes a description as a feed stores it. The description must be at most 64 UTF-8 bytes
+/// with no zero byte, and it is zero padded to 64 bytes.
 pub fn encode_description(description: &str) -> Result<[u8; DESCRIPTION_LEN]> {
     let bytes = description.as_bytes();
     require!(
         bytes.len() <= DESCRIPTION_LEN,
         StoreError::DescriptionTooLong
     );
-    // stored zero padded, so a NUL would cut the description short on read
+    // The description is stored zero padded, so a zero byte would cut it short when read back.
     require!(!bytes.contains(&0), StoreError::InvalidDescription);
     let mut out = [0u8; DESCRIPTION_LEN];
     out[..bytes.len()].copy_from_slice(bytes);
     Ok(out)
 }
 
+/// Decodes a stored description, which ends at its first zero byte.
 pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
     let end = description
         .iter()
@@ -247,10 +262,10 @@ pub fn decode_description(description: &[u8; DESCRIPTION_LEN]) -> String {
     String::from_utf8_lossy(&description[..end]).into_owned()
 }
 
-/// Emits CPI events from code that has no `Context` (`emit_cpi!` needs one): the same self-invoke
-/// signed by the event authority PDA. It reuses one instruction for every event, serializing the
-/// event straight into it, so a batch only allocates the copy `invoke_signed` makes on this
-/// program's heap per event.
+/// Emits CPI events from code that has no Anchor `Context`, which `emit_cpi!` needs. It makes the
+/// same call to this program, signed by the event authority PDA. It reuses one instruction buffer
+/// and serializes each event straight into it, so the only allocation per event is the copy that
+/// `invoke_signed` makes on the heap.
 pub struct EventEmitter<'info> {
     authority: AccountInfo<'info>,
     bump: u8,
@@ -258,6 +273,7 @@ pub struct EventEmitter<'info> {
 }
 
 impl<'info> EventEmitter<'info> {
+    /// Prepares to emit events signed by `authority`, the event authority PDA with bump `bump`.
     pub fn new(authority: AccountInfo<'info>, bump: u8) -> Self {
         let ix = Instruction {
             program_id: crate::ID,
@@ -271,13 +287,14 @@ impl<'info> EventEmitter<'info> {
         }
     }
 
+    /// Emits one event.
     pub fn emit<E: AnchorSerialize + Discriminator>(&self, event: &E) -> Result<()> {
         self.emit_with(E::DISCRIMINATOR, |data| Ok(event.serialize(data)?))
     }
 
-    /// Emit an event whose fields `write` serializes in order, so large fields can be written from
-    /// borrowed data instead of an owned copy per event. The bytes must match the event struct's
-    /// Borsh encoding (see the tests in `event.rs`).
+    /// Emits an event whose fields `write` serializes in order, so large fields can be written
+    /// from borrowed data instead of an owned copy per event. The bytes must match the event
+    /// struct's Borsh encoding, which the tests in `event.rs` check.
     pub fn emit_with(
         &self,
         discriminator: &[u8],
@@ -298,6 +315,7 @@ impl<'info> EventEmitter<'info> {
     }
 }
 
+/// Fails with `Unauthorized` unless the signer is one of the store's feed admins.
 pub fn verify_feed_admin(admin: &Signer, admins: &AccountList) -> Result<()> {
     require!(
         admins.binary_search(admin.key).is_ok(),
@@ -306,12 +324,15 @@ pub fn verify_feed_admin(admin: &Signer, admins: &AccountList) -> Result<()> {
     Ok(())
 }
 
+/// Fails with `InvalidDataId` for a data ID the store doesn't serve: one that is zero or has an
+/// SVR path ID.
 pub fn validate_data_id(id: &[u8; 16]) -> Result<()> {
     require!(data_id::is_valid_data_id(id), StoreError::InvalidDataId);
     Ok(())
 }
 
-/// Check a workflow list: at most `MAX_WORKFLOW_METADATAS` entries, each valid.
+/// Checks a workflow list. It may hold at most `MAX_WORKFLOW_METADATAS` entries, and each entry
+/// must pass [`validate_workflow_metadata`].
 pub fn validate_workflows(workflow_metadata: &[WorkflowMetadata]) -> Result<()> {
     require!(
         workflow_metadata.len() <= MAX_WORKFLOW_METADATAS,
@@ -323,6 +344,8 @@ pub fn validate_workflows(workflow_metadata: &[WorkflowMetadata]) -> Result<()> 
     Ok(())
 }
 
+/// Refuses a workflow entry whose sender is the default key, or whose workflow owner or name is
+/// all zeros. EVM refuses the same entries.
 pub fn validate_workflow_metadata(metadata: &WorkflowMetadata) -> Result<()> {
     require_keys_neq!(
         metadata.allowed_sender,
@@ -340,8 +363,8 @@ pub fn validate_workflow_metadata(metadata: &WorkflowMetadata) -> Result<()> {
     Ok(())
 }
 
-/// Whether a sender and workflow may write a data ID: feed-specific metadata when configured,
-/// otherwise the store's default metadata.
+/// Returns whether a sender and workflow may write a data ID. The feed's own workflow list decides
+/// when it has one, and the store's default list decides otherwise.
 pub fn has_permission(
     specific: &[WorkflowMetadata],
     default: &[WorkflowMetadata],
@@ -361,16 +384,24 @@ pub fn has_permission(
     })
 }
 
-// workflow_cid           offset  0, size 32
-// workflow_name          offset 32, size 10
-// workflow_owner         offset 42, size 20
-// report_id              offset 62, size  2
+/// Returns the workflow name and owner from the forwarder's metadata, the only parts the store
+/// uses. The metadata is laid out as follows:
+///
+/// ```text
+/// workflow_cid           offset  0, size 32
+/// workflow_name          offset 32, size 10
+/// workflow_owner         offset 42, size 20
+/// report_id              offset 62, size  2
+/// ```
 pub fn workflow_metadata(metadata: &[u8]) -> Result<([u8; 10], [u8; 20])> {
     let name = metadata.get(32..42).ok_or(StoreError::MalformedReport)?;
     let owner = metadata.get(42..62).ok_or(StoreError::MalformedReport)?;
     Ok((name.try_into().unwrap(), owner.try_into().unwrap()))
 }
 
+/// Returns the next remaining account, or fails with `InvalidAccountCount` if the caller passed
+/// too few. Remaining accounts are a plain list the caller builds, so running out is the caller's
+/// mistake, which is reported as a named error rather than a panic.
 pub fn next_account<'a, 'info>(
     accounts: &mut std::slice::Iter<'a, AccountInfo<'info>>,
 ) -> Result<&'a AccountInfo<'info>> {

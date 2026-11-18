@@ -1,7 +1,7 @@
-//! Feed admin settings of data IDs (remaining accounts: their feed PDAs, in order). A feed that
-//! doesn't exist yet is created first, the feed admin paying its rent: on Solana a feed is set by a
-//! feed admin, as on Aptos and Stellar, since the forwarder passes no account that could pay for
-//! it.
+//! Feed admin instructions that change feeds. Their remaining accounts are the feed PDAs of the
+//! data IDs, in the same order. A feed that doesn't exist yet is created first, and the feed admin
+//! pays its rent. On Solana a feed admin creates feeds, as on Aptos and Stellar, because the
+//! forwarder passes no account that could pay for a new one.
 
 use std::mem::size_of;
 
@@ -25,10 +25,11 @@ use crate::{
     },
 };
 
-/// Check the admin, create the feeds that don't exist yet, then run `f` on each feed's header and
-/// write it back. One header buffer and one event emitter serve the batch: the bump allocator never
-/// frees. `FeedsCreated` comes first, so indexers applying events in order see a feed created
-/// before its settings; the emitter is returned for events covering the whole call.
+/// Checks that the signer is a feed admin, creates the feeds that don't exist yet, then runs `f`
+/// on each feed's header and writes the header back. One header buffer and one event emitter serve
+/// the whole call, because a program's heap is never freed. `FeedsCreated` is emitted first, so
+/// indexers that apply events in order see a feed created before its settings. The emitter is
+/// returned for events that cover the whole call.
 fn update_feeds_with_events<'info>(
     ctx: &Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: &[[u8; 16]],
@@ -47,8 +48,9 @@ fn update_feeds_with_events<'info>(
     );
     let payer = ctx.accounts.feed_admin.to_account_info();
     let system_program = ctx.accounts.system_program.to_account_info();
-    // one event for every feed created: each event is an instruction, and a transaction holds at
-    // most 64 (a data ID listed twice is created once)
+    // A single event lists every feed created, because each event is an inner instruction and
+    // Solana allows at most 64 instructions per transaction. A data ID listed twice is created,
+    // and listed, once.
     let mut created: Vec<[u8; 16]> = Vec::new();
     for (id, info) in data_ids.iter().zip(feeds.iter()) {
         if is_uninitialized(info) && !created.contains(id) {
@@ -91,7 +93,7 @@ fn update_feeds_with_events<'info>(
     Ok(events)
 }
 
-/// `update_feeds_with_events` for setters that emit only per-feed events.
+/// Runs `update_feeds_with_events` for setters whose events are all emitted per feed.
 fn update_feeds<'info>(
     ctx: &Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: &[[u8; 16]],
@@ -101,14 +103,15 @@ fn update_feeds<'info>(
     update_feeds_with_events(ctx, data_ids, feeds, f).map(|_| ())
 }
 
-/// Replace a feed's own workflow list, zeroing the slots a shorter list leaves (the layout is
-/// public, so removed workflows shouldn't linger in it).
+/// Replaces a feed's own workflow list. The entries a shorter list leaves unused are zeroed,
+/// because the layout is public and removed workflows shouldn't stay visible in it.
 fn set_specific(feed: &mut Feed, workflow_metadata: &[WorkflowMetadata]) {
     feed.specific_workflow_metadata = bytemuck::Zeroable::zeroed();
     feed.specific_workflow_metadata.extend(workflow_metadata);
 }
 
-/// One SpecificFeedMetadataSet for every data ID of the call, written from the borrowed lists.
+/// Emits one `SpecificFeedMetadataSet` covering every data ID of the call, serialized straight
+/// from the borrowed lists instead of from copies.
 fn emit_specific_set(
     events: &EventEmitter<'_>,
     state: &Pubkey,
@@ -123,7 +126,8 @@ fn emit_specific_set(
     })
 }
 
-/// FeedDescriptionSet, written from the borrowed description instead of a copy.
+/// Emits `FeedDescriptionSet`, serialized straight from the borrowed description instead of from
+/// a copy.
 fn emit_description_set(
     events: &EventEmitter<'_>,
     state: &Pubkey,
@@ -138,10 +142,9 @@ fn emit_description_set(
     })
 }
 
-/// Set feeds up, creating those that don't exist yet: their descriptions and, unless
-/// `workflow_metadata` is empty, the workflows allowed to write them (the same list for every feed
-/// of the call). With an empty list the feeds keep their feed-specific workflows, or the store's
-/// default ones.
+/// Sets feeds up, creating those that don't exist yet. It sets each feed's description and, if
+/// `workflow_metadata` isn't empty, makes that list each feed's own workflow list. With an empty
+/// list, each feed keeps its own list, or the store's default list if it has none.
 pub fn set_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -174,7 +177,7 @@ pub fn set_feeds<'info>(
     Ok(())
 }
 
-/// Set feed descriptions, e.g. "ETH / USD", an empty string clears one.
+/// Sets feed descriptions, for example "ETH / USD". An empty string clears a description.
 pub fn set_feed_descriptions<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -197,8 +200,8 @@ pub fn set_feed_descriptions<'info>(
     )
 }
 
-/// Set the workflows allowed to write the given data IDs, replacing any previous feed-specific
-/// metadata. Data IDs without feed-specific metadata use the store's default metadata.
+/// Gives each feed its own workflow list, replacing any list it had. A feed without its own list
+/// uses the store's default list.
 pub fn set_specific_feed_metadata<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -218,7 +221,7 @@ pub fn set_specific_feed_metadata<'info>(
     emit_specific_set(&events, &state, &data_ids, &workflow_metadata)
 }
 
-/// Remove feed-specific workflow metadata, the data IDs fall back to the default metadata.
+/// Removes the feeds' own workflow lists, so the store's default list applies to them again.
 pub fn remove_specific_feed_metadata<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -242,7 +245,8 @@ pub fn remove_specific_feed_metadata<'info>(
     )
 }
 
-/// Set the accepted answer range of feeds, the (i128::MIN, i128::MAX) pair clears the range.
+/// Sets the range of answers each feed accepts. The pair `(i128::MIN, i128::MAX)` removes the
+/// range.
 pub fn set_min_max_answers<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -261,7 +265,7 @@ pub fn set_min_max_answers<'info>(
         |i, id, feed, events| {
             let (min_answer, max_answer) = (min_answers[i], max_answers[i]);
             if min_answer == i128::MIN && max_answer == i128::MAX {
-                // unbounded pair, same as never configured
+                // The unbounded pair removes the range, as if it had never been set.
                 feed.min_max_configured = 0;
                 feed.min_answer = 0;
                 feed.max_answer = 0;
@@ -281,8 +285,8 @@ pub fn set_min_max_answers<'info>(
     )
 }
 
-/// Disable or enable writes of feeds: while disabled, every workflow's reports for the data ID are
-/// skipped (default and feed-specific alike) and reads keep serving the last round.
+/// Disables or enables writes to feeds. While a feed's writes are disabled, every report for it
+/// is skipped, whichever workflow sent it, and reads keep serving the last round.
 pub fn set_feed_writes_disabled<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -304,8 +308,9 @@ pub fn set_feed_writes_disabled<'info>(
     )
 }
 
-/// Freeze or unfreeze round reads of feeds: frozen feeds refuse `latest_round` and `get_round`,
-/// their description and decimals stay readable, and writes continue.
+/// Freezes or unfreezes round reads of feeds. While a feed is frozen, `latest_round` and
+/// `get_round` fail, its description and decimals stay readable, and its reports are still
+/// stored.
 pub fn set_feed_frozen<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -327,7 +332,7 @@ pub fn set_feed_frozen<'info>(
     )
 }
 
-/// Set the fewest decimals reads of feeds may ask for; new feeds start at the stored decimals.
+/// Sets the fewest decimals a read of each feed may ask for, at most 18. New feeds start at 18.
 pub fn set_min_decimals<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -350,15 +355,26 @@ pub fn set_min_decimals<'info>(
     )
 }
 
-/// Link data IDs to the DF1 feeds this store keeps written with their rounds (default pubkey
-/// unlinks), and enable or disable that write. A DF1 feed is linked from at most one data ID: it
-/// has a marker PDA `["df1_link", state, df1_feed]` holding the data ID that links it, created on
-/// its first link (the feed admin paying, about 0.001 SOL) and cleared, not closed, when the link
-/// is removed. Reports never read the marker. Moving a DF1 feed between data IDs in one call needs
-/// the unlink first.
+/// Links data IDs to the DF1 feeds that this store then writes their rounds to, or unlinks them
+/// when given the default key, and enables or disables that write. A DF1 feed can be linked from
+/// only one data ID. Its link marker, the PDA `["df1_link", state, df1_feed]`, holds the data ID
+/// that links it. The marker is created on the DF1 feed's first link, with the feed admin paying
+/// about 0.001 SOL, and it is cleared rather than closed when the link is removed. Reports never
+/// read it. To move a DF1 feed between data IDs in one call, list the data ID that gives it up
+/// first. Markers are passed writable; below, link(F) is DF1 feed F's marker.
 ///
-/// Remaining accounts: the feeds, then for each data ID in order: the marker of its current DF1
-/// feed if the link changes away from it, then the new DF1 feed and its marker if one is linked.
+/// ```text
+/// data_ids        A        B        C        D
+/// df1_feeds       X        none     W        V        none is the default key
+/// linked before   none     Y        Z        V
+///
+/// remaining accounts, in this order:
+///   feed A, feed B, feed C, feed D     the feeds, in data ID order
+///   X, link(X)                         A links X (link(X) is created if it is new)
+///   link(Y)                            B unlinks Y
+///   link(Z), W, link(W)                C moves from Z to W
+///   V, link(V)                         D keeps V, for example to change write_disabled
+/// ```
 pub fn set_df1_feeds<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -388,8 +404,10 @@ pub fn set_df1_feeds<'info>(
         if new != Pubkey::default() {
             let info = next_account(&mut links)?;
             require_keys_eq!(*info.key, new, StoreError::AccountMismatch);
+            // Only the layout is checked: the DF1 feed can be linked before its owner makes this
+            // store its writer.
             require!(
-                df1::check_layout(info, &df1_program).is_ok(),
+                df1::check_feed(info.owner, &info.try_borrow_data()?, &df1_program).is_ok(),
                 StoreError::InvalidDf1Feed
             );
             link_df1_feed(
@@ -414,7 +432,8 @@ pub fn set_df1_feeds<'info>(
     Ok(())
 }
 
-/// Create a DF1 feed's link marker for a data ID, or check it already belongs to that data ID.
+/// Creates a DF1 feed's link marker for a data ID, or checks that the existing marker is free or
+/// already holds that data ID. It then writes the data ID into the marker.
 fn link_df1_feed<'info>(
     marker: &AccountInfo<'info>,
     state: &Pubkey,
@@ -444,6 +463,7 @@ fn link_df1_feed<'info>(
     write_link(marker, seed)
 }
 
+/// Writes a link marker's tag, version and data ID.
 fn write_link(marker: &AccountInfo, data_id: [u8; 32]) -> Result<()> {
     let link = Df1Link {
         version: ACCOUNT_VERSION,
@@ -456,9 +476,10 @@ fn write_link(marker: &AccountInfo, data_id: [u8; 32]) -> Result<()> {
     Ok(())
 }
 
-/// Clear a DF1 feed's link marker held by a data ID, so another data ID can link the DF1 feed. The
-/// marker is kept rather than closed: closing moves lamports by hand, which the runtime refuses
-/// once a later call to another program follows in the same instruction.
+/// Clears a DF1 feed's link marker held by a data ID, so that another data ID can link the DF1
+/// feed. The marker is kept rather than closed. Closing would move its SOL by hand, and the
+/// runtime's balance check then fails a later call in the same instruction, such as the system
+/// program call that creates the next feed.
 fn unlink_df1_feed(
     marker: &AccountInfo,
     state: &Pubkey,
@@ -474,7 +495,9 @@ fn unlink_df1_feed(
     write_link(marker, [0; 32])
 }
 
-/// The data ID (as its 32-byte seed) a link marker of this store holds.
+/// Returns the data ID, as its 32-byte seed, that a link marker of this program holds. It checks
+/// that the marker is this program's, writable, of the right type and size, and at the current
+/// version.
 fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
     require_keys_eq!(*marker.owner, crate::ID, StoreError::InvalidAccount);
     require!(marker.is_writable, StoreError::AccountNotWritable);
@@ -493,11 +516,12 @@ fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
     Ok(link.data_id)
 }
 
-/// Grow the number of rounds feeds keep: only up, only before a feed's ring wraps, by at most 10 KiB
-/// per feed per instruction counted from its length when the instruction started (320 rounds for an
-/// existing feed; a feed created in the call holds at most 278). Called through another program,
-/// as an MCMS batch does, the runtime counts from the outer instruction's start, so grow each feed
-/// once per outer instruction. The feed admin tops up the rent.
+/// Grows the number of rounds feeds keep. A ring can only grow, and only before it first wraps.
+/// Each feed can grow by at most 10 KiB per instruction, counted from its length when the
+/// instruction started: 320 rounds for an existing feed, while a feed created in the same call
+/// holds at most 278. When this is called through another program, as an MCMS batch does, the
+/// runtime counts from the start of the outer instruction, so grow each feed once per outer
+/// instruction. The feed admin tops up the rent.
 pub fn set_max_stored_reports<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
     data_ids: Vec<[u8; 16]>,
@@ -513,8 +537,9 @@ pub fn set_max_stored_reports<'info>(
     let system_program = ctx.accounts.system_program.to_account_info();
     let rent = Rent::get()?;
     let feeds = ctx.remaining_accounts;
-    // The runtime caps growth at 10 KiB against an account's length when the instruction started,
-    // which is 0 for a feed created in this call and the same for a data ID listed twice.
+    // The runtime caps growth at 10 KiB against an account's length when the instruction started.
+    // That length is 0 for a feed created in this call, and it stays the first length for a data
+    // ID listed twice.
     let entry_lens: Vec<usize> = feeds.iter().map(|info| info.data_len()).collect();
     update_feeds(&ctx, &data_ids, feeds, |i, id, feed, events| {
         let new_max = max_stored_reports[i];
@@ -524,7 +549,8 @@ pub fn set_max_stored_reports<'info>(
             MaxStoredReportsError::Locked => StoreError::MaxStoredReportsLocked,
         })?;
         let info = &feeds[i];
-        // before the rent top-up, which would otherwise fail with a less clear error
+        // This is checked before the rent top-up, which would otherwise fail with a less clear
+        // error.
         require!(info.is_writable, StoreError::AccountNotWritable);
         let old_len = info.data_len();
         let new_len = feed_account_len(new_max);
@@ -547,7 +573,7 @@ pub fn set_max_stored_reports<'info>(
                 top_up,
             )?;
         }
-        // zero-fills the new bytes
+        // `resize` zero-fills the new bytes, so the new ring indexes start empty.
         info.resize(new_len)?;
         feed.max_stored_reports = new_max;
         events.emit(&MaxStoredReportsSet {

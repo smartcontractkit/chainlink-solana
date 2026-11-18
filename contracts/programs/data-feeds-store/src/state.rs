@@ -11,146 +11,223 @@ use crate::common::{
     ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, MAX_FEED_ADMINS, MAX_WORKFLOW_METADATAS,
 };
 
-/// Store instance: ownership, admins, the DF1 program it keeps written and the defaults applied to
-/// every feed.
+/// The state account of one store. It holds the owner, the feed admins, the DF1 program the store
+/// may write to, and the settings that apply to every feed of the store. One program can hold many
+/// stores, each with its own state account and its own feeds.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct StoreState {
+    /// The layout version of this account, set to `ACCOUNT_VERSION`.
     pub version: u8,
-    /// Bump of the store authority PDA, which only holds recoverable tokens and SOL
+    /// The bump of the store authority PDA. A PDA's address is found by trying bump values from
+    /// 255 downwards until the address is one no private key exists for, and signing as the PDA
+    /// needs that bump. `initialize` finds it once and stores it here, so later instructions don't
+    /// repeat the search. The store authority only holds tokens and SOL sent to the store, which
+    /// the owner can recover.
     pub store_authority_bump: u8,
-    /// Bump of the `df1_writer` PDA, the writer of DF1 feeds this store keeps written
+    /// The bump of the `df1_writer` PDA, stored for the same reason. The store signs its `submit`
+    /// calls to DF1 as this PDA, and each linked DF1 feed must name it as its writer.
     pub df1_writer_bump: u8,
+    /// Always zero. This byte fills the gap before `max_observation_forward_secs`, because a
+    /// zero-copy account is read straight from its bytes and so cannot have hidden padding.
     pub _padding0: u8,
-    /// Maximum seconds a report's observation timestamp may lead the clock before it is ignored
+    /// How many seconds ahead of the chain's clock a report's observation timestamp may be. A
+    /// report stamped further ahead is skipped with `FutureReportIgnored`. If it were stored, it
+    /// would become the feed's latest round, and every later report carrying the correct time would
+    /// be skipped as stale until the clock caught up. The limit is a window rather than "not after
+    /// now" because the DON's clocks and the chain's clock drift slightly apart. EVM has the same
+    /// setting.
     pub max_observation_forward_secs: u32,
-    /// Ring size of the feeds this store creates
+    /// How many rounds each feed this store creates keeps, which is the size of its ring.
     pub default_max_stored_reports: u64,
+    /// The owner. It manages the feed admins and ownership, and can recover tokens and SOL sent
+    /// to the store.
     pub owner: Pubkey,
+    /// The owner proposed by `transfer_ownership`, until it accepts. It is the default key when no
+    /// transfer is pending.
     pub proposed_owner: Pubkey,
-    /// DF1 store program whose feeds this store can keep written
+    /// The DF1 program whose feed accounts this store may write.
     pub df1_program: Pubkey,
+    /// The keys allowed to manage feeds and the store-wide feed settings. They are kept sorted so
+    /// that a lookup can use binary search.
     pub feed_admins: AccountList,
-    /// Workflows allowed to write any data ID without feed-specific metadata
+    /// The workflows allowed to write any feed that has no workflow list of its own. The list may
+    /// be empty, which leaves only feeds with their own list writable.
     pub default_workflow_metadata: WorkflowMetadataList,
+    /// Always zero. These bytes are kept free so that fields can be added later without moving
+    /// the layout.
     pub _reserved: [u8; 64],
 }
 
-/// One feed: its latest round, how it is read and how it is written, followed in the account by a
-/// circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` at slot `r %
-/// max_stored_reports`. This is the account readers pass, and its layout is public: fields only
-/// move with a version bump.
+/// One feed's account. It holds the feed's latest round, the settings that control how the feed
+/// is read and written, and a ring (a circular buffer) of its last `max_stored_reports` rounds.
+/// Readers pass this account, and its layout is public, so fields only move with a version bump.
+///
+/// ```text
+/// byte 0     8                           1336    1368                    1336 + 32 * N
+///      +-----+---------------------------+-------+-------+-----+---------+
+///      | tag | Feed header (1328 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
+///      +-----+---------------------------+-------+-------+-----+---------+
+///                                          one 32-byte StoredReport per index
+///
+/// N is max_stored_reports, and round r is stored at index r % N. Round IDs start at 1, so
+/// index 0 is first written by round N. With N = 4, after 5 rounds:
+///
+///      idx 0     idx 1     idx 2     idx 3
+///      round 4   round 5   round 2   round 3      (round 5 overwrote round 1)
+///
+/// Only the last N rounds can be read, here rounds 2 to 5. The header repeats the latest round.
+/// Some header fields by account byte (header offset + 8): state 56, round_id 88,
+/// max_stored_reports 104, latest_answer 120, description 136.
+/// ```
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Feed {
+    /// The layout version of this account, set to `ACCOUNT_VERSION`.
     pub version: u8,
-    /// Round reads (`latest_round`, `get_round` and the client crate's) refuse the feed while set;
-    /// its description and decimals stay readable, and writes continue
+    /// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
+    /// reads then fail, while the description and decimals stay readable and new reports are
+    /// still stored.
     pub frozen: u8,
-    /// Fewest decimals a read may ask for
+    /// The fewest decimals a read may ask for. New feeds start at 18.
     pub min_decimals: u8,
-    /// Reports are skipped for every workflow while set, reads continue
+    /// Non-zero while writes are disabled. Every report for the feed is then skipped, whichever
+    /// workflow sent it, and reads keep working.
     pub writes_disabled: u8,
+    /// The time, in Unix seconds, at which the latest round was observed offchain, taken from its
+    /// report. A new report must be newer than this to be stored.
     pub latest_observations_timestamp: u32,
+    /// The time, in Unix seconds, at which the latest round was written onchain.
     pub latest_recorded_timestamp: u32,
-    /// Whether an accepted answer range is set, unbounded otherwise
+    /// Non-zero when `min_answer` and `max_answer` apply. Otherwise any answer is accepted.
     pub min_max_configured: u8,
-    /// The DF1 write-through is skipped while set, the round is still stored
+    /// Non-zero while the DF1 write is disabled. Rounds are then still stored here, but they are
+    /// not written to the linked DF1 feed.
     pub df1_write_disabled: u8,
+    /// Always zero. These bytes fill the gap before `data_id`, because a zero-copy account is read
+    /// straight from its bytes and so cannot have hidden padding.
     pub _padding0: [u8; 2],
-    /// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
+    /// The data ID, zero padded to 32 bytes (see [`crate::data_id::DataIdSeed`]).
     pub data_id: [u8; 32],
-    /// Store state the feed belongs to
+    /// The store state account this feed belongs to.
     pub state: Pubkey,
-    /// Latest round ID, 0 before the first round
+    /// The latest round ID. It is 0 until the first round is stored.
     pub round_id: u64,
-    /// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
-    /// (`visibleRoundId`), so SVR can be added without moving the fields below.
+    /// Always zero. These bytes are kept free for SVR: the EVM store keeps the newest round
+    /// released to non-SVR readers here (`visibleRoundId`), so SVR can be added without moving the
+    /// fields below.
     pub _reserved0: [u8; 8],
+    /// How many rounds the ring after this header holds.
     pub max_stored_reports: u64,
+    /// The slot (the chain's clock tick) in which the latest round was written.
     pub latest_recorded_slot: u64,
-    /// Latest answer with `STORED_DECIMALS`
+    /// The latest answer, with 18 decimals (`STORED_DECIMALS`).
     pub latest_answer: i128,
-    /// UTF-8 description, e.g. "ETH / USD", zero padded, empty when none is set
+    /// The description as UTF-8, for example "ETH / USD", zero padded. It is all zeros when no
+    /// description is set.
     pub description: [u8; DESCRIPTION_LEN],
-    /// DF1 feed account kept written with this data ID's rounds, default for none
+    /// The DF1 feed account that each new round is also written to, or the default key when the
+    /// feed has no DF1 link.
     pub df1_feed: Pubkey,
+    /// The lowest answer accepted, with 18 decimals. It only applies when `min_max_configured` is
+    /// set.
     pub min_answer: i128,
+    /// The highest answer accepted, with 18 decimals. It only applies when `min_max_configured` is
+    /// set.
     pub max_answer: i128,
-    /// Workflows allowed to write this data ID, the store's default workflows when empty
+    /// The workflows allowed to write this feed. When the list is empty, the store's default list
+    /// applies instead.
     pub specific_workflow_metadata: WorkflowMetadataList,
+    /// Always zero. These bytes are kept free so that fields can be added later without moving
+    /// the layout.
     pub _reserved: [u8; 72],
 }
 
 impl Feed {
+    /// Returns whether the feed is linked to a DF1 feed.
     pub fn has_df1_feed(&self) -> bool {
         self.df1_feed != Pubkey::default()
     }
 }
 
-/// Offset of the circular buffer in a feed account.
+/// The byte offset at which the ring starts in a feed account: after Anchor's 8-byte tag and the
+/// 1,328-byte header, at byte 1,336.
 pub const FEED_RING_OFFSET: usize = ANCHOR_DISCRIMINATOR + size_of::<Feed>();
 
-/// Length of a feed account with a ring of `max_stored_reports`, saturating: an absurd ring size
-/// gives an absurd length that every bound check rejects, instead of an overflow panic.
+/// Returns the length of a feed account whose ring holds `max_stored_reports` rounds. The
+/// arithmetic saturates, so an absurd ring size gives an absurd length that every bound check
+/// rejects, rather than an overflow panic.
 pub fn feed_account_len(max_stored_reports: u64) -> usize {
     (max_stored_reports as usize)
         .saturating_mul(size_of::<StoredReport>())
         .saturating_add(FEED_RING_OFFSET)
 }
 
-/// Marks which data ID links a DF1 feed (PDA `["df1_link", state, df1_feed]`), so two data IDs can
-/// never both write it. Created on the DF1 feed's first link and cleared (zero data ID) when the
-/// link is removed. Reports never read it.
+/// A marker account that records which data ID links a DF1 feed, so that two data IDs can never
+/// both write it. Its address is the PDA `["df1_link", state, df1_feed]`. It is created on the
+/// DF1 feed's first link and cleared, by zeroing its data ID, when the link is removed. Reports
+/// never read it.
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Df1Link {
+    /// The layout version of this account, set to `ACCOUNT_VERSION`.
     pub version: u8,
+    /// Always zero. These bytes keep `data_id` at offset 8.
     pub _padding0: [u8; 7],
-    /// Data ID zero padded to 32 bytes whose feed links the DF1 feed, zero when unlinked
+    /// The data ID, zero padded to 32 bytes, whose feed links the DF1 feed. It is all zeros while
+    /// no data ID links the DF1 feed.
     pub data_id: [u8; 32],
 }
 
-/// One stored round of a feed's history.
+/// One round stored in a feed's ring.
 #[zero_copy]
 #[derive(Default, Debug, PartialEq, Eq, InitSpace)]
 pub struct StoredReport {
-    /// Answer with `STORED_DECIMALS`
+    /// The answer, with 18 decimals.
     pub answer: i128,
-    /// When the observations were made offchain
+    /// The time, in Unix seconds, at which the round was observed offchain.
     pub observations_timestamp: u32,
-    /// When the round was written onchain
+    /// The time, in Unix seconds, at which the round was written onchain.
     pub recorded_timestamp: u32,
-    /// Slot the round was written in
+    /// The slot (the chain's clock tick) in which the round was written.
     pub recorded_slot: u64,
 }
 
-/// Fixed size list of public keys
+/// A fixed-size list of public keys. The first `len` entries are in use and the rest are zero.
+/// A zero-copy account has a fixed layout, so it cannot hold a `Vec`.
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct AccountList {
+    /// The entries. Those at index `len` and after are zero.
     pub xs: [Pubkey; MAX_FEED_ADMINS],
+    /// The number of entries in use.
     pub len: u64,
 }
 arrayvec!(AccountList, Pubkey, u64);
 
-/// Fixed size list of workflow metadata
+/// A fixed-size list of workflows. The first `len` entries are in use and the rest are zero.
 #[zero_copy]
 #[derive(InitSpace)]
 pub struct WorkflowMetadataList {
+    /// The entries. Those at index `len` and after are zero.
     pub xs: [WorkflowMetadata; MAX_WORKFLOW_METADATAS],
+    /// The number of entries in use.
     pub len: u64,
 }
 arrayvec!(WorkflowMetadataList, WorkflowMetadata, u64);
 
-/// A workflow authorized to write feeds
+/// A workflow allowed to write feeds. A report is accepted only when its sender, workflow owner
+/// and workflow name all match one entry.
 #[zero_copy]
 #[derive(InitSpace, BorshSerialize, BorshDeserialize, PartialEq, Eq, Debug)]
 pub struct WorkflowMetadata {
-    /// Address allowed to send reports: a forwarder's authority PDA for this program,
-    /// `["forwarder", forwarder_state, program ID]`, shared by every store state of the program
+    /// The address that must send the reports. It is the authority PDA that a forwarder program
+    /// derives for this program, `["forwarder", forwarder_state, this program's ID]`, so it is the
+    /// same for every store state of this program.
     pub allowed_sender: Pubkey,
+    /// The workflow owner, 20 bytes, as the forwarder's metadata carries it.
     pub allowed_workflow_owner: [u8; 20],
+    /// The workflow name, 10 bytes, as the forwarder's metadata carries it.
     pub allowed_workflow_name: [u8; 10],
 }
 
@@ -158,8 +235,9 @@ const_assert_eq!(size_of::<StoreState>(), 3232);
 const_assert_eq!(size_of::<Feed>(), 1328);
 const_assert_eq!(size_of::<StoredReport>(), 32);
 const_assert_eq!(size_of::<Df1Link>(), 40);
-// Offsets readers decode feed accounts by (add 8 for the discriminator); `state` is the
-// getProgramAccounts filter for a store's feeds.
+// These are the header offsets that readers decode feed accounts by; add 8 for Anchor's tag.
+// `state` (account bytes 56 to 88) is the filter for listing a store's feeds with
+// `getProgramAccounts`, the RPC call that lists a program's accounts.
 const_assert_eq!(std::mem::offset_of!(Feed, frozen), 1);
 const_assert_eq!(std::mem::offset_of!(Feed, min_decimals), 2);
 const_assert_eq!(std::mem::offset_of!(Feed, latest_observations_timestamp), 4);
@@ -176,56 +254,78 @@ const_assert_eq!(std::mem::offset_of!(Feed, specific_workflow_metadata), 256);
 // │                Instruction arguments and returns             │
 // ================================================================
 
-/// Report entry received from the forwarder, Borsh `Vec<ReceivedReport>` is the report payload.
+/// One entry of a report. The forwarder's report payload is a Borsh-encoded
+/// `Vec<ReceivedReport>`.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct ReceivedReport {
+    /// The data ID the round is for.
     pub data_id: [u8; 16],
-    /// Offchain observations timestamp
+    /// The time, in Unix seconds, at which the observations were made offchain.
     pub timestamp: u32,
-    /// Answer with `STORED_DECIMALS`
+    /// The answer, with 18 decimals.
     pub answer: i128,
 }
 
-/// A round as returned by reads, with the answer at the decimals the reader asked for.
+/// A round as reads return it, with the answer at the decimals the reader asked for.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default, PartialEq)]
 pub struct Round {
+    /// The round's ID. Round IDs start at 1 and increase by one per stored round.
     pub round_id: u64,
+    /// The answer, at the decimals the reader asked for.
     pub answer: i128,
-    /// Offchain observations timestamp
+    /// The time, in Unix seconds, at which the round was observed offchain.
     pub observations_timestamp: u32,
-    /// Onchain recorded timestamp
+    /// The time, in Unix seconds, at which the round was written onchain.
     pub recorded_timestamp: u32,
 }
 
-/// What a store is created with.
+/// The settings `initialize` creates a store with: its first feed admins, the ring size new feeds
+/// get, the forward window for report timestamps, and the DF1 program whose feeds it may write.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq)]
 pub struct StoreConfig {
-    /// At most 64, strictly increasing (else `InvalidAddress`), which also refuses the default key
+    /// The first feed admins. There can be at most 64 (otherwise `FeedAdminsFull`), and they must
+    /// be in strictly increasing order (otherwise `InvalidAddress`), which also refuses the
+    /// default key.
     pub feed_admins: Vec<Pubkey>,
-    /// Ring size of the feeds the store creates
+    /// The ring size of the feeds the store creates. It must be from 2 to 278, because a feed
+    /// account created by the program can be at most 10 KiB.
     pub default_max_stored_reports: u64,
+    /// How many seconds ahead of the chain's clock a report's observation timestamp may be (see
+    /// `StoreState::max_observation_forward_secs`).
     pub max_observation_forward_secs: u32,
-    /// DF1 store program whose feeds this store can keep written
+    /// The DF1 program whose feed accounts the store may write. It must not be the default key or
+    /// this program.
     pub df1_program: Pubkey,
 }
 
-/// Why a round was stored without writing its DF1 feed.
+/// The reason a round was stored without being written to its linked DF1 feed. The
+/// `Df1WriteSkipped` event carries it.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Df1SkipReason {
-    /// The feed's DF1 write-through is disabled
+    /// A feed admin has disabled this feed's DF1 write with `set_df1_feeds`, so the round is
+    /// stored in this store only.
     Disabled,
-    /// The transaction did not pass the DF1 program and writer
+    /// The transaction left out the DF1 program or the `df1_writer` PDA, passing this program's
+    /// ID in its place, so the store cannot call `submit`.
     NotPassed,
-    /// Not a DF1 feed account of the configured program, or a layout `submit` can't write
+    /// The account is not a DF1 feed that `submit` can write. The configured DF1 program does not
+    /// own it, it is shorter than DF1's header, it is not tagged as a feed, or its ring lengths and
+    /// cursors are out of range.
     InvalidAccount,
-    /// Not the feed layout version `submit` writes
+    /// The DF1 feed's layout version is not 2, the only version `submit` accepts.
     InvalidVersion,
-    /// The DF1 feed's writer is not this store
+    /// The DF1 feed names a writer other than this store's `df1_writer` PDA, so `submit` would
+    /// refuse the store's signature. This is expected until the DF1 feed's owner switches its
+    /// writer from OCR2 to this store with DF1's `set_writer`.
     NotWriter,
-    /// The DF1 feed already has a round as new or newer
+    /// The DF1 feed's latest round was observed at the same time as this round or later, for
+    /// example a round OCR2 wrote shortly before the switch. `submit` does not check order, so
+    /// writing this round would put the DF1 feed's rounds out of order.
     Stale,
-    /// The answer doesn't fit the DF1 feed's decimals
+    /// The answer, rescaled from 18 decimals to the DF1 feed's decimals, does not fit in an i128.
+    /// This can only happen when the DF1 feed has more than 18 decimals.
     AnswerOverflow,
-    /// The DF1 feed's round counter is exhausted
+    /// The DF1 feed's round counter is already at `u32::MAX`, so `submit` would fail when it adds
+    /// one.
     RoundIdOverflow,
 }

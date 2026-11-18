@@ -1,38 +1,44 @@
-use anchor_lang::prelude::*;
+use std::mem::size_of;
+
+use anchor_lang::{prelude::*, Discriminator};
 use anchor_spl::token_interface;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE, MIN_MAX_STORED_REPORTS,
-        STORE_AUTHORITY_SEED,
+        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE,
+        MIN_MAX_STORED_REPORTS, STATE_SEED, STORE_AUTHORITY_SEED,
     },
     context::*,
     error::StoreError,
     event::*,
-    state::{feed_account_len, StoreConfig, WorkflowMetadata},
-    utils::{validate_workflows, verify_feed_admin},
+    state::{feed_account_len, StoreConfig, StoreState, WorkflowMetadata},
+    utils::{create_pda_account, is_uninitialized, validate_workflows, verify_feed_admin},
 };
 
-pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
+/// Creates a store: its state account at the PDA `["state", store ID]`, with the upgrade authority
+/// as owner and paying the rent, and the settings in `config`. The settings are checked before the
+/// account is created.
+pub fn initialize(ctx: Context<Initialize>, store_id: u64, config: StoreConfig) -> Result<()> {
     let StoreConfig {
         feed_admins,
         default_max_stored_reports,
         max_observation_forward_secs,
         df1_program,
     } = config;
+    // The program creates every feed account, and an account a program creates can be at most
+    // 10 KiB, so the default ring size must fit a feed in that.
     require!(
         default_max_stored_reports >= MIN_MAX_STORED_REPORTS
             && feed_account_len(default_max_stored_reports) <= MAX_ACCOUNT_DATA_INCREASE,
         StoreError::InvalidMaxStoredReports
     );
     require_keys_neq!(df1_program, Pubkey::default(), StoreError::InvalidAddress);
-    // this program's ID stands for "not passed" among a report's optional accounts
+    // This program's ID stands for "not passed" among a report's optional DF1 accounts, so it
+    // can't also be the DF1 program.
     require_keys_neq!(df1_program, crate::ID, StoreError::InvalidAddress);
 
     let state_key = ctx.accounts.state.key();
-    let state = &mut ctx.accounts.state.load_init()?;
-    // start from zeroes whatever the account held: `zero` only checks the discriminator
-    **state = bytemuck::Zeroable::zeroed();
+    let mut state: Box<StoreState> = bytemuck::zeroed_box();
     state.version = ACCOUNT_VERSION;
     state.owner = ctx.accounts.owner.key();
     state.default_max_stored_reports = default_max_stored_reports;
@@ -49,10 +55,28 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
     );
     let mut previous = Pubkey::default();
     for admin in feed_admins.iter() {
-        // strictly increasing, for binary search; this also refuses the default key
+        // The admins must be strictly increasing, so the list is sorted for binary search. Since
+        // `previous` starts at the default key, this also refuses the default key.
         require!(previous < *admin, StoreError::InvalidAddress);
         state.feed_admins.push(*admin);
         previous = *admin;
+    }
+
+    // A second `initialize` for the same store ID finds the account already created.
+    let info = ctx.accounts.state.to_account_info();
+    require!(is_uninitialized(&info), StoreError::StoreAlreadyInitialized);
+    let space = ANCHOR_DISCRIMINATOR + size_of::<StoreState>();
+    create_pda_account(
+        space,
+        &[STATE_SEED, &store_id.to_le_bytes(), &[ctx.bumps.state]],
+        &ctx.accounts.owner.to_account_info(),
+        &info,
+        &ctx.accounts.system_program.to_account_info(),
+    )?;
+    {
+        let mut data = info.try_borrow_mut_data()?;
+        data[..ANCHOR_DISCRIMINATOR].copy_from_slice(StoreState::DISCRIMINATOR);
+        data[ANCHOR_DISCRIMINATOR..space].copy_from_slice(bytemuck::bytes_of(&*state));
     }
 
     emit_cpi!(StoreInitialized {
@@ -66,6 +90,7 @@ pub fn initialize(ctx: Context<Initialize>, config: StoreConfig) -> Result<()> {
     Ok(())
 }
 
+/// Proposes a new owner, who takes over only after accepting.
 pub fn transfer_ownership(ctx: Context<OwnerOnly>, proposed_owner: Pubkey) -> Result<()> {
     let state = &mut ctx.accounts.state.load_mut()?;
     require_keys_neq!(
@@ -82,6 +107,7 @@ pub fn transfer_ownership(ctx: Context<OwnerOnly>, proposed_owner: Pubkey) -> Re
     Ok(())
 }
 
+/// Makes the proposed owner the owner and clears the proposal.
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let state = &mut ctx.accounts.state.load_mut()?;
     let previous = state.owner;
@@ -94,6 +120,7 @@ pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     Ok(())
 }
 
+/// Grants or revokes a key's feed admin permission, keeping the admin list sorted.
 pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: bool) -> Result<()> {
     require_keys_neq!(feed_admin, Pubkey::default(), StoreError::InvalidAddress);
     let state = &mut ctx.accounts.state.load_mut()?;
@@ -107,11 +134,12 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
         }
         (Ok(index), false) => {
             state.feed_admins.remove(index);
-            // the layout is public: don't leave the removed admin in the freed slot
+            // The layout is public, so the removed admin must not stay visible in the entry the
+            // list no longer uses.
             let freed = state.feed_admins.len();
             state.feed_admins.xs[freed] = Pubkey::default();
         }
-        // already in the requested state
+        // The key already has the requested status, so nothing changes.
         _ => {}
     }
     emit_cpi!(FeedAdminSet {
@@ -122,9 +150,9 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
     Ok(())
 }
 
-/// Replace the default workflow list. Unlike on EVM it can be emptied: then only feeds with their
-/// own workflow list can be written, so a compromised default workflow can be revoked in one call
-/// without naming a replacement.
+/// Replaces the store's default workflow list. Unlike on EVM, the list can be emptied. Only feeds
+/// with their own workflow list can then be written, so a compromised default workflow can be
+/// revoked in one call without naming a replacement.
 pub fn set_default_feed_metadata(
     ctx: Context<FeedAdminState>,
     workflow_metadata: Vec<WorkflowMetadata>,
@@ -134,7 +162,8 @@ pub fn set_default_feed_metadata(
     let state = &mut ctx.accounts.state.load_mut()?;
     verify_feed_admin(&ctx.accounts.feed_admin, &state.feed_admins)?;
 
-    // zeroed first, so a shorter list leaves no removed workflows in the public layout
+    // The list is zeroed first, so a shorter list leaves no removed workflows in the public
+    // layout.
     state.default_workflow_metadata = bytemuck::Zeroable::zeroed();
     state.default_workflow_metadata.extend(&workflow_metadata);
 
@@ -145,6 +174,8 @@ pub fn set_default_feed_metadata(
     Ok(())
 }
 
+/// Sets how many seconds ahead of the chain's clock a report's observation timestamp may be (see
+/// `StoreState::max_observation_forward_secs`).
 pub fn set_max_observation_forward_duration(
     ctx: Context<FeedAdminState>,
     max_observation_forward_secs: u32,
@@ -159,7 +190,8 @@ pub fn set_max_observation_forward_duration(
     Ok(())
 }
 
-/// Recover SPL tokens held by token accounts of the store authority.
+/// Moves tokens out of a token account of the store authority PDA, to recover tokens sent to the
+/// store by mistake.
 pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
     require!(
         amount <= ctx.accounts.from.amount,
@@ -194,9 +226,10 @@ pub fn recover_tokens(ctx: Context<RecoverTokens>, amount: u64) -> Result<()> {
     Ok(())
 }
 
-/// Recover native SOL sent to the store authority.
+/// Moves SOL out of the store authority PDA, to recover SOL sent to the store by mistake.
 pub fn recover_native(ctx: Context<RecoverNative>, amount: u64) -> Result<()> {
-    // all of it, or leave the store authority rent-exempt: the runtime refuses anything between
+    // The transfer must take all of the SOL or leave the store authority rent-exempt, because the
+    // runtime refuses a balance in between.
     let balance = ctx.accounts.store_authority.lamports();
     let left = balance
         .checked_sub(amount)

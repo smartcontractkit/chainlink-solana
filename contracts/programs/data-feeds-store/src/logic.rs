@@ -1,50 +1,60 @@
-//! Round storage, round selection and rescaling, ported from the non-SVR part of the EVM
-//! `DataFeedsStore`. Pure functions over a feed header and its circular buffer, so they can be unit
-//! tested and reused by readers that decode feed accounts themselves.
+//! Stores rounds, finds stored rounds and rescales answers, ported from the non-SVR part of the
+//! EVM `DataFeedsStore`. The functions work only on a feed header and its ring, never on accounts,
+//! so they can be unit tested and reused by readers that decode feed accounts themselves.
 
 use crate::{
     common::{MIN_MAX_STORED_REPORTS, STORED_DECIMALS},
     state::{Feed, StoredReport},
 };
 
-/// Current slot and unix timestamp.
+/// The chain's current slot and Unix time, read once per `on_report`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Now {
+    /// The current slot (the chain's clock tick).
     pub slot: u64,
+    /// The current Unix time, in seconds.
     pub timestamp: u32,
 }
 
-/// A feed's circular buffer, indexed by storage slot (`round_id % max_stored_reports`).
+/// A feed's ring of stored rounds. Round r is kept at index `r % max_stored_reports`.
 pub trait Ring {
-    fn get(&self, slot: u64) -> StoredReport;
-    fn set(&mut self, slot: u64, report: StoredReport);
+    /// Returns the round stored at `index`.
+    fn get(&self, index: u64) -> StoredReport;
+    /// Stores a round at `index`, replacing what was there.
+    fn set(&mut self, index: u64, report: StoredReport);
 }
 
 #[cfg(test)]
 impl Ring for Vec<StoredReport> {
-    fn get(&self, slot: u64) -> StoredReport {
-        self[slot as usize]
+    fn get(&self, index: u64) -> StoredReport {
+        self[index as usize]
     }
 
-    fn set(&mut self, slot: u64, report: StoredReport) {
-        self[slot as usize] = report;
+    fn set(&mut self, index: u64, report: StoredReport) {
+        self[index as usize] = report;
     }
 }
 
-/// A round as served to a reader, answer with `STORED_DECIMALS`.
+/// A round as reads see it before rescaling, with the answer at 18 decimals.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct StoredRound {
+    /// The round's ID.
     pub round_id: u64,
+    /// The answer, with 18 decimals.
     pub answer: i128,
+    /// The time, in Unix seconds, at which the round was observed offchain.
     pub observations_timestamp: u32,
+    /// The time, in Unix seconds, at which the round was written onchain.
     pub recorded_timestamp: u32,
 }
 
-fn storage_slot(round_id: u64, max_stored_reports: u64) -> u64 {
+/// Returns the ring index of a round.
+fn ring_index(round_id: u64, max_stored_reports: u64) -> u64 {
     round_id % max_stored_reports
 }
 
-/// Whether a round ID is still within the circular buffer's retained window.
+/// Returns whether a round can still be read from the ring. That is true for round IDs from 1 to
+/// the latest that are among the last `max_stored_reports` rounds.
 pub fn round_in_window(round_id: u64, latest_round_id: u64, max_stored_reports: u64) -> bool {
     if round_id == 0 || round_id > latest_round_id {
         return false;
@@ -52,8 +62,8 @@ pub fn round_in_window(round_id: u64, latest_round_id: u64, max_stored_reports: 
     latest_round_id - round_id < max_stored_reports
 }
 
-/// Append a round to the feed's circular buffer and latest fields, returning its round ID. The
-/// caller has checked it is newer than the latest round.
+/// Appends a round to the ring, updates the header's latest round and returns the new round ID.
+/// The caller must already have checked that the round is newer than the latest one.
 pub fn store_round(
     feed: &mut Feed,
     ring: &mut impl Ring,
@@ -65,7 +75,7 @@ pub fn store_round(
     let round_id = feed.round_id;
 
     ring.set(
-        storage_slot(round_id, feed.max_stored_reports),
+        ring_index(round_id, feed.max_stored_reports),
         StoredReport {
             answer,
             observations_timestamp,
@@ -82,7 +92,7 @@ pub fn store_round(
     round_id
 }
 
-/// The latest round, `None` while the feed has never received one.
+/// Returns the latest round, or `None` if the feed has never stored one.
 pub fn latest_round(feed: &Feed) -> Option<StoredRound> {
     if feed.round_id == 0 {
         return None;
@@ -95,12 +105,13 @@ pub fn latest_round(feed: &Feed) -> Option<StoredRound> {
     })
 }
 
-/// A stored round, `None` when it was never written or has been overwritten in the ring.
+/// Returns a stored round, or `None` if it was never stored or has since been overwritten in the
+/// ring.
 pub fn stored_round(round_id: u64, feed: &Feed, ring: &impl Ring) -> Option<StoredRound> {
     if !round_in_window(round_id, feed.round_id, feed.max_stored_reports) {
         return None;
     }
-    let stored = ring.get(storage_slot(round_id, feed.max_stored_reports));
+    let stored = ring.get(ring_index(round_id, feed.max_stored_reports));
     Some(StoredRound {
         round_id,
         answer: stored.answer,
@@ -109,20 +120,32 @@ pub fn stored_round(round_id: u64, feed: &Feed, ring: &impl Ring) -> Option<Stor
     })
 }
 
-/// Why a ring size change is rejected.
+/// The reasons `check_max_stored_reports` refuses a new ring size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MaxStoredReportsError {
-    /// Below `MIN_MAX_STORED_REPORTS`
+    /// The new ring size is below `MIN_MAX_STORED_REPORTS` (2), which would leave no previous
+    /// round readable.
     Invalid,
-    /// Not larger than the current ring
+    /// The new ring size is not larger than the feed's current one. A ring can only grow.
     NotIncreased,
-    /// The ring has wrapped
+    /// The feed has stored at least as many rounds as its ring holds, so the ring has wrapped.
+    /// Growing it now would leave some rounds where reads no longer look for them.
     Locked,
 }
 
-/// The ring can only grow, and only while it has never wrapped: every stored round r then still
-/// sits at slot r, so the larger ring keeps every round where reads look for it. As on EVM; the
-/// new size then always exceeds the latest round ID.
+/// Checks that a feed's ring can grow to `new_max_stored_reports`. A ring can only grow, and only
+/// while it has never wrapped. Until then every stored round r sits at index r, which is also
+/// where the larger ring looks for it, so no round has to move. EVM has the same rule. The new
+/// size then always exceeds the latest round ID.
+///
+/// ```text
+///   index    0     1     2     3     4     5
+///   N = 4    -     r1    r2    r3
+///   N = 6    -     r1    r2    r3    -     -     r % 6 = r, so every round is still found
+/// ```
+///
+/// After round 4, a ring of 4 has wrapped: round 4 is at index 0. Grown to 6, a read of round 4
+/// would look at index 4 and find nothing, so the change is refused with `Locked`.
 pub fn check_max_stored_reports(
     feed: &Feed,
     new_max_stored_reports: u64,
@@ -140,16 +163,18 @@ pub fn check_max_stored_reports(
     Ok(())
 }
 
-/// Why a read at some decimals is refused.
+/// The reasons a read at some number of decimals is refused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScaleError {
-    /// Below the feed's minimum or above the stored decimals
+    /// The reader asked for fewer decimals than the feed's minimum, or for more than 18.
     InvalidDecimals,
-    /// A non-zero answer would read as zero
+    /// The answer is not zero, but at the requested decimals it would truncate to zero. Reading it
+    /// as zero could be mistaken for no price.
     RoundsToZero,
 }
 
-/// Check that a reader may ask for `decimals` from a feed with `min_decimals`.
+/// Checks that a reader may ask for `decimals` from a feed whose minimum is `min_decimals`.
+/// `decimals` must be between that minimum and 18.
 pub fn check_decimals(decimals: u8, min_decimals: u8) -> Result<(), ScaleError> {
     if decimals < min_decimals || decimals > STORED_DECIMALS {
         return Err(ScaleError::InvalidDecimals);
@@ -157,9 +182,9 @@ pub fn check_decimals(decimals: u8, min_decimals: u8) -> Result<(), ScaleError> 
     Ok(())
 }
 
-/// Rescale an answer with `STORED_DECIMALS` to `decimals` (at most `STORED_DECIMALS`), truncating
-/// toward zero. A non-zero answer that would become zero is an error, so a reader never mistakes a
-/// tiny price for none.
+/// Rescales an answer from 18 decimals to `decimals` (at most 18), truncating toward zero. It
+/// refuses a non-zero answer that would become zero, so a reader never mistakes a tiny price for no
+/// price.
 pub fn scale(answer: i128, decimals: u8) -> Result<i128, ScaleError> {
     if decimals > STORED_DECIMALS {
         return Err(ScaleError::InvalidDecimals);
@@ -202,7 +227,7 @@ mod tests {
             );
         }
         assert_eq!(f.round_id, 5);
-        // rounds 3..=5 retained
+        // Rounds 3 to 5 are still in the ring.
         assert!(!round_in_window(2, 5, 3));
         assert!(round_in_window(3, 5, 3));
         assert_eq!(stored_round(3, &f, &ring).unwrap().answer, 3);
@@ -274,7 +299,7 @@ mod tests {
         use super::*;
         use proptest::prelude::*;
 
-        /// Store `answers` as rounds 1..=n into a fresh ring of `max`.
+        /// Stores `answers` as rounds 1 to n in a new ring of `max` rounds.
         fn stored(max: u64, answers: &[i128]) -> (Feed, Vec<StoredReport>) {
             let (mut f, mut ring) = feed(max);
             for (i, answer) in answers.iter().enumerate() {
@@ -284,8 +309,8 @@ mod tests {
             (f, ring)
         }
 
-        /// What a read of `round_id` must return: the answer stored as that round while it is
-        /// among the last `max` rounds, nothing otherwise.
+        /// Returns what a read of `round_id` must return: the answer stored as that round while
+        /// it is among the last `max` rounds, and nothing otherwise.
         fn expected(round_id: u64, max: u64, answers: &[i128]) -> Option<i128> {
             let n = answers.len() as u64;
             (round_id >= 1 && round_id <= n && n - round_id < max)
@@ -324,7 +349,8 @@ mod tests {
                 }
                 prop_assert_eq!(result, Ok(()));
                 prop_assert!(new_max > f.round_id, "a grown ring holds every round so far");
-                // the program grows the account with zeroed rounds and keeps the header's round
+                // The program grows the account with zeroed rounds and keeps the header's latest
+                // round, so the model does the same.
                 ring.resize(new_max as usize, StoredReport::default());
                 f.max_stored_reports = new_max;
                 let mut all = answers.clone();
@@ -364,7 +390,8 @@ mod tests {
                 let unit = 10u128.pow(u32::from(STORED_DECIMALS - decimals));
                 match result {
                     Ok(scaled) => {
-                        // truncated toward zero: |scaled| units fit in |answer|, one more doesn't
+                        // The answer is truncated toward zero: |scaled| units fit in |answer|, and
+                        // one more unit doesn't.
                         let (a, s) = (answer.unsigned_abs(), scaled.unsigned_abs());
                         prop_assert!(s * unit <= a && a < (s + 1) * unit);
                         prop_assert!(scaled == 0 || (scaled < 0) == (answer < 0));

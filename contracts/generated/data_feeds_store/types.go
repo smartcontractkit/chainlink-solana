@@ -11,10 +11,14 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 )
 
-// Fixed size list of public keys
+// A fixed-size list of public keys. The first `len` entries are in use and the rest are zero.
+// A zero-copy account has a fixed layout, so it cannot hold a `Vec`.
 type AccountList struct {
-	Xs  [64]solanago.PublicKey `json:"xs"`
-	Len uint64                 `json:"len"`
+	// The entries. Those at index `len` and after are zero.
+	Xs [64]solanago.PublicKey `json:"xs"`
+
+	// The number of entries in use.
+	Len uint64 `json:"len"`
 }
 
 func (obj AccountList) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -72,12 +76,22 @@ func UnmarshalAccountList(buf []byte) (*AccountList, error) {
 	return obj, nil
 }
 
+// A report was skipped because its answer is outside the feed's accepted range.
 type AnswerOutOfMinMaxRange struct {
-	State     solanago.PublicKey `json:"state"`
-	DataId    [16]uint8          `json:"data_id"`
-	MinAnswer binary.Int128      `json:"min_answer"`
-	MaxAnswer binary.Int128      `json:"max_answer"`
-	Answer    binary.Int128      `json:"answer"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The feed's lowest accepted answer, with 18 decimals.
+	MinAnswer binary.Int128 `json:"min_answer"`
+
+	// The feed's highest accepted answer, with 18 decimals.
+	MaxAnswer binary.Int128 `json:"max_answer"`
+
+	// The report's answer, with 18 decimals.
+	Answer binary.Int128 `json:"answer"`
 }
 
 func (obj AnswerOutOfMinMaxRange) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -165,8 +179,12 @@ func UnmarshalAnswerOutOfMinMaxRange(buf []byte) (*AnswerOutOfMinMaxRange, error
 	return obj, nil
 }
 
+// A feed admin replaced the store's default workflow list.
 type DefaultFeedMetadataSet struct {
-	State            solanago.PublicKey `json:"state"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The new default workflow list, which may be empty.
 	WorkflowMetadata []WorkflowMetadata `json:"workflow_metadata"`
 }
 
@@ -225,12 +243,20 @@ func UnmarshalDefaultFeedMetadataSet(buf []byte) (*DefaultFeedMetadataSet, error
 	return obj, nil
 }
 
-// The DF1 feed kept written with a data ID's rounds, default for none.
+// A data ID's DF1 link was set.
 type Df1FeedSet struct {
-	State         solanago.PublicKey `json:"state"`
-	DataId        [16]uint8          `json:"data_id"`
-	Df1Feed       solanago.PublicKey `json:"df1_feed"`
-	WriteDisabled bool               `json:"write_disabled"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The DF1 feed that the data ID's rounds are now written to, or the default key if the data
+	// ID was unlinked.
+	Df1Feed solanago.PublicKey `json:"df1_feed"`
+
+	// True if the DF1 write is disabled, so rounds are stored in this store only.
+	WriteDisabled bool `json:"write_disabled"`
 }
 
 func (obj Df1FeedSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -308,7 +334,8 @@ func UnmarshalDf1FeedSet(buf []byte) (*Df1FeedSet, error) {
 	return obj, nil
 }
 
-// Why a round was stored without writing its DF1 feed.
+// The reason a round was stored without being written to its linked DF1 feed. The
+// `Df1WriteSkipped` event carries it.
 type Df1SkipReason binary.BorshEnum
 
 const (
@@ -345,12 +372,19 @@ func (value Df1SkipReason) String() string {
 	}
 }
 
-// A round was stored without writing the data ID's DF1 feed.
+// A round was stored without being written to the data ID's linked DF1 feed.
 type Df1WriteSkipped struct {
-	State   solanago.PublicKey `json:"state"`
-	DataId  [16]uint8          `json:"data_id"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The linked DF1 feed that was not written.
 	Df1Feed solanago.PublicKey `json:"df1_feed"`
-	Reason  Df1SkipReason      `json:"reason"`
+
+	// Why the DF1 write was skipped.
+	Reason Df1SkipReason `json:"reason"`
 }
 
 func (obj Df1WriteSkipped) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -428,61 +462,107 @@ func UnmarshalDf1WriteSkipped(buf []byte) (*Df1WriteSkipped, error) {
 	return obj, nil
 }
 
-// One feed: its latest round, how it is read and how it is written, followed in the account by a
-// circular buffer of `max_stored_reports` [`StoredReport`]s, round `r` at slot `r %
-// max_stored_reports`. This is the account readers pass, and its layout is public: fields only
-// move with a version bump.
+// One feed's account. It holds the feed's latest round, the settings that control how the feed
+// is read and written, and a ring (a circular buffer) of its last `max_stored_reports` rounds.
+// Readers pass this account, and its layout is public, so fields only move with a version bump.
+//
+// ```text
+// byte 0     8                           1336    1368                    1336 + 32 * N
+// +-----+---------------------------+-------+-------+-----+---------+
+// | tag | Feed header (1328 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
+// +-----+---------------------------+-------+-------+-----+---------+
+// one 32-byte StoredReport per index
+//
+// N is max_stored_reports, and round r is stored at index r % N. Round IDs start at 1, so
+// index 0 is first written by round N. With N = 4, after 5 rounds:
+//
+// idx 0     idx 1     idx 2     idx 3
+// round 4   round 5   round 2   round 3      (round 5 overwrote round 1)
+//
+// Only the last N rounds can be read, here rounds 2 to 5. The header repeats the latest round.
+// Some header fields by account byte (header offset + 8): state 56, round_id 88,
+// max_stored_reports 104, latest_answer 120, description 136.
+// ```
 type Feed struct {
+	// The layout version of this account, set to `ACCOUNT_VERSION`.
 	Version uint8 `json:"version"`
 
-	// Round reads (`latest_round`, `get_round` and the client crate's) refuse the feed while set;
-	// its description and decimals stay readable, and writes continue
+	// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
+	// reads then fail, while the description and decimals stay readable and new reports are
+	// still stored.
 	Frozen uint8 `json:"frozen"`
 
-	// Fewest decimals a read may ask for
+	// The fewest decimals a read may ask for. New feeds start at 18.
 	MinDecimals uint8 `json:"min_decimals"`
 
-	// Reports are skipped for every workflow while set, reads continue
-	WritesDisabled              uint8  `json:"writes_disabled"`
-	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
-	LatestRecordedTimestamp     uint32 `json:"latest_recorded_timestamp"`
+	// Non-zero while writes are disabled. Every report for the feed is then skipped, whichever
+	// workflow sent it, and reads keep working.
+	WritesDisabled uint8 `json:"writes_disabled"`
 
-	// Whether an accepted answer range is set, unbounded otherwise
+	// The time, in Unix seconds, at which the latest round was observed offchain, taken from its
+	// report. A new report must be newer than this to be stored.
+	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
+
+	// The time, in Unix seconds, at which the latest round was written onchain.
+	LatestRecordedTimestamp uint32 `json:"latest_recorded_timestamp"`
+
+	// Non-zero when `min_answer` and `max_answer` apply. Otherwise any answer is accepted.
 	MinMaxConfigured uint8 `json:"min_max_configured"`
 
-	// The DF1 write-through is skipped while set, the round is still stored
-	Df1WriteDisabled uint8    `json:"df1_write_disabled"`
-	Padding0         [2]uint8 `json:"_padding0"`
+	// Non-zero while the DF1 write is disabled. Rounds are then still stored here, but they are
+	// not written to the linked DF1 feed.
+	Df1WriteDisabled uint8 `json:"df1_write_disabled"`
 
-	// Data ID zero padded to 32 bytes, see [`crate::data_id::DataIdSeed`]
+	// Always zero. These bytes fill the gap before `data_id`, because a zero-copy account is read
+	// straight from its bytes and so cannot have hidden padding.
+	Padding0 [2]uint8 `json:"_padding0"`
+
+	// The data ID, zero padded to 32 bytes (see [`crate::data_id::DataIdSeed`]).
 	DataId [32]uint8 `json:"data_id"`
 
-	// Store state the feed belongs to
+	// The store state account this feed belongs to.
 	State solanago.PublicKey `json:"state"`
 
-	// Latest round ID, 0 before the first round
+	// The latest round ID. It is 0 until the first round is stored.
 	RoundId uint64 `json:"round_id"`
 
-	// Kept free for SVR: the EVM store tracks the newest round released to non-SVR readers here
-	// (`visibleRoundId`), so SVR can be added without moving the fields below.
-	Reserved0          [8]uint8 `json:"_reserved0"`
-	MaxStoredReports   uint64   `json:"max_stored_reports"`
-	LatestRecordedSlot uint64   `json:"latest_recorded_slot"`
+	// Always zero. These bytes are kept free for SVR: the EVM store keeps the newest round
+	// released to non-SVR readers here (`visibleRoundId`), so SVR can be added without moving the
+	// fields below.
+	Reserved0 [8]uint8 `json:"_reserved0"`
 
-	// Latest answer with `STORED_DECIMALS`
+	// How many rounds the ring after this header holds.
+	MaxStoredReports uint64 `json:"max_stored_reports"`
+
+	// The slot (the chain's clock tick) in which the latest round was written.
+	LatestRecordedSlot uint64 `json:"latest_recorded_slot"`
+
+	// The latest answer, with 18 decimals (`STORED_DECIMALS`).
 	LatestAnswer binary.Int128 `json:"latest_answer"`
 
-	// UTF-8 description, e.g. "ETH / USD", zero padded, empty when none is set
+	// The description as UTF-8, for example "ETH / USD", zero padded. It is all zeros when no
+	// description is set.
 	Description [64]uint8 `json:"description"`
 
-	// DF1 feed account kept written with this data ID's rounds, default for none
-	Df1Feed   solanago.PublicKey `json:"df1_feed"`
-	MinAnswer binary.Int128      `json:"min_answer"`
-	MaxAnswer binary.Int128      `json:"max_answer"`
+	// The DF1 feed account that each new round is also written to, or the default key when the
+	// feed has no DF1 link.
+	Df1Feed solanago.PublicKey `json:"df1_feed"`
 
-	// Workflows allowed to write this data ID, the store's default workflows when empty
+	// The lowest answer accepted, with 18 decimals. It only applies when `min_max_configured` is
+	// set.
+	MinAnswer binary.Int128 `json:"min_answer"`
+
+	// The highest answer accepted, with 18 decimals. It only applies when `min_max_configured` is
+	// set.
+	MaxAnswer binary.Int128 `json:"max_answer"`
+
+	// The workflows allowed to write this feed. When the list is empty, the store's default list
+	// applies instead.
 	SpecificWorkflowMetadata WorkflowMetadataList `json:"specific_workflow_metadata"`
-	Reserved                 [72]uint8            `json:"_reserved"`
+
+	// Always zero. These bytes are kept free so that fields can be added later without moving
+	// the layout.
+	Reserved [72]uint8 `json:"_reserved"`
 }
 
 func (obj Feed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -740,10 +820,17 @@ func UnmarshalFeed(buf []byte) (*Feed, error) {
 	return obj, nil
 }
 
+// The owner granted or revoked a key's feed admin permission. The event is emitted even when the
+// key already had the requested status.
 type FeedAdminSet struct {
-	State     solanago.PublicKey `json:"state"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The key whose permission was set.
 	FeedAdmin solanago.PublicKey `json:"feed_admin"`
-	IsAdmin   bool               `json:"is_admin"`
+
+	// True if the key is now a feed admin, false if it no longer is one.
+	IsAdmin bool `json:"is_admin"`
 }
 
 func (obj FeedAdminSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -811,10 +898,16 @@ func UnmarshalFeedAdminSet(buf []byte) (*FeedAdminSet, error) {
 	return obj, nil
 }
 
+// A feed's description was set.
 type FeedDescriptionSet struct {
-	State       solanago.PublicKey `json:"state"`
-	DataId      [16]uint8          `json:"data_id"`
-	Description string             `json:"description"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The new description. An empty description means it was cleared.
+	Description string `json:"description"`
 }
 
 func (obj FeedDescriptionSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -882,11 +975,16 @@ func UnmarshalFeedDescriptionSet(buf []byte) (*FeedDescriptionSet, error) {
 	return obj, nil
 }
 
-// Round reads of the feed were frozen or unfrozen.
+// Round reads of a feed were frozen or unfrozen.
 type FeedFrozenSet struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
-	Frozen bool               `json:"frozen"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// True if round reads are now frozen, false if they were unfrozen.
+	Frozen bool `json:"frozen"`
 }
 
 func (obj FeedFrozenSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -954,12 +1052,18 @@ func UnmarshalFeedFrozenSet(buf []byte) (*FeedFrozenSet, error) {
 	return obj, nil
 }
 
-// A report for a feed that hasn't been set was skipped. Emitted before the permission check, so
-// anyone can cause it: it carries the sender, and indexers must not take it as coming from a
+// A report was skipped because the data ID's feed has not been set. This check comes before the
+// permission check, so anyone can cause this event, and indexers must not assume it came from a
 // forwarder.
 type FeedNotInitializedIgnored struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The account that signed as the report's sender. It has not been checked against any
+	// workflow, so it may not be a forwarder.
 	Sender solanago.PublicKey `json:"sender"`
 }
 
@@ -1028,12 +1132,22 @@ func UnmarshalFeedNotInitializedIgnored(buf []byte) (*FeedNotInitializedIgnored,
 	return obj, nil
 }
 
+// A round was stored.
 type FeedUpdated struct {
-	State                 solanago.PublicKey `json:"state"`
-	DataId                [16]uint8          `json:"data_id"`
-	RoundId               uint64             `json:"round_id"`
-	ObservationsTimestamp uint32             `json:"observations_timestamp"`
-	Answer                binary.Int128      `json:"answer"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The ID the new round was stored as.
+	RoundId uint64 `json:"round_id"`
+
+	// The round's observation timestamp, in Unix seconds.
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+
+	// The round's answer, with 18 decimals.
+	Answer binary.Int128 `json:"answer"`
 }
 
 func (obj FeedUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1121,12 +1235,18 @@ func UnmarshalFeedUpdated(buf []byte) (*FeedUpdated, error) {
 	return obj, nil
 }
 
-// A report for a feed whose writes are disabled was skipped. Emitted before the permission check,
-// so anyone can cause it: it carries the sender, and indexers must not take it as coming from a
+// A report was skipped because the feed's writes are disabled. This check comes before the
+// permission check, so anyone can cause this event, and indexers must not assume it came from a
 // forwarder.
 type FeedWritesDisabledIgnored struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The account that signed as the report's sender. It has not been checked against any
+	// workflow, so it may not be a forwarder.
 	Sender solanago.PublicKey `json:"sender"`
 }
 
@@ -1195,11 +1315,16 @@ func UnmarshalFeedWritesDisabledIgnored(buf []byte) (*FeedWritesDisabledIgnored,
 	return obj, nil
 }
 
-// Writes of the feed were disabled or enabled.
+// Writes to a feed were disabled or enabled.
 type FeedWritesDisabledSet struct {
-	State    solanago.PublicKey `json:"state"`
-	DataId   [16]uint8          `json:"data_id"`
-	Disabled bool               `json:"disabled"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// True if writes are now disabled, false if they were enabled.
+	Disabled bool `json:"disabled"`
 }
 
 func (obj FeedWritesDisabledSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1267,11 +1392,16 @@ func UnmarshalFeedWritesDisabledSet(buf []byte) (*FeedWritesDisabledSet, error) 
 	return obj, nil
 }
 
-// Feeds were created by a feed admin setting, the feed admin paying their rent.
+// A feed admin's call created feeds and paid their rent.
 type FeedsCreated struct {
-	State            solanago.PublicKey `json:"state"`
-	DataIds          [][16]uint8        `json:"data_ids"`
-	MaxStoredReports uint64             `json:"max_stored_reports"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data IDs whose feeds were created, each listed once.
+	DataIds [][16]uint8 `json:"data_ids"`
+
+	// The ring size the new feeds were created with, which is the store's default.
+	MaxStoredReports uint64 `json:"max_stored_reports"`
 }
 
 func (obj FeedsCreated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1339,11 +1469,20 @@ func UnmarshalFeedsCreated(buf []byte) (*FeedsCreated, error) {
 	return obj, nil
 }
 
+// A report was skipped because its observation timestamp is further ahead of the chain's clock
+// than the forward window allows.
 type FutureReportIgnored struct {
-	State                 solanago.PublicKey `json:"state"`
-	DataId                [16]uint8          `json:"data_id"`
-	ObservationsTimestamp uint32             `json:"observations_timestamp"`
-	RecordedTimestamp     uint32             `json:"recorded_timestamp"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The report's observation timestamp, in Unix seconds.
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+
+	// The chain's clock when the report arrived, in Unix seconds.
+	RecordedTimestamp uint32 `json:"recorded_timestamp"`
 }
 
 func (obj FutureReportIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1421,11 +1560,18 @@ func UnmarshalFutureReportIgnored(buf []byte) (*FutureReportIgnored, error) {
 	return obj, nil
 }
 
-// A report for a zero or SVR data ID was skipped. Emitted before the permission check, so anyone
-// can cause it: it carries the sender, and indexers must not take it as coming from a forwarder.
+// A report was skipped because its data ID is zero or has an SVR path ID. This check comes before
+// the permission check, so anyone can cause this event, and indexers must not assume it came from
+// a forwarder.
 type InvalidDataIdIgnored struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The account that signed as the report's sender. It has not been checked against any
+	// workflow, so it may not be a forwarder.
 	Sender solanago.PublicKey `json:"sender"`
 }
 
@@ -1494,12 +1640,22 @@ func UnmarshalInvalidDataIdIgnored(buf []byte) (*InvalidDataIdIgnored, error) {
 	return obj, nil
 }
 
+// A report was skipped because its workflow is not allowed to write the data ID.
 type InvalidUpdatePermission struct {
-	State         solanago.PublicKey `json:"state"`
-	DataId        [16]uint8          `json:"data_id"`
-	Sender        solanago.PublicKey `json:"sender"`
-	WorkflowOwner [20]uint8          `json:"workflow_owner"`
-	WorkflowName  [10]uint8          `json:"workflow_name"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The account that signed as the report's sender.
+	Sender solanago.PublicKey `json:"sender"`
+
+	// The workflow owner from the report's metadata.
+	WorkflowOwner [20]uint8 `json:"workflow_owner"`
+
+	// The workflow name from the report's metadata.
+	WorkflowName [10]uint8 `json:"workflow_name"`
 }
 
 func (obj InvalidUpdatePermission) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1587,9 +1743,14 @@ func UnmarshalInvalidUpdatePermission(buf []byte) (*InvalidUpdatePermission, err
 	return obj, nil
 }
 
+// The forward window changed: how many seconds ahead of the chain's clock a report's observation
+// timestamp may be.
 type MaxObservationForwardDurationSecondsUpdated struct {
-	State       solanago.PublicKey `json:"state"`
-	NewDuration uint32             `json:"new_duration"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The new forward window, in seconds.
+	NewDuration uint32 `json:"new_duration"`
 }
 
 func (obj MaxObservationForwardDurationSecondsUpdated) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1647,10 +1808,16 @@ func UnmarshalMaxObservationForwardDurationSecondsUpdated(buf []byte) (*MaxObser
 	return obj, nil
 }
 
+// A feed's ring was grown.
 type MaxStoredReportsSet struct {
-	State            solanago.PublicKey `json:"state"`
-	DataId           [16]uint8          `json:"data_id"`
-	MaxStoredReports uint64             `json:"max_stored_reports"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The feed's new ring size.
+	MaxStoredReports uint64 `json:"max_stored_reports"`
 }
 
 func (obj MaxStoredReportsSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1718,10 +1885,16 @@ func UnmarshalMaxStoredReportsSet(buf []byte) (*MaxStoredReportsSet, error) {
 	return obj, nil
 }
 
+// The fewest decimals a read of a feed may ask for changed.
 type MinDecimalsSet struct {
-	State       solanago.PublicKey `json:"state"`
-	DataId      [16]uint8          `json:"data_id"`
-	MinDecimals uint8              `json:"min_decimals"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The fewest decimals a read of the feed may now ask for.
+	MinDecimals uint8 `json:"min_decimals"`
 }
 
 func (obj MinDecimalsSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1789,11 +1962,20 @@ func UnmarshalMinDecimalsSet(buf []byte) (*MinDecimalsSet, error) {
 	return obj, nil
 }
 
+// A feed's accepted answer range was set. A minimum of `i128::MIN` with a maximum of `i128::MAX`
+// means the range was removed.
 type MinMaxAnswerSet struct {
-	State     solanago.PublicKey `json:"state"`
-	DataId    [16]uint8          `json:"data_id"`
-	MinAnswer binary.Int128      `json:"min_answer"`
-	MaxAnswer binary.Int128      `json:"max_answer"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The lowest accepted answer, with 18 decimals.
+	MinAnswer binary.Int128 `json:"min_answer"`
+
+	// The highest accepted answer, with 18 decimals.
+	MaxAnswer binary.Int128 `json:"max_answer"`
 }
 
 func (obj MinMaxAnswerSet) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1871,10 +2053,16 @@ func UnmarshalMinMaxAnswerSet(buf []byte) (*MinMaxAnswerSet, error) {
 	return obj, nil
 }
 
+// The owner proposed a new owner, who still has to accept.
 type OwnershipTransferRequested struct {
+	// The store state account the event is about.
 	State solanago.PublicKey `json:"state"`
-	From  solanago.PublicKey `json:"from"`
-	To    solanago.PublicKey `json:"to"`
+
+	// The current owner, who made the proposal.
+	From solanago.PublicKey `json:"from"`
+
+	// The proposed owner. The default key means a pending proposal was cancelled.
+	To solanago.PublicKey `json:"to"`
 }
 
 func (obj OwnershipTransferRequested) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -1942,10 +2130,16 @@ func UnmarshalOwnershipTransferRequested(buf []byte) (*OwnershipTransferRequeste
 	return obj, nil
 }
 
+// The proposed owner accepted and is now the owner.
 type OwnershipTransferred struct {
+	// The store state account the event is about.
 	State solanago.PublicKey `json:"state"`
-	From  solanago.PublicKey `json:"from"`
-	To    solanago.PublicKey `json:"to"`
+
+	// The previous owner.
+	From solanago.PublicKey `json:"from"`
+
+	// The new owner.
+	To solanago.PublicKey `json:"to"`
 }
 
 func (obj OwnershipTransferred) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2013,15 +2207,18 @@ func UnmarshalOwnershipTransferred(buf []byte) (*OwnershipTransferred, error) {
 	return obj, nil
 }
 
-// A round as returned by reads, with the answer at the decimals the reader asked for.
+// A round as reads return it, with the answer at the decimals the reader asked for.
 type Round struct {
-	RoundId uint64        `json:"round_id"`
-	Answer  binary.Int128 `json:"answer"`
+	// The round's ID. Round IDs start at 1 and increase by one per stored round.
+	RoundId uint64 `json:"round_id"`
 
-	// Offchain observations timestamp
+	// The answer, at the decimals the reader asked for.
+	Answer binary.Int128 `json:"answer"`
+
+	// The time, in Unix seconds, at which the round was observed offchain.
 	ObservationsTimestamp uint32 `json:"observations_timestamp"`
 
-	// Onchain recorded timestamp
+	// The time, in Unix seconds, at which the round was written onchain.
 	RecordedTimestamp uint32 `json:"recorded_timestamp"`
 }
 
@@ -2100,9 +2297,13 @@ func UnmarshalRound(buf []byte) (*Round, error) {
 	return obj, nil
 }
 
+// A feed's own workflow list was removed, so the store's default list applies to it again.
 type SpecificFeedMetadataRemoved struct {
-	State  solanago.PublicKey `json:"state"`
-	DataId [16]uint8          `json:"data_id"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID of the feed concerned.
+	DataId [16]uint8 `json:"data_id"`
 }
 
 func (obj SpecificFeedMetadataRemoved) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2160,11 +2361,18 @@ func UnmarshalSpecificFeedMetadataRemoved(buf []byte) (*SpecificFeedMetadataRemo
 	return obj, nil
 }
 
-// Feeds were given their own workflow list, replacing any they had. One event per call for every
-// data ID given the same list: each event is an instruction, and copies its data onto the heap.
+// Feeds were given their own workflow list, replacing any list they had. One event per call
+// lists every data ID given the list, because each event is an inner instruction and copies its
+// data onto the heap.
 type SpecificFeedMetadataSet struct {
-	State            solanago.PublicKey `json:"state"`
-	DataIds          [][16]uint8        `json:"data_ids"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data IDs whose feeds were given the list, in call order. A data ID listed twice in the
+	// call appears twice here.
+	DataIds [][16]uint8 `json:"data_ids"`
+
+	// The workflow list each of those feeds now has as its own.
 	WorkflowMetadata []WorkflowMetadata `json:"workflow_metadata"`
 }
 
@@ -2233,11 +2441,19 @@ func UnmarshalSpecificFeedMetadataSet(buf []byte) (*SpecificFeedMetadataSet, err
 	return obj, nil
 }
 
+// A report was skipped because it is no newer than the feed's latest round.
 type StaleReport struct {
-	State                       solanago.PublicKey `json:"state"`
-	DataId                      [16]uint8          `json:"data_id"`
-	ObservationsTimestamp       uint32             `json:"observations_timestamp"`
-	LatestObservationsTimestamp uint32             `json:"latest_observations_timestamp"`
+	// The store state account the event is about.
+	State solanago.PublicKey `json:"state"`
+
+	// The data ID from the report.
+	DataId [16]uint8 `json:"data_id"`
+
+	// The report's observation timestamp, in Unix seconds.
+	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+
+	// The observation timestamp of the feed's latest round, which the report had to exceed.
+	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
 }
 
 func (obj StaleReport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2315,16 +2531,24 @@ func UnmarshalStaleReport(buf []byte) (*StaleReport, error) {
 	return obj, nil
 }
 
-// What a store is created with.
+// The settings `initialize` creates a store with: its first feed admins, the ring size new feeds
+// get, the forward window for report timestamps, and the DF1 program whose feeds it may write.
 type StoreConfig struct {
-	// At most 64, strictly increasing (else `InvalidAddress`), which also refuses the default key
+	// The first feed admins. There can be at most 64 (otherwise `FeedAdminsFull`), and they must
+	// be in strictly increasing order (otherwise `InvalidAddress`), which also refuses the
+	// default key.
 	FeedAdmins []solanago.PublicKey `json:"feed_admins"`
 
-	// Ring size of the feeds the store creates
-	DefaultMaxStoredReports   uint64 `json:"default_max_stored_reports"`
+	// The ring size of the feeds the store creates. It must be from 2 to 278, because a feed
+	// account created by the program can be at most 10 KiB.
+	DefaultMaxStoredReports uint64 `json:"default_max_stored_reports"`
+
+	// How many seconds ahead of the chain's clock a report's observation timestamp may be (see
+	// `StoreState::max_observation_forward_secs`).
 	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
 
-	// DF1 store program whose feeds this store can keep written
+	// The DF1 program whose feed accounts the store may write. It must not be the default key or
+	// this program.
 	Df1Program solanago.PublicKey `json:"df1_program"`
 }
 
@@ -2403,15 +2627,27 @@ func UnmarshalStoreConfig(buf []byte) (*StoreConfig, error) {
 	return obj, nil
 }
 
-// A store was created, with its owner and first feed admins. One event rather than a
-// `FeedAdminSet` per admin: every event is an instruction, and a transaction holds at most 64.
+// A store was created with its owner, settings and first feed admins. The admins are listed in
+// this one event rather than in one `FeedAdminSet` each, because every event is an inner
+// instruction and Solana allows at most 64 instructions per transaction, inner ones included.
 type StoreInitialized struct {
-	State                     solanago.PublicKey   `json:"state"`
-	Owner                     solanago.PublicKey   `json:"owner"`
-	DefaultMaxStoredReports   uint64               `json:"default_max_stored_reports"`
-	MaxObservationForwardSecs uint32               `json:"max_observation_forward_secs"`
-	Df1Program                solanago.PublicKey   `json:"df1_program"`
-	FeedAdmins                []solanago.PublicKey `json:"feed_admins"`
+	// The new store's state account.
+	State solanago.PublicKey `json:"state"`
+
+	// The store's first owner, the program's upgrade authority.
+	Owner solanago.PublicKey `json:"owner"`
+
+	// The ring size the store's feeds are created with.
+	DefaultMaxStoredReports uint64 `json:"default_max_stored_reports"`
+
+	// How many seconds ahead of the chain's clock a report's observation timestamp may be.
+	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
+
+	// The DF1 program whose feed accounts the store may write.
+	Df1Program solanago.PublicKey `json:"df1_program"`
+
+	// The first feed admins, in increasing order.
+	FeedAdmins []solanago.PublicKey `json:"feed_admins"`
 }
 
 func (obj StoreInitialized) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2509,33 +2745,61 @@ func UnmarshalStoreInitialized(buf []byte) (*StoreInitialized, error) {
 	return obj, nil
 }
 
-// Store instance: ownership, admins, the DF1 program it keeps written and the defaults applied to
-// every feed.
+// The state account of one store. It holds the owner, the feed admins, the DF1 program the store
+// may write to, and the settings that apply to every feed of the store. One program can hold many
+// stores, each with its own state account and its own feeds.
 type StoreState struct {
+	// The layout version of this account, set to `ACCOUNT_VERSION`.
 	Version uint8 `json:"version"`
 
-	// Bump of the store authority PDA, which only holds recoverable tokens and SOL
+	// The bump of the store authority PDA. A PDA's address is found by trying bump values from
+	// 255 downwards until the address is one no private key exists for, and signing as the PDA
+	// needs that bump. `initialize` finds it once and stores it here, so later instructions don't
+	// repeat the search. The store authority only holds tokens and SOL sent to the store, which
+	// the owner can recover.
 	StoreAuthorityBump uint8 `json:"store_authority_bump"`
 
-	// Bump of the `df1_writer` PDA, the writer of DF1 feeds this store keeps written
+	// The bump of the `df1_writer` PDA, stored for the same reason. The store signs its `submit`
+	// calls to DF1 as this PDA, and each linked DF1 feed must name it as its writer.
 	Df1WriterBump uint8 `json:"df1_writer_bump"`
-	Padding0      uint8 `json:"_padding0"`
 
-	// Maximum seconds a report's observation timestamp may lead the clock before it is ignored
+	// Always zero. This byte fills the gap before `max_observation_forward_secs`, because a
+	// zero-copy account is read straight from its bytes and so cannot have hidden padding.
+	Padding0 uint8 `json:"_padding0"`
+
+	// How many seconds ahead of the chain's clock a report's observation timestamp may be. A
+	// report stamped further ahead is skipped with `FutureReportIgnored`. If it were stored, it
+	// would become the feed's latest round, and every later report carrying the correct time would
+	// be skipped as stale until the clock caught up. The limit is a window rather than "not after
+	// now" because the DON's clocks and the chain's clock drift slightly apart. EVM has the same
+	// setting.
 	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
 
-	// Ring size of the feeds this store creates
-	DefaultMaxStoredReports uint64             `json:"default_max_stored_reports"`
-	Owner                   solanago.PublicKey `json:"owner"`
-	ProposedOwner           solanago.PublicKey `json:"proposed_owner"`
+	// How many rounds each feed this store creates keeps, which is the size of its ring.
+	DefaultMaxStoredReports uint64 `json:"default_max_stored_reports"`
 
-	// DF1 store program whose feeds this store can keep written
+	// The owner. It manages the feed admins and ownership, and can recover tokens and SOL sent
+	// to the store.
+	Owner solanago.PublicKey `json:"owner"`
+
+	// The owner proposed by `transfer_ownership`, until it accepts. It is the default key when no
+	// transfer is pending.
+	ProposedOwner solanago.PublicKey `json:"proposed_owner"`
+
+	// The DF1 program whose feed accounts this store may write.
 	Df1Program solanago.PublicKey `json:"df1_program"`
-	FeedAdmins AccountList        `json:"feed_admins"`
 
-	// Workflows allowed to write any data ID without feed-specific metadata
+	// The keys allowed to manage feeds and the store-wide feed settings. They are kept sorted so
+	// that a lookup can use binary search.
+	FeedAdmins AccountList `json:"feed_admins"`
+
+	// The workflows allowed to write any feed that has no workflow list of its own. The list may
+	// be empty, which leaves only feeds with their own list writable.
 	DefaultWorkflowMetadata WorkflowMetadataList `json:"default_workflow_metadata"`
-	Reserved                [64]uint8            `json:"_reserved"`
+
+	// Always zero. These bytes are kept free so that fields can be added later without moving
+	// the layout.
+	Reserved [64]uint8 `json:"_reserved"`
 }
 
 func (obj StoreState) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2693,13 +2957,19 @@ func UnmarshalStoreState(buf []byte) (*StoreState, error) {
 	return obj, nil
 }
 
+// The owner recovered tokens or SOL from the store authority PDA.
 type TokenRecovered struct {
+	// The store state account the event is about.
 	State solanago.PublicKey `json:"state"`
 
-	// Default pubkey for native SOL
-	Mint   solanago.PublicKey `json:"mint"`
-	To     solanago.PublicKey `json:"to"`
-	Amount uint64             `json:"amount"`
+	// The mint of the recovered tokens, or the default key for SOL.
+	Mint solanago.PublicKey `json:"mint"`
+
+	// The account the tokens or SOL were sent to.
+	To solanago.PublicKey `json:"to"`
+
+	// The amount moved, in the token's smallest unit or in lamports.
+	Amount uint64 `json:"amount"`
 }
 
 func (obj TokenRecovered) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2777,13 +3047,19 @@ func UnmarshalTokenRecovered(buf []byte) (*TokenRecovered, error) {
 	return obj, nil
 }
 
-// A workflow authorized to write feeds
+// A workflow allowed to write feeds. A report is accepted only when its sender, workflow owner
+// and workflow name all match one entry.
 type WorkflowMetadata struct {
-	// Address allowed to send reports: a forwarder's authority PDA for this program,
-	// `["forwarder", forwarder_state, program ID]`, shared by every store state of the program
-	AllowedSender        solanago.PublicKey `json:"allowed_sender"`
-	AllowedWorkflowOwner [20]uint8          `json:"allowed_workflow_owner"`
-	AllowedWorkflowName  [10]uint8          `json:"allowed_workflow_name"`
+	// The address that must send the reports. It is the authority PDA that a forwarder program
+	// derives for this program, `["forwarder", forwarder_state, this program's ID]`, so it is the
+	// same for every store state of this program.
+	AllowedSender solanago.PublicKey `json:"allowed_sender"`
+
+	// The workflow owner, 20 bytes, as the forwarder's metadata carries it.
+	AllowedWorkflowOwner [20]uint8 `json:"allowed_workflow_owner"`
+
+	// The workflow name, 10 bytes, as the forwarder's metadata carries it.
+	AllowedWorkflowName [10]uint8 `json:"allowed_workflow_name"`
 }
 
 func (obj WorkflowMetadata) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2851,10 +3127,13 @@ func UnmarshalWorkflowMetadata(buf []byte) (*WorkflowMetadata, error) {
 	return obj, nil
 }
 
-// Fixed size list of workflow metadata
+// A fixed-size list of workflows. The first `len` entries are in use and the rest are zero.
 type WorkflowMetadataList struct {
-	Xs  [16]WorkflowMetadata `json:"xs"`
-	Len uint64               `json:"len"`
+	// The entries. Those at index `len` and after are zero.
+	Xs [16]WorkflowMetadata `json:"xs"`
+
+	// The number of entries in use.
+	Len uint64 `json:"len"`
 }
 
 func (obj WorkflowMetadataList) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
