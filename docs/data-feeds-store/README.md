@@ -118,6 +118,17 @@ If any check fails, the DF1 write is skipped with `Df1WriteSkipped { reason }` a
 3. The DF1 feed owner (MCMS on mainnet) calls DF1's `set_writer(df1_writer)`, then stops the feed's OCR2 job.
 4. To roll back: DF1's `set_writer` back to the OCR2 store authority PDA, and restart OCR2.
 
+## Releasing a new build
+
+A new build is proven before customers read it, then installed by upgrading the program in place:
+
+1. Deploy the candidate build under a second program ID on mainnet, with its own store and feeds.
+2. Point a workflow, or a second zone, at both, and compare the shadow feeds with the live ones for an agreed period.
+3. Upgrade the main program to the exact binary that ran as the shadow, checked by its verified-build hash, through an MCMS proposal.
+4. To roll back, upgrade to the previous verified build (through the MCMS bypasser in an incident).
+
+Feed accounts keep their addresses, history and settings across an upgrade; a layout change bumps the account version and migrates accounts explicitly.
+
 ## Capacity
 
 A CRE write is one forwarder report instruction with every account inline, plus the relayer's compute unit limit and price instructions. It is signed by F+1 nodes of the workflow DON (65 bytes each). Measured with `contracts/gotests/data_feeds_store_test.go`:
