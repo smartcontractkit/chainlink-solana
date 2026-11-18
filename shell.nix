@@ -1,37 +1,43 @@
-{ stdenv, pkgs, lib }:
-
+{
+  stdenv,
+  pkgs,
+  lib,
+}:
 pkgs.mkShell {
-  nativeBuildInputs = with pkgs; [
-    (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
-    # lld_11
-    llvm_12
-    stdenv.cc.cc.lib
-    pkg-config
-    openssl
+  nativeBuildInputs = with pkgs;
+    [
+      (rust-bin.stable.latest.default.override {extensions = ["rust-src"];})
+      # lld_11
+      llvm_18
+      stdenv.cc.cc.lib
+      pkg-config
+      openssl
 
-    # Solana
-    # solana.solana-full
-    # spl-token-cli
-    # anchor
+      # Solana
+      # solana.solana-full
+      # spl-token-cli
+      # anchor
 
-    # Golang
-    # Keep this golang version in sync with the version in .tool-versions please
-    go_1_24
-    gopls
-    delve
-    golangci-lint
-    gotools
+      # Golang
+      # Keep this golang version in sync with the version in .tool-versions please
+      go_1_27
+      gopls
+      delve
+      golangci-lint
+      gotools
 
-    # NodeJS + TS
-    nodePackages.typescript
-    nodePackages.typescript-language-server
-    nodePackages.npm
-    nodePackages.pnpm
-    # Keep this nodejs version in sync with the version in .tool-versions please
-    nodejs_20
-    (yarn.override { nodejs = nodejs_20; })
-    python3
-    ] ++ lib.optionals stdenv.isLinux [
+      # NodeJS + TS
+      pkgs.typescript
+      pkgs.typescript-language-server
+      pkgs.pnpm
+      # Keep this nodejs version in sync with the version in .tool-versions please
+      nodejs_26
+      # Required by yarn/node-gyp-build to compile native addons (e.g. gauntlet's `usb`).
+      (node-gyp.override {nodejs = nodejs_26;})
+      (yarn.override {nodejs = nodejs_26;})
+      python3
+    ]
+    ++ lib.optionals stdenv.isLinux [
       # ledger specific packages
       libudev-zero
       libusb1
@@ -41,7 +47,7 @@ pkgs.mkShell {
   LD_LIBRARY_PATH = lib.makeLibraryPath [pkgs.zlib stdenv.cc.cc.lib]; # lib64
 
   # Avoids issues with delve
-  CGO_CPPFLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
+  CGO_CPPFLAGS = "-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0";
 
   shellHook = ''
     # install gotestloghelper

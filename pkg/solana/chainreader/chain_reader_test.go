@@ -4,6 +4,7 @@ import (
 	"context"
 	go_binary "encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cometbft/cometbft/libs/service"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/google/uuid"
@@ -178,7 +178,7 @@ func TestSolanaChainReaderService_Start(t *testing.T) {
 				if tt.Name == "already started" {
 					return nil
 				}
-				return service.ErrNotStarted
+				return errors.New("not started")
 			}())
 			er.On("Start", mock.Anything).Maybe().Return(tt.StartError)
 			er.On("HasFilter", mock.Anything, mock.Anything).Return(false).Maybe()

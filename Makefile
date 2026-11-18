@@ -122,7 +122,7 @@ gomodtidy: gomods
 
 .PHONY: mockery
 mockery: $(mockery) ## Install mockery.
-	go install github.com/vektra/mockery/v2@v2.53.2
+	go install github.com/vektra/mockery/v2@v2.53.7
 
 .PHONY: rm-mocked
 rm-mocked:
@@ -149,10 +149,6 @@ lint-go-relay:
 .PHONY: upgrade-solana-image
 upgrade-solana-image:
 	./scripts/update-solana.sh
-
-.PHONY: update-e2e-core-deps
-upgrade-e2e-core-deps:
-	cd ./integration-tests && ../scripts/update-e2e.sh
 
 .PHONY: format-contracts
 format-contracts:
