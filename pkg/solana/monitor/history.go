@@ -73,7 +73,7 @@ type historyMonitor struct {
 }
 
 // NewHistoryMonitor returns a service which measures the RPC history depth of
-// each node once per period. The first measurement runs one period after Start.
+// each node once per period. Measurements run asynchronously after Start.
 // A failed measurement leaves the gauges unchanged.
 func NewHistoryMonitor(lggr logger.Logger, chainID string, period time.Duration, nodes []NodeHistory) (services.Service, error) {
 	if period <= 0 {
@@ -125,8 +125,7 @@ func NewHistoryMonitor(lggr logger.Logger, chainID string, period time.Duration,
 
 			for _, n := range m.nodes {
 				promRPCHistoryLastSuccess.WithLabelValues(chainID, n.name).Set(0)
-				ticker := services.TickerConfig{Initial: period, JitterPct: services.DefaultJitter}.NewTicker(period)
-				m.engine.GoTick(ticker, func(ctx context.Context) {
+				m.engine.GoTick(services.NewTicker(period), func(ctx context.Context) {
 					m.measureNode(ctx, n)
 				})
 			}

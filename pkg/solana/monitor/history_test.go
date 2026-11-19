@@ -123,17 +123,19 @@ func TestHistoryMonitorRejectsNonpositivePeriod(t *testing.T) {
 func TestHistoryMonitorRecordsPerNodeValues(t *testing.T) {
 	clientA := mocks.NewReaderWriter(t)
 	clientB := mocks.NewReaderWriter(t)
+	clientA.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(100), nil).Once()
+	clientB.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(200), nil).Once()
+
 	m, reader := newTestHistoryMonitor(t, time.Hour,
 		NodeHistory{Name: "a", Client: clientA},
 		NodeHistory{Name: "b", Client: clientB})
 	require.NoError(t, m.Start(t.Context()))
 	t.Cleanup(func() { require.NoError(t, m.Close()) })
 
-	clientA.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(100), nil).Once()
-	clientB.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(200), nil).Once()
-
-	m.measureNode(t.Context(), m.nodes[0])
-	m.measureNode(t.Context(), m.nodes[1])
+	require.Eventually(t, func() bool {
+		return testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")) > 0 &&
+			testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "b")) > 0
+	}, 5*time.Second, 10*time.Millisecond)
 
 	require.InDelta(t, float64(100), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "a")), 0)
 	require.InDelta(t, float64(200), testutil.ToFloat64(promRPCFirstAvailableSlot.WithLabelValues(t.Name(), "b")), 0)
@@ -208,11 +210,24 @@ func TestHistoryMonitorConstructorHasNoMetricSideEffects(t *testing.T) {
 func TestHistoryMonitorSeedsLastSuccessAtZero(t *testing.T) {
 	clientA := mocks.NewReaderWriter(t)
 	clientB := mocks.NewReaderWriter(t)
+	release := make(chan struct{})
+	clientA.EXPECT().GetFirstAvailableBlock(mock.Anything).RunAndReturn(func(context.Context) (uint64, error) {
+		<-release
+		return 0, nil
+	}).Maybe()
+	clientB.EXPECT().GetFirstAvailableBlock(mock.Anything).RunAndReturn(func(context.Context) (uint64, error) {
+		<-release
+		return 0, nil
+	}).Maybe()
+
 	m, reader := newTestHistoryMonitor(t, time.Hour,
 		NodeHistory{Name: "a", Client: clientA},
 		NodeHistory{Name: "b", Client: clientB})
 	require.NoError(t, m.Start(t.Context()))
-	t.Cleanup(func() { require.NoError(t, m.Close()) })
+	t.Cleanup(func() {
+		close(release)
+		require.NoError(t, m.Close())
+	})
 
 	require.Zero(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "a"))
 	require.Zero(t, mustGaugeValue(t, reader, rpcHistoryLastSuccessName, t.Name(), "b"))
@@ -220,18 +235,18 @@ func TestHistoryMonitorSeedsLastSuccessAtZero(t *testing.T) {
 	require.Zero(t, testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "b")))
 }
 
-func TestHistoryMonitorNoRequestInsideStart(t *testing.T) {
+func TestHistoryMonitorMeasuresImmediatelyAfterStart(t *testing.T) {
 	client := mocks.NewReaderWriter(t)
 	var calls atomic.Int64
 	client.EXPECT().GetFirstAvailableBlock(mock.Anything).RunAndReturn(func(context.Context) (uint64, error) {
 		calls.Add(1)
 		return 0, nil
-	}).Maybe()
+	}).Once()
 
-	m, _ := newTestHistoryMonitor(t, 300*time.Millisecond, NodeHistory{Name: "a", Client: client})
+	m, _ := newTestHistoryMonitor(t, time.Hour, NodeHistory{Name: "a", Client: client})
 	require.NoError(t, m.Start(t.Context()))
+	require.Eventually(t, func() bool { return calls.Load() == 1 }, 5*time.Second, 10*time.Millisecond)
 	require.NoError(t, m.Close())
-	require.Zero(t, calls.Load())
 }
 
 func TestHistoryMonitorFailingNodeDoesNotStopOthers(t *testing.T) {
@@ -257,7 +272,9 @@ func TestHistoryMonitorCloseDeletesSeries(t *testing.T) {
 	client.EXPECT().GetFirstAvailableBlock(mock.Anything).Return(uint64(1), nil).Once()
 	m, reader := newTestHistoryMonitor(t, time.Hour, NodeHistory{Name: "a", Client: client})
 	require.NoError(t, m.Start(t.Context()))
-	m.measureNode(t.Context(), m.nodes[0])
+	require.Eventually(t, func() bool {
+		return testutil.ToFloat64(promRPCHistoryLastSuccess.WithLabelValues(t.Name(), "a")) > 0
+	}, 5*time.Second, 10*time.Millisecond)
 
 	require.NoError(t, m.Close())
 
