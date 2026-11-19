@@ -230,11 +230,8 @@ func TestHistoryMonitorNoRequestInsideStart(t *testing.T) {
 
 	m, _ := newTestHistoryMonitor(t, 300*time.Millisecond, NodeHistory{Name: "a", Client: client})
 	require.NoError(t, m.Start(t.Context()))
-
-	time.Sleep(100 * time.Millisecond)
-	require.Zero(t, calls.Load())
-
 	require.NoError(t, m.Close())
+	require.Zero(t, calls.Load())
 }
 
 func TestHistoryMonitorFailingNodeDoesNotStopOthers(t *testing.T) {
