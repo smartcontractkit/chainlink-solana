@@ -22,7 +22,6 @@ package codecv1
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -343,6 +342,10 @@ func asArray(parentTypeName string, idlArray *IdlTypeArray, refs *codecRefs) (co
 		return nil, err
 	}
 
+	if err = solcommoncodec.CheckElementCount(idlArray.Num, codec); err != nil {
+		return nil, err
+	}
+
 	return commonencodings.NewArray(idlArray.Num, codec)
 }
 
@@ -360,7 +363,7 @@ func getCodecByStringType(curType IdlTypeAsString, builder commonencodings.Build
 	case IdlTypeBool:
 		return builder.Bool(), nil
 	case IdlTypeString:
-		return builder.String(math.MaxUint32)
+		return solcommoncodec.NewBoundedString(builder)
 	case IdlTypeI8, IdlTypeI16, IdlTypeI32, IdlTypeI64, IdlTypeI128:
 		return getIntCodecByStringType(curType, builder)
 	case IdlTypeU8, IdlTypeU16, IdlTypeU32, IdlTypeU64, IdlTypeU128:

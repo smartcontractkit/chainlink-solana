@@ -18,6 +18,18 @@ const MaxAccountBytes = 10 * 1024 * 1024
 // carry at least their own 4 byte length prefix.
 const minVariableElementBytes = 4
 
+// minWireElementBytes returns a lower bound on the encoded size of one element.
+// Fixed-size elements report their exact size, which may be zero. Variable-size
+// elements are bounded by one byte, the smallest footprint any of them (an
+// option tag, an enum discriminant, a length prefix) can have.
+func minWireElementBytes(element encodings.TypeCodec) int {
+	if fixed, err := element.FixedSize(); err == nil {
+		return fixed
+	}
+
+	return 1
+}
+
 // maxElementCount returns the largest number of elements of the given type that
 // can fit within MaxAccountBytes.
 //
@@ -63,11 +75,11 @@ func CheckElementCount(count int, element encodings.TypeCodec) error {
 // count whose implied byte footprint exceeds MaxAccountBytes is rejected while
 // decoding the prefix itself.
 //
-// encodings.NewSlice hands the wire length straight to reflect.MakeSlice and
-// validates only that it is non-negative, so a 4 byte prefix would otherwise
-// let a few bytes of untrusted data allocate gigabytes before the decode fails
-// for lack of input. encodings.slice.Decode returns as soon as the size codec
-// errors, which is why the bound belongs here rather than around the slice.
+// The prefix is also checked against the input that follows it: count elements
+// need at least count times their minimum wire size in bytes. encodings.NewSlice
+// calls reflect.MakeSlice with the decoded count before reading any element, so
+// rejecting here keeps a short payload from forcing an allocation larger than
+// the data supplied. The in-memory bound applies even when enough bytes exist.
 //
 // The wire format is unchanged: encoding delegates to the wrapped codec.
 func NewBoundedSize(size, element encodings.TypeCodec) (encodings.TypeCodec, error) {
@@ -75,12 +87,18 @@ func NewBoundedSize(size, element encodings.TypeCodec) (encodings.TypeCodec, err
 		return nil, fmt.Errorf("%w: size and element codecs must be non-nil", types.ErrInvalidConfig)
 	}
 
-	return &boundedSize{sizeEncoder: size, maxCount: maxElementCount(element)}, nil
+	return &boundedSize{
+		sizeEncoder:  size,
+		maxCount:     maxElementCount(element),
+		minWireBytes: minWireElementBytes(element),
+	}, nil
 }
 
 type boundedSize struct {
 	sizeEncoder encodings.TypeCodec
 	maxCount    int
+	// minWireBytes is the least number of encoded bytes one element occupies.
+	minWireBytes int
 }
 
 var _ encodings.TypeCodec = &boundedSize{}
@@ -104,6 +122,10 @@ func (b *boundedSize) Decode(encoded []byte) (any, []byte, error) {
 	}
 	if count > b.maxCount {
 		return nil, nil, fmt.Errorf("%w: element count %d exceeds the maximum of %d for solana data", types.ErrInvalidEncoding, count, b.maxCount)
+	}
+
+	if b.minWireBytes > 0 && count > len(bytes)/b.minWireBytes {
+		return nil, nil, fmt.Errorf("%w: slice length %d exceeds remaining input of %d bytes", types.ErrInvalidEncoding, count, len(bytes))
 	}
 
 	return value, bytes, nil
@@ -137,4 +159,52 @@ func NewBoundedSlice(element encodings.TypeCodec, builder encodings.Builder) (en
 	}
 
 	return encodings.NewSlice(element, bounded)
+}
+
+// NewBoundedString builds a string codec with a 4 byte Borsh length prefix whose
+// length is bounded like NewBoundedSlice. Builder.String wraps an unbounded
+// encodings.NewSlice, so a 4 byte prefix could allocate up to 4 GiB.
+func NewBoundedString(builder encodings.Builder) (encodings.TypeCodec, error) {
+	bytesCodec, err := NewBoundedSlice(builder.Uint8(), builder)
+	if err != nil {
+		return nil, err
+	}
+
+	return &boundedString{codec: bytesCodec}, nil
+}
+
+type boundedString struct {
+	codec encodings.TypeCodec
+}
+
+var _ encodings.TypeCodec = &boundedString{}
+
+func (s *boundedString) Encode(value any, into []byte) ([]byte, error) {
+	str, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("%w: expected string, got %T", types.ErrInvalidType, value)
+	}
+
+	return s.codec.Encode([]byte(str), into)
+}
+
+func (s *boundedString) Decode(encoded []byte) (any, []byte, error) {
+	value, remaining, err := s.codec.Decode(encoded)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return string(value.([]byte)), remaining, nil
+}
+
+func (s *boundedString) GetType() reflect.Type {
+	return reflect.TypeFor[string]()
+}
+
+func (s *boundedString) Size(_ int) (int, error) {
+	return 0, fmt.Errorf("%w: strings are not sized by number of items", types.ErrInvalidType)
+}
+
+func (s *boundedString) FixedSize() (int, error) {
+	return 0, fmt.Errorf("%w: strings do not have a fixed size", types.ErrInvalidType)
 }
