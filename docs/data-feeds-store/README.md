@@ -148,7 +148,9 @@ A CRE write is one forwarder report instruction with every account inline, plus 
 
 **How many reports fit in one transaction.** Three runtime limits apply: 4,096 bytes, 64 accounts and 64 instructions (inner calls included). Size and accounts run out first, at about 40 store-only or 25 DF1-backed reports at F=5. The instruction limit would allow about 57 and 28: each stored report adds one instruction (its event), and a report that writes DF1 adds two (`submit` and the event). Memory runs out at about the same point.
 
-**Leave two instructions spare.** Anyone can send SOL to an address before an account is created there. When a program then creates that account, it takes three instructions instead of one. This applies to feed and link-marker accounts created by `set_feeds`, and to the forwarder's per-report execution-state account, whose address anyone can work out from the report. A batch sized exactly to the instruction limit could then fail, and for a report, every retry would fail the same way. So size `set_feeds` calls and report batches with at least two instructions spare.
+**Pre-funded accounts need extra headroom.** Anyone can send SOL to an address before the program creates its account there. Creating a pre-funded account takes `allocate` and `assign`, plus a `transfer` if more lamports are needed for rent, instead of a single `create_account`. Each pre-funded account therefore adds up to two instructions to the transaction's instruction count. This applies to every feed account `set_feeds` creates, every DF1 link marker `set_df1_feeds` creates, and the forwarder's per-report execution-state account, whose address anyone can derive from the report.
+
+Allow two spare instructions for every account a call may create, rather than two for the whole transaction. Otherwise, a transaction at the 64-instruction limit can fail if someone pre-funds those addresses. A failed report transaction rolls back its account creation, so retrying the same report hits the same limit again; reduce the batch size if this happens.
 
 ## Adding SVR later
 
