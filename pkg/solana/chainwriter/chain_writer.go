@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/big"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
@@ -64,7 +65,7 @@ type MethodConfig struct {
 	FromAddress        string                      `json:"fromAddress"`
 	InputModifications commoncodec.ModifiersConfig `json:"inputModifications,omitempty"`
 	ChainSpecificName  string                      `json:"chainSpecificName"`
-	LookupTables       LookupTables                `json:"lookupTables,omitempty"`
+	LookupTables       LookupTables                `json:"lookupTables"`
 	Accounts           []Lookup                    `json:"accounts"`
 	ATAs               []ATALookup                 `json:"atas,omitempty"`
 	// Location in the args where the debug ID is stored
@@ -488,9 +489,7 @@ func (s *SolanaChainWriterService) ResolveLookupTables(ctx context.Context, args
 			if derivedTableMap[tableName] == nil {
 				derivedTableMap[tableName] = make(map[string][]*solana.AccountMeta)
 			}
-			for accountKey, metas := range innerMap {
-				derivedTableMap[tableName][accountKey] = metas
-			}
+			maps.Copy(derivedTableMap[tableName], innerMap)
 		}
 	}
 

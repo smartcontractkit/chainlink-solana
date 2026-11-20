@@ -25,11 +25,9 @@ func TestPendingTxContext_add_remove_multiple(t *testing.T) {
 
 		// start subprocess to wait for context
 		processCtx, cancel := context.WithCancel(ctx)
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			<-processCtx.Done()
-			wg.Done()
-		}()
+		})
 		return sig, cancel
 	}
 
@@ -37,7 +35,7 @@ func TestPendingTxContext_add_remove_multiple(t *testing.T) {
 	txs := newPendingTxContext()
 	ids := map[solana.Signature]string{}
 	n := 5
-	for i := 0; i < n; i++ {
+	for range n {
 		sig, cancel := newProcess()
 		msg := pendingTx{id: uuid.NewString()}
 		addBroadcastedTxWithSigAndCancel(t, txs, msg, sig, cancel)

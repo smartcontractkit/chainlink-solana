@@ -403,7 +403,7 @@ func (s *ContractReaderService) CreateContractType(readIdentifier string, forEnc
 	return s.bdRegistry.CreateType(values.contract, values.reads[0].readName, forEncoding)
 }
 
-func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codecv1.IDL, idlDefinition interface{}, modCfg commoncodec.ModifiersConfig) error {
+func (s *ContractReaderService) addCodecDef(parsed *solcommoncodec.ParsedTypes, forEncoding bool, namespace, genericName string, idl codecv1.IDL, idlDefinition any, modCfg commoncodec.ModifiersConfig) error {
 	mod, err := modCfg.ToModifier(solcommoncodec.DecoderHooks...)
 	if err != nil {
 		return err
@@ -470,7 +470,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 		reads = append(reads, multiRead...)
 	}
 
-	var inputIDLDef interface{} = codecv1.NilIdlTypeDefTy
+	var inputIDLDef any = codecv1.NilIdlTypeDefTy
 	isPDA := false
 
 	// Create PDA read binding if PDA prefix or seeds configs are populated
@@ -489,7 +489,7 @@ func (s *ContractReaderService) addAccountRead(namespace string, genericName str
 	return nil
 }
 
-func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedTypes, namespace string, genericName string, idl codecv1.IDL, inputIDLDef interface{}, outputIDLDef interface{}, readDefinition config.ReadDefinition) error {
+func (s *ContractReaderService) addReadToCodec(parsed *solcommoncodec.ParsedTypes, namespace string, genericName string, idl codecv1.IDL, inputIDLDef any, outputIDLDef any, readDefinition config.ReadDefinition) error {
 	if err := s.addCodecDef(parsed, true, namespace, genericName, idl, inputIDLDef, readDefinition.InputModifications); err != nil {
 		return err
 	}
@@ -514,7 +514,7 @@ func (s *ContractReaderService) addMultiAccountReadToCodec(namespace string, rea
 			return nil, fmt.Errorf("unexpected type %T from IDL definition for account read with chainSpecificName: %q, of type: %q", accountIDLDef, mr.ChainSpecificName, mr.ReadType)
 		}
 
-		var inputIDLDef interface{} = codecv1.NilIdlTypeDefTy
+		var inputIDLDef any = codecv1.NilIdlTypeDefTy
 		isPDA := false
 
 		// Create PDA read binding if PDA prefix or seeds configs are populated
@@ -735,7 +735,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	}
 
 	returnSliceVal := reflect.ValueOf(returnVal)
-	if returnSliceVal.Kind() != reflect.Ptr {
+	if returnSliceVal.Kind() != reflect.Pointer {
 		return fmt.Errorf("expected <**[]*struct { Value *big.Int; Timestamp *int64 } Value>, got %q", returnSliceVal.String())
 	}
 
@@ -774,7 +774,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	}
 
 	returnSliceValType := returnSliceVal.Type()
-	if returnSliceValType.Kind() != reflect.Ptr {
+	if returnSliceValType.Kind() != reflect.Pointer {
 		return fmt.Errorf("expected <*[]*struct { Value *big.Int; Timestamp *int64 } Value>, got %q", returnSliceValType.String())
 	}
 
@@ -796,7 +796,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 	}
 
 	pointerType := sliceType.Elem()
-	if pointerType.Kind() != reflect.Ptr {
+	if pointerType.Kind() != reflect.Pointer {
 		return fmt.Errorf("expected *struct { Value *big.Int; Timestamp *int64 }, got %q", pointerType.String())
 	}
 
@@ -842,7 +842,7 @@ func (s *ContractReaderService) handleGetTokenPricesGetLatestValue(
 
 func (s *ContractReaderService) getPDAsForGetTokenPrices(params any, values readValues) ([]solana.PublicKey, error) {
 	val := reflect.ValueOf(params)
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

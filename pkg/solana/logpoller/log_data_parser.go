@@ -179,9 +179,9 @@ func (l *eventLine) Process(instLogs *appendOnly[types.ProgramOutput], programs 
 	output := instLogs.PeekUnchecked()
 	txLogIdx := uint(len(output.Events))
 	output.Events = append(output.Events, types.ProgramEvent{
-		Program:   programs.PeekUnchecked(),
-		Data:      l.EventData,
-		BlockData: types.BlockData{TransactionLogIndex: txLogIdx},
+		Program:             programs.PeekUnchecked(),
+		Data:                l.EventData,
+		TransactionLogIndex: txLogIdx,
 	})
 	return nil
 }

@@ -13,7 +13,7 @@ import (
 // integer to extract a specific element from a slice or array.)
 func ExtractField(data any, path []string) (any, error) {
 	v := reflect.ValueOf(data)
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			if len(path) > 0 {
 				return nil, fmt.Errorf("cannot extract field '%s' from a nil pointer", path[0])

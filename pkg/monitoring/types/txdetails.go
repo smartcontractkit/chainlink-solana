@@ -30,7 +30,7 @@ var (
 )
 
 type TxDetails struct {
-	Err  interface{}
+	Err  any
 	Fee  uint64
 	Slot uint64
 
@@ -50,7 +50,7 @@ func (td TxDetails) Empty() bool {
 }
 
 // MakeTxDetails casts an interface to []TxDetails
-func MakeTxDetails(in interface{}) ([]TxDetails, error) {
+func MakeTxDetails(in any) ([]TxDetails, error) {
 	out, ok := (in).([]TxDetails)
 	if !ok {
 		return nil, fmt.Errorf("Unable to make type []TxDetails from %T", in)

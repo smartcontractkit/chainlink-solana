@@ -137,7 +137,7 @@ func NewCodec(conf Config) (commontypes.RemoteCodec, error) {
 	return codecv1.NewCodec(conf)
 }
 
-func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, mod commoncodec.Modifier) (entry Entry, err error) {
+func CreateCodecEntry(idlDefinition any, offChainName string, idl IDL, mod commoncodec.Modifier) (entry Entry, err error) {
 	return codecv1.CreateCodecEntry(idlDefinition, offChainName, idl, mod)
 }
 
@@ -145,7 +145,7 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl IDL, m
 // 	return codecv1.CreateCodecEntryWrapper(cfgType, mod, onChainName, offChainName, idlString)
 // }
 
-func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, idl IDL) (interface{}, error) {
+func FindDefinitionFromIDL(cfgType ChainConfigType, chainSpecificName string, idl IDL) (any, error) {
 	return codecv1.FindDefinitionFromIDL(cfgType, chainSpecificName, idl)
 }
 

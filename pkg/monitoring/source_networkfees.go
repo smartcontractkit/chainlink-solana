@@ -40,7 +40,7 @@ type networkFeesSource struct {
 	client ChainReader
 }
 
-func (t *networkFeesSource) Fetch(ctx context.Context) (interface{}, error) {
+func (t *networkFeesSource) Fetch(ctx context.Context) (any, error) {
 	block, err := t.client.GetLatestBlock(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, err

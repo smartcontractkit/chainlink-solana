@@ -22,7 +22,7 @@ func (testOptionInnerCodec) Decode(encoded []byte) (any, []byte, error) {
 }
 
 func (testOptionInnerCodec) GetType() reflect.Type {
-	return reflect.TypeOf(int32(0))
+	return reflect.TypeFor[int32]()
 }
 
 func (testOptionInnerCodec) Size(_ int) (int, error) {
@@ -46,7 +46,7 @@ func (panicOptionInnerCodec) Decode(encoded []byte) (any, []byte, error) {
 }
 
 func (panicOptionInnerCodec) GetType() reflect.Type {
-	return reflect.TypeOf(int32(0))
+	return reflect.TypeFor[int32]()
 }
 
 func (panicOptionInnerCodec) Size(_ int) (int, error) {

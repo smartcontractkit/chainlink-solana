@@ -44,7 +44,7 @@ func TestMetricsAreProperlyPopulatedWithLabels(t *testing.T) {
 	expectedCount := 9
 	expectedSize := 2
 
-	for i := 0; i < expectedCount; i++ {
+	for range expectedCount {
 		_, err := withObservedQueryAndResults(orm, "query", func() ([]string, error) { return []string{"value1", "value2"}, nil })
 		require.NoError(t, err)
 	}

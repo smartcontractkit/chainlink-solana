@@ -14,7 +14,7 @@ type testErrDecodeEntry struct {
 	entry
 }
 
-func (t *testErrDecodeEntry) Decode(_ []byte) (interface{}, []byte, error) {
+func (t *testErrDecodeEntry) Decode(_ []byte) (any, []byte, error) {
 	return nil, nil, fmt.Errorf("decode error")
 }
 
@@ -22,12 +22,12 @@ type testErrDecodeRemainingBytes struct {
 	entry
 }
 
-func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (interface{}, []byte, error) {
+func (t *testErrDecodeRemainingBytes) Decode(_ []byte) (any, []byte, error) {
 	return struct{}{}, []byte{1}, nil
 }
 
 func TestDecoder_Decode_Errors(t *testing.T) {
-	var into interface{}
+	var into any
 	someType := "input.Some.Type"
 	t.Run("error when item type not found", func(t *testing.T) {
 		nonExistentType := "output.Non.Existent"

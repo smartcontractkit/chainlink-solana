@@ -66,7 +66,7 @@ func GetValuesAtLocation(args any, location string) ([][]byte, error) {
 
 	for _, item := range items {
 		rv := reflect.ValueOf(item)
-		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 			item = rv.Elem().Interface()
 		}
 
@@ -154,7 +154,7 @@ func traversePath(data any, path []string) ([]any, error) {
 
 	val := reflect.ValueOf(data)
 
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

@@ -37,7 +37,7 @@ type slotHeight struct {
 	metrics    metrics.SlotHeight
 }
 
-func (p *slotHeight) Export(ctx context.Context, data interface{}) {
+func (p *slotHeight) Export(ctx context.Context, data any) {
 	slot, ok := data.(types.SlotHeight)
 	if !ok {
 		return // skip if input could not be parsed

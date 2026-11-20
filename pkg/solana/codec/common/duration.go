@@ -42,7 +42,7 @@ func (d *duration) Decode(encoded []byte) (any, []byte, error) {
 }
 
 func (d *duration) GetType() reflect.Type {
-	return reflect.TypeOf(time.Duration(0))
+	return reflect.TypeFor[time.Duration]()
 }
 
 func (d *duration) Size(val int) (int, error) {

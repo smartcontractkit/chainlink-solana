@@ -43,7 +43,7 @@ type txDetailsSource struct {
 	source *txResultsSource // reuse underlying logic for getting signatures
 }
 
-func (s *txDetailsSource) Fetch(ctx context.Context) (interface{}, error) {
+func (s *txDetailsSource) Fetch(ctx context.Context) (any, error) {
 	_, sigs, err := s.source.fetch(ctx)
 	if err != nil {
 		return nil, err

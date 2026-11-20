@@ -26,7 +26,7 @@ type accountReadBinding struct {
 	responseAddressHardCoder *commoncodec.HardCodeModifierConfig
 	readDefinition           config.ReadDefinition
 	idl                      codecv1.IDL
-	inputIDLType             interface{}
+	inputIDLType             any
 	outputIDLTypeDef         codecv1.IdlTypeDef
 }
 
@@ -35,7 +35,7 @@ func newAccountReadBinding(
 	isPda bool,
 	pdaPrefix []byte,
 	idl codecv1.IDL,
-	inputIDLType interface{},
+	inputIDLType any,
 	outputIDLTypeDef codecv1.IdlTypeDef,
 	readDefinition config.ReadDefinition,
 ) *accountReadBinding {
@@ -110,7 +110,7 @@ func (b *accountReadBinding) GetReadDefinition() config.ReadDefinition {
 	return b.readDefinition
 }
 
-func (b *accountReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
+func (b *accountReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef any, outputIDLTypeDef codecv1.IdlTypeDef) {
 	return b.idl, b.inputIDLType, b.outputIDLTypeDef
 }
 
@@ -157,10 +157,7 @@ func (b *accountReadBinding) buildSeedsSlice(ctx context.Context, params any) ([
 	seedByteArray := make([][]byte, 0, numSeeds)
 	for i := 0; i < numSeeds; i++ {
 		startIdx := i * solana.MaxSeedLength
-		endIdx := startIdx + solana.MaxSeedLength
-		if endIdx > len(flattenedSeeds) {
-			endIdx = len(flattenedSeeds)
-		}
+		endIdx := min(startIdx+solana.MaxSeedLength, len(flattenedSeeds))
 		seedByteArray = append(seedByteArray, flattenedSeeds[startIdx:endIdx])
 	}
 	return seedByteArray, nil

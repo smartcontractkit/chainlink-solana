@@ -128,8 +128,8 @@ func TestEventSignatureString(t *testing.T) {
 	})
 
 	t.Run("output is always valid UTF-8", func(t *testing.T) {
-		for b0 := 0; b0 < 256; b0++ {
-			for b1 := 0; b1 < 256; b1++ {
+		for b0 := range 256 {
+			for b1 := range 256 {
 				sig := EventSignature{byte(b0), byte(b1), 0x00, 0x7f, 0x80, 0xbf, 0xc0, 0xff}
 				require.True(t, utf8.ValidString(sig.String()), "sig %x produced invalid UTF-8", [8]byte(sig))
 			}

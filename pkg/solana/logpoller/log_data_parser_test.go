@@ -395,25 +395,19 @@ Program ComputeBudget111111111111111111111111111111 success`, aLog, anotherLog)
 			},
 			Events: []types.ProgramEvent{
 				{
-					Program: "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
-					Data:    "zyX7mu/lDkMyZB6FXWyVFQIAeT7zUhwyy3BjUp8rmSZ0UUd+I8Z6cwEAAAAAAAAA7aXVf7lOOB4ObyqQDzIKJGnrRzl1fsbEObXd22CeZ40=",
-					BlockData: types.BlockData{
-						TransactionLogIndex: 0,
-					},
+					Program:             "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
+					Data:                "zyX7mu/lDkMyZB6FXWyVFQIAeT7zUhwyy3BjUp8rmSZ0UUd+I8Z6cwEAAAAAAAAA7aXVf7lOOB4ObyqQDzIKJGnrRzl1fsbEObXd22CeZ40=",
+					TransactionLogIndex: 0,
 				},
 				{
-					Program: "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
-					Data:    aLog,
-					BlockData: types.BlockData{
-						TransactionLogIndex: 1,
-					},
+					Program:             "G5TnFDEUNtXnPpj73PkphKJ7Uc2QR9WVUEZG5KHdEN8V",
+					Data:                aLog,
+					TransactionLogIndex: 1,
 				},
 				{
-					Program: "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
-					Data:    anotherLog,
-					BlockData: types.BlockData{
-						TransactionLogIndex: 2,
-					},
+					Program:             "Ccip842gzYHhvdDkSyi2YVCoAWPbYJoApMFzSxQroE9C",
+					Data:                anotherLog,
+					TransactionLogIndex: 2,
 				},
 			},
 			ComputeUnits: 265023,
@@ -776,11 +770,9 @@ func TestLogDataParse_DifferentStartLog(t *testing.T) {
 				Data:    "UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
 			},
 			{
-				Program: "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
-				Data:    "UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
-				BlockData: types.BlockData{
-					TransactionLogIndex: 1,
-				},
+				Program:             "J2XMGdW2qQLx7rAdwWtSZpTXDgAQ988BLP9QTgUZvm54",
+				Data:                "UhUxVlc2hGeTBjNPCGmmZjvNSuBOYpfpRPJLfJmTLZueJAmbgEtIMGl9lLKKH6YKy1AQd8lrsdJPPc7joZ6kCkEKlNLKhbUv",
+				TransactionLogIndex: 1,
 			},
 		},
 		ComputeUnits: 73106,

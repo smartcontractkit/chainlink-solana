@@ -38,7 +38,7 @@ type slotHeightSource struct {
 	client ChainReader
 }
 
-func (t *slotHeightSource) Fetch(ctx context.Context) (interface{}, error) {
+func (t *slotHeightSource) Fetch(ctx context.Context) (any, error) {
 	slot, err := t.client.GetSlot(ctx)
 	return types.SlotHeight(slot), err
 }

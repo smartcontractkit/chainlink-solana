@@ -49,7 +49,7 @@ func (r *RoundRequested) UnmarshalBinary(data []byte) error {
 type NewTransmission struct {
 	RoundID               uint32     `json:"round_id,omitempty"`
 	ConfigDigest          [32]uint8  `json:"config_digest,omitempty"`
-	Answer                bin.Int128 `json:"answer,omitempty"`
+	Answer                bin.Int128 `json:"answer"`
 	Transmitter           uint8      `json:"transmitter,omitempty"`
 	ObservationsTimestamp uint32     `json:"observations_timestamp,omitempty"`
 	ObserverCount         uint8      `json:"observer_count,omitempty"`

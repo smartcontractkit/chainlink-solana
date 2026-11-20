@@ -3,6 +3,7 @@ package codecv2
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	anchoridl "github.com/gagliardetto/anchor-go/idl"
@@ -51,7 +52,7 @@ func validateUniqueFieldNames(named []commonencodings.NamedTypeCodec) error {
 	return nil
 }
 
-func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl anchoridl.Idl, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
+func CreateCodecEntry(idlDefinition any, offChainName string, idl anchoridl.Idl, mod commoncodec.Modifier) (entry solcommoncodec.Entry, err error) {
 	switch v := idlDefinition.(type) {
 	// No IdlTypeDef, PDATypeDef required as chain_reader (codec based) has moved to chain_accessor (binding based)
 	case anchoridl.IdlInstruction:
@@ -68,7 +69,7 @@ func CreateCodecEntry(idlDefinition interface{}, offChainName string, idl anchor
 	return entry, nil
 }
 
-func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl anchoridl.Idl) (interface{}, error) {
+func FindDefinitionFromIDL(cfgType solcommoncodec.ChainConfigType, chainSpecificName string, idl anchoridl.Idl) (any, error) {
 	// not the most efficient way to do this, but these slices should always be very, very small
 	switch cfgType {
 	case solcommoncodec.ChainConfigTypeAccountDef:
@@ -398,10 +399,8 @@ func asVec(parentTypeName string, idlVec *idltype.Vec, refs *codecRefs) (commone
 func validDependency(refs *codecRefs, parent, child string) bool {
 	deps, ok := refs.dependencies[child]
 	if ok {
-		for _, dep := range deps {
-			if dep == parent {
-				return false
-			}
+		if slices.Contains(deps, parent) {
+			return false
 		}
 	}
 

@@ -16,7 +16,7 @@ type testErrEncodeEntry struct {
 	codecType commonencodings.TypeCodec
 }
 
-func (t *testErrEncodeEntry) Encode(_ interface{}, _ []byte) ([]byte, error) {
+func (t *testErrEncodeEntry) Encode(_ any, _ []byte) ([]byte, error) {
 	return nil, fmt.Errorf("encode error")
 }
 
@@ -52,7 +52,7 @@ func TestEncoder_Encode_Errors(t *testing.T) {
 
 	t.Run("error when entry encode fails", func(t *testing.T) {
 		_, err := newEncoder(map[string]Entry{someType: &testErrEncodeEntry{codecType: commonencodings.Empty{}}}).
-			Encode(t.Context(), make(map[string]interface{}), someType)
+			Encode(t.Context(), make(map[string]any), someType)
 		require.ErrorContains(t, err, "encode error")
 	})
 }

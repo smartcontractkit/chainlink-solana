@@ -305,7 +305,7 @@ func (c *Client) ListDirFilenamesByExt(dir string, ext string) ([]string, error)
 }
 
 // LoadWallets loads wallets from config
-func (c *Client) LoadWallets(nc interface{}) error {
+func (c *Client) LoadWallets(nc any) error {
 	cfg := nc.(*SolNetwork)
 	for _, pkString := range cfg.PrivateKeys {
 		w, err := c.LoadWallet(pkString)
@@ -342,7 +342,7 @@ func (c *Client) CalculateTxGas(gasUsedValue *big.Int) (*big.Float, error) {
 	panic("implement me")
 }
 
-func (c *Client) Get() interface{} {
+func (c *Client) Get() any {
 	return c
 }
 

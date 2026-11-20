@@ -3,7 +3,8 @@ package logpoller
 import (
 	"context"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -103,13 +104,7 @@ func (c *EncodedLogCollector) getSlotsToFetch(ctx context.Context, addresses []t
 	}
 
 	// it should be safe to access slotsToFetch without lock as all the jobs signalled that they are done
-	result := make([]uint64, 0, len(slotsToFetch))
-	for slot := range slotsToFetch {
-		result = append(result, slot)
-	}
-
-	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
-	return result, nil
+	return slices.Sorted(maps.Keys(slotsToFetch)), nil
 }
 
 func (c *EncodedLogCollector) scheduleBlocksFetching(ctx context.Context, slots []uint64) (<-chan types.Block, error) {

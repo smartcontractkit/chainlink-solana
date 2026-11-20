@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/timeutil"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	"github.com/smartcontractkit/chainlink-solana/pkg/solana/monitor"
 )
@@ -102,7 +102,7 @@ func (c *Cache[R]) Poll() {
 				c.lggr.Errorw("error in Poll.fetch", "err", err)
 			}
 			// Note negative duration will be immediately ready
-			tick = time.After(utils.WithJitter(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
+			tick = time.After(timeutil.JitterPct(0.1).Apply(c.cfg.OCR2CachePollPeriod()) - time.Since(start))
 		}
 	}
 }

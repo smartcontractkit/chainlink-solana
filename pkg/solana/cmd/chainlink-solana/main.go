@@ -23,7 +23,7 @@ func main() {
 	s := loop.MustNewStartedServer(loggerName)
 	defer s.Stop()
 
-	p := &pluginRelayer{Plugin: loop.Plugin{Logger: s.Logger}, ds: s.DataSource}
+	p := &pluginRelayer{Logger: s.Logger, ds: s.DataSource}
 	defer s.Logger.ErrorIfFn(p.Close, "Failed to close")
 
 	s.MustRegister(p)
@@ -36,11 +36,9 @@ func main() {
 		Plugins: map[string]plugin.Plugin{
 			loop.PluginRelayerName: &loop.GRPCPluginRelayer{
 				PluginServer: p,
-				BrokerConfig: loop.BrokerConfig{
-					StopCh:   stopCh,
-					Logger:   s.Logger,
-					GRPCOpts: s.GRPCOpts,
-				},
+				StopCh:       stopCh,
+				Logger:       s.Logger,
+				GRPCOpts:     s.GRPCOpts,
 			},
 		},
 		GRPCServer: s.GRPCOpts.NewServer,

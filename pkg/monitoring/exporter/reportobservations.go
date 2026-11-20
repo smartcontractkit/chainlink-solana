@@ -50,7 +50,7 @@ type reportObservations struct {
 	metrics metrics.ReportObservations
 }
 
-func (p *reportObservations) Export(ctx context.Context, data interface{}) {
+func (p *reportObservations) Export(ctx context.Context, data any) {
 	details, err := types.MakeTxDetails(data)
 	if err != nil {
 		return // skip if input could not be parsed

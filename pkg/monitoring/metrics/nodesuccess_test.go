@@ -21,7 +21,7 @@ func TestNodeSuccess(t *testing.T) {
 	require.True(t, ok)
 
 	v := 100
-	inputs := NodeFeedInput{FeedInput: FeedInput{NetworkName: t.Name()}}
+	inputs := NodeFeedInput{NetworkName: t.Name()}
 
 	// set gauge
 	assert.NotPanics(t, func() { m.Add(v, inputs) })

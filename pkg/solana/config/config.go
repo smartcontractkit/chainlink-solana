@@ -183,7 +183,3 @@ func (n *Node) ValidateConfig() (err error) {
 	}
 	return err
 }
-
-func ptr[T any](t T) *T {
-	return &t
-}

@@ -78,7 +78,7 @@ func (s *envelopeSource) readJuelsPerLamport() uint64 {
 	return s.cacheJuelsPerLamport
 }
 
-func (s *envelopeSource) Fetch(ctx context.Context) (interface{}, error) {
+func (s *envelopeSource) Fetch(ctx context.Context) (any, error) {
 	state, blockNum, err := s.client.GetState(ctx, s.feedConfig.StateAccount, rpc.CommitmentConfirmed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch state from on-chain: %w", err)

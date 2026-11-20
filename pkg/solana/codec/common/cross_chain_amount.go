@@ -80,7 +80,7 @@ func DecodeLEToBigInt(data []byte) cciptypes.BigInt {
 }
 
 func (d *crossChainAmount) GetType() reflect.Type {
-	return reflect.TypeOf(cciptypes.BigInt{})
+	return reflect.TypeFor[cciptypes.BigInt]()
 }
 
 func (d *crossChainAmount) Size(val int) (int, error) {

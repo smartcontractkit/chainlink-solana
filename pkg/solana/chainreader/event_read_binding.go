@@ -202,7 +202,7 @@ func (b *eventReadBinding) GetReadDefinition() config.ReadDefinition {
 	return b.readDefinition
 }
 
-func (b *eventReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef interface{}, outputIDLTypeDef codecv1.IdlTypeDef) {
+func (b *eventReadBinding) GetIDLInfo() (idl codecv1.IDL, inputIDLTypeDef any, outputIDLTypeDef codecv1.IdlTypeDef) {
 	return codecv1.IDL{}, codecv1.IdlTypeDef{}, codecv1.IdlTypeDef{}
 }
 

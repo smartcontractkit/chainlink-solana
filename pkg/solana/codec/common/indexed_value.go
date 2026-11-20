@@ -83,7 +83,7 @@ func NewIndexedValue(typedVal any) (iVal IndexedValue, err error) {
 			}
 			result := make([]byte, v.Len())
 			l := v.Len()
-			for i := 0; i < l; i++ {
+			for i := range l {
 				result[i] = byte(v.Index(i).Uint())
 			}
 			return result, nil
