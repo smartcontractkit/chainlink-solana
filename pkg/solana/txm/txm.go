@@ -234,13 +234,6 @@ func (txm *Txm) buildTx(ctx context.Context, msg pendingTx, retryCount int) (sol
 	// work with a copy
 	newTx := utils.DeepCopyTx(msg.tx)
 
-	// Set compute unit limit if specified
-	if msg.cfg.ComputeUnitLimit != 0 {
-		if err := fees.SetComputeUnitLimit(&newTx, fees.ComputeUnitLimit(msg.cfg.ComputeUnitLimit)); err != nil {
-			return solanaGo.Transaction{}, fmt.Errorf("failed to add compute unit limit instruction: %w", err)
-		}
-	}
-
 	// Set compute unit price (fee)
 	fee := fees.ComputeUnitPrice(
 		fees.CalculateFee(
@@ -249,7 +242,8 @@ func (txm *Txm) buildTx(ctx context.Context, msg pendingTx, retryCount int) (sol
 			msg.cfg.ComputeUnitPriceMin,
 			uint(retryCount), //nolint:gosec // reasonable number of bumps should never cause overflow
 		))
-	if err := fees.SetComputeUnitPrice(&newTx, fee); err != nil {
+
+	if err := applyComputeBudget(&newTx, msg.cfg.ComputeUnitLimit, fee); err != nil {
 		return solanaGo.Transaction{}, err
 	}
 
@@ -733,6 +727,16 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 		return errors.New("error in soltxm.Enqueue: tx is nil pointer")
 	}
 
+	if isV1Tx(tx) {
+		if err := validateV1Tx(*tx); err != nil {
+			return fmt.Errorf("error in soltxm.Enqueue: %w", err)
+		}
+	}
+
+	return txm.enqueue(ctx, accountID, *tx, txID, txLastValidBlockHeight, txCfgs...)
+}
+
+func (txm *Txm) enqueue(ctx context.Context, accountID string, tx solanaGo.Transaction, txID *string, txLastValidBlockHeight uint64, txCfgs ...txmutils.SetTxConfig) error {
 	// Use transaction ID provided by caller if set
 	id := uuid.NewString()
 	if txID != nil && *txID != "" {
@@ -767,7 +771,7 @@ func (txm *Txm) Enqueue(ctx context.Context, accountID string, tx *solanaGo.Tran
 
 	msg := pendingTx{
 		id:                   id,
-		tx:                   *tx,
+		tx:                   tx,
 		cfg:                  cfg,
 		lastValidBlockHeight: txLastValidBlockHeight,
 	}
@@ -975,10 +979,11 @@ func (txm *Txm) GetTransactionSig(transactionID string) (solanaGo.Signature, err
 func (txm *Txm) EstimateComputeUnitLimit(ctx context.Context, tx *solanaGo.Transaction, id string) (uint32, error) {
 	txCopy := utils.DeepCopyTx(*tx)
 
-	// Set max compute unit limit when simulating a transaction to avoid getting an error for exceeding the default 200k compute unit limit
-	if computeUnitLimitErr := fees.SetComputeUnitLimit(&txCopy, fees.ComputeUnitLimit(MaxComputeUnitLimit)); computeUnitLimitErr != nil {
-		txm.lggr.Errorw("failed to set compute unit limit when simulating tx", "error", computeUnitLimitErr)
-		return 0, computeUnitLimitErr
+	// Set max compute budget when simulating so the estimate is not capped by runtime defaults
+	// (legacy: 200k CU; v1: unset CU limit and loaded-accounts data-size limit are both 0).
+	if simBudgetErr := prepareTxForSimulation(&txCopy); simBudgetErr != nil {
+		txm.lggr.Errorw("failed to set compute budget when simulating tx", "error", simBudgetErr)
+		return 0, simBudgetErr
 	}
 
 	// Sign and set signature in tx copy for simulation

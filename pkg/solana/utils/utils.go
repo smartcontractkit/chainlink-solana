@@ -78,6 +78,14 @@ func DeepCopyTx(tx solana.Transaction) solana.Transaction {
 		}
 	}
 
+	// Deep-copy the V1 TransactionConfig values.
+	msg.TransactionConfig = solana.TransactionConfig{
+		PriorityFee:                 clonePtr(msg.TransactionConfig.PriorityFee),
+		ComputeUnitLimit:            clonePtr(msg.TransactionConfig.ComputeUnitLimit),
+		LoadedAccountsDataSizeLimit: clonePtr(msg.TransactionConfig.LoadedAccountsDataSizeLimit),
+		HeapSize:                    clonePtr(msg.TransactionConfig.HeapSize),
+	}
+
 	// Reassemble the cloned message.
 	msg.AccountKeys = accountKeys
 	msg.Instructions = instructions
@@ -87,4 +95,12 @@ func DeepCopyTx(tx solana.Transaction) solana.Transaction {
 		Signatures: sigs,
 		Message:    msg,
 	}
+}
+
+func clonePtr[T any](v *T) *T {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }

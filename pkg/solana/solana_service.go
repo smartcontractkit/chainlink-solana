@@ -704,6 +704,7 @@ func convertMessage(m solana.Message) commonsol.Message {
 		RecentBlockhash:     commonsol.Hash(m.RecentBlockhash),
 		Instructions:        make([]commonsol.CompiledInstruction, len(m.Instructions)),
 		AddressTableLookups: convertAddressTableLookupSlice(m.AddressTableLookups),
+		TransactionConfig:   convertTransactionConfig(m.TransactionConfig),
 	}
 
 	for i, pk := range m.AccountKeys {
@@ -715,6 +716,31 @@ func convertMessage(m solana.Message) commonsol.Message {
 	}
 
 	return out
+}
+
+func convertTransactionConfig(cfg solana.TransactionConfig) commonsol.TransactionConfig {
+	return commonsol.TransactionConfig{
+		PriorityFee:                 cloneUint64(cfg.PriorityFee),
+		ComputeUnitLimit:            cloneUint32(cfg.ComputeUnitLimit),
+		LoadedAccountsDataSizeLimit: cloneUint32(cfg.LoadedAccountsDataSizeLimit),
+		HeapSize:                    cloneUint32(cfg.HeapSize),
+	}
+}
+
+func cloneUint32(v *uint32) *uint32 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
+}
+
+func cloneUint64(v *uint64) *uint64 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 func convertAddressTableLookupSlice(in []solana.MessageAddressTableLookup) commonsol.MessageAddressTableLookupSlice {
