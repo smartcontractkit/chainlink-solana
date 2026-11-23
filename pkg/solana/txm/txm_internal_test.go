@@ -1578,7 +1578,8 @@ func TestTxm_ExpirationRebroadcast(t *testing.T) {
 		statuses[sig1] = func() *rpc.SignatureStatusesResult {
 			defer func() { count++ }()
 			// Transaction remains unconfirmed
-			if count == 1 {
+			// the pre-rebroadcast status check consumes one call, so the rebroadcast poll is the second
+			if count == 2 {
 				wg.Done()
 			}
 			return nil
@@ -1732,7 +1733,10 @@ func TestTxm_OnReorg(t *testing.T) {
 
 					// simulate re-org => NotFound
 					initialTxCtxStopped = true
-					wg.Done()
+					// the pre-rebroadcast status check adds one call before the re-org poll
+					if initialStatusCallCount == 2 {
+						wg.Done()
+					}
 					return nil
 				},
 			}
@@ -1958,5 +1962,96 @@ func TestTxm_DependencyTx(t *testing.T) {
 		mainTxMeta := txmutils.DependencyTxMeta{DependencyTxs: []txmutils.DependencyTx{{TxID: mainTxID, DesiredStatus: types.Finalized}}}
 		err = txm.waitForDependencyTxs(ctx, mainTxMeta)
 		require.Error(t, err)
+	})
+}
+
+func TestTxm_RebroadcastGivenBlockhash(t *testing.T) {
+	t.Parallel()
+
+	setupTxmTest := func(t *testing.T, statusesFor func(sigs []solana.Signature) []*rpc.SignatureStatusesResult) (*Txm, *mocks.ReaderWriter, *keyMocks.SimpleKeystore) {
+		estimator := "fixed"
+		id := "mocknet-" + estimator + "-" + uuid.NewString()
+		cfg := config.NewDefault()
+		cfg.Chain.FeeEstimatorMode = &estimator
+
+		mc := mocks.NewReaderWriter(t)
+		mc.On("SimulateTx", mock.Anything, mock.Anything, mock.Anything).Return(&rpc.SimulateTransactionResult{}, nil).Maybe()
+		mc.On("SignatureStatuses", mock.Anything, mock.AnythingOfType("[]solana.Signature")).Return(
+			func(_ context.Context, sigs []solana.Signature) ([]*rpc.SignatureStatusesResult, error) {
+				return statusesFor(sigs), nil
+			},
+		).Maybe()
+
+		mkey := keyMocks.NewSimpleKeystore(t)
+		mkey.On("Sign", mock.Anything, mock.Anything, mock.Anything).Return([]byte{}, nil).Maybe()
+
+		loader := utils.NewStaticLoader[client.ReaderWriter](mc)
+		txm, err := NewTxm(id, loader, nil, cfg, mkey, logger.Test(t))
+		require.NoError(t, err)
+		require.NoError(t, txm.Start(t.Context()))
+		t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
+		return txm, mc, mkey
+	}
+
+	addBroadcastedTx := func(t *testing.T, txm *Txm, mkey *keyMocks.SimpleKeystore, sig solana.Signature) pendingTx {
+		tx, _ := getTx(t, 0, mkey)
+		pTx := pendingTx{id: uuid.NewString(), tx: *tx, cfg: txm.defaultTxConfig()}
+		require.NoError(t, txm.txs.New(pTx))
+		require.NoError(t, txm.txs.OnBroadcasted(pTx))
+		require.NoError(t, txm.txs.AddSignature(func() {}, pTx.id, sig))
+
+		stored, err := txm.txs.GetPendingTx(pTx.id)
+		require.NoError(t, err)
+		return stored
+	}
+
+	t.Run("skips rebuild when a signature is already on-chain", func(t *testing.T) {
+		sig := randomSignature(t)
+		txm, mc, mkey := setupTxmTest(t, func(sigs []solana.Signature) []*rpc.SignatureStatusesResult {
+			out := make([]*rpc.SignatureStatusesResult, len(sigs))
+			for i := range sigs {
+				out[i] = &rpc.SignatureStatusesResult{ConfirmationStatus: rpc.ConfirmationStatusProcessed}
+			}
+			return out
+		})
+
+		mc.On("SendTx", mock.Anything, mock.Anything).Run(func(mock.Arguments) {
+			t.Error("SendTx should not be called when a signature is already on-chain")
+		}).Return(sig, nil).Maybe()
+
+		pTx := addBroadcastedTx(t, txm, mkey, sig)
+
+		newSig, err := txm.rebroadcastWithGivenBlockhash(t.Context(), pTx, solana.Hash{}, 2000)
+		require.ErrorContains(t, err, "already has signature on-chain")
+		require.Equal(t, solana.Signature{}, newSig)
+
+		state, ok := txm.txs.GetTxState(pTx.id)
+		require.True(t, ok)
+		require.NotEqual(t, txmutils.AwaitingBroadcast, state)
+		require.Equal(t, 1, txm.InflightTxs(t.Context()))
+		mc.AssertNotCalled(t, "SendTx", mock.Anything, mock.Anything)
+	})
+
+	t.Run("rebuilds when no signature is on-chain", func(t *testing.T) {
+		sig := randomSignature(t)
+		newSig := randomSignature(t)
+		txm, _, mkey := setupTxmTest(t, func(sigs []solana.Signature) []*rpc.SignatureStatusesResult {
+			return make([]*rpc.SignatureStatusesResult, len(sigs)) // all nil: signatures not found on-chain
+		})
+
+		txm.sendTx = func(_ context.Context, _ *solana.Transaction) (solana.Signature, error) {
+			return newSig, nil
+		}
+
+		pTx := addBroadcastedTx(t, txm, mkey, sig)
+
+		returnedSig, err := txm.rebroadcastWithGivenBlockhash(t.Context(), pTx, solana.Hash{}, 2000)
+		require.NoError(t, err)
+		require.Equal(t, newSig, returnedSig)
+
+		state, ok := txm.txs.GetTxState(pTx.id)
+		require.True(t, ok)
+		require.Equal(t, txmutils.Broadcasted, state)
 	})
 }

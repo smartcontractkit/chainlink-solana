@@ -1144,12 +1144,44 @@ func (txm *Txm) InflightTxs(ctx context.Context) int {
 	return len(txm.txs.ListAllSigs(ctx))
 }
 
+// anySignatureLanded returns the first of the pending tx's signatures already on-chain.
+func (txm *Txm) anySignatureLanded(ctx context.Context, pTx pendingTx) (solanaGo.Signature, bool, error) {
+	if len(pTx.signatures) == 0 {
+		return solanaGo.Signature{}, false, nil
+	}
+	c, err := txm.client.Get(ctx)
+	if err != nil {
+		return solanaGo.Signature{}, false, err
+	}
+	statuses, err := c.SignatureStatuses(ctx, pTx.signatures)
+	if err != nil {
+		return solanaGo.Signature{}, false, err
+	}
+	for i, status := range statuses {
+		if i < len(pTx.signatures) && status != nil {
+			return pTx.signatures[i], true, nil
+		}
+	}
+	return solanaGo.Signature{}, false, nil
+}
+
 // rebroadcastWithGivenBlockhash attempts to rebroadcast a pending tx with a new blockhash.
 // Removes all signatures associated with the prior tx, cancels prior ctx, updates compute unit price and sets given blockhash for rebroadcasting.
 // Calls sendWithRetry directly to avoid enqueuing the transaction. It logs the error when rebroadcast fails and returns the new signature when successful.
 func (txm *Txm) rebroadcastWithGivenBlockhash(ctx context.Context, pTx pendingTx, blockhash solanaGo.Hash, lastValidBlockHeight uint64) (solanaGo.Signature, error) {
+	// skip rebroadcast if any of the signatures are already on-chain to avoid duplicate txs
+	sig, landed, err := txm.anySignatureLanded(ctx, pTx)
+	if err != nil {
+		txm.lggr.Errorw("failed to verify tx signatures before rebroadcast, skipping rebroadcast", "id", pTx.id, "error", err)
+		return solanaGo.Signature{}, fmt.Errorf("failed to verify tx signatures before rebroadcast: %w", err)
+	}
+	if landed {
+		txm.lggr.Infow("tx signature already on-chain, skipping rebroadcast", "id", pTx.id, "signature", sig)
+		return solanaGo.Signature{}, fmt.Errorf("tx %s already has signature on-chain, skipping rebroadcast", pTx.id)
+	}
+
 	// Revert tx state back to AwaitingBroadcast
-	err := txm.txs.RevertToAwaitingBroadcast(pTx.id)
+	err = txm.txs.RevertToAwaitingBroadcast(pTx.id)
 	if err != nil {
 		txm.lggr.Errorw("failed to remove tx", "id", pTx.id, "error", err)
 		return solanaGo.Signature{}, err
