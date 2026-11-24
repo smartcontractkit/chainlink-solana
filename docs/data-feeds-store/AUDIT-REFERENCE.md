@@ -6,13 +6,14 @@ The lookup detail behind the [audit brief](AUDIT.md): read the brief first for t
 
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
-- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290).
+- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
+- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. The evidence, with explorer links, is in the [audit brief, §12](AUDIT.md#12-running-on-df-cre-staging).
 
 ## 1. Scope and build
 
-The program is `contracts/programs/data-feeds-store`, program ID `9qCsUGTdKCanybkroJuPzAhuRU8P2SZN4NCexevSZAwu`, Anchor 0.31. The client crate is `contracts/crates/chainlink-solana-data-feeds-store`. DF1 is the unchanged `contracts/programs/store` program (declared ID `9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC`); only what the store assumes about it is in scope (section 5).
+The program is `contracts/programs/data-feeds-store`, program ID `9qCsUGTdKCanybkroJuPzAhuRU8P2SZN4NCexevSZAwu`, Anchor 0.31. The client crate is `contracts/crates/chainlink-solana-data-feeds-store`. Also in production scope is `contracts/crates/arrayvec/src/lib.rs`: the unchanged macro that implements the store's feed-admin and workflow lists. DF1 is the unchanged `contracts/programs/store` program (declared ID `9kRNTZmoZSiTBuXC62dzK9E7gC7huYgcmRRhYv3i4osC`); only what the store assumes about it is in scope (section 5).
 
 Source map, under `src/`:
 
@@ -26,6 +27,7 @@ Source map, under `src/`:
 - `utils.rs`: PDA creation, feed loading, ring accessors, the `EventEmitter`, permission helpers.
 - `event.rs` and `error.rs`: events and errors.
 - `instructions/admin.rs`, `feeds.rs`, `on_report.rs`, `reads.rs`: the handlers.
+- `instructions/mod.rs`: the handler module wiring.
 
 Build and test from `contracts`:
 
@@ -33,6 +35,10 @@ Build and test from `contracts`:
 - `cargo test` runs the Rust unit and property tests of the program and the client crate.
 - `anchor test` runs `tests/data-feeds-store.spec.ts` (27 tests, including 25 seeded random report batches checked against a model) against a local validator. `Anchor.toml` deploys workspace programs as upgradeable by the provider wallet (`[test] upgradeable = true`), as `initialize` requires.
 - `go test ./gotests -run 'TestDataFeedsStore$' -v` runs the end-to-end suite through a real keystone forwarder at F=2 and F=5, and performs an in-place loader upgrade of the current binary mid-test. It does not test old-layout migration. It needs Docker for the local validator, and the validator must be able to upgrade a program it loaded at startup. On amd64 the test uses `anzaxyz/agave:v2.1.21`. The deployment framework's own Linux image, `solanalabs/solana:v1.18.26`, can't upgrade such a program, because it marks the program's data as executable. On arm64 the framework's default image works as it is.
+
+### Reference-only context
+
+The following unchanged files provide context for the store's external assumptions without adding line-by-line production scope: `programs/store/src/lib.rs` and `state.rs` for DF1's layout and `submit`; `programs/keystone-forwarder/src/lib.rs`, `common.rs`, `context.rs`, `state.rs` and `utils.rs` for signatures, account hashing and execution state; and `programs/ocr_2/src/lib.rs`, `context.rs` and `sdk/chainlink-solana/src/lib.rs` for cutover and existing-customer reads.
 
 ## 2. Accounts and seeds
 

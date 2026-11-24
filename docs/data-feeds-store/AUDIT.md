@@ -6,7 +6,8 @@ This brief is for the internal review, then the external audit. It says what the
 
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
-- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290).
+- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
+- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. §12 has the evidence, with explorer links.
 
@@ -20,8 +21,11 @@ In scope, in `smartcontractkit/chainlink-solana` (Anchor 0.31), on PR [#1676](ht
 
 - `programs/data-feeds-store` (about 3,500 lines with tests, new), program ID `9qCsUGTdKCanybkroJuPzAhuRU8P2SZN4NCexevSZAwu`.
 - `crates/chainlink-solana-data-feeds-store` (about 590 lines with tests), the client crate for programs that read feeds.
+- `crates/arrayvec/src/lib.rs`, the unchanged production macro that implements the store's feed-admin and workflow lists. Its length, capacity, insertion, removal and slicing behavior is in scope because the program instantiates it directly.
 
 DF1 (`programs/store`) is unchanged and out of scope, except for what the store assumes about it (§5). Also out of scope: the keystone forwarder (audited separately; what we rely on is in §2), CRE nodes and the workflow, and the deployment changesets, which drive the owner and feed admin instructions.
+
+Useful unchanged context for those assumptions is `programs/store/src/lib.rs` and `state.rs`, `programs/keystone-forwarder/src/lib.rs`, `common.rs`, `context.rs`, `state.rs` and `utils.rs`, plus `programs/ocr_2/src/lib.rs` and `context.rs` and `sdk/chainlink-solana/src/lib.rs` for cutover and existing-customer reads. These files provide context rather than additional line-by-line scope.
 
 ## 2. Architecture and trust
 

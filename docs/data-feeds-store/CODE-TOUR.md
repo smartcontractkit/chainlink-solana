@@ -70,6 +70,7 @@ Read in this order. The first four files give you the whole shape; the rest fill
 Outside the program:
 
 - **`contracts/crates/chainlink-solana-data-feeds-store`:** the client crate other programs use to read feeds, either by calling the store or by decoding a feed account themselves.
+- **`contracts/crates/arrayvec`:** the unchanged production macro that implements the store's admin and workflow lists. Review `src/lib.rs` with the program.
 - **`contracts/programs/store`:** DF1, the existing store, unchanged. The store calls its `submit`.
 - **`contracts/programs/keystone-forwarder`:** the forwarder that checks the DON's signatures and calls `on_report`.
 - **`contracts/tests/data-feeds-store.spec.ts` and `contracts/gotests/data_feeds_store_test.go`:** the end-to-end tests (section 9).

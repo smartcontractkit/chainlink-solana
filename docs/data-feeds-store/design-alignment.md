@@ -6,7 +6,8 @@ This doc lists the design decisions for the Solana Data Feeds program (the data-
 
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
-- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290).
+- the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
+- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. The evidence, with explorer links, is in the [audit brief, §12](AUDIT.md#12-running-on-df-cre-staging).
 
