@@ -16,18 +16,18 @@ A data ID is 16 bytes, laid out like `DataId.sol`: a compact feed ID (bytes 0–
 ## Accounts
 
 - **`StoreState`** (the PDA `["state", store ID]` that `initialize` creates: 3,240 bytes, a 3,232-byte struct after the discriminator): owner, feed admins, the default ring size, the forward window (`max_observation_forward_secs`, how far an observation timestamp may lead the clock), the DF1 program, and the default workflow list.
-- **Feed** (PDA `["feed", state, data_id_32]`): the account readers pass. Its 1,328-byte header holds the latest round, the description, the minimum read decimals, the read freeze, the feed's own workflow list, its answer bounds, its write freeze and its DF1 link. A ring of `max_stored_reports` rounds follows (32 bytes each, round `r` at slot `r % max_stored_reports`). Its layout is public: fields move only with a version bump, and reserved bytes are kept for later fields, including SVR's.
+- **Feed** (PDA `["feed", state, data_id_32]`): the account readers pass. Its 1,344-byte header holds the latest round, the description, the minimum read decimals, the read freeze, the feed's own workflow list, its answer bounds, its write freeze and its DF1 link. A ring of `max_stored_reports` rounds follows (48 bytes each, round `r` at slot `r % max_stored_reports`). Its layout is public: fields move only with a version bump, and reserved bytes are kept for later fields, including SVR's. Timestamps are u64 Unix seconds.
 - **Store authority** (PDA `["store_authority", state]`): holds tokens and SOL sent to the store, which the owner can recover. It signs nothing else.
 - **DF1 writer** (PDA `["df1_writer", state]`): the writer the store signs DF1 `submit` calls with, set as each linked DF1 feed's writer.
 - **Link marker** (PDA `["df1_link", state, df1_feed]`): which data ID links a DF1 feed, so no two do.
 
 **Creating a store.** Only the program's upgrade authority can `initialize` a store. It passes a store ID (a `u64`), and `initialize` creates the state account itself at the PDA `["state", store ID as 8 little-endian bytes]`, so a timelock holding the authority can create a store by proposal. The authority becomes the store's owner and pays the state's rent (about 0.023 SOL), so a timelock signer needs that much SOL first. Creating the account in the same instruction leaves no window in which anyone could take over a half-created state account.
 
-**Creating feeds.** A feed admin creates feeds with `set_feeds`, which also sets their descriptions and, optionally, their own workflow list. Every other per-feed setter but `remove_specific_feed_metadata` also creates a feed that doesn't exist yet. The feed admin pays the rent: about 0.01 SOL plus about 0.00022 SOL per round kept, so about 0.07 SOL at the largest default ring size (278 rounds). Reports never create feeds: the forwarder passes every account unsigned, so none could pay the rent. As on EVM, feeds are never closed.
+**Creating feeds.** A feed admin creates feeds with `set_feeds`, which also sets their descriptions and, optionally, their own workflow list. Every other per-feed setter but `remove_specific_feed_metadata` also creates a feed that doesn't exist yet. The feed admin pays the rent: about 0.01 SOL plus about 0.00033 SOL per round kept, so about 0.07 SOL at the largest default ring size (185 rounds). Reports never create feeds: the forwarder passes every account unsigned, so none could pay the rent. As on EVM, feeds are never closed.
 
 ## Reports
 
-`on_report(metadata, report)` is called by the forwarder. `report` is Borsh `Vec<ReceivedReport { data_id: [u8; 16], timestamp: u32, answer: i128 }>`.
+`on_report(metadata, report)` is called by the forwarder. `report` is Borsh `Vec<ReceivedReport { data_id: [u8; 16], timestamp: u64, answer: i128 }>`. Timestamps are Unix seconds.
 
 **Accounts.** After the forwarder's own two (`forwarder_state`, `forwarder_authority`) come the store state, the DF1 program, the DF1 writer, and the event authority and program. The DF1 program and writer are optional. Anchor marks an optional account as absent by passing the program's own ID in its place, so a transaction in which no report writes DF1 passes the store's program ID for both. Then, for each report in order, come the data ID's feed (writable) and its linked DF1 feed if the feed has one. Reports take these accounts in order, so even a skipped report steps past exactly its own accounts, and the next report reads the right feed.
 
@@ -73,7 +73,7 @@ Round IDs keep increasing for the life of a feed: the program is upgraded in pla
 
 **The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. Every one of them checks that the account belongs to the store program, the store state the caller trusts and the data ID, whatever it returns, because another feed's account would otherwise give another feed's price or description. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
 
-**No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 56).
+**No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 72).
 
 ## Feed settings
 
@@ -86,7 +86,7 @@ Feed admins (MCMS on mainnet) change every per-feed setting. Each setter takes t
 - `set_feed_frozen`: the read freeze, which refuses round reads (the description and decimals stay readable) while writes continue;
 - `set_min_decimals`: the fewest decimals a read may ask for;
 - `set_df1_feeds`: the DF1 link and its own switch (see below);
-- `set_max_stored_reports`: the ring size. It only grows, and only before the ring has wrapped. Solana lets an account grow by at most 10 KiB per instruction, so one call adds at most 320 rounds; later calls can grow it further. Inside an MCMS timelock batch, the runtime applies that limit to the whole batch, so a batch should grow each feed once.
+- `set_max_stored_reports`: the ring size. It only grows, and only before the ring has wrapped. Solana lets an account grow by at most 10 KiB per instruction, so one call adds at most 213 rounds; later calls can grow it further. Inside an MCMS timelock batch, the runtime applies that limit to the whole batch, so a batch should grow each feed once.
 
 Store-wide settings are the default workflow list (`set_default_feed_metadata`) and the forward window (`set_max_observation_forward_duration`). On EVM the default list can only be replaced; here it can also be emptied, leaving only feeds with their own workflow list writable, which revokes a compromised default workflow at once. The owner manages feed admins and ownership (two steps) and can recover tokens and SOL sent to the store.
 
@@ -94,7 +94,7 @@ Store-wide settings are the default workflow list (`set_default_feed_metadata`) 
 
 Existing customers read DF1 prices from the DF1 store program's `Transmissions` accounts, so the store keeps those accounts written instead of moving customers.
 
-**Linking.** `set_df1_feeds` links a data ID to a DF1 feed. It refuses an account that isn't a DF1 feed `submit` can write, and a DF1 feed another data ID already links (`Df1FeedAlreadyLinked`). Each linked DF1 feed has a link marker holding the data ID that links it: created on its first link, with the feed admin paying, and cleared on unlink. Reports never pass the link marker. Remaining accounts are the feeds, then for each data ID in order:
+**Linking.** `set_df1_feeds` links a data ID to a DF1 feed. It refuses an account that isn't a DF1 feed `submit` can write, and a DF1 feed another data ID already links (`Df1FeedAlreadyLinked`). Creating, changing or enabling a link checks the DF1 feed's layout; disabling an existing link does not, so an admin can still disable it if DF1's layout becomes unsupported. Each linked DF1 feed has a link marker holding the data ID that links it: created on its first link, with the feed admin paying, and cleared on unlink. Reports never pass the link marker. Remaining accounts are the feeds, then for each data ID in order:
 
 - the link marker of its current DF1 feed, if the link changes away from it;
 - the new DF1 feed and its link marker, if one is linked.
@@ -106,7 +106,9 @@ So unlinking passes one account, linking or re-linking the same DF1 feed two, an
 - the account's owner, discriminator, version and ring geometry;
 - that its writer is the store's `df1_writer`;
 - that the round is newer than DF1's latest (`submit` doesn't check order; OCR2 did that for it);
+- that the observation timestamp fits DF1's u32 storage (`TimestampOverflow`);
 - that the rescaled answer fits;
+- that a non-zero answer does not become zero at the DF1 feed's decimals (`RoundsToZero`);
 - that DF1's round counter won't overflow.
 
 If any check fails, the DF1 write is skipped with `Df1WriteSkipped { reason }` and the round is still stored. Each feed also has a switch, `df1_write_disabled`, that stops only its DF1 write. The DF1 feed has to be writable only when `submit` is called. So while a link is disabled, or before the cutover, the DF1 feed can be passed read-only, and store transactions don't compete with OCR2's for a write lock on the account OCR2 writes.
@@ -127,9 +129,12 @@ A new build is proven before customers read it, then installed by upgrading the 
 3. Upgrade the main program to the exact binary that ran as the shadow, checked by its verified-build hash, through an MCMS proposal.
 4. To roll back, upgrade to the previous verified build (through the MCMS bypasser in an incident).
 
-Feed accounts keep their addresses, history and settings across an upgrade; a layout change bumps the account version and migrates accounts explicitly.
+Feed accounts keep their addresses, history and settings across a compatible upgrade. Store states, feeds and DF1 link markers have independent layout versions; an incompatible layout change bumps that account type's version and migrates its accounts explicitly.
+
+The v2 feed layout is not migration-compatible with v1 staging feeds. Pre-release v1 stores are abandoned; create a new store and new v2 feeds rather than upgrading a v1 store in place and continuing to use its feeds.
 
 Before the first mainnet release:
+
 - the external audit is complete, and its findings are fixed or accepted;
 - the audited commit has a verified build, and that build is the one deployed;
 - the client crate `chainlink_solana_data_feeds_store` is published to crates.io from the audited commit, so customer programs can depend on it as they depend on `chainlink_solana` for DF1.
@@ -138,13 +143,13 @@ Before the first mainnet release:
 
 A CRE write is one forwarder report instruction with every account inline, plus the relayer's compute unit limit and price instructions. It is signed by F+1 nodes of the workflow DON (65 bytes each). Measured with `contracts/gotests/data_feeds_store_test.go`:
 
-- **One report at F=2** (staging): 1,012 bytes store-only and 1,109 bytes with the DF1 write, both within a legacy or V0 transaction's 1,232 bytes.
-- **One report at F=5** (the 16-node mainnet DON): 1,207 and 1,304 bytes. A store-only report fits a legacy transaction; a DF1-backed one needs a V1 transaction.
-- **V1 transactions** (4,096 bytes, no lookup tables, at most 64 accounts): at F=5, 40 store-only reports take 3,898 bytes and 51 accounts; 25 DF1-backed reports take 3,752 bytes and 63 accounts.
-- **Compute:** about 4.4k compute units per store-only report and 10.2k per DF1-backed report, on top of the forwarder (about 100k at F=2 and 188k at F=5). 20 DF1-backed reports in one `on_report` take about 211k.
+- **One report at F=2** (staging): 1,016 bytes store-only and 1,113 bytes with the DF1 write, both within a legacy or V0 transaction's 1,232 bytes.
+- **One report at F=5** (the 16-node mainnet DON): 1,211 and 1,308 bytes. A store-only report fits a legacy transaction; a DF1-backed one needs a V1 transaction.
+- **V1 transactions** (4,096 bytes, no lookup tables, at most 64 accounts): at F=5, 40 store-only reports take 4,058 bytes and 51 accounts; 25 DF1-backed reports take 3,852 bytes and 63 accounts.
+- **Compute:** about 4.4k compute units per store-only report and 10.2k per DF1-backed report, on top of the forwarder (about 100k at F=2 and 188k at F=5). 20 DF1-backed reports in one `on_report` take about 212k.
 - **Heap:** every batch above fits the default 32 KiB heap, which never frees, so `on_report` and the feed setters reuse one buffer for every feed.
 - **Instruction limit:** a transaction carries at most 64 instructions, counting events and inner calls. A store-only report uses 1 (`FeedUpdated`), a DF1-backed report 2 (`submit` or the `Df1WriteSkipped` event, plus `FeedUpdated`).
-- **Feed setters:** `set_feeds` creating 20 feeds takes about 238k compute units.
+- **Feed setters:** `set_feeds` creating 20 feeds takes about 243k compute units.
 
 **How many reports fit in one transaction.** Three runtime limits apply: 4,096 bytes, 64 accounts and 64 instructions (inner calls included). Size and accounts run out first, at about 40 store-only or 25 DF1-backed reports at F=5. The instruction limit would allow about 57 and 28: each stored report adds one instruction (its event), and a report that writes DF1 adds two (`submit` and the event). Memory runs out at about the same point.
 

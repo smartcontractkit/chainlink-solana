@@ -17,7 +17,7 @@ use crate::common::{
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct StoreState {
-    /// The layout version of this account, set to `ACCOUNT_VERSION`.
+    /// The layout version of this account, set to `STORE_STATE_VERSION`.
     pub version: u8,
     /// The bump of the store authority PDA. A PDA's address is found by trying bump values from
     /// 255 downwards until the address is one no private key exists for, and signing as the PDA
@@ -64,11 +64,11 @@ pub struct StoreState {
 /// Readers pass this account, and its layout is public, so fields only move with a version bump.
 ///
 /// ```text
-/// byte 0     8                           1336    1368                    1336 + 32 * N
+/// byte 0     8                           1352    1400                    1352 + 48 * N
 ///      +-----+---------------------------+-------+-------+-----+---------+
-///      | tag | Feed header (1328 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
+///      | tag | Feed header (1344 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
 ///      +-----+---------------------------+-------+-------+-----+---------+
-///                                          one 32-byte StoredReport per index
+///                                          one 48-byte StoredReport per index
 ///
 /// N is max_stored_reports, and round r is stored at index r % N. Round IDs start at 1, so
 /// index 0 is first written by round N. With N = 4, after 5 rounds:
@@ -77,13 +77,13 @@ pub struct StoreState {
 ///      round 4   round 5   round 2   round 3      (round 5 overwrote round 1)
 ///
 /// Only the last N rounds can be read, here rounds 2 to 5. The header repeats the latest round.
-/// Some header fields by account byte (header offset + 8): state 56, round_id 88,
-/// max_stored_reports 104, latest_answer 120, description 136.
+/// Some header fields by account byte (header offset + 8): state 72, round_id 104,
+/// max_stored_reports 120, latest_answer 136, description 152.
 /// ```
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Feed {
-    /// The layout version of this account, set to `ACCOUNT_VERSION`.
+    /// The layout version of this account, set to `FEED_ACCOUNT_VERSION`.
     pub version: u8,
     /// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
     /// reads then fail, while the description and decimals stay readable and new reports are
@@ -94,19 +94,21 @@ pub struct Feed {
     /// Non-zero while writes are disabled. Every report for the feed is then skipped, whichever
     /// workflow sent it, and reads keep working.
     pub writes_disabled: u8,
+    /// Always zero. These bytes align the timestamps. A zero-copy account is read straight from
+    /// its bytes and cannot have hidden padding.
+    pub _padding0: [u8; 4],
     /// The time, in Unix seconds, at which the latest round was observed offchain, taken from its
     /// report. A new report must be newer than this to be stored.
-    pub latest_observations_timestamp: u32,
+    pub latest_observations_timestamp: u64,
     /// The time, in Unix seconds, at which the latest round was written onchain.
-    pub latest_recorded_timestamp: u32,
+    pub latest_recorded_timestamp: u64,
     /// Non-zero when `min_answer` and `max_answer` apply. Otherwise any answer is accepted.
     pub min_max_configured: u8,
     /// Non-zero while the DF1 write is disabled. Rounds are then still stored here, but they are
     /// not written to the linked DF1 feed.
     pub df1_write_disabled: u8,
-    /// Always zero. These bytes fill the gap before `data_id`, because a zero-copy account is read
-    /// straight from its bytes and so cannot have hidden padding.
-    pub _padding0: [u8; 2],
+    /// Always zero. These bytes fill the gap before `data_id`.
+    pub _padding1: [u8; 6],
     /// The data ID, zero padded to 32 bytes (see [`crate::data_id::DataIdSeed`]).
     pub data_id: [u8; 32],
     /// The store state account this feed belongs to.
@@ -151,7 +153,7 @@ impl Feed {
 }
 
 /// The byte offset at which the ring starts in a feed account: after Anchor's 8-byte tag and the
-/// 1,328-byte header, at byte 1,336.
+/// 1,344-byte header, at byte 1,352.
 pub const FEED_RING_OFFSET: usize = ANCHOR_DISCRIMINATOR + size_of::<Feed>();
 
 /// Returns the length of a feed account whose ring holds `max_stored_reports` rounds. The
@@ -170,7 +172,7 @@ pub fn feed_account_len(max_stored_reports: u64) -> usize {
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct Df1Link {
-    /// The layout version of this account, set to `ACCOUNT_VERSION`.
+    /// The layout version of this account, set to `DF1_LINK_VERSION`.
     pub version: u8,
     /// Always zero. These bytes keep `data_id` at offset 8.
     pub _padding0: [u8; 7],
@@ -186,11 +188,13 @@ pub struct StoredReport {
     /// The answer, with 18 decimals.
     pub answer: i128,
     /// The time, in Unix seconds, at which the round was observed offchain.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The time, in Unix seconds, at which the round was written onchain.
-    pub recorded_timestamp: u32,
+    pub recorded_timestamp: u64,
     /// The slot (the chain's clock tick) in which the round was written.
     pub recorded_slot: u64,
+    /// Always zero. These bytes make the struct's size a multiple of its 16-byte alignment.
+    pub _padding0: [u8; 8],
 }
 
 /// A fixed-size list of public keys. The first `len` entries are in use and the rest are zero.
@@ -232,23 +236,23 @@ pub struct WorkflowMetadata {
 }
 
 const_assert_eq!(size_of::<StoreState>(), 3232);
-const_assert_eq!(size_of::<Feed>(), 1328);
-const_assert_eq!(size_of::<StoredReport>(), 32);
+const_assert_eq!(size_of::<Feed>(), 1344);
+const_assert_eq!(size_of::<StoredReport>(), 48);
 const_assert_eq!(size_of::<Df1Link>(), 40);
 // These are the header offsets that readers decode feed accounts by; add 8 for Anchor's tag.
-// `state` (account bytes 56 to 88) is the filter for listing a store's feeds with
+// `state` (account bytes 72 to 104) is the filter for listing a store's feeds with
 // `getProgramAccounts`, the RPC call that lists a program's accounts.
 const_assert_eq!(std::mem::offset_of!(Feed, frozen), 1);
 const_assert_eq!(std::mem::offset_of!(Feed, min_decimals), 2);
-const_assert_eq!(std::mem::offset_of!(Feed, latest_observations_timestamp), 4);
-const_assert_eq!(std::mem::offset_of!(Feed, data_id), 16);
-const_assert_eq!(std::mem::offset_of!(Feed, state), 48);
-const_assert_eq!(std::mem::offset_of!(Feed, round_id), 80);
-const_assert_eq!(std::mem::offset_of!(Feed, max_stored_reports), 96);
-const_assert_eq!(std::mem::offset_of!(Feed, latest_answer), 112);
-const_assert_eq!(std::mem::offset_of!(Feed, description), 128);
-const_assert_eq!(std::mem::offset_of!(Feed, df1_feed), 192);
-const_assert_eq!(std::mem::offset_of!(Feed, specific_workflow_metadata), 256);
+const_assert_eq!(std::mem::offset_of!(Feed, latest_observations_timestamp), 8);
+const_assert_eq!(std::mem::offset_of!(Feed, data_id), 32);
+const_assert_eq!(std::mem::offset_of!(Feed, state), 64);
+const_assert_eq!(std::mem::offset_of!(Feed, round_id), 96);
+const_assert_eq!(std::mem::offset_of!(Feed, max_stored_reports), 112);
+const_assert_eq!(std::mem::offset_of!(Feed, latest_answer), 128);
+const_assert_eq!(std::mem::offset_of!(Feed, description), 144);
+const_assert_eq!(std::mem::offset_of!(Feed, df1_feed), 208);
+const_assert_eq!(std::mem::offset_of!(Feed, specific_workflow_metadata), 272);
 
 // ================================================================
 // │                Instruction arguments and returns             │
@@ -261,7 +265,7 @@ pub struct ReceivedReport {
     /// The data ID the round is for.
     pub data_id: [u8; 16],
     /// The time, in Unix seconds, at which the observations were made offchain.
-    pub timestamp: u32,
+    pub timestamp: u64,
     /// The answer, with 18 decimals.
     pub answer: i128,
 }
@@ -274,9 +278,9 @@ pub struct Round {
     /// The answer, at the decimals the reader asked for.
     pub answer: i128,
     /// The time, in Unix seconds, at which the round was observed offchain.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The time, in Unix seconds, at which the round was written onchain.
-    pub recorded_timestamp: u32,
+    pub recorded_timestamp: u64,
 }
 
 /// The settings `initialize` creates a store with: its first feed admins, the ring size new feeds
@@ -287,7 +291,7 @@ pub struct StoreConfig {
     /// be in strictly increasing order (otherwise `InvalidAddress`), which also refuses the
     /// default key.
     pub feed_admins: Vec<Pubkey>,
-    /// The ring size of the feeds the store creates. It must be from 2 to 278, because a feed
+    /// The ring size of the feeds the store creates. It must be from 2 to 185, because a feed
     /// account created by the program can be at most 10 KiB.
     pub default_max_stored_reports: u64,
     /// How many seconds ahead of the chain's clock a report's observation timestamp may be (see
@@ -328,4 +332,11 @@ pub enum Df1SkipReason {
     /// The DF1 feed's round counter is already at `u32::MAX`, so `submit` would fail when it adds
     /// one.
     RoundIdOverflow,
+    /// The answer is not zero, but rescaling it from 18 decimals to the DF1 feed's decimals would
+    /// make it zero. The store keeps its exact round and skips only the DF1 write rather than
+    /// presenting a non-zero answer as zero to DF1 readers.
+    RoundsToZero,
+    /// DF1 stores its transmission timestamp as u32, so it cannot store this round's observation
+    /// timestamp without wrapping it. The store keeps its exact round and skips only the DF1 write.
+    TimestampOverflow,
 }

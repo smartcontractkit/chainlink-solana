@@ -273,7 +273,7 @@ mod tests {
     use super::*;
     use anchor_lang::solana_program::program_stubs::{set_syscall_stubs, SyscallStubs};
     use anchor_lang::Discriminator;
-    use data_feeds_store::common::{ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR};
+    use data_feeds_store::common::{ANCHOR_DISCRIMINATOR, FEED_ACCOUNT_VERSION};
     use data_feeds_store::data_id::to_seed;
     use data_feeds_store::state::{feed_account_len, StoredReport, FEED_RING_OFFSET};
     use std::mem::size_of;
@@ -328,7 +328,7 @@ mod tests {
     fn feed_account(state: &Pubkey, data_id: &[u8; 16], rounds: u64, frozen: bool) -> Vec<u8> {
         let mut data = vec![0u8; feed_account_len(MAX)];
         let mut header: Feed = bytemuck::Zeroable::zeroed();
-        header.version = ACCOUNT_VERSION;
+        header.version = FEED_ACCOUNT_VERSION;
         header.frozen = frozen as u8;
         header.min_decimals = 8;
         header.description[..7].copy_from_slice(b"BTC/USD");
@@ -338,9 +338,10 @@ mod tests {
         for r in 1..=rounds {
             let report = StoredReport {
                 answer: r as i128 * 100 * E18,
-                observations_timestamp: r as u32 * 10,
-                recorded_timestamp: r as u32 * 10 + 1,
+                observations_timestamp: r * 10,
+                recorded_timestamp: r * 10 + 1,
                 recorded_slot: r,
+                _padding0: [0; 8],
             };
             set_report(&mut data, r, &report);
             header.latest_answer = report.answer;
@@ -500,7 +501,7 @@ mod tests {
         assert_eq!(discriminator.unwrap_err(), err(StoreError::InvalidAccount));
 
         let mut data = feed_account(&state, &id, 3, false);
-        data[ANCHOR_DISCRIMINATOR] = ACCOUNT_VERSION + 1;
+        data[ANCHOR_DISCRIMINATOR] = FEED_ACCOUNT_VERSION + 1;
         let version = read(&mut data, &DATA_FEEDS_STORE_ID);
         assert_eq!(version.unwrap_err(), err(StoreError::InvalidAccountVersion));
 

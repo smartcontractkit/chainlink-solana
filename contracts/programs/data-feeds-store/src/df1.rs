@@ -105,9 +105,9 @@ pub fn check_feed(
     Ok(())
 }
 
-/// Rescales an answer from 18 decimals to a DF1 feed's decimals, truncating toward zero. A small
-/// non-zero answer can therefore reach DF1 as 0; the store's own reads refuse that, but DF1's
-/// reads don't. Returns `None` if the result overflows.
+/// Rescales an answer from 18 decimals to a DF1 feed's decimals, truncating toward zero. Returns
+/// `None` if the scale factor or result overflows. [`check_round`] rejects a non-zero answer that
+/// would become zero.
 pub fn rescale(answer: i128, decimals: u8) -> Option<i128> {
     if decimals <= STORED_DECIMALS {
         Some(answer / 10i128.checked_pow(u32::from(STORED_DECIMALS - decimals))?)
@@ -119,14 +119,15 @@ pub fn rescale(answer: i128, decimals: u8) -> Option<i128> {
 /// Checks that a DF1 feed, owned by `owner` with `data`, can take a round, and returns the answer
 /// at the feed's decimals. It checks the layout with [`check_feed`], that `writer` (this store's
 /// `df1_writer` PDA) is the feed's writer, that the feed's round counter isn't at its maximum,
-/// that the round is newer than the feed's latest (`submit` doesn't check order), and that the
-/// answer fits the feed's decimals.
+/// that the round is newer than the feed's latest (`submit` doesn't check order), that the
+/// observation timestamp fits DF1's u32 storage, that the answer fits the feed's decimals, and
+/// that a non-zero answer doesn't become zero.
 pub fn check_round(
     owner: &Pubkey,
     data: &[u8],
     program: &Pubkey,
     writer: &Pubkey,
-    observations_timestamp: u32,
+    observations_timestamp: u64,
     answer: i128,
 ) -> std::result::Result<i128, Df1SkipReason> {
     check_feed(owner, data, program)?;
@@ -136,6 +137,10 @@ pub fn check_round(
     let latest_round_id = u32_at(data, df1::LATEST_ROUND_ID);
     if latest_round_id == u32::MAX {
         return Err(Df1SkipReason::RoundIdOverflow);
+    }
+    // DF1's `submit` takes u64 but stores it as u32 with a silent cast. Do not let it wrap.
+    if observations_timestamp > u64::from(u32::MAX) {
+        return Err(Df1SkipReason::TimestampOverflow);
     }
     if latest_round_id > 0 {
         let live_length = u64::from(u32_at(data, df1::LIVE_LENGTH));
@@ -147,11 +152,15 @@ pub fn check_round(
             data,
             df1::RINGS + latest * df1::TRANSMISSION_LEN + df1::TRANSMISSION_TIMESTAMP,
         );
-        if observations_timestamp <= latest_timestamp {
+        if observations_timestamp <= u64::from(latest_timestamp) {
             return Err(Df1SkipReason::Stale);
         }
     }
-    rescale(answer, data[df1::DECIMALS]).ok_or(Df1SkipReason::AnswerOverflow)
+    let scaled = rescale(answer, data[df1::DECIMALS]).ok_or(Df1SkipReason::AnswerOverflow)?;
+    if answer != 0 && scaled == 0 {
+        return Err(Df1SkipReason::RoundsToZero);
+    }
+    Ok(scaled)
 }
 
 /// Calls DF1's `submit`, signed by the store's `df1_writer` PDA. One instruction buffer is reused
@@ -198,7 +207,7 @@ impl<'info> Submit<'info> {
         &mut self,
         state: &Pubkey,
         feed: &AccountInfo<'info>,
-        observations_timestamp: u32,
+        observations_timestamp: u64,
         answer: i128,
     ) -> Result<()> {
         self.ix.accounts.clear();
@@ -212,7 +221,7 @@ impl<'info> Submit<'info> {
         self.ix.data.extend_from_slice(&df1::SUBMIT_DISCRIMINATOR);
         self.ix
             .data
-            .extend_from_slice(&u64::from(observations_timestamp).to_le_bytes());
+            .extend_from_slice(&observations_timestamp.to_le_bytes());
         self.ix.data.extend_from_slice(&answer.to_le_bytes());
         self.infos.clear();
         self.infos.push(feed.clone());
@@ -266,7 +275,7 @@ mod tests {
         owner: &Pubkey,
         program: &Pubkey,
         writer: &Pubkey,
-        obs: u32,
+        obs: u64,
     ) -> std::result::Result<i128, Df1SkipReason> {
         check_round(
             owner,
@@ -371,6 +380,43 @@ mod tests {
         assert_eq!(rescale(i128::MAX, 19), None);
     }
 
+    #[test]
+    fn refuses_nonzero_answers_that_would_become_zero() {
+        let (program, writer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let smallest = E18 / 100_000_000;
+        for answer in [1, -1, smallest - 1, -(smallest - 1)] {
+            let data = feed(&writer, 8, 4, 0, 0, 0);
+            assert_eq!(
+                check_round(&program, &data, &program, &writer, 1, answer),
+                Err(Df1SkipReason::RoundsToZero)
+            );
+        }
+        for (answer, expected) in [(0, 0), (smallest, 1), (-smallest, -1)] {
+            let data = feed(&writer, 8, 4, 0, 0, 0);
+            assert_eq!(
+                check_round(&program, &data, &program, &writer, 1, answer),
+                Ok(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn refuses_timestamps_df1_would_wrap() {
+        let (program, writer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let mut data = feed(&writer, 8, 4, 0, 0, 0);
+        assert!(check(&mut data, &program, &program, &writer, u64::from(u32::MAX)).is_ok());
+        assert_eq!(
+            check(
+                &mut data,
+                &program,
+                &program,
+                &writer,
+                u64::from(u32::MAX) + 1
+            ),
+            Err(Df1SkipReason::TimestampOverflow)
+        );
+    }
+
     mod properties {
         use super::*;
         use proptest::prelude::*;
@@ -445,6 +491,22 @@ mod tests {
                         }
                         None => prop_assert!(answer.unsigned_abs() > i128::MAX as u128 / unit as u128),
                     }
+                }
+            }
+
+            #[test]
+            fn df1_writes_never_turn_nonzero_answers_into_zero(
+                answer in any::<i128>(),
+                decimals in 0u8..=STORED_DECIMALS,
+            ) {
+                let (program, writer) = (Pubkey::new_unique(), Pubkey::new_unique());
+                let data = feed(&writer, decimals, 4, 0, 0, 0);
+                let result = check_round(&program, &data, &program, &writer, 1, answer);
+                let scaled = rescale(answer, decimals).unwrap();
+                if answer != 0 && scaled == 0 {
+                    prop_assert_eq!(result, Err(Df1SkipReason::RoundsToZero));
+                } else {
+                    prop_assert_eq!(result, Ok(scaled));
                 }
             }
         }

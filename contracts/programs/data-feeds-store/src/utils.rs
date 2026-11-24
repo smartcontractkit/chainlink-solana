@@ -12,7 +12,7 @@ use bytemuck::Pod;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, DF1_LINK_SEED, FEED_SEED,
+        ANCHOR_DISCRIMINATOR, DESCRIPTION_LEN, DF1_LINK_SEED, FEED_ACCOUNT_VERSION, FEED_SEED,
         MAX_WORKFLOW_METADATAS, ZERO_ADDRESS, ZERO_NAME,
     },
     data_id,
@@ -148,7 +148,7 @@ pub fn decode_feed_into(
         .copy_from_slice(&data[ANCHOR_DISCRIMINATOR..ANCHOR_DISCRIMINATOR + size_of::<Feed>()]);
     require_eq!(
         feed.version,
-        ACCOUNT_VERSION,
+        FEED_ACCOUNT_VERSION,
         StoreError::InvalidAccountVersion
     );
     require!(
@@ -190,7 +190,7 @@ fn ring_offset(index: u64) -> usize {
 }
 
 /// The ring of a feed account, for reading and writing. It wraps the whole account data, header
-/// included, and finds index i at byte `FEED_RING_OFFSET + 32 * i`.
+/// included, and finds index i at byte `FEED_RING_OFFSET + 48 * i`.
 pub struct RingMut<'a> {
     data: &'a mut [u8],
 }

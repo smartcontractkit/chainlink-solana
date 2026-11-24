@@ -27,18 +27,18 @@ const MAX_TX_ACCOUNTS = 64;
 
 type Report = { dataId: Buffer; timestamp: number; answer: BN };
 
-// Borsh Vec<ReceivedReport { data_id: [u8; 16], timestamp: u32, answer: i128 }>
+// Borsh Vec<ReceivedReport { data_id: [u8; 16], timestamp: u64, answer: i128 }>
 const encodeReports = (reports: Report[]) => {
-  const out = Buffer.alloc(4 + reports.length * 36);
+  const out = Buffer.alloc(4 + reports.length * 40);
   out.writeUInt32LE(reports.length, 0);
   reports.forEach((r, i) => {
-    const o = 4 + i * 36;
+    const o = 4 + i * 40;
     r.dataId.copy(out, o);
-    out.writeUInt32LE(r.timestamp, o + 16);
+    out.writeBigUInt64LE(BigInt(r.timestamp), o + 16);
     r.answer
       .toTwos(128)
       .toArrayLike(Buffer, "le", 16)
-      .copy(out, o + 20);
+      .copy(out, o + 24);
   });
   return out;
 };
@@ -512,7 +512,7 @@ describe("data feeds store", function () {
 
       const round = await readLatest(set);
       assert.equal(round.roundId.toNumber(), 1);
-      assert.equal(round.observationsTimestamp, ts);
+      assert.equal(round.observationsTimestamp.toNumber(), ts);
       assert.isTrue(round.answer.eq(new BN(1234).mul(E18).divn(100)));
     });
 
@@ -887,7 +887,10 @@ describe("data feeds store", function () {
             feedPda(Buffer.from(hex, "hex"))
           );
           assert.equal(feed.roundId.toNumber(), want.roundId, `batch ${batch}`);
-          assert.equal(feed.latestObservationsTimestamp, want.timestamp);
+          assert.equal(
+            feed.latestObservationsTimestamp.toNumber(),
+            want.timestamp
+          );
           assert.isTrue(feed.latestAnswer.eq(new BN(want.answer)));
         }
       }
@@ -1051,6 +1054,69 @@ describe("data feeds store", function () {
       assert.isTrue((await latestAnswer(id)).eq(new BN(6).mul(E18)));
     });
 
+    it("skips only DF1 when a non-zero answer would become zero", async () => {
+      const id = newDataId();
+      const legacy = await createDf1Feed(8);
+      await link(id, legacy);
+      await setWriter(legacy, df1Writer());
+      const df1Feeds = new Map([[id.toString("hex"), legacy]]);
+      const readOnly = (r: Report) => [
+        meta(feedPda(r.dataId)),
+        meta(legacy, false),
+      ];
+
+      for (const answer of [new BN(1), new BN(-1)]) {
+        const signature = await report(
+          [{ dataId: id, timestamp: nextTimestamp(), answer }],
+          { df1Feeds, accounts: readOnly }
+        );
+        assert.deepEqual(await skipReason(signature), { roundsToZero: {} });
+        assert.equal((await df1Round(legacy)).roundId, 0, "DF1 unchanged");
+      }
+      assert.equal((await readLatest(id)).roundId.toNumber(), 2);
+      assert.isTrue((await latestAnswer(id)).eq(new BN(-1)));
+
+      // A genuine zero is representable and is still written.
+      await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(0) }],
+        { df1Feeds }
+      );
+      let round = await df1Round(legacy);
+      assert.equal(round.roundId, 1);
+      assert.isTrue(round.answer.eq(new BN(0)));
+
+      // The smallest positive answer at 8 decimals writes as 1.
+      const smallest = E18.div(new BN(100_000_000));
+      await report(
+        [{ dataId: id, timestamp: nextTimestamp(), answer: smallest }],
+        { df1Feeds }
+      );
+      round = await df1Round(legacy);
+      assert.equal(round.roundId, 2);
+      assert.isTrue(round.answer.eq(new BN(1)));
+      assert.isTrue((await latestAnswer(id)).eq(smallest));
+    });
+
+    it("can disable an existing DF1 link after the DF1 feed closes", async () => {
+      const id = newDataId();
+      const legacy = await createDf1Feed(8);
+      await link(id, legacy);
+      await df1.methods
+        .closeFeed()
+        .accounts({
+          feed: legacy,
+          owner: provider.publicKey,
+          receiver: provider.publicKey,
+          authority: provider.publicKey,
+        })
+        .rpc();
+
+      await link(id, legacy, true);
+      const feed = await program.account.feed.fetch(feedPda(id));
+      assert.equal(feed.df1WriteDisabled, 1);
+      await expectError(link(id, legacy, false), "InvalidDf1Feed");
+    });
+
     it("requires the linked DF1 feed in reports", async () => {
       const id = newDataId();
       const legacy = await createDf1Feed(8);
@@ -1067,13 +1133,10 @@ describe("data feeds store", function () {
       await link(id, legacy);
       await setWriter(legacy, df1Writer());
       await expectError(
-        report(
-          [{ dataId: id, timestamp: nextTimestamp(), answer: new BN(1) }],
-          {
-            df1Feeds: new Map([[id.toString("hex"), legacy]]),
-            accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
-          }
-        ),
+        report([{ dataId: id, timestamp: nextTimestamp(), answer: E18 }], {
+          df1Feeds: new Map([[id.toString("hex"), legacy]]),
+          accounts: (r) => [meta(feedPda(r.dataId)), meta(legacy, false)],
+        }),
         "AccountNotWritable"
       );
 
@@ -1117,6 +1180,15 @@ describe("data feeds store", function () {
     it("only links DF1 feeds submit can write", async () => {
       const id = newDataId();
       await expectError(link(id, state.publicKey), "InvalidDf1Feed");
+
+      // Disabled writes still validate new and changed links.
+      await expectError(
+        link(newDataId(), state.publicKey, true),
+        "InvalidDf1Feed"
+      );
+      const existing = await createDf1Feed(8);
+      await link(id, existing);
+      await expectError(link(id, state.publicKey, true), "InvalidDf1Feed");
     });
   });
 });

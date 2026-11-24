@@ -5,8 +5,8 @@ use anchor_spl::token_interface;
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE,
-        MIN_MAX_STORED_REPORTS, STATE_SEED, STORE_AUTHORITY_SEED,
+        ANCHOR_DISCRIMINATOR, DF1_WRITER_SEED, MAX_ACCOUNT_DATA_INCREASE, MIN_MAX_STORED_REPORTS,
+        STATE_SEED, STORE_AUTHORITY_SEED, STORE_STATE_VERSION,
     },
     context::*,
     error::StoreError,
@@ -39,7 +39,7 @@ pub fn initialize(ctx: Context<Initialize>, store_id: u64, config: StoreConfig) 
 
     let state_key = ctx.accounts.state.key();
     let mut state: Box<StoreState> = bytemuck::zeroed_box();
-    state.version = ACCOUNT_VERSION;
+    state.version = STORE_STATE_VERSION;
     state.owner = ctx.accounts.owner.key();
     state.default_max_stored_reports = default_max_stored_reports;
     state.max_observation_forward_secs = max_observation_forward_secs;

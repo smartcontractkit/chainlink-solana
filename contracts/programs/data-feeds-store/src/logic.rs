@@ -13,7 +13,7 @@ pub struct Now {
     /// The current slot (the chain's clock tick).
     pub slot: u64,
     /// The current Unix time, in seconds.
-    pub timestamp: u32,
+    pub timestamp: u64,
 }
 
 /// A feed's ring of stored rounds. Round r is kept at index `r % max_stored_reports`.
@@ -43,9 +43,9 @@ pub struct StoredRound {
     /// The answer, with 18 decimals.
     pub answer: i128,
     /// The time, in Unix seconds, at which the round was observed offchain.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The time, in Unix seconds, at which the round was written onchain.
-    pub recorded_timestamp: u32,
+    pub recorded_timestamp: u64,
 }
 
 /// Returns the ring index of a round.
@@ -67,7 +67,7 @@ pub fn round_in_window(round_id: u64, latest_round_id: u64, max_stored_reports: 
 pub fn store_round(
     feed: &mut Feed,
     ring: &mut impl Ring,
-    observations_timestamp: u32,
+    observations_timestamp: u64,
     answer: i128,
     now: Now,
 ) -> u64 {
@@ -81,6 +81,7 @@ pub fn store_round(
             observations_timestamp,
             recorded_timestamp: now.timestamp,
             recorded_slot: now.slot,
+            _padding0: [0; 8],
         },
     );
 
@@ -212,7 +213,7 @@ mod tests {
         )
     }
 
-    fn at(slot: u64, timestamp: u32) -> Now {
+    fn at(slot: u64, timestamp: u64) -> Now {
         Now { slot, timestamp }
     }
 
@@ -220,10 +221,10 @@ mod tests {
     fn rounds_and_ring_wrap() {
         let (mut f, mut ring) = feed(3);
         assert_eq!(latest_round(&f), None, "no round yet");
-        for i in 1..=5u32 {
+        for i in 1..=5u64 {
             assert_eq!(
-                store_round(&mut f, &mut ring, i, i as i128, at(i as u64, 100 + i)),
-                i as u64
+                store_round(&mut f, &mut ring, i, i as i128, at(i, 100 + i)),
+                i
             );
         }
         assert_eq!(f.round_id, 5);
@@ -303,8 +304,8 @@ mod tests {
         fn stored(max: u64, answers: &[i128]) -> (Feed, Vec<StoredReport>) {
             let (mut f, mut ring) = feed(max);
             for (i, answer) in answers.iter().enumerate() {
-                let t = i as u32 + 1;
-                store_round(&mut f, &mut ring, t, *answer, at(t as u64, t));
+                let t = i as u64 + 1;
+                store_round(&mut f, &mut ring, t, *answer, at(t, t));
             }
             (f, ring)
         }
@@ -355,8 +356,8 @@ mod tests {
                 f.max_stored_reports = new_max;
                 let mut all = answers.clone();
                 for answer in later {
-                    let t = all.len() as u32 + 1;
-                    store_round(&mut f, &mut ring, t, answer, at(t as u64, t));
+                    let t = all.len() as u64 + 1;
+                    store_round(&mut f, &mut ring, t, answer, at(t, t));
                     all.push(answer);
                 }
                 for round_id in 0..=all.len() as u64 + 1 {

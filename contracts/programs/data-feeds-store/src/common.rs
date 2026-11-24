@@ -1,9 +1,15 @@
 /// The number of bytes Anchor puts at the start of every account to tag its type.
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
-/// The layout version written to every account the program creates. It is increased whenever an
-/// account's layout changes, so code can tell old layouts from new ones.
-pub const ACCOUNT_VERSION: u8 = 1;
+/// The layout version of a store state account. It is increased when that account's layout changes,
+/// independently of the other account types.
+pub const STORE_STATE_VERSION: u8 = 1;
+/// The layout version of a feed account. It is increased when that account's layout changes,
+/// independently of the other account types.
+pub const FEED_ACCOUNT_VERSION: u8 = 2;
+/// The layout version of a DF1 link marker account. It is increased when that account's layout
+/// changes, independently of the other account types.
+pub const DF1_LINK_VERSION: u8 = 1;
 
 /// The number of decimals every answer is stored with. It is also the most decimals a read can
 /// ask for.
@@ -24,7 +30,7 @@ pub const MIN_MAX_STORED_REPORTS: u64 = 2;
 
 /// The most a program can grow an account in one instruction, 10 KiB. Solana counts the growth
 /// from the account's length when the instruction started, and an account the program creates
-/// counts as grown from zero, so a feed created by the program holds at most 278 rounds.
+/// counts as grown from zero, so a feed created by the program holds at most 185 rounds.
 pub const MAX_ACCOUNT_DATA_INCREASE: usize = 10_240;
 
 /// The all-zero workflow owner. Workflow lists refuse it, because it means the owner is unset.

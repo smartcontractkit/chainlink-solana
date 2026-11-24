@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    common::ACCOUNT_VERSION,
+    common::STORE_STATE_VERSION,
     context::OnReport,
     data_id, df1,
     error::StoreError,
@@ -47,7 +47,7 @@ pub fn handler<'info>(
     let state: Box<StoreState> = load_boxed(&ctx.accounts.state.to_account_info())?;
     require_eq!(
         state.version,
-        ACCOUNT_VERSION,
+        STORE_STATE_VERSION,
         StoreError::InvalidAccountVersion
     );
     let clock = Clock::get()?;
@@ -59,8 +59,9 @@ pub fn handler<'info>(
         workflow_owner,
         now: Now {
             slot: clock.slot,
-            // Seconds are kept as u32, like EVM's uint32 timestamps, which lasts until 2106.
-            timestamp: clock.unix_timestamp as u32,
+            // The chain's clock is signed; reject a negative value rather than wrapping it.
+            timestamp: u64::try_from(clock.unix_timestamp)
+                .map_err(|_| StoreError::InvalidTimestamp)?,
         },
         events: EventEmitter::new(
             ctx.accounts.event_authority.to_account_info(),
@@ -184,8 +185,11 @@ impl<'info> Batch<'_, 'info> {
 
         // A report stamped further ahead than the forward window would become the latest round
         // and leave every later report stale until the clock caught up.
-        if u64::from(report.timestamp)
-            > u64::from(self.now.timestamp) + u64::from(self.state.max_observation_forward_secs)
+        if report.timestamp
+            > self
+                .now
+                .timestamp
+                .saturating_add(u64::from(self.state.max_observation_forward_secs))
         {
             return self.events.emit(&FutureReportIgnored {
                 state: state_key,

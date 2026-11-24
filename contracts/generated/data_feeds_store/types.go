@@ -347,6 +347,8 @@ const (
 	Df1SkipReason_Stale
 	Df1SkipReason_AnswerOverflow
 	Df1SkipReason_RoundIdOverflow
+	Df1SkipReason_RoundsToZero
+	Df1SkipReason_TimestampOverflow
 )
 
 func (value Df1SkipReason) String() string {
@@ -367,6 +369,10 @@ func (value Df1SkipReason) String() string {
 		return "AnswerOverflow"
 	case Df1SkipReason_RoundIdOverflow:
 		return "RoundIdOverflow"
+	case Df1SkipReason_RoundsToZero:
+		return "RoundsToZero"
+	case Df1SkipReason_TimestampOverflow:
+		return "TimestampOverflow"
 	default:
 		return ""
 	}
@@ -467,11 +473,11 @@ func UnmarshalDf1WriteSkipped(buf []byte) (*Df1WriteSkipped, error) {
 // Readers pass this account, and its layout is public, so fields only move with a version bump.
 //
 // ```text
-// byte 0     8                           1336    1368                    1336 + 32 * N
+// byte 0     8                           1352    1400                    1352 + 48 * N
 // +-----+---------------------------+-------+-------+-----+---------+
-// | tag | Feed header (1328 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
+// | tag | Feed header (1344 bytes)  | idx 0 | idx 1 | ... | idx N-1 |
 // +-----+---------------------------+-------+-------+-----+---------+
-// one 32-byte StoredReport per index
+// one 48-byte StoredReport per index
 //
 // N is max_stored_reports, and round r is stored at index r % N. Round IDs start at 1, so
 // index 0 is first written by round N. With N = 4, after 5 rounds:
@@ -480,11 +486,11 @@ func UnmarshalDf1WriteSkipped(buf []byte) (*Df1WriteSkipped, error) {
 // round 4   round 5   round 2   round 3      (round 5 overwrote round 1)
 //
 // Only the last N rounds can be read, here rounds 2 to 5. The header repeats the latest round.
-// Some header fields by account byte (header offset + 8): state 56, round_id 88,
-// max_stored_reports 104, latest_answer 120, description 136.
+// Some header fields by account byte (header offset + 8): state 72, round_id 104,
+// max_stored_reports 120, latest_answer 136, description 152.
 // ```
 type Feed struct {
-	// The layout version of this account, set to `ACCOUNT_VERSION`.
+	// The layout version of this account, set to `FEED_ACCOUNT_VERSION`.
 	Version uint8 `json:"version"`
 
 	// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
@@ -499,12 +505,16 @@ type Feed struct {
 	// workflow sent it, and reads keep working.
 	WritesDisabled uint8 `json:"writes_disabled"`
 
+	// Always zero. These bytes align the timestamps. A zero-copy account is read straight from
+	// its bytes and cannot have hidden padding.
+	Padding0 [4]uint8 `json:"_padding0"`
+
 	// The time, in Unix seconds, at which the latest round was observed offchain, taken from its
 	// report. A new report must be newer than this to be stored.
-	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
+	LatestObservationsTimestamp uint64 `json:"latest_observations_timestamp"`
 
 	// The time, in Unix seconds, at which the latest round was written onchain.
-	LatestRecordedTimestamp uint32 `json:"latest_recorded_timestamp"`
+	LatestRecordedTimestamp uint64 `json:"latest_recorded_timestamp"`
 
 	// Non-zero when `min_answer` and `max_answer` apply. Otherwise any answer is accepted.
 	MinMaxConfigured uint8 `json:"min_max_configured"`
@@ -513,9 +523,8 @@ type Feed struct {
 	// not written to the linked DF1 feed.
 	Df1WriteDisabled uint8 `json:"df1_write_disabled"`
 
-	// Always zero. These bytes fill the gap before `data_id`, because a zero-copy account is read
-	// straight from its bytes and so cannot have hidden padding.
-	Padding0 [2]uint8 `json:"_padding0"`
+	// Always zero. These bytes fill the gap before `data_id`.
+	Padding1 [6]uint8 `json:"_padding1"`
 
 	// The data ID, zero padded to 32 bytes (see [`crate::data_id::DataIdSeed`]).
 	DataId [32]uint8 `json:"data_id"`
@@ -586,6 +595,11 @@ func (obj Feed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("WritesDisabled", err)
 	}
+	// Serialize `Padding0`:
+	err = encoder.Encode(obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
 	// Serialize `LatestObservationsTimestamp`:
 	err = encoder.Encode(obj.LatestObservationsTimestamp)
 	if err != nil {
@@ -606,10 +620,10 @@ func (obj Feed) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
 	if err != nil {
 		return errors.NewField("Df1WriteDisabled", err)
 	}
-	// Serialize `Padding0`:
-	err = encoder.Encode(obj.Padding0)
+	// Serialize `Padding1`:
+	err = encoder.Encode(obj.Padding1)
 	if err != nil {
-		return errors.NewField("Padding0", err)
+		return errors.NewField("Padding1", err)
 	}
 	// Serialize `DataId`:
 	err = encoder.Encode(obj.DataId)
@@ -710,6 +724,11 @@ func (obj *Feed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	if err != nil {
 		return errors.NewField("WritesDisabled", err)
 	}
+	// Deserialize `Padding0`:
+	err = decoder.Decode(&obj.Padding0)
+	if err != nil {
+		return errors.NewField("Padding0", err)
+	}
 	// Deserialize `LatestObservationsTimestamp`:
 	err = decoder.Decode(&obj.LatestObservationsTimestamp)
 	if err != nil {
@@ -730,10 +749,10 @@ func (obj *Feed) UnmarshalWithDecoder(decoder *binary.Decoder) (err error) {
 	if err != nil {
 		return errors.NewField("Df1WriteDisabled", err)
 	}
-	// Deserialize `Padding0`:
-	err = decoder.Decode(&obj.Padding0)
+	// Deserialize `Padding1`:
+	err = decoder.Decode(&obj.Padding1)
 	if err != nil {
-		return errors.NewField("Padding0", err)
+		return errors.NewField("Padding1", err)
 	}
 	// Deserialize `DataId`:
 	err = decoder.Decode(&obj.DataId)
@@ -1144,7 +1163,7 @@ type FeedUpdated struct {
 	RoundId uint64 `json:"round_id"`
 
 	// The round's observation timestamp, in Unix seconds.
-	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+	ObservationsTimestamp uint64 `json:"observations_timestamp"`
 
 	// The round's answer, with 18 decimals.
 	Answer binary.Int128 `json:"answer"`
@@ -1479,10 +1498,10 @@ type FutureReportIgnored struct {
 	DataId [16]uint8 `json:"data_id"`
 
 	// The report's observation timestamp, in Unix seconds.
-	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+	ObservationsTimestamp uint64 `json:"observations_timestamp"`
 
 	// The chain's clock when the report arrived, in Unix seconds.
-	RecordedTimestamp uint32 `json:"recorded_timestamp"`
+	RecordedTimestamp uint64 `json:"recorded_timestamp"`
 }
 
 func (obj FutureReportIgnored) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2216,10 +2235,10 @@ type Round struct {
 	Answer binary.Int128 `json:"answer"`
 
 	// The time, in Unix seconds, at which the round was observed offchain.
-	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+	ObservationsTimestamp uint64 `json:"observations_timestamp"`
 
 	// The time, in Unix seconds, at which the round was written onchain.
-	RecordedTimestamp uint32 `json:"recorded_timestamp"`
+	RecordedTimestamp uint64 `json:"recorded_timestamp"`
 }
 
 func (obj Round) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2450,10 +2469,10 @@ type StaleReport struct {
 	DataId [16]uint8 `json:"data_id"`
 
 	// The report's observation timestamp, in Unix seconds.
-	ObservationsTimestamp uint32 `json:"observations_timestamp"`
+	ObservationsTimestamp uint64 `json:"observations_timestamp"`
 
 	// The observation timestamp of the feed's latest round, which the report had to exceed.
-	LatestObservationsTimestamp uint32 `json:"latest_observations_timestamp"`
+	LatestObservationsTimestamp uint64 `json:"latest_observations_timestamp"`
 }
 
 func (obj StaleReport) MarshalWithEncoder(encoder *binary.Encoder) (err error) {
@@ -2539,7 +2558,7 @@ type StoreConfig struct {
 	// default key.
 	FeedAdmins []solanago.PublicKey `json:"feed_admins"`
 
-	// The ring size of the feeds the store creates. It must be from 2 to 278, because a feed
+	// The ring size of the feeds the store creates. It must be from 2 to 185, because a feed
 	// account created by the program can be at most 10 KiB.
 	DefaultMaxStoredReports uint64 `json:"default_max_stored_reports"`
 
@@ -2749,7 +2768,7 @@ func UnmarshalStoreInitialized(buf []byte) (*StoreInitialized, error) {
 // may write to, and the settings that apply to every feed of the store. One program can hold many
 // stores, each with its own state account and its own feeds.
 type StoreState struct {
-	// The layout version of this account, set to `ACCOUNT_VERSION`.
+	// The layout version of this account, set to `STORE_STATE_VERSION`.
 	Version uint8 `json:"version"`
 
 	// The bump of the store authority PDA. A PDA's address is found by trying bump values from

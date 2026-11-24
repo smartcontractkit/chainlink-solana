@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::common::{ACCOUNT_VERSION, DF1_WRITER_SEED, STATE_SEED, STORE_AUTHORITY_SEED};
+use crate::common::{DF1_WRITER_SEED, STATE_SEED, STORE_AUTHORITY_SEED, STORE_STATE_VERSION};
 use crate::error::StoreError;
 use crate::state::{Feed, StoreState};
 
@@ -47,7 +47,7 @@ pub struct OwnerOnly<'info> {
     #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
-    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(mut, constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 }
 
@@ -58,7 +58,7 @@ pub struct AcceptOwnership<'info> {
     #[account(address = state.load()?.proposed_owner @ StoreError::Unauthorized)]
     pub new_owner: Signer<'info>,
 
-    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(mut, constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 }
 
@@ -69,7 +69,7 @@ pub struct AcceptOwnership<'info> {
 pub struct FeedAdminState<'info> {
     pub feed_admin: Signer<'info>,
 
-    #[account(mut, constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(mut, constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 }
 
@@ -82,7 +82,7 @@ pub struct FeedAdminAccounts<'info> {
     #[account(mut)]
     pub feed_admin: Signer<'info>,
 
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
     pub system_program: Program<'info, System>,
@@ -135,7 +135,7 @@ pub struct OnReport<'info> {
 /// The accounts of the read instructions: the store state and the feed of the data ID being read.
 #[derive(Accounts)]
 pub struct FeedRead<'info> {
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
     /// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
@@ -145,7 +145,7 @@ pub struct FeedRead<'info> {
 /// The accounts of `check_feed_permission`.
 #[derive(Accounts)]
 pub struct PermissionRead<'info> {
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
     /// CHECK: The data ID's feed PDA, which may not exist yet. The handler checks its address when
@@ -161,7 +161,7 @@ pub struct RecoverTokens<'info> {
     #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
     /// CHECK: The store authority PDA, which owns the token account being recovered from.
@@ -190,7 +190,7 @@ pub struct RecoverNative<'info> {
     #[account(address = state.load()?.owner @ StoreError::Unauthorized)]
     pub owner: Signer<'info>,
 
-    #[account(constraint = state.load()?.version == ACCOUNT_VERSION @ StoreError::InvalidAccountVersion)]
+    #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
     /// CHECK: The store authority PDA, which holds the SOL being recovered.

@@ -234,9 +234,9 @@ pub struct FutureReportIgnored {
     /// The data ID from the report.
     pub data_id: [u8; 16],
     /// The report's observation timestamp, in Unix seconds.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The chain's clock when the report arrived, in Unix seconds.
-    pub recorded_timestamp: u32,
+    pub recorded_timestamp: u64,
 }
 
 /// A report was skipped because it is no newer than the feed's latest round.
@@ -247,9 +247,9 @@ pub struct StaleReport {
     /// The data ID from the report.
     pub data_id: [u8; 16],
     /// The report's observation timestamp, in Unix seconds.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The observation timestamp of the feed's latest round, which the report had to exceed.
-    pub latest_observations_timestamp: u32,
+    pub latest_observations_timestamp: u64,
 }
 
 /// A report was skipped because its answer is outside the feed's accepted range.
@@ -277,7 +277,7 @@ pub struct FeedUpdated {
     /// The ID the new round was stored as.
     pub round_id: u64,
     /// The round's observation timestamp, in Unix seconds.
-    pub observations_timestamp: u32,
+    pub observations_timestamp: u64,
     /// The round's answer, with 18 decimals.
     pub answer: i128,
 }

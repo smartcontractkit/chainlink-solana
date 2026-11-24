@@ -176,14 +176,14 @@ func TestDataFeedsStore(t *testing.T) {
 		return target{id: id, legacy: legacy.PublicKey()}
 	}
 
-	// report: Borsh Vec<ReceivedReport { data_id, timestamp: u32, answer: i128 }>
+	// report: Borsh Vec<ReceivedReport { data_id, timestamp: u64, answer: i128 }>
 	answer := new(big.Int).Mul(big.NewInt(325012), new(big.Int).Exp(big.NewInt(10), big.NewInt(16), nil)) // 3250.12 at 18 decimals
-	observedAt := uint32(time.Now().Unix() - 300)
+	observedAt := uint64(time.Now().Unix() - 300)
 	// payloadAndAccounts builds the report payload and the store's accounts after the forwarder's:
 	// the store state, the DF1 program and writer when a report writes DF1 (the store program stands
 	// for them otherwise), the event authority and program, then per report its feed and its linked
 	// DF1 feed.
-	payloadAndAccounts := func(targets []target, observed uint32) ([]byte, []*solana.AccountMeta) {
+	payloadAndAccounts := func(targets []target, observed uint64) ([]byte, []*solana.AccountMeta) {
 		none := solana.Meta(data_feeds_store.ProgramID)
 		withDF1 := false
 		for _, tg := range targets {
@@ -196,13 +196,13 @@ func TestDataFeedsStore(t *testing.T) {
 		if withDF1 {
 			remaining[1], remaining[2] = solana.Meta(store.ProgramID), solana.Meta(df1Writer)
 		}
-		payload := make([]byte, 4+36*len(targets))
+		payload := make([]byte, 4+40*len(targets))
 		binary.LittleEndian.PutUint32(payload, uint32(len(targets)))
 		for i, tg := range targets {
-			o := 4 + 36*i
+			o := 4 + 40*i
 			copy(payload[o:], tg.id[:])
-			binary.LittleEndian.PutUint32(payload[o+16:], observed)
-			copy(payload[o+20:], littleEndianI128(answer))
+			binary.LittleEndian.PutUint64(payload[o+16:], observed)
+			copy(payload[o+24:], littleEndianI128(answer))
 			remaining = append(remaining, solana.Meta(feedPDA(tg.id)).WRITE())
 			if !tg.legacy.IsZero() {
 				remaining = append(remaining, solana.Meta(tg.legacy).WRITE())
@@ -211,7 +211,7 @@ func TestDataFeedsStore(t *testing.T) {
 		return payload, remaining
 	}
 	// reportIx builds the forwarder report instruction a CRE write sends.
-	reportIx := func(forwarderState, forwarderAuthority solana.PublicKey, f uint8, id uint16, targets []target, observed uint32) solana.Instruction {
+	reportIx := func(forwarderState, forwarderAuthority solana.PublicKey, f uint8, id uint16, targets []target, observed uint64) solana.Instruction {
 		payload, remaining := payloadAndAccounts(targets, observed)
 		keys := make([]solana.PublicKey, len(remaining))
 		for i, m := range remaining {
@@ -229,7 +229,7 @@ func TestDataFeedsStore(t *testing.T) {
 	metadata := make([]byte, 64)
 	copy(metadata[32:42], testWorkflowName[:])
 	copy(metadata[42:62], testWorkflowOwner[:])
-	directIx := func(targets []target, observed uint32) solana.Instruction {
+	directIx := func(targets []target, observed uint64) solana.Instruction {
 		payload, remaining := payloadAndAccounts(targets, observed)
 		ix := build(data_feeds_store.NewOnReportInstruction(metadata, payload, solana.SystemProgramID, deployer.PublicKey(),
 			storeState, data_feeds_store.ProgramID, data_feeds_store.ProgramID, storeEvents, data_feeds_store.ProgramID))
@@ -291,7 +291,7 @@ func TestDataFeedsStore(t *testing.T) {
 		return res
 	}
 
-	requireStored := func(tg target, roundID uint64, observed uint32) {
+	requireStored := func(tg target, roundID uint64, observed uint64) {
 		// stored in the feed at 18 decimals
 		info, err := client.GetAccountInfoWithOpts(t.Context(), feedPDA(tg.id), &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentConfirmed})
 		require.NoError(t, err)
@@ -311,7 +311,7 @@ func TestDataFeedsStore(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint32(roundID), transmissions.LatestRoundId)
 		live := legacyData[8+192 : 8+192+48] // slot u64, timestamp u32, padding u32, answer i128
-		require.Equal(t, observed, binary.LittleEndian.Uint32(live[8:12]))
+		require.Equal(t, uint32(observed), binary.LittleEndian.Uint32(live[8:12]))
 		require.Equal(t, big.NewInt(325012000000).String(), fromLittleEndianI128(live[16:32]).String())
 	}
 
@@ -390,10 +390,10 @@ func TestDataFeedsStore(t *testing.T) {
 	// a transaction the local validator accepts (1,232 bytes, even with a lookup table) carries the
 	// report data of about 20 reports; larger batches are only measured below, for V1
 	for i, n := range []int{1, 12, 20} {
-		sendReport(directIx(storeTargets[:n], observedAt+uint32(10+i)), fmt.Sprintf("direct on_report, %d store-only reports", n))
+		sendReport(directIx(storeTargets[:n], observedAt+uint64(10+i)), fmt.Sprintf("direct on_report, %d store-only reports", n))
 	}
 	for i, n := range []int{1, 12, 20} {
-		sendReport(directIx(df1Targets[:n], observedAt+uint32(20+i)), fmt.Sprintf("direct on_report, %d reports with DF1 write-through", n))
+		sendReport(directIx(df1Targets[:n], observedAt+uint64(20+i)), fmt.Sprintf("direct on_report, %d reports with DF1 write-through", n))
 	}
 	requireStored(storeTargets[0], 3, observedAt+12)
 	requireStored(df1Targets[0], 3, observedAt+22)

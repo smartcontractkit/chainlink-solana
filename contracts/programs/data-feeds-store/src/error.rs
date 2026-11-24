@@ -50,7 +50,7 @@ pub enum StoreError {
     FeedNotConfigured,
     /// A ring size is below 2, or would grow a feed account by more than 10 KiB in one
     /// instruction. For `initialize`, the default ring size would make a new feed account larger
-    /// than 10 KiB, which is more than 278 rounds.
+    /// than 10 KiB, which is more than 185 rounds.
     #[msg("The ring size must be at least 2 and grow a feed by at most 10 KiB per instruction")]
     InvalidMaxStoredReports,
     /// The new ring size is not larger than the feed's current one. A ring can only grow.
@@ -92,7 +92,7 @@ pub enum StoreError {
     /// amount would leave the store authority with some SOL but less than the rent-exempt minimum.
     #[msg("The amount exceeds the balance or would leave less than the rent-exempt minimum")]
     InsufficientBalance,
-    /// An account's layout version is not `ACCOUNT_VERSION`, the only one this program reads.
+    /// An account's layout version is not the current version for its account type.
     #[msg("The account has a layout version this program doesn't support")]
     InvalidAccountVersion,
     /// The signer is not allowed to call this instruction. It is not the owner, the proposed
@@ -122,4 +122,7 @@ pub enum StoreError {
     /// `initialize` was called for a store ID whose state account already exists.
     #[msg("A store already exists for this store ID")]
     StoreAlreadyInitialized,
+    /// The chain's clock timestamp is negative and cannot be represented as Unix seconds in u64.
+    #[msg("The chain's clock timestamp is invalid")]
+    InvalidTimestamp,
 }

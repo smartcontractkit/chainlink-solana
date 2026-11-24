@@ -9,8 +9,8 @@ use anchor_lang::{prelude::*, Discriminator};
 
 use crate::{
     common::{
-        ACCOUNT_VERSION, ANCHOR_DISCRIMINATOR, DF1_LINK_SEED, FEED_SEED, MAX_ACCOUNT_DATA_INCREASE,
-        STORED_DECIMALS,
+        ANCHOR_DISCRIMINATOR, DF1_LINK_SEED, DF1_LINK_VERSION, FEED_ACCOUNT_VERSION, FEED_SEED,
+        MAX_ACCOUNT_DATA_INCREASE, STORED_DECIMALS,
     },
     context::FeedAdminAccounts,
     data_id, df1,
@@ -79,7 +79,7 @@ fn update_feeds_with_events<'info>(
                 &system_program,
             )?;
             bytemuck::bytes_of_mut(&mut *feed).fill(0);
-            feed.version = ACCOUNT_VERSION;
+            feed.version = FEED_ACCOUNT_VERSION;
             feed.min_decimals = STORED_DECIMALS;
             feed.data_id = seed;
             feed.state = state_key;
@@ -405,11 +405,15 @@ pub fn set_df1_feeds<'info>(
             let info = next_account(&mut links)?;
             require_keys_eq!(*info.key, new, StoreError::AccountMismatch);
             // Only the layout is checked: the DF1 feed can be linked before its owner makes this
-            // store its writer.
-            require!(
-                df1::check_feed(info.owner, &info.try_borrow_data()?, &df1_program).is_ok(),
-                StoreError::InvalidDf1Feed
-            );
+            // store its writer. A new or changed link, and enabling an existing one, must be valid.
+            // Disabling an existing link stays available if DF1's layout becomes unsupported.
+            // Reports check the feed again before every `submit`.
+            if old != new || !write_disabled[i] {
+                require!(
+                    df1::check_feed(info.owner, &info.try_borrow_data()?, &df1_program).is_ok(),
+                    StoreError::InvalidDf1Feed
+                );
+            }
             link_df1_feed(
                 next_account(&mut links)?,
                 &state,
@@ -466,7 +470,7 @@ fn link_df1_feed<'info>(
 /// Writes a link marker's tag, version and data ID.
 fn write_link(marker: &AccountInfo, data_id: [u8; 32]) -> Result<()> {
     let link = Df1Link {
-        version: ACCOUNT_VERSION,
+        version: DF1_LINK_VERSION,
         _padding0: [0; 7],
         data_id,
     };
@@ -510,7 +514,7 @@ fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
     let link: &Df1Link = bytemuck::from_bytes(&data[ANCHOR_DISCRIMINATOR..]);
     require_eq!(
         link.version,
-        ACCOUNT_VERSION,
+        DF1_LINK_VERSION,
         StoreError::InvalidAccountVersion
     );
     Ok(link.data_id)
@@ -518,8 +522,8 @@ fn linked_data_id(marker: &AccountInfo) -> Result<[u8; 32]> {
 
 /// Grows the number of rounds feeds keep. A ring can only grow, and only before it first wraps.
 /// Each feed can grow by at most 10 KiB per instruction, counted from its length when the
-/// instruction started: 320 rounds for an existing feed, while a feed created in the same call
-/// holds at most 278. When this is called through another program, as an MCMS batch does, the
+/// instruction started: 213 rounds for an existing feed, while a feed created in the same call
+/// holds at most 185. When this is called through another program, as an MCMS batch does, the
 /// runtime counts from the start of the outer instruction, so grow each feed once per outer
 /// instruction. The feed admin tops up the rent.
 pub fn set_max_stored_reports<'info>(
