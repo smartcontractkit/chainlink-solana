@@ -75,7 +75,7 @@ pub const DF1_LINK_VERSION: u8 = 1;
 
 See `contracts/programs/data-feeds-store/src/common.rs:4-13`.
 
-Store-state, feed and DF1-link checks use their respective constants. Store states and markers remain at version `1`; feeds use version `2` because their layout changed. A future incompatible layout change can bump only the affected account type rather than invalidating unchanged markers through an unrelated constant.
+Store-state, feed and DF1-link checks use their respective constants, all currently version `1`. A future incompatible layout change can bump only the affected account type rather than invalidating unchanged markers through an unrelated constant.
 
 The current layout is the initial public version 1. Development-era staging accounts are abandoned and recreated rather than migrated. The Go e2e upgrade step checks the upgradeable loader with the current binary, not old-layout migration. Deployment reads reject feed versions other than 1 before consuming decoded fields.
 

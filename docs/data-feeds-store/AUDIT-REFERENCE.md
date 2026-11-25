@@ -335,7 +335,7 @@ Accounts key the ID zero padded to 32 bytes (`to_seed`: the 16 bytes followed by
 - 6020 `FeedAdminsFull`: more than 64 feed admins.
 - 6021 `InvalidProposedOwner`: proposing the current owner.
 - 6022 `InsufficientBalance`: recovery amount above the balance, or leaving the store authority neither empty nor rent-exempt.
-- 6023 `InvalidAccountVersion`: a state, feed or link marker whose version differs from its current account-type version (store state 1, link marker 1, feed 2).
+- 6023 `InvalidAccountVersion`: a state, feed or link marker whose version differs from its current account-type version (store state 1, link marker 1, feed 1).
 - 6024 `Unauthorized`: signer not the owner, proposed owner, a feed admin, or the upgrade authority in `initialize`.
 - 6025 `InvalidDf1Feed`: `set_df1_feeds` given an account `check_feed` rejects when the link operation requires that check.
 - 6026 `InvalidDecimals`: read decimals below the minimum or above 18; `set_min_decimals` above 18.
