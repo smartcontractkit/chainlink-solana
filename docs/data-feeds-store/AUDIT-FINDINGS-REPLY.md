@@ -40,7 +40,7 @@ Dispositions below mean:
 
 **Response: fixed by skipping only the DF1 write.**
 
-`df1::check_round` now returns `Df1SkipReason::RoundsToZero` when a nonzero 18-decimal answer would become zero at the linked DF1 feed's decimals. The store still stores its exact round. DF1 is not called, so the DF1 feed may be passed read-only in this case. At supported decimal settings, a genuine zero answer remains valid and is still written. At DF1 decimals 57 and above, the scale factor itself overflows and every answer, including zero, is rejected as `AnswerOverflow`; zero-only support would not make those feeds usable, so no special case was added.
+`df1::check_round` returns `Df1SkipReason::RoundsToZero` when a nonzero 18-decimal answer would become zero at the linked DF1 feed's decimals. The store still stores its exact round. DF1 is not called, so the DF1 feed may be passed read-only in this case. At supported decimal settings, a genuine zero answer remains valid and is still written. At DF1 decimals 57 and above, the scale factor itself overflows and every answer, including zero, is rejected as `AnswerOverflow`; zero-only support would not make those feeds usable, so no special case was added.
 
 Implementation:
 
@@ -59,25 +59,25 @@ Evidence considered:
 Tests cover positive and negative tiny answers, genuine zero, the smallest representable positive answer, preservation of the store round, and passing DF1 read-only when its write is skipped. A property test asserts that no nonzero input produces a successful zero DF1 write:
 
 - `contracts/programs/data-feeds-store/src/df1.rs:384-422,498-513`
-- `contracts/tests/data-feeds-store.spec.ts:1057`
+- `contracts/tests/data-feeds-store.spec.ts`, test "skips only DF1 when a non-zero answer would become zero"
 
 ### `5ac024d5`: shared account version and marker migration
 
 **Response: fixed with independent account-type versions.**
 
-The program now has:
+The program has:
 
 ```rust
 pub const STORE_STATE_VERSION: u8 = 1;
-pub const FEED_ACCOUNT_VERSION: u8 = 2;
+pub const FEED_ACCOUNT_VERSION: u8 = 1;
 pub const DF1_LINK_VERSION: u8 = 1;
 ```
 
 See `contracts/programs/data-feeds-store/src/common.rs:4-13`.
 
-Store-state, feed and DF1-link checks use their respective constants. Store states and markers remain at version `1`; feeds use version `2` because their layout changed. A future incompatible layout change can now bump only the affected account type rather than invalidating unchanged markers through an unrelated constant.
+Store-state, feed and DF1-link checks use their respective constants. Store states and markers remain at version `1`; feeds use version `2` because their layout changed. A future incompatible layout change can bump only the affected account type rather than invalidating unchanged markers through an unrelated constant.
 
-There is no v1-to-v2 feed migration. Pre-release v1 staging feeds are abandoned and recreated as v2 feeds under a new store; they are not compatible with the new layout. The Go e2e upgrade step checks the upgradeable loader with the current binary, not v1 feed migration. Deployment reads also reject feed versions other than 2 before consuming decoded fields.
+The current layout is the initial public version 1. Development-era staging accounts are abandoned and recreated rather than migrated. The Go e2e upgrade step checks the upgradeable loader with the current binary, not old-layout migration. Deployment reads reject feed versions other than 1 before consuming decoded fields.
 
 ### `a8cdfb21`: rechecking an unchanged DF1 link
 
@@ -87,23 +87,34 @@ There is no v1-to-v2 feed migration. Pre-release v1 staging feeds are abandoned 
 
 Implementation: `contracts/programs/data-feeds-store/src/instructions/feeds.rs:399-421`. The deployment planner applies the same predicate, so a closed or unsupported DF1 feed no longer blocks a disable-only change during planning.
 
-The Anchor test closes a linked DF1 feed, verifies that disabling the existing link succeeds, and verifies that re-enabling it fails with `InvalidDf1Feed`: `contracts/tests/data-feeds-store.spec.ts:1100`. The invalid-link test also covers creation and changes with `write_disabled = true`, proving that disabled writes do not bypass validation.
+The Anchor test "can disable an existing DF1 link after the DF1 feed closes" closes a linked DF1 feed, verifies that disabling the existing link succeeds, and verifies that re-enabling it fails with `InvalidDf1Feed`. The invalid-link test also covers creation and changes with `write_disabled = true`, proving that disabled writes do not bypass validation.
 
 ### `2b584cb6`: clock timestamp cast to u32
 
 **Response: fixed by using u64 Unix-second timestamps throughout the new store.**
 
-`ReceivedReport`, the feed header, historical rounds, `Round`, events and the internal clock representation now use `u64`. The signed Solana clock value is converted with `u64::try_from`, rejecting a negative value with `StoreError::InvalidTimestamp` rather than silently wrapping it. This removes the new store's 2106 limit and gives consumers the same timestamp width as Stellar's rounds.
+`ReceivedReport`, the feed header, historical rounds, `Round`, events and the internal clock representation use `u64`. The signed Solana clock value is converted with `u64::try_from`, rejecting a negative value with `StoreError::InvalidTimestamp` rather than silently wrapping it. Consumers receive full u64 Unix-second timestamps, with the same width as Stellar's rounds.
 
-DF1 still stores transmission timestamps as `u32`. Its `submit` argument is `u64`, but DF1 casts it internally, so `check_round` now returns `Df1SkipReason::TimestampOverflow` when an observation timestamp exceeds `u32::MAX`. The exact store round still lands; only DF1 is skipped, preventing a wrapped legacy timestamp.
+DF1 stores transmission timestamps as `u32`. Its `submit` argument is `u64`, but DF1 casts it internally, so `check_round` returns `Df1SkipReason::TimestampOverflow` when an observation timestamp exceeds `u32::MAX`. The exact store round still lands; only DF1 is skipped, preventing a wrapped legacy timestamp.
 
 The report entry is 40 bytes. A historical round is 48 bytes after explicit Rust alignment padding, and the feed header is 1,344 bytes. A newly created feed's ring holds at most 185 rounds within the 10 KiB creation limit; an existing ring can grow by 213 rounds per instruction before its first wrap. The measured V1 batches still hold 40 store-only or 25 DF1-backed reports.
+
+## Read interface behavior
+
+The customer-facing read interface has these behaviors:
+
+- **Error precedence:** `InvalidDecimals` precedes `FeedFrozen` for both round reads and direct decoding.
+- **Metadata freeze:** `decimals` and `description` refuse a frozen feed, while `get_min_decimals` remains unfrozen.
+- **Missing feeds:** with otherwise valid arguments, a correctly derived but uninitialized feed returns `NoDataPresent` for `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals`. For round reads, decimals are validated first against the default minimum of 18, so invalid decimals return `InvalidDecimals`. `get_min_decimals` deliberately has no 18 fallback for an unset feed, keeping all missing-feed data reads consistent.
+- **Wrong-address precedence:** a wrong empty feed address returns `AccountMismatch` before the fallback decimals check, even when the decimals argument is also invalid. The client crate applies the same behavior, so CPI and direct decoding agree.
+
+Implementation and regression coverage are in `contracts/programs/data-feeds-store/src/instructions/reads.rs`, `contracts/programs/data-feeds-store/src/context.rs`, `contracts/programs/data-feeds-store/src/utils.rs`, `contracts/crates/chainlink-solana-data-feeds-store/src/lib.rs` and `contracts/tests/data-feeds-store.spec.ts`.
 
 ## No-change findings
 
 ### `12d84b23`: a frozen feed keeps receiving rounds, including DF1 writes
 
-**Intended behavior.** `frozen` is a read freeze only. Round reads fail while reports continue to the store and any linked DF1 feed. `writes_disabled` is the separate write freeze. The two flags are documented in `state.rs`, `feeds.rs` and the README. Treating the read freeze as a write freeze would remove the intended ability to keep history current while consumers cannot read it.
+**Intended behavior.** `frozen` is a read freeze only. Round reads, `decimals` and `description` fail while reports continue to the store and any linked DF1 feed. `get_min_decimals` does not check the freeze and returns `NoDataPresent` for an unset feed. `writes_disabled` is the separate write freeze. The two flags are documented in `state.rs`, `feeds.rs` and the README. Treating the read freeze as a write freeze would remove the intended ability to keep history current while consumers cannot read prices.
 
 ### `02686b61`: per-feed setters can create feeds writable by the default workflow list
 
@@ -157,16 +168,20 @@ All 14 directory-listed live feeds have `minSubmissionValue = 1` at their DF1 de
 
 ## Verification
 
-- `cargo test -p data-feeds-store -p chainlink_solana_data_feeds_store`: **31 passed** (22 program tests and 9 reader-crate tests), including property tests.
+- `cargo test -p data-feeds-store -p chainlink_solana_data_feeds_store`: **33 passed** (22 program tests and 11 reader-crate tests), including property tests.
+- `cargo test -p data-feeds-store -p chainlink_solana_data_feeds_store --all-features`: **62 passed** (51 program tests, including the IDL-build tests, and 11 reader-crate tests).
 - `anchor build -p data_feeds_store`: passed.
-- `cargo clippy -p data-feeds-store -p chainlink_solana_data_feeds_store --all-targets -- -D warnings`: passed.
-- `tests/data-feeds-store.spec.ts` on an isolated local validator: **27 passed**, including the new DF1 zero-truncation and closed-feed disable tests.
+- `cargo clippy -p data-feeds-store -p chainlink_solana_data_feeds_store --all-targets -- -D warnings`: passed, with standard and all features.
+- `tests/data-feeds-store.spec.ts` on an isolated local validator: **30 passed**, including ownership, recovery, bounds-clearing and read regression tests.
+- `../scripts/test-data-feeds-store-wrong-versions.sh`: **3 passed**, covering wrong state, feed and link-marker versions through read and admin instructions.
 - `go test ./generated/data_feeds_store`: passed.
 - `go test ./gotests -run '^$'`: the e2e package compiled successfully.
 - `go test ./gotests -run 'TestDataFeedsStore$' -v`: passed, including real-forwarder reports and the in-place program upgrade.
 - Workflow `bun test chains/solana`: **76 passed**; `bunx tsc --noEmit`: passed.
 - Full workflow `bun test`: **773 passed**.
 - Deployment `go test ./changesets/solana` against the local updated bindings: passed.
+- Devnet staging: both zones landed non-skipped post-cutover reports in the version 1 store and its existing DF1 feeds. Store and DF1 timestamps and rescaled answers matched, and public `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` reads matched direct account decoding.
+- Changed TypeScript specs compile and run under `ts-mocha`. A focused TypeScript 5.9.3 check reports no errors in the changed store specs, only the pre-existing `tests/utils.ts` `Buffer`/`EthKeypairInfo` mismatch. The full workspace check also contains pre-existing errors in other specs, examples and Web3 typings.
 - `git diff --check`: passed.
 
 The deployment integration harness currently stops during MCMS setup with `DeclaredProgramIdMismatch`, before any store operation. This is the pre-existing harness issue noted in the deployment PR, not a result of the store changes.

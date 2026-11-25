@@ -1,6 +1,6 @@
-//! Stores rounds, finds stored rounds and rescales answers, ported from the non-SVR part of the
-//! EVM `DataFeedsStore`. The functions work only on a feed header and its ring, never on accounts,
-//! so they can be unit tested and reused by readers that decode feed accounts themselves.
+//! Stores rounds, finds stored rounds and rescales answers. The functions work only on a feed
+//! header and its ring, never on accounts, so they can be unit tested and reused by readers that
+//! decode feed accounts themselves.
 
 use crate::{
     common::{MIN_MAX_STORED_REPORTS, STORED_DECIMALS},
@@ -136,8 +136,8 @@ pub enum MaxStoredReportsError {
 
 /// Checks that a feed's ring can grow to `new_max_stored_reports`. A ring can only grow, and only
 /// while it has never wrapped. Until then every stored round r sits at index r, which is also
-/// where the larger ring looks for it, so no round has to move. EVM has the same rule. The new
-/// size then always exceeds the latest round ID.
+/// where the larger ring looks for it, so no round has to move. The new size then always exceeds
+/// the latest round ID.
 ///
 /// ```text
 ///   index    0     1     2     3     4     5

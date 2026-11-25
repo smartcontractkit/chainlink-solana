@@ -6,7 +6,7 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 pub const STORE_STATE_VERSION: u8 = 1;
 /// The layout version of a feed account. It is increased when that account's layout changes,
 /// independently of the other account types.
-pub const FEED_ACCOUNT_VERSION: u8 = 2;
+pub const FEED_ACCOUNT_VERSION: u8 = 1;
 /// The layout version of a DF1 link marker account. It is increased when that account's layout
 /// changes, independently of the other account types.
 pub const DF1_LINK_VERSION: u8 = 1;

@@ -1,8 +1,7 @@
-//! Events mirror those of the EVM `DataFeedsStore` where it has them, and each also carries the
-//! store state account. They are emitted as CPI events: the program calls itself, signed by its
-//! event authority PDA, with the event as the call's data. The event is then recorded in the
-//! transaction's inner instructions, so it can't be lost to log truncation when one `on_report`
-//! applies many reports.
+//! Events each carry the store state account. They are emitted as CPI events: the program calls
+//! itself, signed by its event authority PDA, with the event as the call's data. The event is then
+//! recorded in the transaction's inner instructions, so it can't be lost to log truncation when
+//! one `on_report` applies many reports.
 
 use anchor_lang::prelude::*;
 
@@ -161,14 +160,14 @@ pub struct MinDecimalsSet {
     pub min_decimals: u8,
 }
 
-/// Round reads of a feed were frozen or unfrozen.
+/// Round, decimals and description reads of a feed were frozen or unfrozen.
 #[event]
 pub struct FeedFrozenSet {
     /// The store state account the event is about.
     pub state: Pubkey,
     /// The data ID of the feed concerned.
     pub data_id: [u8; 16],
-    /// True if round reads are now frozen, false if they were unfrozen.
+    /// True if round, decimals and description reads are now frozen, false if they were unfrozen.
     pub frozen: bool,
 }
 

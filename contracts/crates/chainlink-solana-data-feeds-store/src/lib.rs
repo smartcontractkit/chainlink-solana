@@ -15,23 +15,25 @@
 //! | The feed's description       | [`read_description`]    | [`description`]      |
 //! | The fewest decimals to read  | [`read_min_decimals`]   | [`get_min_decimals`] |
 //!
-//! - Decoding reads the feed account in your program, with no call to another program. Before it
-//!   trusts the bytes, the crate checks that the account is owned by the store program this crate
-//!   is built for ([`DATA_FEEDS_STORE_ID`]), carries the feed discriminator and version, and
-//!   belongs to the store state and data ID you pass.
+//! - Decoding reads the feed account in your program, with no call to another program. For an
+//!   existing feed, the crate checks that the account is owned by the store program this crate is
+//!   built for ([`DATA_FEEDS_STORE_ID`]), carries the feed discriminator and version, and belongs
+//!   to the store state and data ID you pass. Valid feeds can only be created at their canonical
+//!   PDA, so existing-feed reads rely on that creation invariant rather than recomputing the
+//!   address. A correctly derived but uninitialized feed returns `NoDataPresent`; a wrong empty
+//!   address returns `AccountMismatch`.
 //! - Calling runs the store's own read instruction, which makes the same account checks. Before
 //!   the call, the crate checks that the program is the store program and that the store state is
 //!   the one you pinned (`expected_state`). After the call, it accepts the answer only if the
 //!   store program returned it.
 //!
-//! Every read makes these account checks, whatever it returns, because a reader given another
-//! store's or another data ID's feed would otherwise get that feed's price or description without
-//! noticing.
+//! These checks prevent a reader given another store's or another data ID's feed from getting its
+//! price or description without noticing.
 //!
-//! The round reads also refuse a frozen feed, decimals outside the feed's minimum to 18, a round
-//! that isn't stored, and a non-zero answer that would round to zero. The other reads don't check
-//! the read freeze, as in the store program, because they return no price. Round IDs keep
-//! increasing for the life of a feed.
+//! Round reads refuse decimals outside the feed's minimum to 18, a frozen feed, a round that isn't
+//! stored, and a non-zero answer that would round to zero. `decimals` and `description` also refuse
+//! a frozen feed. `get_min_decimals` does not check the freeze. Missing feeds return
+//! `NoDataPresent`. Round IDs keep increasing for the life of a feed.
 //!
 //! The store's `check_feed_permission` instruction, which says whether a workflow may write a data
 //! ID, is for tooling rather than readers, so the crate doesn't wrap it.
@@ -43,7 +45,9 @@ use data_feeds_store::{
     instructions::reads::to_round,
     logic,
     state::Feed,
-    utils::{decode_description, decode_feed_into, RingRef},
+    utils::{
+        decode_description, decode_feed_into, is_uninitialized, validate_feed_address, RingRef,
+    },
 };
 
 pub use data_feeds_store::common::STORED_DECIMALS;
@@ -61,6 +65,10 @@ fn decode<'a>(
     store_state: &Pubkey,
     data_id: &[u8; 16],
 ) -> Result<(Box<Feed>, std::cell::Ref<'a, &'a mut [u8]>)> {
+    if is_uninitialized(feed) {
+        validate_feed_address(feed, store_state, data_id)?;
+        return Err(StoreError::NoDataPresent.into());
+    }
     require_keys_eq!(*feed.owner, DATA_FEEDS_STORE_ID, StoreError::InvalidAccount);
     let data = feed.try_borrow_data()?;
     let mut header: Box<Feed> = bytemuck::zeroed_box();
@@ -75,6 +83,10 @@ pub fn read_latest_round(
     data_id: [u8; 16],
     decimals: u8,
 ) -> Result<Round> {
+    if is_uninitialized(feed) {
+        validate_feed_address(feed, store_state, &data_id)?;
+        logic::check_decimals(decimals, STORED_DECIMALS).map_err(StoreError::from)?;
+    }
     let (header, _) = decode(feed, store_state, &data_id)?;
     to_round(&header, logic::latest_round(&header), decimals)
 }
@@ -87,31 +99,39 @@ pub fn read_round(
     round_id: u64,
     decimals: u8,
 ) -> Result<Round> {
+    if is_uninitialized(feed) {
+        validate_feed_address(feed, store_state, &data_id)?;
+        logic::check_decimals(decimals, STORED_DECIMALS).map_err(StoreError::from)?;
+    }
     let (header, data) = decode(feed, store_state, &data_id)?;
     let round = logic::stored_round(round_id, &header, &RingRef::new(&data[..]));
     to_round(&header, round, decimals)
 }
 
 /// Returns the decimals the store keeps answers in, which is 18 and also the most a read can ask
-/// for, after checking that `feed` is the data ID's feed account of `store_state`. It fails for a
-/// data ID whose feed doesn't exist, as the store's `decimals` instruction does.
+/// for, after checking that `feed` is the data ID's feed account of `store_state`. It fails with
+/// `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen one.
 pub fn read_decimals(feed: &AccountInfo, store_state: &Pubkey, data_id: [u8; 16]) -> Result<u8> {
-    decode(feed, store_state, &data_id)?;
+    let (header, _) = decode(feed, store_state, &data_id)?;
+    require!(header.frozen == 0, StoreError::FeedFrozen);
     Ok(STORED_DECIMALS)
 }
 
 /// Returns the description of a data ID's feed, decoded from its feed account, or an empty string
-/// when none is set.
+/// when none is set. It fails with `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen
+/// one.
 pub fn read_description(
     feed: &AccountInfo,
     store_state: &Pubkey,
     data_id: [u8; 16],
 ) -> Result<String> {
     let (header, _) = decode(feed, store_state, &data_id)?;
+    require!(header.frozen == 0, StoreError::FeedFrozen);
     Ok(decode_description(&header.description))
 }
 
-/// Returns the fewest decimals a read of a data ID may ask for, decoded from its feed account.
+/// Returns the fewest decimals a read of a data ID may ask for. It fails with `NoDataPresent` for
+/// an unset feed but does not check the read freeze.
 pub fn read_min_decimals(
     feed: &AccountInfo,
     store_state: &Pubkey,
@@ -188,8 +208,9 @@ pub fn get_round<'info>(
     returned()
 }
 
-/// Returns the decimals the store keeps answers in (18) by calling the store program, which fails
-/// for a data ID whose feed doesn't exist. `expected_state` is the store state you trust.
+/// Returns the decimals the store keeps answers in (18) by calling the store program. It fails
+/// with `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen one. `expected_state` is
+/// the store state you trust.
 pub fn decimals<'info>(
     store_program: AccountInfo<'info>,
     store_state: AccountInfo<'info>,
@@ -209,8 +230,9 @@ pub fn decimals<'info>(
     returned()
 }
 
-/// Returns the description of a data ID's feed by calling the store program. `expected_state` is
-/// the store state you trust.
+/// Returns the description of a data ID's feed by calling the store program. It fails with
+/// `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen one. `expected_state` is the
+/// store state you trust.
 pub fn description<'info>(
     store_program: AccountInfo<'info>,
     store_state: AccountInfo<'info>,
@@ -230,7 +252,8 @@ pub fn description<'info>(
     returned()
 }
 
-/// Returns the fewest decimals a read of a data ID may ask for by calling the store program.
+/// Returns the fewest decimals a read of a data ID may ask for by calling the store program. It
+/// fails with `NoDataPresent` for an unset feed but does not check the read freeze.
 /// `expected_state` is the store state you trust.
 pub fn get_min_decimals<'info>(
     store_program: AccountInfo<'info>,
@@ -370,6 +393,18 @@ mod tests {
         f(&info)
     }
 
+    /// Runs `f` on an account at `key`, with the given data and owner.
+    fn with_account_at<T>(
+        key: Pubkey,
+        data: &mut [u8],
+        owner: &Pubkey,
+        f: impl FnOnce(&AccountInfo) -> T,
+    ) -> T {
+        let mut lamports = 0;
+        let info = AccountInfo::new(&key, false, false, &mut lamports, data, owner, false, 0);
+        f(&info)
+    }
+
     fn err(e: StoreError) -> Error {
         e.into()
     }
@@ -463,10 +498,18 @@ mod tests {
             let foreign = read_description(info, &state, id);
             assert_eq!(foreign.unwrap_err(), err(StoreError::InvalidAccount));
         });
-        // As in the store program, only round reads check the read freeze.
+        // Decimals and description check the read freeze; get_min_decimals does not.
         let mut frozen = feed_account(&state, &id, 3, true);
         with_account(&mut frozen, &DATA_FEEDS_STORE_ID, |info| {
-            assert_eq!(read_description(info, &state, id).unwrap(), "BTC/USD");
+            assert_eq!(
+                read_description(info, &state, id).unwrap_err(),
+                err(StoreError::FeedFrozen)
+            );
+            assert_eq!(
+                read_decimals(info, &state, id).unwrap_err(),
+                err(StoreError::FeedFrozen)
+            );
+            assert_eq!(read_min_decimals(info, &state, id).unwrap(), 8);
         });
     }
 
@@ -480,6 +523,84 @@ mod tests {
             assert_eq!(latest.unwrap_err(), err(StoreError::FeedFrozen));
             let round = read_round(info, &state, id, 2, 8);
             assert_eq!(round.unwrap_err(), err(StoreError::FeedFrozen));
+        });
+    }
+
+    #[test]
+    fn invalid_decimals_precedes_frozen() {
+        let state = Pubkey::new_unique();
+        let id = [1u8; 16];
+        let mut data = feed_account(&state, &id, 3, true);
+        with_account(&mut data, &DATA_FEEDS_STORE_ID, |info| {
+            assert_eq!(
+                read_latest_round(info, &state, id, 7).unwrap_err(),
+                err(StoreError::InvalidDecimals)
+            );
+            assert_eq!(
+                read_round(info, &state, id, 1, 7).unwrap_err(),
+                err(StoreError::InvalidDecimals)
+            );
+        });
+    }
+
+    #[test]
+    fn missing_feeds_return_no_data_present() {
+        let state = Pubkey::new_unique();
+        let id = [1u8; 16];
+        let (key, _) = feed_address(&state, &id);
+        let mut data = Vec::new();
+        with_account_at(key, &mut data, &System::id(), |info| {
+            assert_eq!(
+                read_latest_round(info, &state, id, 18).unwrap_err(),
+                err(StoreError::NoDataPresent)
+            );
+            assert_eq!(
+                read_round(info, &state, id, 1, 18).unwrap_err(),
+                err(StoreError::NoDataPresent)
+            );
+            assert_eq!(
+                read_decimals(info, &state, id).unwrap_err(),
+                err(StoreError::NoDataPresent)
+            );
+            assert_eq!(
+                read_description(info, &state, id).unwrap_err(),
+                err(StoreError::NoDataPresent)
+            );
+            assert_eq!(
+                read_min_decimals(info, &state, id).unwrap_err(),
+                err(StoreError::NoDataPresent)
+            );
+            // For a canonical missing feed, the PDA is checked first, then decimals are validated,
+            // and only then does the read return `NoDataPresent`.
+            assert_eq!(
+                read_latest_round(info, &state, id, 7).unwrap_err(),
+                err(StoreError::InvalidDecimals)
+            );
+            assert_eq!(
+                read_round(info, &state, id, 1, 7).unwrap_err(),
+                err(StoreError::InvalidDecimals)
+            );
+        });
+        // A wrong, uninitialized address is an account mismatch rather than no data, even when
+        // the decimals argument is also invalid.
+        let mut data = Vec::new();
+        with_account(&mut data, &System::id(), |info| {
+            assert_eq!(
+                read_latest_round(info, &state, id, 18).unwrap_err(),
+                err(StoreError::AccountMismatch)
+            );
+            assert_eq!(
+                read_latest_round(info, &state, id, 7).unwrap_err(),
+                err(StoreError::AccountMismatch)
+            );
+            assert_eq!(
+                read_round(info, &state, id, 1, 7).unwrap_err(),
+                err(StoreError::AccountMismatch)
+            );
+            assert_eq!(
+                read_min_decimals(info, &state, id).unwrap_err(),
+                err(StoreError::AccountMismatch)
+            );
         });
     }
 

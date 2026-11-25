@@ -1,5 +1,6 @@
-//! Chainlink Data Feeds store for CRE. It is a Solana port of the EVM `DataFeedsStore`, without
-//! SVR, and it is the program that readers integrate with.
+//! Chainlink Data Feeds store for CRE. It receives reports, keeps each data ID's rounds in its
+//! own feed account, and is the program that readers integrate with. The EVM and Stellar
+//! implementations informed its design.
 //!
 //! Each data ID has one feed account. It holds the latest round, a circular buffer of earlier
 //! rounds, a description, the settings that control reads (minimum decimals and a read freeze) and
@@ -11,9 +12,8 @@
 //! the workflows allowed for its data ID (the feed's own list, or else the store's default list),
 //! against the feed's latest round and against the feed's answer range.
 //!
-//! A feed admin creates feeds, with `set_feeds` or any per-feed setter, and pays their rent. On EVM
-//! a feed's storage is paid for in gas by its first report, but on Solana the forwarder passes no
-//! account that could pay for a new account.
+//! A feed admin creates feeds, with `set_feeds` or any per-feed setter, and pays their rent. The
+//! forwarder passes no account that could pay for a new account.
 //!
 //! A data ID can also be linked to an existing DF1 feed account. The store then writes each new
 //! round to that account through DF1's `submit`, after first checking everything that could make
@@ -193,9 +193,9 @@ pub mod data_feeds_store {
         feeds::set_feed_writes_disabled(ctx, data_ids, disabled)
     }
 
-    /// Freezes or unfreezes round reads of each feed. While a feed is frozen, `latest_round` and
-    /// `get_round` fail, but its reports are still stored. The remaining accounts are the feeds,
-    /// in data ID order.
+    /// Freezes or unfreezes reads of each feed. While a feed is frozen, `latest_round`, `get_round`,
+    /// `decimals` and `description` fail, `get_min_decimals` stays readable, and reports are still
+    /// stored. The remaining accounts are the feeds, in data ID order.
     pub fn set_feed_frozen<'info>(
         ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,
         data_ids: Vec<[u8; 16]>,
@@ -279,17 +279,20 @@ pub mod data_feeds_store {
     }
 
     /// Returns the number of decimals answers are stored with, which is 18. This is also the most
-    /// decimals a read can ask for.
+    /// decimals a read can ask for. It fails with `NoDataPresent` for an unset feed and
+    /// `FeedFrozen` for a frozen one.
     pub fn decimals(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<u8> {
         reads::decimals(ctx, data_id)
     }
 
-    /// Returns the description of a data ID's feed, or an empty string if none is set.
+    /// Returns the description of a data ID's feed, or an empty string if none is set. It fails
+    /// with `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen one.
     pub fn description(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<String> {
         reads::description(ctx, data_id)
     }
 
-    /// Returns the fewest decimals a read of a data ID may ask for.
+    /// Returns the fewest decimals a read of a data ID may ask for. It fails with `NoDataPresent`
+    /// for an unset feed but does not check the read freeze.
     pub fn get_min_decimals(ctx: Context<FeedRead>, data_id: [u8; 16]) -> Result<u8> {
         reads::get_min_decimals(ctx, data_id)
     }

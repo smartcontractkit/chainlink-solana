@@ -7,7 +7,7 @@ The lookup detail behind the [audit brief](AUDIT.md): read the brief first for t
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
 - the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
-- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
+- the u64 and initial-v1 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. The evidence, with explorer links, is in the [audit brief, §12](AUDIT.md#12-running-on-df-cre-staging).
 
@@ -33,8 +33,11 @@ Build and test from `contracts`:
 
 - `anchor build` builds every workspace program and the IDLs.
 - `cargo test` runs the Rust unit and property tests of the program and the client crate.
-- `anchor test` runs `tests/data-feeds-store.spec.ts` (27 tests, including 25 seeded random report batches checked against a model) against a local validator. `Anchor.toml` deploys workspace programs as upgradeable by the provider wallet (`[test] upgradeable = true`), as `initialize` requires.
+- `anchor test` runs `tests/data-feeds-store.spec.ts` (30 tests, including 25 seeded random report batches checked against a model) against a local validator. `Anchor.toml` deploys workspace programs as upgradeable by the provider wallet (`[test] upgradeable = true`), as `initialize` requires.
+- `../scripts/test-data-feeds-store-wrong-versions.sh` builds the program and runs three additional instruction tests with preloaded wrong-version state, feed and link-marker accounts.
 - `go test ./gotests -run 'TestDataFeedsStore$' -v` runs the end-to-end suite through a real keystone forwarder at F=2 and F=5, and performs an in-place loader upgrade of the current binary mid-test. It does not test old-layout migration. It needs Docker for the local validator, and the validator must be able to upgrade a program it loaded at startup. On amd64 the test uses `anzaxyz/agave:v2.1.21`. The deployment framework's own Linux image, `solanalabs/solana:v1.18.26`, can't upgrade such a program, because it marks the program's data as executable. On arm64 the framework's default image works as it is.
+
+The tracked `contracts/generated/data_feeds_store` bindings are customer-facing artifacts regenerated from the IDL. They are checked for synchronization with the program but are not independent production source files.
 
 ### Reference-only context
 
@@ -42,7 +45,7 @@ The following unchanged files provide context for the store's external assumptio
 
 ## 2. Accounts and seeds
 
-All program accounts start with an 8-byte Anchor discriminator. Offsets below are within the struct; add 8 for the account offset. Structs are `#[account(zero_copy)]` (`repr(C)`, `bytemuck::Pod`). Account layouts have independent versions, checked on load: `STORE_STATE_VERSION = 1`, `DF1_LINK_VERSION = 1` and `FEED_ACCOUNT_VERSION = 2`.
+All program accounts start with an 8-byte Anchor discriminator. Offsets below are within the struct; add 8 for the account offset. Structs are `#[account(zero_copy)]` (`repr(C)`, `bytemuck::Pod`). Account layouts have independent versions, checked on load: `STORE_STATE_VERSION = 1`, `DF1_LINK_VERSION = 1` and `FEED_ACCOUNT_VERSION = 1`.
 
 ### StoreState
 
@@ -59,11 +62,11 @@ The PDA `["state", store_id as u64 little-endian]`, created by `initialize`, own
 
 ### Feed
 
-PDA `["feed", state, data_id_32]`, owned by the store. A 1,344-byte header (asserted) followed by the ring. The layout is public: readers decode it, and fields move only with a version bump. Offsets marked \* are const-asserted in `state.rs`. Version 1 feeds are not migrated: this layout requires a new store and newly created version 2 feeds.
+PDA `["feed", state, data_id_32]`, owned by the store. A 1,344-byte header (asserted) followed by the ring. The layout is public: readers decode it, and fields move only with a version bump. Offsets marked \* are const-asserted in `state.rs`. The current layout is the initial public version 1; development-era accounts are abandoned and recreated rather than migrated.
 
 - **Flags and timestamps:**
   - `version: u8` (0): 2.
-  - `frozen: u8` (1\*): the read freeze; round reads fail, writes continue.
+  - `frozen: u8` (1\*): the read freeze; round, decimals and description reads fail, `get_min_decimals` stays readable, and writes continue.
   - `min_decimals: u8` (2\*): fewest decimals a read may ask for, 18 at creation.
   - `writes_disabled: u8` (3): the write freeze; reports skipped, reads continue.
   - `_padding0: [u8; 4]` (4): zero bytes aligning the timestamps.
@@ -148,7 +151,7 @@ All use `FeedAdminAccounts`: `feed_admin` (writable signer, pays rent), `state` 
 2. If any feed account is uninitialized, emit one `FeedsCreated` first, listing each such data ID once, so indexers see a feed created before its settings.
 3. Per data ID:
    - validate it (`InvalidDataId`);
-   - if the account is uninitialized (system-owned, empty), require it to be the feed PDA (`AccountMismatch`) and create it at `feed_account_len(default_max_stored_reports)` with the feed admin paying. The new header is zero except `version = 2`, `min_decimals = 18`, `data_id`, `state` and `max_stored_reports = default`;
+   - if the account is uninitialized (system-owned, empty), require it to be the feed PDA (`AccountMismatch`) and create it at `feed_account_len(default_max_stored_reports)` with the feed admin paying. The new header is zero except `version = 1`, `min_decimals = 18`, `data_id`, `state` and `max_stored_reports = default`;
    - otherwise load it with `load_feed_into`: owner, length and discriminator (`InvalidAccount`), version (`InvalidAccountVersion`), state, data ID and ring length (`AccountMismatch`).
 4. Apply the setter to the header, then write it back (`AccountNotWritable` if read-only).
 
@@ -208,25 +211,25 @@ When `set_max_stored_reports` runs inside another program's instruction, such as
 
 ### Reads
 
-`FeedRead` takes `state` (version checked) and `feed`, both `AccountLoader`s, so Anchor checks their owner and discriminator. Handlers re-load the feed with `load_feed_into` against the state and the data ID argument. Results go through Anchor return data; reads change nothing and emit no events.
+`FeedRead` takes `state` (version checked) and an unchecked `feed`. Handlers re-load the feed with `load_feed_into` against the state and the data ID argument, which checks the owner, discriminator, version, state, data ID and ring length. For an uninitialized account, the handler checks the feed PDA before any fallback decimals validation: a wrong empty address returns `AccountMismatch`; a canonical missing feed with invalid round decimals returns `InvalidDecimals`, and with otherwise valid arguments returns `NoDataPresent`. The IDL build retains the typed `Feed` account entry for generated account decoders. Results go through Anchor return data; reads change nothing and emit no events.
 
 - **`latest_round(data_id, decimals) -> Round`** and **`get_round(data_id, round_id, decimals) -> Round`** check, through `to_round`, in the order below. When several checks fail, the first decides the error the caller sees; the order matches the Stellar proxy's.
 
-  1. `FeedFrozen`;
-  2. `InvalidDecimals`, below `min_decimals` or above 18;
+  1. `InvalidDecimals`, below `min_decimals` or above 18;
+  2. `FeedFrozen`;
   3. `NoDataPresent`: before the first round for `latest_round`; for `get_round`, unless `1 <= round_id <= latest` and `latest − round_id < max_stored_reports`;
   4. `RoundsToZero`.
 
   The answer is divided by `10^(18 − decimals)`, truncating toward zero.
 
-- **`decimals(data_id) -> u8`**: 18 after loading the feed.
-- **`description(data_id) -> String`**: bytes up to the first NUL.
-- **`get_min_decimals(data_id) -> u8`**.
+- **`decimals(data_id) -> u8`**: 18 after loading the feed and checking it is not frozen.
+- **`description(data_id) -> String`**: bytes up to the first NUL, after the same freeze check.
+- **`get_min_decimals(data_id) -> u8`**: the feed's minimum. `NoDataPresent` for an unset feed; no freeze check.
 - **`check_feed_permission(data_id, workflow_metadata) -> bool`** (`PermissionRead`: `state` and an unchecked `feed`, both required). `InvalidDataId` for an ID the store doesn't serve. An uninitialized `feed` must be the feed PDA (`AccountMismatch`) and answers false, as its reports would be skipped. Otherwise it is loaded as for other reads, and the answer uses its own list or else the default list. Like the EVM function it mirrors, it ignores the write freeze, which EVM doesn't have, so its answer is about permission only.
 
 `Round` is `{ round_id: u64, answer: i128, observations_timestamp: u64, recorded_timestamp: u64 }`, with both timestamps in Unix seconds.
 
-The client crate's decode functions (`read_latest_round`, `read_round`, `read_decimals`, `read_description`, `read_min_decimals`) check the owner is the store program (`InvalidAccount`), then run the same `decode_feed_into` (discriminator, version, the store state the caller trusts, data ID, ring length) as the program; the round reads then run `to_round`, so they fail the same way. Its call functions (`latest_round`, `get_round`, `decimals`, `description`, `get_min_decimals`) check the program ID (`InvalidProgramId`) and that the store state passed is the one the caller trusts (`expected_state`, else `AccountMismatch`), and accept return data only from the store program.
+The client crate's decode functions (`read_latest_round`, `read_round`, `read_decimals`, `read_description`, `read_min_decimals`) check the PDA for an uninitialized account, returning `NoDataPresent` for the canonical missing feed and `AccountMismatch` for a wrong empty address. For an existing feed they check the store-program owner (`InvalidAccount`), then run the same `decode_feed_into` (discriminator, version, the store state the caller trusts, data ID, ring length) as the program. Valid feeds can only be created at their canonical PDA, so existing-feed reads rely on that creation invariant rather than recomputing the address. Round reads then run `to_round`, so they fail the same way. Its call functions (`latest_round`, `get_round`, `decimals`, `description`, `get_min_decimals`) check the program ID (`InvalidProgramId`) and that the store state passed is the one the caller trusts (`expected_state`, else `AccountMismatch`), and accept return data only from the store program.
 
 ## 4. on_report in detail
 
@@ -325,7 +328,7 @@ Accounts key the ID zero padded to 32 bytes (`to_seed`: the 16 bytes followed by
 - 6013 `MaxStoredReportsLocked`: the ring has wrapped.
 - 6014 `MaxStoredReportsTooLow`: no longer returned; kept so later codes don't change.
 - 6015 `InvalidMinMaxRange`: `min > max`.
-- 6016 `NoDataPresent`: read of a feed with no round, or of a round outside the ring window.
+- 6016 `NoDataPresent`: read of a correctly derived but uninitialized feed, a feed with no round, or a round outside the ring window.
 - 6017 `DescriptionTooLong`: over 64 bytes.
 - 6018 `InvalidDescription`: description containing NUL.
 - 6019 `MalformedReport`: metadata under 62 bytes or a report that doesn't decode exactly.
@@ -337,7 +340,7 @@ Accounts key the ID zero padded to 32 bytes (`to_seed`: the 16 bytes followed by
 - 6025 `InvalidDf1Feed`: `set_df1_feeds` given an account `check_feed` rejects when the link operation requires that check.
 - 6026 `InvalidDecimals`: read decimals below the minimum or above 18; `set_min_decimals` above 18.
 - 6027 `RoundsToZero`: a non-zero answer would read as zero.
-- 6028 `FeedFrozen`: round read of a frozen feed.
+- 6028 `FeedFrozen`: round, decimals or description read of a frozen feed.
 - 6029 `Df1FeedAlreadyLinked`: the DF1 feed's link marker holds another data ID.
 - 6030 `StoreAlreadyInitialized`: `initialize` for a store ID whose state account exists.
 - 6031 `InvalidTimestamp`: the chain's signed clock timestamp is negative and cannot be represented as u64 Unix seconds.

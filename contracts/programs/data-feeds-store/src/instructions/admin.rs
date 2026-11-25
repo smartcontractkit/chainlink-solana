@@ -150,9 +150,9 @@ pub fn set_feed_admin(ctx: Context<OwnerOnly>, feed_admin: Pubkey, is_admin: boo
     Ok(())
 }
 
-/// Replaces the store's default workflow list. Unlike on EVM, the list can be emptied. Only feeds
-/// with their own workflow list can then be written, so a compromised default workflow can be
-/// revoked in one call without naming a replacement.
+/// Replaces the store's default workflow list. The list may be emptied, leaving only feeds with
+/// their own workflow list writable. This revokes a compromised default workflow in one call
+/// without naming a replacement.
 pub fn set_default_feed_metadata(
     ctx: Context<FeedAdminState>,
     workflow_metadata: Vec<WorkflowMetadata>,

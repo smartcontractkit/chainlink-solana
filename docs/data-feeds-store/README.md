@@ -56,22 +56,24 @@ Why a read-only account aborts rather than skips: the transmitter chooses which 
 
 ## Reads
 
-On EVM, a read returns the answer at the feed's fixed decimals. Here, as on Stellar, the caller passes the data ID and the decimals it wants.
+On EVM's normal aggregator-proxy reads, the answer is returned at the proxy's configured decimals. Here, as on Stellar, the caller passes the data ID and the decimals it wants.
 
 - `latest_round(data_id, decimals)` and `get_round(data_id, round_id, decimals)` return `Round { round_id, answer, observations_timestamp, recorded_timestamp }`, with the answer rescaled to `decimals` (truncating toward zero). They take the store state and the feed.
-- `decimals(data_id)` returns 18, `description(data_id)` the description, `get_min_decimals(data_id)` the fewest decimals a read may ask for.
+- `decimals(data_id)` returns 18, `description(data_id)` the description, `get_min_decimals(data_id)` the fewest decimals a read may ask for. `decimals` and `description` fail while the read freeze is set; `get_min_decimals` does not check the freeze. All three return `NoDataPresent` for an unset feed.
 - `check_feed_permission(data_id, workflow)` tells whether a workflow may write a data ID, from the feed's own list or else the default list. It takes the feed account and answers false for a feed that isn't set, since its reports are skipped. Like the EVM function it mirrors, it ignores the write freeze, which EVM doesn't have.
 
 A round read fails with the first of these that applies:
 
-1. `FeedFrozen` while the read freeze is on;
-2. `InvalidDecimals` below the feed's minimum (18 until a feed admin lowers it) or above 18;
+1. `InvalidDecimals` below the feed's minimum (18 until a feed admin lowers it) or above 18;
+2. `FeedFrozen` while the read freeze is on;
 3. `NoDataPresent` for a round that was never written or has left the ring;
 4. `RoundsToZero` when a non-zero answer would read as zero.
 
+With otherwise valid arguments, a correctly derived but uninitialized feed returns `NoDataPresent` for `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals`. For round reads, decimals are validated first against the default minimum of 18, so invalid decimals return `InvalidDecimals`. A wrong empty feed address fails with `AccountMismatch` before that validation.
+
 Round IDs keep increasing for the life of a feed: the program is upgraded in place, so there are no phase IDs.
 
-**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. Every one of them checks that the account belongs to the store program, the store state the caller trusts and the data ID, whatever it returns, because another feed's account would otherwise give another feed's price or description. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
+**The `chainlink-solana-data-feeds-store` crate** (`contracts/crates/chainlink-solana-data-feeds-store`) offers every read the store gives readers, both ways. `read_latest_round`, `read_round`, `read_decimals`, `read_description` and `read_min_decimals` decode the feed account inside the customer's program, with no call. `latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals` call the store. For an uninitialized account they check the feed PDA; for an existing feed they check its store-program owner, discriminator, version, the store state the caller trusts, the data ID and ring length. Valid feeds can only be created at their canonical PDA, so existing-feed reads rely on that creation invariant rather than recomputing the address. The call functions take that state as `expected_state` and refuse any other (`AccountMismatch`). The round reads also apply the program's freeze, decimals and rescaling checks, in the same order.
 
 **No read access control.** Any program can decode an account passed to it, so reads can't be gated. EVM's `getDataIds` becomes a `getProgramAccounts` query on the feed discriminator and `state` (account offset 72).
 
@@ -83,7 +85,7 @@ Feed admins (MCMS on mainnet) change every per-feed setting. Each setter takes t
 - `set_specific_feed_metadata` and `remove_specific_feed_metadata`: the feed's own workflow list, which replaces the default;
 - `set_min_max_answers`: answer bounds, cleared with `(i128::MIN, i128::MAX)`;
 - `set_feed_writes_disabled`: the write freeze, which skips every workflow's reports while reads continue;
-- `set_feed_frozen`: the read freeze, which refuses round reads (the description and decimals stay readable) while writes continue;
+- `set_feed_frozen`: the read freeze, which refuses round reads, `decimals` and `description` while writes continue. `get_min_decimals` stays readable;
 - `set_min_decimals`: the fewest decimals a read may ask for;
 - `set_df1_feeds`: the DF1 link and its own switch (see below);
 - `set_max_stored_reports`: the ring size. It only grows, and only before the ring has wrapped. Solana lets an account grow by at most 10 KiB per instruction, so one call adds at most 213 rounds; later calls can grow it further. Inside an MCMS timelock batch, the runtime applies that limit to the whole batch, so a batch should grow each feed once.
@@ -131,7 +133,7 @@ A new build is proven before customers read it, then installed by upgrading the 
 
 Feed accounts keep their addresses, history and settings across a compatible upgrade. Store states, feeds and DF1 link markers have independent layout versions; an incompatible layout change bumps that account type's version and migrates its accounts explicitly.
 
-The v2 feed layout is not migration-compatible with v1 staging feeds. Pre-release v1 stores are abandoned; create a new store and new v2 feeds rather than upgrading a v1 store in place and continuing to use its feeds.
+The current feed layout is the initial public version 1. Development-era staging accounts are abandoned; create a new store and new v1 feeds rather than using old accounts.
 
 Before the first mainnet release:
 

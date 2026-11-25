@@ -1,4 +1,4 @@
-//! A port of the EVM `DataId.sol`. A data ID is one 16-byte word, laid out as follows:
+//! A data ID is one 16-byte word, laid out as follows:
 //!
 //! ```text
 //! byte   0               8        9           11         12         16
@@ -16,8 +16,8 @@
 pub type DataId = [u8; 16];
 
 /// A data ID as accounts store it and derive their addresses from: zero padded to 32 bytes. Data
-/// IDs are 16 bytes in reports and events, as on EVM, but accounts are keyed on 32 bytes so that a
-/// wider data ID format later keeps every existing account address.
+/// IDs are 16 bytes in reports and events, but accounts are keyed on 32 bytes so that a wider
+/// data ID format later keeps every existing account address.
 pub type DataIdSeed = [u8; 32];
 
 /// Bytes 9 and 10 of a data ID hold its SVR path ID.

@@ -7,7 +7,7 @@ This doc lists the design decisions for the Solana Data Feeds program (the data-
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
 - the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
-- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
+- the u64 and initial-v1 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. The evidence, with explorer links, is in the [audit brief, §12](AUDIT.md#12-running-on-df-cre-staging).
 
@@ -40,7 +40,7 @@ DF1 on Solana already reflects these properties.
 
 - **A read proxy doesn't work on Solana.** Customers would pass the proxy's accounts and the store's, so repointing the proxy would change the accounts they pass. It would also add a call and three accounts (the proxy program, its state and the store program) to every read.
 - **A thin proxy that owns the feeds protects little.** Its purpose would be to keep the store's own settings out of the accounts customers read, so the store could change without changing them. But each feed's write settings (its workflow list, answer bounds, freezes and DF1 link) must sit in the feed account itself: a second account per feed would fit too few reports under the 64-account limit. So the store's settings end up in the proxy's accounts anyway, and the split still costs three accounts and a call per transaction.
-- **Programs are upgraded in place.** Layout changes use independent account versions and reserved bytes, as DF1's have: store states are version 1, DF1 link markers version 1 and feeds version 2. As with DF1, upgrading the store upgrades the program customers read from; decision 12 covers seeing new code work before the upgrade.
+- **Programs are upgraded in place.** Layout changes use independent account versions and reserved bytes, as DF1's have: store states are version 1, DF1 link markers version 1 and feeds version 1. As with DF1, upgrading the store upgrades the program customers read from; decision 12 covers seeing new code work before the upgrade.
 - **Measured at F=5 (the mainnet DON), no lookup table:** a V1 transaction carries 40 store-only or 25 DF1-backed reports.
 
 ## 2. Phase IDs: none
@@ -158,7 +158,7 @@ A client library offers the same rescale for programs that decode the feed accou
 
 **Landed.**
 
-- **Freeze reads, not writes.** A flag in the feed makes reads and the client library refuse the feed, while rounds keep being written.
+- **Freeze reads, not writes.** A flag in the feed makes round reads, `decimals` and `description` refuse the feed, while rounds keep being written. `get_min_decimals` does not check the freeze and returns `NoDataPresent` for an unset feed.
   - This matches Stellar's `set_feed_frozen` and disconnecting an EVM aggregator proxy from the store.
   - Programs that decode the account themselves are expected to check the flag.
 - **Freeze writes, not reads.** A flag in the feed skips the feed's reports for every workflow, whether on the default list or the feed's own list. Reads keep serving the last round.
@@ -233,4 +233,4 @@ The proxy considered here is one that owns the feed accounts customers read, wit
 - **A proxy switches every feed at once too.** Switching feed by feed would need a writer per feed, which costs accounts in every report.
 - **The settings would sit in the proxy.** Per-feed settings would have to live in the proxy's feed accounts, so a replacement store would either share their layout or need a migration, which undercuts the clean swap a proxy promises.
 - **A proxy has standing costs:** a second program to audit and upgrade in step, one more call on every write, and about two fewer DF1-backed reports per V1 transaction (estimated). Reads gain no call, because readers would read the proxy's accounts directly.
-- **The loader upgrade path is tested:** the end-to-end test upgrades the current binary in place and checks that current-layout feeds keep their history and keep taking rounds, DF1 writes included. It does not test old-layout migration. Version 1 feeds are not migrated: the version 2 layout requires a new store and newly created version 2 feeds. Staging's devnet program was also upgraded in place, keeping its program ID and the zones' forwarder addresses; that upgrade is not evidence of version 1 feed compatibility.
+- **The loader upgrade path is tested:** the end-to-end test upgrades the current binary in place and checks that current-layout feeds keep their history and keep taking rounds, DF1 writes included. It does not test old-layout migration. Development-era accounts are not migrated: fresh stores and feeds use the initial public version 1 layout. Staging's devnet program was also upgraded in place, keeping its program ID and the zones' forwarder addresses; that upgrade is not evidence of old-layout compatibility.

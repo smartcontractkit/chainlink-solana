@@ -493,9 +493,8 @@ type Feed struct {
 	// The layout version of this account, set to `FEED_ACCOUNT_VERSION`.
 	Version uint8 `json:"version"`
 
-	// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
-	// reads then fail, while the description and decimals stay readable and new reports are
-	// still stored.
+	// Non-zero while reads are frozen. `latest_round`, `get_round`, `decimals` and `description`
+	// then fail, while `get_min_decimals` stays readable and new reports are still stored.
 	Frozen uint8 `json:"frozen"`
 
 	// The fewest decimals a read may ask for. New feeds start at 18.
@@ -535,9 +534,8 @@ type Feed struct {
 	// The latest round ID. It is 0 until the first round is stored.
 	RoundId uint64 `json:"round_id"`
 
-	// Always zero. These bytes are kept free for SVR: the EVM store keeps the newest round
-	// released to non-SVR readers here (`visibleRoundId`), so SVR can be added without moving the
-	// fields below.
+	// Always zero. These bytes are reserved for a future visible-round field, so SVR can be
+	// added without moving the fields below.
 	Reserved0 [8]uint8 `json:"_reserved0"`
 
 	// How many rounds the ring after this header holds.
@@ -994,7 +992,7 @@ func UnmarshalFeedDescriptionSet(buf []byte) (*FeedDescriptionSet, error) {
 	return obj, nil
 }
 
-// Round reads of a feed were frozen or unfrozen.
+// Round, decimals and description reads of a feed were frozen or unfrozen.
 type FeedFrozenSet struct {
 	// The store state account the event is about.
 	State solanago.PublicKey `json:"state"`
@@ -1002,7 +1000,7 @@ type FeedFrozenSet struct {
 	// The data ID of the feed concerned.
 	DataId [16]uint8 `json:"data_id"`
 
-	// True if round reads are now frozen, false if they were unfrozen.
+	// True if round, decimals and description reads are now frozen, false if they were unfrozen.
 	Frozen bool `json:"frozen"`
 }
 
@@ -2790,8 +2788,7 @@ type StoreState struct {
 	// report stamped further ahead is skipped with `FutureReportIgnored`. If it were stored, it
 	// would become the feed's latest round, and every later report carrying the correct time would
 	// be skipped as stale until the clock caught up. The limit is a window rather than "not after
-	// now" because the DON's clocks and the chain's clock drift slightly apart. EVM has the same
-	// setting.
+	// now" because the DON's clocks and the chain's clock drift slightly apart.
 	MaxObservationForwardSecs uint32 `json:"max_observation_forward_secs"`
 
 	// How many rounds each feed this store creates keeps, which is the size of its ring.

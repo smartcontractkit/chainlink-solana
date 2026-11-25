@@ -124,7 +124,7 @@ That's a ring of 4 after 8 rounds: round `r` is in slot `r mod 4`.
 
 - **The header** holds the latest round and answer, the description, how the feed is read (minimum decimals, the read freeze) and how it's written (its own workflow list, answer bounds, the write freeze, the DF1 link). Timestamps are u64 Unix seconds.
 - **The ring** keeps the last N rounds, 48 bytes each. Round `r` goes in slot `r mod N`, so once the ring is full, each new round overwrites the oldest. A read of an overwritten round fails with `NoDataPresent`.
-- **The layout is public.** Readers may decode the account themselves, so fields never move without a version bump, and spare bytes are reserved for later fields. Store states and link markers use version 1; feeds use version 2. Version 1 feeds are not migrated: this layout requires a new store and newly created version 2 feeds.
+- **The layout is public.** Readers may decode the account themselves, so fields never move without a version bump, and spare bytes are reserved for later fields. Store states, link markers and feeds all use version 1. This is the initial public layout; development-era accounts are abandoned and recreated rather than migrated.
 - **It's created by a feed admin, who pays its rent:** about 0.01 SOL plus about 0.00033 SOL per round kept, so about 0.07 SOL for the largest default ring of 185 rounds.
 
 **`Df1Link`: a small marker, one per linked DF1 feed.** It records which data ID links that DF1 feed, so no two data IDs can link the same one.
@@ -176,22 +176,25 @@ A customer's program can read a feed in two ways, and both give the same answer.
 
 A round read checks, in this order (the same as Stellar):
 
-1. **The read freeze** is off, else `FeedFrozen`.
-2. **The decimals** are between the feed's minimum and 18, else `InvalidDecimals`.
+1. **The decimals** are between the feed's minimum and 18, else `InvalidDecimals`.
+2. **The read freeze** is off, else `FeedFrozen`.
 3. **The round exists** and is still in the ring, else `NoDataPresent`.
 4. **A non-zero answer doesn't come out as zero** at those decimals, else `RoundsToZero`. A reader should never mistake a tiny price for no price.
 
 Answers are stored with 18 decimals and scaled down by dividing, which truncates toward zero. The scaling code is `logic::scale`.
 
+`decimals` and `description` also check the freeze. `get_min_decimals` does not, but all three return `NoDataPresent` for an unset feed.
+
 The result comes back as Solana _return data_, a small buffer a called program leaves for its caller (the equivalent of a Solidity return value).
 
-**Decode the feed account directly.** Because a feed account's layout is public, a customer's program can read it in place with no call at all, which is cheaper. The client crate (`contracts/crates/chainlink-solana-data-feeds-store`) does this in `read_latest_round` and `read_round`, and in `read_decimals`, `read_description` and `read_min_decimals` for the other reads. Before trusting the bytes, every one of them checks that:
+**Decode the feed account directly.** Because a feed account's layout is public, a customer's program can read it in place with no call at all, which is cheaper. The client crate (`contracts/crates/chainlink-solana-data-feeds-store`) does this in `read_latest_round` and `read_round`, and in `read_decimals`, `read_description` and `read_min_decimals` for the other reads. For an uninitialized account it checks the feed PDA, returning `NoDataPresent` for the canonical missing feed and `AccountMismatch` for a wrong empty address. For an existing feed it checks that:
 
 - the account is owned by the store program;
 - it has the feed type tag and version;
-- it belongs to the store and data ID the caller expects.
+- it belongs to the store and data ID the caller expects;
+- its data is long enough for the ring its header claims.
 
-The checks are the same for every read, because a reader given another feed's account would otherwise get that feed's price or description without noticing. The round reads then run the same freeze, decimals and scaling checks as the program, using the same code. The crate also wraps the call route for each read (`latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals`). These functions:
+Valid feeds can only be created at their canonical PDA, so existing-feed reads rely on that creation invariant rather than recomputing the address. These checks prevent a reader given another feed's account from getting its price or description without noticing. The round reads then run the same freeze, decimals and scaling checks as the program, using the same code. The crate also wraps the call route for each read (`latest_round`, `get_round`, `decimals`, `description` and `get_min_decimals`). These functions:
 
 - take the store state the caller trusts and refuse any other;
 - accept the answer only if the store program returned it.
@@ -222,7 +225,7 @@ Many of the program's checks and patterns, which a Solidity reader may not expec
 
 There are four layers, from fastest to most realistic. Commands run from `contracts/`.
 
-- **Rust unit tests** sit at the bottom of the files they test, in a `mod tests` block (`logic.rs`, `df1.rs`, `data_id.rs`, `event.rs`, and the client crate). There are 31 across the program and client crate. They check the pure pieces: the ring, ordering and bounds, scaling, DF1 layout, answer and timestamp checks, and that events encode the way indexers expect. Run with `cargo test`.
+- **Rust unit tests** sit at the bottom of the files they test, in a `mod tests` block (`logic.rs`, `df1.rs`, `data_id.rs`, `event.rs`, and the client crate). There are 33 across the program and client crate. They check the pure pieces: the ring, ordering and bounds, scaling, DF1 layout, answer and timestamp checks, and that events encode the way indexers expect. Run with `cargo test`.
 - **Property tests**, in `mod properties` inside `logic.rs` and `df1.rs`, generate thousands of random cases and compare the code with a simple model:
 
   - the ring serves exactly the last rounds, and growing before a wrap loses none;
@@ -231,17 +234,17 @@ There are four layers, from fastest to most realistic. Commands run from `contra
 
   They run with `cargo test` too.
 
-- **The Anchor spec** (`tests/data-feeds-store.spec.ts`, 27 tests) deploys the program to a local Solana node and drives it from TypeScript:
+- **The Anchor spec** (`tests/data-feeds-store.spec.ts`, 30 tests) deploys the program to a local Solana node and drives it from TypeScript:
 
-  - every instruction and who may call it;
+  - a broad set of instructions and their callers;
   - skips and aborts, with the events decoded;
   - both freezes and decimals;
   - DF1 cutover and rollback against the real DF1 program;
   - 25 seeded random batches checked event by event against a model of the report path.
 
-  `anchor test` runs it.
+  `anchor test` runs it. `../scripts/test-data-feeds-store-wrong-versions.sh` runs three additional specs with preloaded wrong-version state, feed and link-marker accounts.
 
-- **The Go end-to-end test** (`gotests/data_feeds_store_test.go`) runs a real keystone forwarder with real DON-style signatures at F=2 and F=5, as in staging and mainnet. It checks every transaction stays within the 64-account limit and V1's 4,096 bytes, measures transaction size and compute, and performs an in-place loader upgrade of the current binary. It does not test old-layout migration or version 1 feed compatibility. It needs Docker.
+- **The Go end-to-end test** (`gotests/data_feeds_store_test.go`) runs a real keystone forwarder with real DON-style signatures at F=2 and F=5, as in staging and mainnet. It checks every transaction stays within the 64-account limit and V1's 4,096 bytes, measures transaction size and compute, and performs an in-place loader upgrade of the current binary. It does not test old-layout migration or compatibility with development-era accounts. It needs Docker.
 
 The workflow has 76 focused Solana tests and 773 full workflow tests. Its report encoder uses u64 timestamps restricted to non-negative JavaScript safe integers, and feed decoding rejects timestamps above that safe range.
 
@@ -280,7 +283,7 @@ If you read one test file, make it the Anchor spec: its test names read like a l
 - **Cutover:** switching a DF1 feed from OCR2 to the store, by making the store's DF1 writer PDA its writer.
 - **Link marker:** the small account recording which data ID links a DF1 feed.
 - **Ring:** a feed's history, the last N rounds in a circular buffer.
-- **Read freeze / write freeze:** per-feed switches that stop round reads, or stop writes, while the other carries on.
+- **Read freeze / write freeze:** per-feed switches that stop round, decimals and description reads, or stop writes, while the other carries on. `get_min_decimals` stays readable during a read freeze.
 - **Skip event:** an event saying why one report in a batch wasn't stored, while the rest still land.
 - **MCMS:** the multisig and timelock that holds every privileged role on mainnet.
 

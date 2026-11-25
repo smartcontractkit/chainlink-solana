@@ -67,9 +67,10 @@ pub enum StoreError {
     /// `set_min_max_answers` was given a minimum answer larger than the maximum.
     #[msg("The minimum answer must not exceed the maximum")]
     InvalidMinMaxRange,
-    /// The requested round doesn't exist. The feed has no round yet, the round ID is 0 or later
-    /// than the latest, or the round has been overwritten in the ring.
-    #[msg("The round doesn't exist or is no longer stored")]
+    /// The feed or requested round doesn't exist. The feed has not been created or has no round
+    /// yet, the round ID is 0 or later than the latest, or the round has been overwritten in the
+    /// ring.
+    #[msg("The feed or requested round doesn't exist or is no longer stored")]
     NoDataPresent,
     /// A description is longer than 64 UTF-8 bytes.
     #[msg("A description can be at most 64 bytes")]
@@ -112,8 +113,8 @@ pub enum StoreError {
     /// decimals reads it.
     #[msg("A non-zero answer rounds to zero at the requested decimals")]
     RoundsToZero,
-    /// A feed admin has frozen round reads of the feed.
-    #[msg("Round reads of this feed are frozen")]
+    /// A feed admin has frozen round, decimals and description reads of the feed.
+    #[msg("Round, decimals and description reads of this feed are frozen")]
     FeedFrozen,
     /// The DF1 feed is already linked from another data ID. Unlink it there first, in an earlier
     /// call or earlier in the same call.

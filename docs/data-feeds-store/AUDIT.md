@@ -7,7 +7,7 @@ This brief is for the internal review, then the external audit. It says what the
 - the program: chainlink-solana [#1676](https://github.com/smartcontractkit/chainlink-solana/pull/1676);
 - the deployment changesets: chainlink-data-feeds [#291](https://github.com/smartcontractkit/chainlink-data-feeds/pull/291);
 - the workflow's Solana adapter: chainlink-data-feeds [#290](https://github.com/smartcontractkit/chainlink-data-feeds/pull/290);
-- the u64 and feed-v2 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
+- the u64 and initial-v1 workflow/deployment follow-up: chainlink-data-feeds [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 The program already runs on DF CRE staging against Solana devnet. §12 has the evidence, with explorer links.
 
@@ -22,6 +22,8 @@ In scope, in `smartcontractkit/chainlink-solana` (Anchor 0.31), on PR [#1676](ht
 - `programs/data-feeds-store` (about 3,500 lines with tests, new), program ID `9qCsUGTdKCanybkroJuPzAhuRU8P2SZN4NCexevSZAwu`.
 - `crates/chainlink-solana-data-feeds-store` (about 590 lines with tests), the client crate for programs that read feeds.
 - `crates/arrayvec/src/lib.rs`, the unchanged production macro that implements the store's feed-admin and workflow lists. Its length, capacity, insertion, removal and slicing behavior is in scope because the program instantiates it directly.
+
+The tracked `contracts/generated/data_feeds_store` bindings are customer-facing artifacts regenerated from the IDL and checked for synchronization, not independent production source files.
 
 DF1 (`programs/store`) is unchanged and out of scope, except for what the store assumes about it (§5). Also out of scope: the keystone forwarder (audited separately; what we rely on is in §2), CRE nodes and the workflow, and the deployment changesets, which drive the owner and feed admin instructions.
 
@@ -118,22 +120,22 @@ The checks read DF1's layout at fixed offsets (reference §5), so a DF1 upgrade 
 - **Owner:** two-step ownership transfer, feed admins (up to 64), token and SOL recovery from the store authority PDA.
 - **Feed admins** create feeds and change every per-feed setting (README "Feed settings"). They also set the default workflow list (up to 16 entries) and the forward window. Unlike on EVM, where the default list can only be replaced, it can be emptied, which revokes a compromised default workflow without naming a replacement. Every per-feed setter but `remove_specific_feed_metadata` creates missing feeds, checking each address is the feed PDA, with the feed admin paying.
 - **Ring size** only grows, and only before the ring has wrapped (`MaxStoredReportsLocked` after). Solana lets an account grow by at most 10 KiB per instruction, so each change adds at most 213 rounds. Inside an MCMS batch, the runtime counts that limit for the whole batch, which the program can't see, so a batch should grow each feed once.
-- **Upgrades.** The program is upgradeable at a fixed address. Store state, DF1 link and feed layouts have independent versions: `STORE_STATE_VERSION = 1`, `DF1_LINK_VERSION = 1` and `FEED_ACCOUNT_VERSION = 2`. Every account carries its version, checked on load, so an incompatible layout requires explicit migration or replacement accounts. Readers decode the feed layout, so its fields move only with a version bump, and spare bytes are kept for later fields such as SVR's. Version 1 feeds are not migrated: the version 2 layout requires a new store and newly created version 2 feeds. New code runs first as a shadow deployment under a second program ID, then the main program is upgraded to that same verified build (README "Releasing a new build").
+- **Upgrades.** The program is upgradeable at a fixed address. Store state, DF1 link and feed layouts have independent versions: `STORE_STATE_VERSION = 1`, `DF1_LINK_VERSION = 1` and `FEED_ACCOUNT_VERSION = 1`. Every account carries its version, checked on load, so an incompatible future layout requires explicit migration or replacement accounts. Readers decode the feed layout, so its fields move only with a version bump, and spare bytes are kept for later fields such as SVR's. The current layout is the initial public version 1; development-era accounts are abandoned and recreated rather than migrated. New code runs first as a shadow deployment under a second program ID, then the main program is upgraded to that same verified build (README "Releasing a new build").
 
 ## 7. Reads
 
-`latest_round(data_id, decimals)` and `get_round(data_id, round_id, decimals)` return `Round { round_id, answer, observations_timestamp, recorded_timestamp }` at the decimals the caller asks for, as Stellar's reads do (EVM returns a fixed number of decimals). When several checks fail, the first in this order decides the error, as on Stellar:
+`latest_round(data_id, decimals)` and `get_round(data_id, round_id, decimals)` return `Round { round_id, answer, observations_timestamp, recorded_timestamp }` at the decimals the caller asks for, as Stellar's reads do. EVM's normal aggregator-proxy reads use the proxy's configured decimals; its access-controlled direct functions also accept a decimals argument. When several checks fail, the first in this order decides the error, as on Stellar:
 
-1. `FeedFrozen` while the read freeze is set;
-2. `InvalidDecimals` below the feed's minimum (18 until lowered) or above 18;
+1. `InvalidDecimals` below the feed's minimum (18 until lowered) or above 18;
+2. `FeedFrozen` while the read freeze is set;
 3. `NoDataPresent` for a round never written or no longer in the ring;
 4. `RoundsToZero` when a non-zero answer would read as zero.
 
-`decimals`, `description` and `get_min_decimals` complete the feed reads.
+`decimals` and `description` also refuse a frozen feed; `get_min_decimals` does not check the freeze. With otherwise valid arguments, a correctly derived but uninitialized feed returns `NoDataPresent` for all of these reads. For round reads, decimals are validated first against the default minimum of 18, so invalid decimals return `InvalidDecimals`. A wrong empty feed address returns `AccountMismatch` before that validation.
 
 `check_feed_permission` takes the data ID's feed account (required) and answers from the feed's own list, or the default list when it has none. It answers false for a feed that isn't set. Like the EVM function it mirrors, it ignores the write freeze, which EVM doesn't have.
 
-The client crate offers each of these reads except `check_feed_permission` two ways: by calling the store, or by decoding the feed account in the caller's program (`read_latest_round` and so on). Every function checks that the account is a feed of the store program for the store state and data ID the caller trusts, and the round reads apply the program's own checks and rescaling. A caller that decodes without the crate must make the same checks.
+The client crate offers each of these reads except `check_feed_permission` two ways: by calling the store, or by decoding the feed account in the caller's program (`read_latest_round` and so on). For an uninitialized account it checks the feed PDA; for an existing feed it checks the store-program owner, discriminator, version, store state, data ID and ring length. Valid feeds can only be created at their canonical PDA, so existing-feed reads rely on that creation invariant rather than recomputing the address. The round reads apply the program's own checks and rescaling. A caller that decodes without the crate must make the same checks.
 
 ## 8. Invariants
 
@@ -172,17 +174,13 @@ The client crate offers each of these reads except `check_feed_permission` two w
 
 **Tested.**
 
-- **31 Rust unit and property tests** check the pure pieces against simple models: the ring, ordering and answer bounds, ring growth, rescaling, DF1 layout, answer and timestamp checks, and that the DF1 layout check accepts exactly the accounts DF1's `submit` can write. The client crate's tests check each way a decoded feed is refused.
-- **27 Anchor specs** run every instruction on a local validator, including permissions, both freezes, ring growth, read-only aborts, DF1 zero truncation and closed-feed disabling, DF1 cutover and rollback against the unchanged DF1 program, and 25 random batches checked event by event against a model.
+- **33 Rust unit and property tests** check the pure pieces against simple models: the ring, ordering and answer bounds, ring growth, rescaling, DF1 layout, answer and timestamp checks, and that the DF1 layout check accepts exactly the accounts DF1's `submit` can write. The client crate's tests check each way a decoded feed is refused.
+- **30 main Anchor specs** exercise the store's read, write, admin and DF1 paths on a local validator, including permissions, ownership transfer and recovery, both freezes, ring growth, read-only aborts, DF1 zero truncation and closed-feed disabling, DF1 cutover and rollback against the unchanged DF1 program, and 25 random batches checked event by event against a model. **Three additional wrong-version specs** exercise state, feed and link-marker version rejection through read and admin instructions.
 - **The Go end-to-end test** sends reports through a real forwarder at F=2 and F=5, checks every transaction fits the account and size limits, and performs an in-place loader upgrade of the current binary mid-test.
 - **Workflow tests:** 76 focused Solana tests and 773 full workflow tests pass. Report encoding uses u64 timestamps restricted to non-negative JavaScript safe integers, and feed decoding rejects timestamps above that safe range.
 - **DF CRE staging on devnet:** both zones write the store and, through it, DF1 (§12).
 
-**Gaps and compatibility boundaries.** We suggest closing the first two test gaps before the external audit, since auditors will ask about them. The third item is the current upgrade boundary, not a claim of old-layout support.
-
-- **Ownership transfer, token and SOL recovery, and clearing answer bounds** aren't run end to end on a validator yet.
-- **Refusing an account with the wrong version in program instructions.** The Anchor accounts are created by the program at the current version. The reader crate unit-tests version rejection, but the on-chain instruction paths do not exercise hand-made accounts with another version.
-- **Old-layout migration.** The Go test's in-place loader upgrade uses the current binary and proves neither migration nor version 1 feed compatibility. Version 1 feeds are not migrated; the version 2 layout requires a new store and newly created version 2 feeds.
+**Coverage and compatibility boundaries.** The expanded Anchor suites cover ownership transfer, token and SOL recovery, clearing answer bounds, and wrong-version rejection through read and admin instructions. Old-layout migration remains intentionally unsupported: the Go test's in-place loader upgrade uses the current binary and does not prove old-layout migration or compatibility with development-era accounts. Development-era accounts are not migrated; fresh stores and feeds use the initial public version 1 layout.
 
 **Findings and exit.** One PR per finding. Severity runs:
 
@@ -200,22 +198,21 @@ The internal review exits when:
 
 ## 12. Running on DF CRE staging
 
-Since 2026-11-18, both DF CRE staging zones write the store on Solana devnet, and through it DF1, along the same path mainnet will use: each zone's DON (F=2) signs the report, that zone's forwarder delivers it, and the store keeps the round and calls DF1's `submit`. This staging evidence does not demonstrate version 1 feed compatibility with the version 2 layout; version 1 feeds are not migrated.
+Since 2026-11-25, both DF CRE staging zones write the initial public version 1 store on Solana devnet, and through it DF1, along the same path mainnet will use: each zone's DON (F=2) signs the report, that zone's forwarder delivers it, and the store keeps the round and calls DF1's `submit`. Development-era accounts are not read; the current store and feeds were created with the version 1 layout.
 
-**What was deployed.**
+**What is deployed.**
 
-- The store program [`J6Xc…`](https://explorer.solana.com/address/J6XcUrbL3pwKgv6Lryfi24QREkueGq7WDaniJJ2Ymsrj?cluster=devnet), upgraded in place to #1676 at `a4d8ef4f`.
-- A store at [state `CQWU…`](https://explorer.solana.com/address/CQWU4ya5YaqDDoDwCVqyQMqyuJX1HwbrvrBcapSQwV99?cluster=devnet), whose DF1 program is Chainlink's devnet DF1 [`HEvS…`](https://explorer.solana.com/address/HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny?cluster=devnet) and whose default workflow list holds both zones' workflows.
-- BTC/USD: store feed [`6YZ2…`](https://explorer.solana.com/address/6YZ2MCP4mTCiJmwtPGFE3n7fTKc2WyBwKLt3im931yER?cluster=devnet), linked to the DF1 feed [`CcKr…`](https://explorer.solana.com/address/CcKr6frHVWyFbN3bgxPFziUszEfreS2VHB3vWuehpjER?cluster=devnet) (8 decimals, one live round as on mainnet), whose writer is the store's [`df1_writer`](https://explorer.solana.com/address/3W8RwxvS1266dNcRYmUYeX3FXwZ8JUvwX5Pxo8qsA7LE?cluster=devnet).
-- ETH/USD: store feed [`Dpz3…`](https://explorer.solana.com/address/Dpz38ZtuMdQVbPeJ5j1uq8zd46jX52hFaxCT7Fw4BBHH?cluster=devnet), linked to the DF1 feed [`468e…`](https://explorer.solana.com/address/468enw9SksE8Vyh3f8k9cC7dNKHqPkCcB1SBX4THyfma?cluster=devnet), with the same writer.
-- The forwarders: zone-a [`DtLX…`](https://explorer.solana.com/address/DtLXqEtnSHebkaZJAMcT4viTg2crdXtKsDMqEUjfxWqf?cluster=devnet) and zone-b [`9muo…`](https://explorer.solana.com/address/9muoNeMxYaRVQTgEEpzfpuAo7AD73gvLaZF9QHr4skuN?cluster=devnet), each running the workflow from #290.
+- The store program [`J6Xc…`](https://explorer.solana.com/address/J6XcUrbL3pwKgv6Lryfi24QREkueGq7WDaniJJ2Ymsrj?cluster=devnet), upgraded in place to the final review build at slot 526,071,392 ([upgrade transaction](https://explorer.solana.com/tx/49KJhSXFi6qWw7seNij7VzS4GX2yqRSFMKWaJ1cMEFSYoukFF8Riea7HTBW7Q9T6v97jocMkCntSZNtEHjKkRb1H?cluster=devnet)).
+- Store ID 2 at [state `7jK7…`](https://explorer.solana.com/address/7jK75uobDCDnkNhdT7Niu9uahnU5RHh7DaJi56a8gMku?cluster=devnet), whose DF1 program is Chainlink's devnet DF1 [`HEvS…`](https://explorer.solana.com/address/HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny?cluster=devnet) and whose default workflow list holds both zones' workflows.
+- BTC/USD: version 1 store feed [`F617…`](https://explorer.solana.com/address/F617SLfbzMBrXHt97QWiU9znurUKN9kMWiknQrMy7Qdi?cluster=devnet), linked to the existing DF1 feed [`CcKr…`](https://explorer.solana.com/address/CcKr6frHVWyFbN3bgxPFziUszEfreS2VHB3vWuehpjER?cluster=devnet) (8 decimals, one live round as on mainnet), whose writer is the store's [`df1_writer`](https://explorer.solana.com/address/Dca1a6Dg7qHRyuppbzpUHgrKkRsJKMPqZ4s4F44b2cv4?cluster=devnet).
+- ETH/USD: version 1 store feed [`Gmbr…`](https://explorer.solana.com/address/GmbrzU2MRKicjnvuYU3BH9DfgzSnYfCXVctvv8xnkmSH?cluster=devnet), linked to the existing DF1 feed [`468e…`](https://explorer.solana.com/address/468enw9SksE8Vyh3f8k9cC7dNKHqPkCcB1SBX4THyfma?cluster=devnet), with the same writer.
+- The forwarders: zone-a [`DtLX…`](https://explorer.solana.com/address/DtLXqEtnSHebkaZJAMcT4viTg2crdXtKsDMqEUjfxWqf?cluster=devnet) and zone-b [`9muo…`](https://explorer.solana.com/address/9muoNeMxYaRVQTgEEpzfpuAo7AD73gvLaZF9QHr4skuN?cluster=devnet), each running the workflow from [#377](https://github.com/smartcontractkit/chainlink-data-feeds/pull/377).
 
 **What it showed.**
 
-- Every round reached both copies: each store round was also a new DF1 round.
-- DF1 customers' reader, `read_feed_v2` from the `chainlink_solana` crate, decodes both DF1 feeds, and its BTC/USD answer is the store's answer at 8 decimals.
-- No transaction failed in either zone.
-- A round stored and written to DF1 costs about 141–146k compute units, forwarder included. In zone-b's [BTC/USD round](https://explorer.solana.com/tx/5v4jx65qgwN4Rq2VyzmMQ9aDBPQHeCivMHQh4DCfXcyYdM5VoESi1kTL3oohdQWqVZcNu9AQSn8xUFTwVMD85Zkv?cluster=devnet), the trace shows the forwarder calling the store and the store calling DF1's `submit`.
-- The other zone's copy of the same round is skipped as stale, as designed, at about 134–138k ([zone-a's copy](https://explorer.solana.com/tx/2vLrMDGkyvvTJcBaUQ6DumE2EjTwUE9ikwYTRGsw84wF3HVcDUE14rGxMitZogDrPBCodh5Vo5r8a6sh7ZseyDTg?cluster=devnet)).
+- Zone-b's [BTC/USD round 2](https://explorer.solana.com/tx/2PZ5HtQCdMJ2EA5mLu3f57EdFonbpZANSWAAuenakiqPSN4FvVJecFTCgv525qUXCUbeMKjgjND2ojBTHmcAAWW?cluster=devnet) and zone-a's [ETH/USD round 2](https://explorer.solana.com/tx/4RtBmqNYfAMoZdc5BDVbGcWdnMiMaYKdbfna8vBP95eDdCLHjw871rdsaLVv3xgpbLwX9zwiRVAnvAFGrVZKrsfQ?cluster=devnet) both emitted `FeedUpdated` with no DF1 skip. Zone-a also wrote [BTC/USD round 3](https://explorer.solana.com/tx/bXkVexBRYsqzmEU339o7P83jPzkP6qps2DNHFb6Hqv4vRMUU4MUjTGmHTEf46XuTKc6XpUKmkSJy3p4XjkRskZG?cluster=devnet). The other zone's copy of the same observation is skipped as stale, as designed.
+- At store round 2, both feeds had observation timestamp `1795591528`. BTC/USD advanced to DF1 round 1,745 with answer `5895684224091`; ETH/USD advanced to DF1 round 1,773 with answer `165211482003`. Those are the store's answers `58956842240910050000000` and `1652114820035000000000` rescaled from 18 to 8 decimals, with the same observation timestamp.
+- Public `latest_round` and `get_round` returned the same single `Round` struct as direct account decoding, including the full u64 observation and recorded timestamps. `decimals` returned 18, `description` returned each feed's description and `get_min_decimals` returned 18.
+- A round stored and written to DF1 costs about 141–143k compute units, forwarder included. The linked traces show the forwarder calling the store and the store calling DF1's `submit`.
 
 **In progress:** the staging run continues, writing both feeds every round.

@@ -1,7 +1,7 @@
 //! Feed admin instructions that change feeds. Their remaining accounts are the feed PDAs of the
 //! data IDs, in the same order. A feed that doesn't exist yet is created first, and the feed admin
-//! pays its rent. On Solana a feed admin creates feeds, as on Aptos and Stellar, because the
-//! forwarder passes no account that could pay for a new one.
+//! pays its rent. On Solana a feed admin creates feeds because the forwarder passes no account
+//! that could pay for a new one.
 
 use std::mem::size_of;
 
@@ -308,8 +308,8 @@ pub fn set_feed_writes_disabled<'info>(
     )
 }
 
-/// Freezes or unfreezes round reads of feeds. While a feed is frozen, `latest_round` and
-/// `get_round` fail, its description and decimals stay readable, and its reports are still
+/// Freezes or unfreezes reads of feeds. While a feed is frozen, `latest_round`, `get_round`,
+/// `decimals` and `description` fail, `get_min_decimals` stays readable, and reports are still
 /// stored.
 pub fn set_feed_frozen<'info>(
     ctx: Context<'_, '_, 'info, 'info, FeedAdminAccounts<'info>>,

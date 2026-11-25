@@ -3,7 +3,9 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::common::{DF1_WRITER_SEED, STATE_SEED, STORE_AUTHORITY_SEED, STORE_STATE_VERSION};
 use crate::error::StoreError;
-use crate::state::{Feed, StoreState};
+#[cfg(feature = "idl-build")]
+use crate::state::Feed;
+use crate::state::StoreState;
 
 // Every context that changes state emits CPI events. `#[event_cpi]` adds the event authority PDA
 // and this program as the context's last two accounts. Every context except `Initialize` checks
@@ -138,8 +140,15 @@ pub struct FeedRead<'info> {
     #[account(constraint = state.load()?.version == STORE_STATE_VERSION @ StoreError::InvalidAccountVersion)]
     pub state: AccountLoader<'info, StoreState>,
 
-    /// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+    // Anchor includes typed accounts in the IDL. Keep that public type for IDL builds, while
+    // runtime reads use an unchecked account so an uninitialized feed reaches the handler.
+    /// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+    /// returning `NoDataPresent` for a correctly derived but uninitialized feed.
+    #[cfg(feature = "idl-build")]
     pub feed: AccountLoader<'info, Feed>,
+    /// CHECK: The handler checks the feed's owner, layout, state and data ID.
+    #[cfg(not(feature = "idl-build"))]
+    pub feed: UncheckedAccount<'info>,
 }
 
 /// The accounts of `check_feed_permission`.

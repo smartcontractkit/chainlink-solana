@@ -121,6 +121,13 @@ pub fn feed_address(state: &Pubkey, data_id: &[u8; 16]) -> (Pubkey, u8) {
     )
 }
 
+/// Checks that `info` is at the data ID's feed PDA in `state`.
+pub fn validate_feed_address(info: &AccountInfo, state: &Pubkey, data_id: &[u8; 16]) -> Result<()> {
+    let (address, _) = feed_address(state, data_id);
+    require_keys_eq!(address, *info.key, StoreError::AccountMismatch);
+    Ok(())
+}
+
 /// Returns the address of a DF1 feed's link marker in a store, together with the PDA's bump.
 pub fn df1_link_address(state: &Pubkey, df1_feed: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
@@ -345,7 +352,7 @@ pub fn validate_workflows(workflow_metadata: &[WorkflowMetadata]) -> Result<()> 
 }
 
 /// Refuses a workflow entry whose sender is the default key, or whose workflow owner or name is
-/// all zeros. EVM refuses the same entries.
+/// all zeros.
 pub fn validate_workflow_metadata(metadata: &WorkflowMetadata) -> Result<()> {
     require_keys_neq!(
         metadata.allowed_sender,

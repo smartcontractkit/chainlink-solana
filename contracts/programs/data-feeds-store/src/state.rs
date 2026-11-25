@@ -35,8 +35,7 @@ pub struct StoreState {
     /// report stamped further ahead is skipped with `FutureReportIgnored`. If it were stored, it
     /// would become the feed's latest round, and every later report carrying the correct time would
     /// be skipped as stale until the clock caught up. The limit is a window rather than "not after
-    /// now" because the DON's clocks and the chain's clock drift slightly apart. EVM has the same
-    /// setting.
+    /// now" because the DON's clocks and the chain's clock drift slightly apart.
     pub max_observation_forward_secs: u32,
     /// How many rounds each feed this store creates keeps, which is the size of its ring.
     pub default_max_stored_reports: u64,
@@ -85,9 +84,8 @@ pub struct StoreState {
 pub struct Feed {
     /// The layout version of this account, set to `FEED_ACCOUNT_VERSION`.
     pub version: u8,
-    /// Non-zero while round reads are frozen. `latest_round`, `get_round` and the client crate's
-    /// reads then fail, while the description and decimals stay readable and new reports are
-    /// still stored.
+    /// Non-zero while reads are frozen. `latest_round`, `get_round`, `decimals` and `description`
+    /// then fail, while `get_min_decimals` stays readable and new reports are still stored.
     pub frozen: u8,
     /// The fewest decimals a read may ask for. New feeds start at 18.
     pub min_decimals: u8,
@@ -115,9 +113,8 @@ pub struct Feed {
     pub state: Pubkey,
     /// The latest round ID. It is 0 until the first round is stored.
     pub round_id: u64,
-    /// Always zero. These bytes are kept free for SVR: the EVM store keeps the newest round
-    /// released to non-SVR readers here (`visibleRoundId`), so SVR can be added without moving the
-    /// fields below.
+    /// Always zero. These bytes are reserved for a future visible-round field, so SVR can be
+    /// added without moving the fields below.
     pub _reserved0: [u8; 8],
     /// How many rounds the ring after this header holds.
     pub max_stored_reports: u64,

@@ -7,6 +7,14 @@ import {
   SystemProgram,
 } from "@solana/web3.js";
 import { assert } from "chai";
+import {
+  createAccount,
+  createMint,
+  getAccount,
+  getOrCreateAssociatedTokenAccount,
+  mintTo,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { randomBytes } from "crypto";
 import { DataFeedsStore } from "../target/types/data_feeds_store";
 import { KeystoneForwarder } from "../target/types/keystone_forwarder";
@@ -81,6 +89,11 @@ describe("data feeds store", function () {
   const df1Writer = () =>
     PublicKey.findProgramAddressSync(
       [Buffer.from("df1_writer"), state.publicKey.toBuffer()],
+      program.programId
+    )[0];
+  const storeAuthority = () =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("store_authority"), state.publicKey.toBuffer()],
       program.programId
     )[0];
   const feedPda = (id: Buffer) =>
@@ -485,6 +498,133 @@ describe("data feeds store", function () {
       );
       assert.isTrue(await check(feedPda(id)), "back to the default");
     });
+
+    it("transfers ownership and recovers native SOL", async () => {
+      const [newOwner] = await newSigners(connection, 1);
+      await program.methods
+        .transferOwnership(newOwner.keypair.publicKey)
+        .accountsStrict({
+          owner: provider.publicKey,
+          state: state.publicKey,
+          ...eventAccounts(),
+        })
+        .rpc();
+      await expectError(
+        program.methods
+          .acceptOwnership()
+          .accountsStrict({
+            newOwner: provider.publicKey,
+            state: state.publicKey,
+            ...eventAccounts(),
+          })
+          .rpc(),
+        "Unauthorized"
+      );
+      await program.methods
+        .acceptOwnership()
+        .accountsStrict({
+          newOwner: newOwner.keypair.publicKey,
+          state: state.publicKey,
+          ...eventAccounts(),
+        })
+        .signers([newOwner.keypair])
+        .rpc();
+      const transferred = await program.account.storeState.fetch(
+        state.publicKey
+      );
+      assert.isTrue(transferred.owner.equals(newOwner.keypair.publicKey));
+      assert.isTrue(transferred.proposedOwner.equals(PublicKey.default));
+
+      const authority = storeAuthority();
+      const recipient = Keypair.generate().publicKey;
+      await provider.sendAndConfirm(
+        new anchor.web3.Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: provider.publicKey,
+            toPubkey: authority,
+            lamports: 2_000_000,
+          })
+        )
+      );
+      await expectError(
+        program.methods
+          .recoverNative(new BN(1_000_000))
+          .accountsStrict({
+            owner: provider.publicKey,
+            state: state.publicKey,
+            storeAuthority: authority,
+            to: recipient,
+            systemProgram: SystemProgram.programId,
+            ...eventAccounts(),
+          })
+          .rpc(),
+        "Unauthorized"
+      );
+      await program.methods
+        .recoverNative(new BN(1_000_000))
+        .accountsStrict({
+          owner: newOwner.keypair.publicKey,
+          state: state.publicKey,
+          storeAuthority: authority,
+          to: recipient,
+          systemProgram: SystemProgram.programId,
+          ...eventAccounts(),
+        })
+        .signers([newOwner.keypair])
+        .rpc();
+      assert.equal(await connection.getBalance(recipient), 1_000_000);
+    });
+
+    it("recovers SPL tokens", async () => {
+      const mint = await createMint(
+        connection,
+        feedAdmin.keypair,
+        feedAdmin.keypair.publicKey,
+        null,
+        0
+      );
+      const from = (
+        await getOrCreateAssociatedTokenAccount(
+          connection,
+          feedAdmin.keypair,
+          mint,
+          storeAuthority(),
+          true
+        )
+      ).address;
+      const to = await createAccount(
+        connection,
+        feedAdmin.keypair,
+        mint,
+        provider.publicKey
+      );
+      await mintTo(
+        connection,
+        feedAdmin.keypair,
+        mint,
+        from,
+        feedAdmin.keypair.publicKey,
+        123
+      );
+      await program.methods
+        .recoverTokens(new BN(100))
+        .accountsStrict({
+          owner: provider.publicKey,
+          state: state.publicKey,
+          storeAuthority: storeAuthority(),
+          from,
+          to,
+          mint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          ...eventAccounts(),
+        })
+        .rpc();
+      assert.equal(
+        (await getAccount(connection, from)).amount.toString(),
+        "23"
+      );
+      assert.equal((await getAccount(connection, to)).amount.toString(), "100");
+    });
   });
 
   describe("reports", function () {
@@ -601,6 +741,22 @@ describe("data feeds store", function () {
       );
       assert.isTrue((await latestAnswer(a)).eq(new BN(1)), "a untouched");
       assert.isTrue((await latestAnswer(b)).eq(new BN(9)), "in range lands");
+
+      await asFeedAdmin(
+        program.methods.setMinMaxAnswers(
+          [Array.from(b)],
+          [new BN("-170141183460469231731687303715884105728")],
+          [new BN("170141183460469231731687303715884105727")]
+        ),
+        [meta(feedPda(b))]
+      );
+      await report([
+        { dataId: b, timestamp: nextTimestamp(), answer: new BN(100) },
+      ]);
+      assert.isTrue(
+        (await latestAnswer(b)).eq(new BN(100)),
+        "clearing the bounds allows the answer"
+      );
     });
 
     it("applies several reports of one feed in a batch in order", async () => {
@@ -672,6 +828,29 @@ describe("data feeds store", function () {
         ]);
       await freeze(true);
       await expectError(readLatest(id), "FeedFrozen");
+      await expectError(
+        program.methods
+          .decimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        "FeedFrozen"
+      );
+      await expectError(
+        program.methods
+          .description(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        "FeedFrozen"
+      );
+      assert.equal(
+        await program.methods
+          .getMinDecimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        18
+      );
+      await expectError(readLatest(id, 7), "InvalidDecimals");
+      await expectError(getRound(id, 1, 7), "InvalidDecimals");
       await report([
         { dataId: id, timestamp: nextTimestamp(), answer: new BN(2) },
       ]);
@@ -792,6 +971,57 @@ describe("data feeds store", function () {
       assert.isTrue((await round(5)).answer.eq(new BN(5)));
       await expectError(round(1), "NoDataPresent");
       await expectError(round(6), "NoDataPresent");
+    });
+
+    it("returns no data for an unset feed, with the expected error order", async () => {
+      const id = newDataId();
+      await expectError(readLatest(id), "NoDataPresent");
+      await expectError(getRound(id, 1), "NoDataPresent");
+      await expectError(
+        program.methods
+          .decimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        "NoDataPresent"
+      );
+      await expectError(
+        program.methods
+          .description(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        "NoDataPresent"
+      );
+      await expectError(
+        program.methods
+          .getMinDecimals(Array.from(id))
+          .accountsStrict(read(id))
+          .view(),
+        "NoDataPresent"
+      );
+      await expectError(readLatest(id, 7), "InvalidDecimals");
+      await expectError(getRound(id, 1, 7), "InvalidDecimals");
+      const wrongFeed = feedPda(newDataId());
+      await expectError(
+        program.methods
+          .latestRound(Array.from(id), 18)
+          .accountsStrict({ ...read(id), feed: wrongFeed })
+          .view(),
+        "AccountMismatch"
+      );
+      await expectError(
+        program.methods
+          .latestRound(Array.from(id), 7)
+          .accountsStrict({ ...read(id), feed: wrongFeed })
+          .view(),
+        "AccountMismatch"
+      );
+      await expectError(
+        program.methods
+          .getRound(Array.from(id), new BN(1), 7)
+          .accountsStrict({ ...read(id), feed: wrongFeed })
+          .view(),
+        "AccountMismatch"
+      );
     });
   });
 

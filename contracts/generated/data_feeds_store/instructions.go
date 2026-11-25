@@ -100,7 +100,7 @@ func NewCheckFeedPermissionInstruction(
 }
 
 // Builds a "decimals" instruction.
-// Returns the number of decimals answers are stored with, which is 18. This is also the most // decimals a read can ask for.
+// Returns the number of decimals answers are stored with, which is 18. This is also the most // decimals a read can ask for. It fails with `NoDataPresent` for an unset feed and // `FeedFrozen` for a frozen one.
 func NewDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -131,7 +131,8 @@ func NewDecimalsInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+		// returning `NoDataPresent` for a correctly derived but uninitialized feed.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -144,7 +145,7 @@ func NewDecimalsInstruction(
 }
 
 // Builds a "description" instruction.
-// Returns the description of a data ID's feed, or an empty string if none is set.
+// Returns the description of a data ID's feed, or an empty string if none is set. It fails // with `NoDataPresent` for an unset feed and `FeedFrozen` for a frozen one.
 func NewDescriptionInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -175,7 +176,8 @@ func NewDescriptionInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+		// returning `NoDataPresent` for a correctly derived but uninitialized feed.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -188,7 +190,7 @@ func NewDescriptionInstruction(
 }
 
 // Builds a "get_min_decimals" instruction.
-// Returns the fewest decimals a read of a data ID may ask for.
+// Returns the fewest decimals a read of a data ID may ask for. It fails with `NoDataPresent` // for an unset feed but does not check the read freeze.
 func NewGetMinDecimalsInstruction(
 	// Params:
 	dataIdParam [16]uint8,
@@ -219,7 +221,8 @@ func NewGetMinDecimalsInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+		// returning `NoDataPresent` for a correctly derived but uninitialized feed.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -275,7 +278,8 @@ func NewGetRoundInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+		// returning `NoDataPresent` for a correctly derived but uninitialized feed.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -390,7 +394,8 @@ func NewLatestRoundInstruction(
 		// Account 0 "state": Read-only, Non-signer, Required
 		accounts__.Append(solanago.NewAccountMeta(stateAccount, false, false))
 		// Account 1 "feed": Read-only, Non-signer, Required
-		// The feed of the data ID. The handler checks that it belongs to this state and this data ID.
+		// The feed of the data ID. The handler checks that it belongs to this state and this data ID,
+		// returning `NoDataPresent` for a correctly derived but uninitialized feed.
 		accounts__.Append(solanago.NewAccountMeta(feedAccount, false, false))
 	}
 
@@ -875,7 +880,7 @@ func NewSetFeedDescriptionsInstruction(
 }
 
 // Builds a "set_feed_frozen" instruction.
-// Freezes or unfreezes round reads of each feed. While a feed is frozen, `latest_round` and // `get_round` fail, but its reports are still stored. The remaining accounts are the feeds, // in data ID order.
+// Freezes or unfreezes reads of each feed. While a feed is frozen, `latest_round`, `get_round`, // `decimals` and `description` fail, `get_min_decimals` stays readable, and reports are still // stored. The remaining accounts are the feeds, in data ID order.
 func NewSetFeedFrozenInstruction(
 	// Params:
 	dataIdsParam [][16]uint8,
